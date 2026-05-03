@@ -1,0 +1,2066 @@
+@page "/plot"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@using System.Globalization
+@using System.Text.Json
+@using GardenPlotWeb.Models
+@inject IJSRuntime JS
+@inject IHttpClientFactory HttpFactory
+
+<PageTitle>Garden Plot</PageTitle>
+
+<div class="d-flex align-items-center mb-2 gap-2 flex-wrap">
+    <h1 class="mb-0 me-2">Garden Plot</h1>
+    @if (currentPlot is not null)
+    {
+        <select class="form-select form-select-sm w-auto" value="@currentPlot.Id"
+                @onchange="OnPlotChanged">
+            @foreach (var p in library.Plots)
+            {
+                <option value="@p.Id">@p.Name (@F(p.WidthFt)' × @F(p.HeightFt)')</option>
+            }
+        </select>
+    }
+    <button class="btn btn-sm btn-outline-success" @onclick="ShowNewPlotDialog">+ New Plot</button>
+    @if (currentPlot is not null && library.Plots.Count > 1)
+    {
+        <button class="btn btn-sm btn-outline-danger" @onclick="DeleteCurrentPlot">Delete Plot</button>
+    }
+    @if (currentPlot is not null)
+    {
+        <span class="text-muted small ms-2">
+            @F(currentPlot.WidthFt) ft × @F(currentPlot.HeightFt) ft &mdash; flat. Pick a tool, then draw or stamp on the plot.
+        </span>
+    }
+</div>
+
+@if (currentPlot is null)
+{
+    <p><em>Loading…</em></p>
+}
+else
+{
+    <div class="plot-toolbar">
+        @foreach (var t in tools)
+        {
+            <button class="btn btn-sm @(currentTool == t.Value ? "btn-primary" : "btn-outline-primary")"
+                    @onclick="() => SetTool(t.Value)">@t.Key</button>
+        }
+        <button class="btn btn-sm btn-outline-danger ms-2" @onclick="DeleteSelected" disabled="@(selectedIds.Count == 0)">Delete</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearAll">Clear All</button>
+        <span class="ms-3 small text-muted">Tool: <strong>@currentTool</strong></span>
+        <span class="zoom-controls ms-3">
+            <span class="small text-muted me-1">Zoom:</span>
+            <button class="btn btn-sm btn-outline-secondary zoom-btn" @onclick="ZoomOut" title="Zoom out (−10%)">−</button>
+            <input type="range" class="zoom-slider" min="@((int)(MinZoom*100))" max="@((int)(MaxZoom*100))" step="5"
+                   value="@((int)Math.Round(zoom * 100))" @oninput="OnZoomSliderInput" />
+            <button class="btn btn-sm btn-outline-secondary zoom-btn" @onclick="ZoomIn" title="Zoom in (+10%)">+</button>
+            <input type="text" class="zoom-input form-control form-control-sm" value="@zoomInputText"
+                   @oninput="OnZoomTextInput" @onkeydown="OnZoomTextKey" @onblur="ApplyZoomFromText" />
+            <button class="btn btn-sm btn-link p-0 ms-1 small" @onclick="ZoomReset" title="Reset zoom">reset</button>
+        </span>
+        <span class="ms-auto d-flex gap-1">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ExportPng" title="Export the plot as a PNG image">PNG</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="PrintPlot" title="Open print preview (use 'Save as PDF' from the print dialog)">Print / PDF</button>
+        </span>
+    </div>
+
+    @if (selectedIds.Count >= 2)
+    {
+        <div class="align-toolbar">
+            <span class="small text-muted me-2">@selectedIds.Count selected</span>
+            <button class="align-btn" title="Align Left" @onclick='() => AlignSelected("left")'>
+                <svg viewBox="0 0 24 24"><line x1="3" y1="2" x2="3" y2="22" stroke="#333" stroke-width="2"/><rect x="4" y="5" width="14" height="4" fill="#5a8a4a"/><rect x="4" y="13" width="9" height="4" fill="#5a8a4a"/></svg>
+            </button>
+            <button class="align-btn" title="Align Right" @onclick='() => AlignSelected("right")'>
+                <svg viewBox="0 0 24 24"><line x1="21" y1="2" x2="21" y2="22" stroke="#333" stroke-width="2"/><rect x="6" y="5" width="14" height="4" fill="#5a8a4a"/><rect x="11" y="13" width="9" height="4" fill="#5a8a4a"/></svg>
+            </button>
+            <button class="align-btn" title="Align Top" @onclick='() => AlignSelected("top")'>
+                <svg viewBox="0 0 24 24"><line x1="2" y1="3" x2="22" y2="3" stroke="#333" stroke-width="2"/><rect x="5" y="4" width="4" height="14" fill="#5a8a4a"/><rect x="13" y="4" width="4" height="9" fill="#5a8a4a"/></svg>
+            </button>
+            <button class="align-btn" title="Align Bottom" @onclick='() => AlignSelected("bottom")'>
+                <svg viewBox="0 0 24 24"><line x1="2" y1="21" x2="22" y2="21" stroke="#333" stroke-width="2"/><rect x="5" y="6" width="4" height="14" fill="#5a8a4a"/><rect x="13" y="11" width="4" height="9" fill="#5a8a4a"/></svg>
+            </button>
+            <span class="align-divider"></span>
+            <button class="align-btn" title="Distribute Horizontally (equal gaps)" disabled="@(selectedIds.Count < 3)" @onclick="() => DistributeSelected(true)">
+                <svg viewBox="0 0 24 24"><rect x="2" y="6" width="4" height="12" fill="#5a8a4a"/><rect x="10" y="6" width="4" height="12" fill="#5a8a4a"/><rect x="18" y="6" width="4" height="12" fill="#5a8a4a"/><line x1="6" y1="12" x2="10" y2="12" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/><line x1="14" y1="12" x2="18" y2="12" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/></svg>
+            </button>
+            <button class="align-btn" title="Distribute Vertically (equal gaps)" disabled="@(selectedIds.Count < 3)" @onclick="() => DistributeSelected(false)">
+                <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="4" fill="#5a8a4a"/><rect x="6" y="10" width="12" height="4" fill="#5a8a4a"/><rect x="6" y="18" width="12" height="4" fill="#5a8a4a"/><line x1="12" y1="6" x2="12" y2="10" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/><line x1="12" y1="14" x2="12" y2="18" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/></svg>
+            </button>
+        </div>
+    }
+
+    <div class="plot-workspace">
+        <aside class="plot-palette">
+            <div class="palette-header">
+                <select class="form-select form-select-sm palette-combobox"
+                        value="@currentCategory"
+                        @onchange="OnCategoryChanged">
+                    @foreach (var cat in System.Enum.GetValues<PaletteCategory>())
+                    {
+                        <option value="@cat">@CategoryLabel(cat)</option>
+                    }
+                </select>
+            </div>
+            <div class="palette-grid">
+                @foreach (var item in PaletteCatalog.For(currentCategory))
+                {
+                    var isActive = selectedItem?.Code == item.Code;
+                    var detail = item.Kind switch
+                    {
+                        PaletteKind.BedKit => $"{item.WidthFt}'×{item.HeightFt}' · {item.Pieces} pcs",
+                        PaletteKind.Plant  => $"spacing {FormatPlantSpacing(item.WidthFt)} · {item.Sunlight} · {item.Water} water",
+                        _                  => $"{item.WidthFt}' Ø · {item.Trait}",
+                    };
+                    <button class="palette-item @(isActive ? "active" : "")"
+                            @onclick="() => SelectItem(item)" title="@item.Code — @detail">
+                        <svg viewBox="@PreviewViewBox(item)" preserveAspectRatio="xMidYMid meet">
+                            @switch (item.Kind)
+                            {
+                                case PaletteKind.BedKit:
+                                    <rect x="0" y="0" width="@F(item.WidthFt)" height="@F(item.HeightFt)"
+                                          rx="@F(Math.Min(item.WidthFt, item.HeightFt) / 3.0)"
+                                          ry="@F(Math.Min(item.WidthFt, item.HeightFt) / 3.0)"
+                                          fill="#e2725b" fill-opacity="0.5" stroke="#7a3520" stroke-width="0.15" />
+                                    break;
+                                case PaletteKind.Tree:
+                                    @((MarkupString)PlantRendering.TreeSvg(0, 0, item.WidthFt, item.HeightFt, item.Trait))
+                                    break;
+                                case PaletteKind.Bush:
+                                    @((MarkupString)PlantRendering.BushSvg(0, 0, item.WidthFt, item.HeightFt, item.Trait))
+                                    break;
+                                case PaletteKind.Plant:
+                                    @((MarkupString)PlantRendering.SpacingRingsSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, "good"))
+                                    @((MarkupString)PlantRendering.PlantSpriteSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, item.Trait))
+                                    break;
+                            }
+                        </svg>
+                        <div class="small palette-item-name">@item.Code</div>
+                        <div class="x-small text-muted">@detail</div>
+                    </button>
+                }
+            </div>
+        </aside>
+
+        <div class="plot-canvas-wrap" @ref="wrapRef">
+            <svg class="plot-canvas"
+                 @ref="canvasRef"
+                 tabindex="0"
+                 style="width:@(PlotWidthFt * PxPerFt * zoom)px; height:@(PlotHeightFt * PxPerFt * zoom)px;"
+                 viewBox="0 0 @F(PlotWidthFt) @F(PlotHeightFt)"
+                 preserveAspectRatio="xMidYMid meet"
+                 @onkeydown="OnKeyDown"
+                 @onpointerdown="OnPointerDown"
+                 @onpointermove="OnPointerMove"
+                 @onpointerup="OnPointerUp"
+                 @onpointerleave="OnPointerLeave"
+                 @onpointerdown:preventDefault="true">
+
+                <defs>
+                    <pattern id="ftgrid" width="1" height="1" patternUnits="userSpaceOnUse">
+                        <path d="M 1 0 L 0 0 0 1" fill="none" stroke="#cfd8c5" stroke-width="0.02" />
+                    </pattern>
+                </defs>
+
+                <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="#f3efe3" />
+                <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="url(#ftgrid)" />
+                <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="none"
+                      stroke="#7a6a4a" stroke-width="0.05" />
+
+                @{
+                    // Plant spacing overlay (under shapes): one set of rings per plant, color-coded by overlap.
+                    var plantList = currentPlot.Shapes.Where(z => z.Kind == ShapeKind.Plant).ToList();
+                }
+                @if (plantList.Count > 0)
+                {
+                    <g pointer-events="none">
+                        @foreach (var p in plantList)
+                        {
+                            var status = ComputeSpacingStatus(p, plantList);
+                            var pcx = p.X + p.W / 2;
+                            var pcy = p.Y + p.H / 2;
+                            @((MarkupString)PlantRendering.SpacingRingsSvg(pcx, pcy, p.W, status))
+                        }
+                    </g>
+                }
+
+                @foreach (var s in currentPlot.Shapes)
+                {
+                    var sb = GetBounds(s);
+                    var scx = sb.x + sb.w / 2;
+                    var scy = sb.y + sb.h / 2;
+                    <g class="shape @(IsSelected(s.Id) ? "selected" : "")"
+                       transform="rotate(@F(s.Rotation) @F(scx) @F(scy))"
+                       pointer-events="@(currentTool == Tool.Select ? "auto" : "none")"
+                       @onpointerdown="(e) => OnShapePointerDown(e, s)"
+                       @onpointerdown:stopPropagation="true">
+                        @switch (s.Kind)
+                        {
+                            case ShapeKind.Rectangle:
+                                <rect x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
+                                      fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
+                                      stroke="@EffectiveStroke(s)" stroke-width="0.06" />
+                                break;
+                            case ShapeKind.Oval:
+                                <ellipse cx="@F(s.X + s.W / 2)" cy="@F(s.Y + s.H / 2)"
+                                         rx="@F(s.W / 2)" ry="@F(s.H / 2)"
+                                         fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
+                                         stroke="@EffectiveStroke(s)" stroke-width="0.06" />
+                                break;
+                            case ShapeKind.FreeDraw:
+                                <polyline points="@PointsString(s.Points)"
+                                          fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.08"
+                                          stroke-linecap="round" stroke-linejoin="round" />
+                                <rect x="@F(sb.x - 0.1)" y="@F(sb.y - 0.1)"
+                                      width="@F(sb.w + 0.2)" height="@F(sb.h + 0.2)"
+                                      fill="transparent" stroke="none" />
+                                break;
+                            case ShapeKind.Ruler:
+                                <polyline points="@PointsString(s.Points)"
+                                          fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.06"
+                                          stroke-linecap="round" stroke-linejoin="round" />
+                                @foreach (var p in s.Points)
+                                {
+                                    <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.08"
+                                            fill="#fff" stroke="@EffectiveStroke(s)" stroke-width="0.04" />
+                                }
+                                @((MarkupString)RulerLabelsSvg(s.Points))
+                                <rect x="@F(sb.x - 0.1)" y="@F(sb.y - 0.1)"
+                                      width="@F(sb.w + 0.2)" height="@F(sb.h + 0.2)"
+                                      fill="transparent" stroke="none" />
+                                break;
+                            case ShapeKind.BedKit:
+                                <g transform="translate(@F(s.X) @F(s.Y))">
+                                    <rect x="0" y="0" width="@F(s.W)" height="@F(s.H)"
+                                          rx="@F(Math.Min(s.W, s.H) / 3.0)"
+                                          ry="@F(Math.Min(s.W, s.H) / 3.0)"
+                                          fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
+                                          stroke="@EffectiveStroke(s)" stroke-width="0.08" />
+                                    <text x="@F(s.W / 2)" y="@F(s.H / 2)"
+                                          text-anchor="middle" dominant-baseline="middle"
+                                          font-size="@F(Math.Min(s.W, s.H) * 0.18)" fill="#3d1c10"
+                                          style="font-family: sans-serif; pointer-events:none;">@s.Label</text>
+                                </g>
+                                break;
+                            case ShapeKind.Tree:
+                                @((MarkupString)PlantRendering.TreeSvg(s.X, s.Y, s.W, s.H, s.Trait, s.Label))
+                                break;
+                            case ShapeKind.Bush:
+                                @((MarkupString)PlantRendering.BushSvg(s.X, s.Y, s.W, s.H, s.Trait, s.Label))
+                                break;
+                            case ShapeKind.Plant:
+                                @((MarkupString)PlantRendering.PlantSpriteSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, s.Trait))
+                                break;
+                        }
+                        @if (IsSelected(s.Id))
+                        {
+                            <rect x="@F(sb.x - 0.05)" y="@F(sb.y - 0.05)"
+                                  width="@F(sb.w + 0.1)" height="@F(sb.h + 0.1)"
+                                  fill="none" stroke="#0d6efd" stroke-width="0.05"
+                                  stroke-dasharray="0.15,0.1" pointer-events="none" />
+                        }
+                    </g>
+                }
+
+                @if (drafting is not null)
+                {
+                    @switch (drafting.Kind)
+                    {
+                        case ShapeKind.Rectangle:
+                            <rect x="@F(drafting.X)" y="@F(drafting.Y)" width="@F(drafting.W)" height="@F(drafting.H)"
+                                  fill="rgba(74,124,89,0.2)" stroke="#2f5a3a" stroke-width="0.06"
+                                  stroke-dasharray="0.2,0.1" pointer-events="none" />
+                            break;
+                        case ShapeKind.Oval:
+                            <ellipse cx="@F(drafting.X + drafting.W / 2)" cy="@F(drafting.Y + drafting.H / 2)"
+                                     rx="@F(Math.Abs(drafting.W) / 2)" ry="@F(Math.Abs(drafting.H) / 2)"
+                                     fill="rgba(74,124,89,0.2)" stroke="#2f5a3a" stroke-width="0.06"
+                                     stroke-dasharray="0.2,0.1" pointer-events="none" />
+                            break;
+                        case ShapeKind.FreeDraw:
+                            <polyline points="@PointsString(drafting.Points)"
+                                      fill="none" stroke="#3a3a3a" stroke-width="0.08"
+                                      stroke-linecap="round" stroke-linejoin="round" pointer-events="none" />
+                            break;
+                        case ShapeKind.Ruler:
+                            <polyline points="@PointsString(drafting.Points)"
+                                      fill="none" stroke="#c81e1e" stroke-width="0.06"
+                                      stroke-linecap="round" stroke-linejoin="round"
+                                      stroke-dasharray="0.2,0.1" pointer-events="none" />
+                            @foreach (var p in drafting.Points)
+                            {
+                                <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.08"
+                                        fill="#fff" stroke="#c81e1e" stroke-width="0.04" pointer-events="none" />
+                            }
+                            @((MarkupString)RulerLabelsSvg(drafting.Points))
+                            break;
+                    }
+                }
+
+                @if (currentTool == Tool.Stamp && selectedItem is { } gk && ghostX is { } gx && ghostY is { } gy)
+                {
+                    var (ghx, ghy) = RotatedHalfExtents(gk.WidthFt, gk.HeightFt, stampRotation);
+                    var gcx = SafeClamp(gx, ghx, PlotWidthFt - ghx);
+                    var gcy = SafeClamp(gy, ghy, PlotHeightFt - ghy);
+                    var gx0 = gcx - gk.WidthFt / 2;
+                    var gy0 = gcy - gk.HeightFt / 2;
+                    <g pointer-events="none" opacity="0.55"
+                       transform="rotate(@F(stampRotation) @F(gcx) @F(gcy))">
+                        @switch (gk.Kind)
+                        {
+                            case PaletteKind.BedKit:
+                                @((MarkupString)BedKitGhostSvg(gx0, gy0, gk.WidthFt, gk.HeightFt, gk.Code))
+                                break;
+                            case PaletteKind.Tree:
+                                @((MarkupString)PlantRendering.TreeSvg(gx0, gy0, gk.WidthFt, gk.HeightFt, gk.Trait, gk.Code))
+                                break;
+                            case PaletteKind.Bush:
+                                @((MarkupString)PlantRendering.BushSvg(gx0, gy0, gk.WidthFt, gk.HeightFt, gk.Trait, gk.Code))
+                                break;
+                            case PaletteKind.Plant:
+                                @((MarkupString)PlantRendering.SpacingRingsSvg(gcx, gcy, gk.WidthFt, "good"))
+                                @((MarkupString)PlantRendering.PlantSpriteSvg(gcx, gcy, gk.WidthFt, gk.Trait))
+                                break;
+                        }
+                    </g>
+                }
+            </svg>
+        </div>
+    </div>
+}
+
+@if (currentPlot is not null)
+{
+    var takeoff = BuildTakeoff(currentPlot.Shapes);
+    var totalCount = takeoff.Sum(t => t.Count);
+    <details class="takeoff-panel mt-2">
+        <summary>
+            <strong>Takeoff list</strong>
+            <span class="text-muted small ms-2">@takeoff.Count distinct items · @totalCount placed</span>
+        </summary>
+        <div class="takeoff-body">
+            @if (takeoff.Count == 0)
+            {
+                <div class="x-small text-muted">Nothing placed yet.</div>
+            }
+            else
+            {
+                <div class="d-flex justify-content-end mb-1">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ExportTakeoffCsv" title="Download as CSV">
+                        Download CSV
+                    </button>
+                </div>
+                <table class="table table-sm takeoff-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Name</th>
+                            <th class="text-end">Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in takeoff)
+                        {
+                            <tr>
+                                <td>@row.Kind</td>
+                                <td>@row.Name</td>
+                                <td class="text-end">@row.Count</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </details>
+}
+
+@{
+    var infoRuler = drafting?.Kind == ShapeKind.Ruler
+        ? drafting
+        : (currentPlot is not null && PrimarySelectedId is { } sid
+            ? currentPlot.Shapes.FirstOrDefault(z => z.Id == sid && z.Kind == ShapeKind.Ruler)
+            : null);
+    var primaryShape = currentPlot is not null && PrimarySelectedId is { } pid
+        ? currentPlot.Shapes.FirstOrDefault(z => z.Id == pid)
+        : null;
+}
+
+@if (infoRuler is not null)
+{
+    var len = RulerLength(infoRuler.Points);
+    var area = EnclosedArea(infoRuler.Points);
+    var positioned = library.Ui.RulerPanelX is double && library.Ui.RulerPanelY is double;
+    <div class="floating-panel ruler-panel @(positioned ? "" : "default-ruler-pos")"
+         style="@(positioned ? $"left:{library.Ui.RulerPanelX!.Value}px;top:{library.Ui.RulerPanelY!.Value}px;" : "")">
+        <div class="panel-header"
+             @onpointerdown="StartRulerPanelDrag"
+             @onpointermove="OnPanelDragMove"
+             @onpointerup="OnPanelDragEnd">
+            <span class="panel-title">Ruler</span>
+            <span class="drag-grip" aria-hidden="true">⠿</span>
+        </div>
+        <div class="panel-body">
+            <div><span class="text-muted small">Segments:</span> <strong>@(Math.Max(0, infoRuler.Points.Count - 1))</strong></div>
+            <div><span class="text-muted small">Length:</span> <strong>@FormatLength(len)</strong> <span class="text-muted small">(@F(len) ft)</span></div>
+            <div><span class="text-muted small">Area (closed):</span> <strong>@F(area) ft²</strong></div>
+            @if (drafting?.Kind == ShapeKind.Ruler)
+            {
+                <div class="x-small text-muted mt-1">Click to finish · Ctrl+click to add a vertex</div>
+            }
+        </div>
+    </div>
+}
+
+@if ((selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null)) && currentPlot is not null)
+{
+    var stampPreview = (selectedIds.Count == 0 && currentTool == Tool.Stamp && selectedItem is not null)
+        ? PreviewShapeFromItem(selectedItem)
+        : null;
+    var isPreview = stampPreview is not null;
+    var selShapes = stampPreview is not null
+        ? new List<Shape> { stampPreview }
+        : SelectedShapes().ToList();
+    var positioned = library.Ui.InfoPanelX is double && library.Ui.InfoPanelY is double;
+    var isSingle = selShapes.Count == 1;
+    var single = isSingle ? selShapes[0] : null;
+    var customizable = isPreview ? new List<Shape>() : selShapes.Where(IsColorCustomizable).ToList();
+    var strokeSet = customizable.Select(EffectiveStroke).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    var fillSet   = customizable.Select(EffectiveFill).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    var opSet     = customizable.Select(EffectiveFillOpacity).Distinct().ToList();
+    var strokeMixed = strokeSet.Count > 1;
+    var fillMixed   = fillSet.Count > 1;
+    var opMixed     = opSet.Count > 1;
+    var strokeValue = strokeMixed ? "#808080" : (strokeSet.Count == 1 ? strokeSet[0] : "#000000");
+    var fillValue   = fillMixed   ? "#808080" : (fillSet.Count == 1   ? fillSet[0]   : "#000000");
+    var opValue     = opMixed     ? 0.5       : (opSet.Count == 1     ? opSet[0]     : 1.0);
+
+    <div class="floating-panel info-panel @(positioned ? "" : "default-info-pos")"
+         style="@(positioned ? $"left:{library.Ui.InfoPanelX!.Value}px;top:{library.Ui.InfoPanelY!.Value}px;" : "")">
+        <div class="panel-header"
+             @onpointerdown="StartInfoPanelDrag"
+             @onpointermove="OnPanelDragMove"
+             @onpointerup="OnPanelDragEnd">
+            <span class="panel-title">
+                @if (isPreview)
+                {
+                    <span>Preview · @PanelTitleFor(single!)</span>
+                }
+                else if (isSingle)
+                {
+                    @PanelTitleFor(single!)
+                }
+                else
+                {
+                    <span>Selection · @selShapes.Count items</span>
+                }
+            </span>
+            <span class="drag-grip" aria-hidden="true">⠿</span>
+        </div>
+        <div class="panel-body">
+            @if (isSingle)
+            {
+                var info = ShapeInfoLines(single!);
+                @foreach (var line in info)
+                {
+                    <div class="small">@((MarkupString)line)</div>
+                }
+            }
+            else
+            {
+                <div class="small text-muted mb-1">Selected items:</div>
+                <ul class="selection-list small">
+                    @foreach (var grp in selShapes
+                                          .GroupBy(s => (Kind: TakeoffKind(s.Kind), Name: TakeoffName(s)))
+                                          .OrderBy(g => g.Key.Kind, StringComparer.Ordinal)
+                                          .ThenBy(g => g.Key.Name, StringComparer.Ordinal))
+                    {
+                        <li>
+                            <span class="text-muted">@grp.Key.Kind:</span>
+                            <strong>@grp.Key.Name</strong>
+                            @if (grp.Count() > 1)
+                            {
+                                <span class="text-muted">× @grp.Count()</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+
+            @if (!isPreview && customizable.Count > 0)
+            {
+                <hr class="my-2" />
+                <div class="fw-bold small mb-1">Appearance</div>
+                <div class="color-row">
+                    <label class="small">Line</label>
+                    <input type="color" value="@strokeValue" @onchange="OnStrokeChanged"
+                           class="@(strokeMixed ? "mixed" : "")" title="@(strokeMixed ? "Mixed values — pick to unify" : strokeValue)" />
+                    @if (strokeMixed) { <span class="x-small text-muted">(mixed)</span> }
+                </div>
+                <div class="color-row">
+                    <label class="small">Fill</label>
+                    <input type="color" value="@fillValue" @onchange="OnFillChanged"
+                           class="@(fillMixed ? "mixed" : "")" title="@(fillMixed ? "Mixed values — pick to unify" : fillValue)" />
+                    @if (fillMixed) { <span class="x-small text-muted">(mixed)</span> }
+                </div>
+                <div class="color-row">
+                    <label class="small">Opacity</label>
+                    <input type="range" min="0" max="1" step="0.05" value="@F(opValue)" @oninput="OnFillOpacityChanged"
+                           class="@(opMixed ? "mixed" : "")" />
+                    <span class="x-small text-muted">@(opMixed ? "(mixed)" : $"{opValue * 100:0}%")</span>
+                </div>
+                <button class="btn btn-sm btn-link p-0 small" @onclick="ResetSelectedColors">Reset to defaults</button>
+            }
+            else if (!isPreview && selShapes.Count > 0)
+            {
+                <hr class="my-2" />
+                <div class="x-small text-muted">
+                    Color customization is not available for trees, bushes, or plants.
+                </div>
+            }
+
+            @if (isSingle && (single!.Kind == ShapeKind.Tree || single.Kind == ShapeKind.Bush))
+            {
+                <hr class="my-2" />
+                @if (wikiLoading)
+                {
+                    <div class="x-small text-muted">Loading Wikipedia summary…</div>
+                }
+                else if (wikiSummary is not null)
+                {
+                    <div class="wiki-block">
+                        @if (!string.IsNullOrEmpty(wikiSummary.ThumbnailUrl))
+                        {
+                            <img class="wiki-thumb" src="@wikiSummary.ThumbnailUrl" alt="@wikiSummary.Title" />
+                        }
+                        <div class="fw-bold small">@wikiSummary.Title</div>
+                        <div class="x-small wiki-extract">@wikiSummary.Extract</div>
+                        <a class="x-small" href="@wikiSummary.PageUrl" target="_blank" rel="noopener">
+                            Read more on Wikipedia →
+                        </a>
+                    </div>
+                }
+                else
+                {
+                    var topic = WikipediaTopic(single.Label ?? "");
+                    var searchUrl = $"https://en.wikipedia.org/w/index.php?search={System.Net.WebUtility.UrlEncode(topic)}";
+                    <div class="x-small text-muted">No Wikipedia summary found.</div>
+                    <a class="x-small" href="@searchUrl" target="_blank" rel="noopener">Search Wikipedia →</a>
+                }
+            }
+
+            @if (isSingle && single!.Kind == ShapeKind.Plant)
+            {
+                var rules = CompanionRules.ForCode(single.Label ?? "");
+                var nearby = isPreview ? new List<(Shape other, double distFt)>() : NearbyPlants(single, currentPlot.Shapes);
+                <hr class="my-2" />
+                @if (!isPreview)
+                {
+                    <div class="fw-bold small mb-1">Companions nearby</div>
+                    @if (nearby.Count == 0)
+                    {
+                        <div class="x-small text-muted">No other plants within 2× spacing.</div>
+                    }
+                    else
+                    {
+                        <ul class="companion-list small">
+                            @foreach (var (other, distFt) in nearby)
+                            {
+                                var otherName = other.Label ?? "";
+                                var verdict = rules.good.Any(g => string.Equals(g, otherName, StringComparison.OrdinalIgnoreCase)) ? "good"
+                                            : rules.bad.Any(b => string.Equals(b, otherName, StringComparison.OrdinalIgnoreCase))  ? "bad"
+                                            : "neutral";
+                                <li class="comp-@verdict">
+                                    <span class="comp-marker"></span>
+                                    <strong>@otherName</strong>
+                                    <span class="text-muted">— @F(distFt) ft</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                }
+                @if (rules.good.Count > 0 || rules.bad.Count > 0)
+                {
+                    <div class="x-small text-muted mt-2">
+                        @if (rules.good.Count > 0)
+                        {
+                            <div><strong>Plant near:</strong> @string.Join(", ", rules.good)</div>
+                        }
+                        @if (rules.bad.Count > 0)
+                        {
+                            <div><strong>Avoid:</strong> @string.Join(", ", rules.bad)</div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@if (showNewPlotDialog)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">New Garden Plot</h5>
+                    <button type="button" class="btn-close" @onclick="CancelNewPlot"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label small">Name</label>
+                        <input class="form-control form-control-sm" @bind="newPlotName" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Shape</label>
+                        <select class="form-select form-select-sm" @bind="newPlotShape">
+                            <option value="Rectangle">Rectangle (flat)</option>
+                        </select>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col">
+                            <label class="form-label small">Width (ft)</label>
+                            <input type="number" min="1" max="500" step="0.5" class="form-control form-control-sm"
+                                   @bind="newPlotWidth" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label small">Height (ft)</label>
+                            <input type="number" min="1" max="500" step="0.5" class="form-control form-control-sm"
+                                   @bind="newPlotHeight" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-secondary" @onclick="CancelNewPlot">Cancel</button>
+                    <button class="btn btn-sm btn-primary" @onclick="CreateNewPlot">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private const string StorageKey = "gardenplot.library.v1";
+    private const double PxPerFt = 16.0; // also used by ToFt()
+
+    private double PlotWidthFt => currentPlot?.WidthFt ?? 60;
+    private double PlotHeightFt => currentPlot?.HeightFt ?? 8;
+
+    private enum Tool { Select, FreeDraw, Rectangle, Oval, Ruler, Stamp }
+
+    private readonly Dictionary<string, Tool> tools = new()
+    {
+        ["Select"] = Tool.Select,
+        ["Free Draw"] = Tool.FreeDraw,
+        ["Rectangle"] = Tool.Rectangle,
+        ["Oval"] = Tool.Oval,
+        ["Ruler"] = Tool.Ruler,
+    };
+
+    private static readonly BedKit[] BedKits =
+    {
+        new("C2080", 2,    8,   12),
+        new("C3565", 3.5,  6.5, 12),
+        new("C2065", 2,    6.5, 10),
+        new("C5050", 5,    5,   12),
+        new("C3550", 3.5,  5,   10),
+        new("C3535", 3.5,  3.5, 8),
+        new("C2050", 2,    5,   8),
+        new("C2035", 2,    3.5, 6),
+        new("C2020", 2,    2,   4),
+    };
+
+    private PlotLibrary library = new();
+    private PlotData? currentPlot;
+    private Shape? drafting;
+    private Tool currentTool = Tool.Select;
+    private PaletteItem? selectedItem;
+    private PaletteCategory currentCategory = PaletteCategory.BedKits;
+    private readonly List<Guid> selectedIds = new();
+    private ElementReference canvasRef;
+    private ElementReference wrapRef;
+
+    private Guid? PrimarySelectedId => selectedIds.Count > 0 ? selectedIds[^1] : null;
+    private bool IsSelected(Guid id) => selectedIds.Contains(id);
+    private void SelectOnly(Guid id) { selectedIds.Clear(); selectedIds.Add(id); }
+    private void ToggleSelection(Guid id) { if (!selectedIds.Remove(id)) selectedIds.Add(id); }
+    private void ClearSelection() => selectedIds.Clear();
+    private IEnumerable<Shape> SelectedShapes()
+        => currentPlot is null ? Enumerable.Empty<Shape>()
+                               : selectedIds.Select(id => currentPlot.Shapes.FirstOrDefault(s => s.Id == id))
+                                            .Where(s => s is not null)!
+                                            .Cast<Shape>();
+
+    // View state
+    private double zoom = 1.0;
+    private string zoomInputText = "100%";
+    private const double MinZoom = 0.25;
+    private const double MaxZoom = 6.0;
+
+    private void SetZoom(double newZoom)
+    {
+        zoom = Math.Clamp(newZoom, MinZoom, MaxZoom);
+        zoomInputText = $"{zoom * 100:0}%";
+    }
+
+    private void ZoomIn() => SetZoom(zoom * 1.1);
+    private void ZoomOut() => SetZoom(zoom / 1.1);
+    private void ZoomReset() => SetZoom(1.0);
+
+    private void OnZoomSliderInput(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var pct))
+            SetZoom(pct / 100.0);
+    }
+
+    private void OnZoomTextInput(ChangeEventArgs e)
+    {
+        zoomInputText = e.Value?.ToString() ?? "";
+    }
+
+    private void OnZoomTextKey(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") ApplyZoomFromText();
+    }
+
+    private void ApplyZoomFromText()
+    {
+        var t = zoomInputText?.Trim().TrimEnd('%').Trim();
+        if (!string.IsNullOrEmpty(t)
+            && double.TryParse(t, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var pct))
+        {
+            SetZoom(pct / 100.0);
+        }
+        else
+        {
+            // Bad input — restore display from current zoom.
+            zoomInputText = $"{zoom * 100:0}%";
+        }
+    }
+
+    // ===== Export =====
+
+    private async Task ExportPng()
+    {
+        if (jsModule is null || currentPlot is null) return;
+        var name = $"{Sanitize(currentPlot.Name)}.png";
+        try { await jsModule.InvokeVoidAsync("exportPng", canvasRef, name, 2); }
+        catch { /* ignore */ }
+    }
+
+    private async Task PrintPlot()
+    {
+        if (jsModule is null || currentPlot is null) return;
+        try { await jsModule.InvokeVoidAsync("printSvg", canvasRef, currentPlot.Name); }
+        catch { /* ignore */ }
+    }
+
+    private static string Sanitize(string name)
+    {
+        var chars = name.Select(c => char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '_').ToArray();
+        var s = new string(chars).Trim('_');
+        return string.IsNullOrEmpty(s) ? "garden-plot" : s;
+    }
+
+    // ===== Takeoff list =====
+
+    private sealed record TakeoffRow(string Kind, string Name, int Count);
+
+    private static List<TakeoffRow> BuildTakeoff(IEnumerable<Shape> shapes)
+    {
+        return shapes
+            .Where(s => s.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant
+                                or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw or ShapeKind.Ruler)
+            .GroupBy(s => (Kind: TakeoffKind(s.Kind), Name: TakeoffName(s)))
+            .Select(g => new TakeoffRow(g.Key.Kind, g.Key.Name, g.Count()))
+            .OrderBy(r => r.Kind, StringComparer.Ordinal)
+            .ThenBy(r => r.Name, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static string TakeoffKind(ShapeKind k) => k switch
+    {
+        ShapeKind.BedKit => "Bed Kit",
+        ShapeKind.Tree => "Tree",
+        ShapeKind.Bush => "Bush",
+        ShapeKind.Plant => "Plant",
+        ShapeKind.Rectangle => "Rectangle",
+        ShapeKind.Oval => "Oval",
+        ShapeKind.FreeDraw => "Freehand",
+        ShapeKind.Ruler => "Ruler",
+        _ => k.ToString(),
+    };
+
+    private static string TakeoffName(Shape s)
+    {
+        if (!string.IsNullOrEmpty(s.Label))
+        {
+            return s.Label!;
+        }
+
+        return s.Kind switch
+        {
+            ShapeKind.Rectangle => $"{s.W:0.##}'×{s.H:0.##}'",
+            ShapeKind.Oval => $"{s.W:0.##}'×{s.H:0.##}'",
+            ShapeKind.FreeDraw => "(unnamed)",
+            ShapeKind.Ruler => "(measurement)",
+            _ => "(unnamed)",
+        };
+    }
+
+    private async Task ExportTakeoffCsv()
+    {
+        if (jsModule is null || currentPlot is null)
+        {
+            return;
+        }
+
+        var rows = BuildTakeoff(currentPlot.Shapes);
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Type,Name,Count");
+        foreach (var r in rows)
+        {
+            sb.Append(CsvField(r.Kind)).Append(',')
+              .Append(CsvField(r.Name)).Append(',')
+              .Append(r.Count.ToString(CultureInfo.InvariantCulture))
+              .Append('\n');
+        }
+
+        var name = $"{Sanitize(currentPlot.Name)}-takeoff.csv";
+        try
+        {
+            await jsModule.InvokeVoidAsync("downloadText", name, sb.ToString(), "text/csv;charset=utf-8");
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private static string CsvField(string s)
+    {
+        if (s.IndexOfAny(new[] { ',', '"', '\r', '\n' }) < 0)
+        {
+            return s;
+        }
+
+        return "\"" + s.Replace("\"", "\"\"") + "\"";
+    }
+
+    // Pan (Ctrl+drag) state
+    private bool panPending;
+    private bool panActive;
+    private double panLastClientX, panLastClientY;
+
+    // JS interop
+    private IJSObjectReference? jsModule;
+    private DotNetObjectReference<GardenPlot>? dotnetRef;
+    private IJSObjectReference? wheelHandle;
+
+    // Floating-panel drag state
+    private string? draggingPanel;
+    private double panelDragOffsetX, panelDragOffsetY;
+    private const double PanelEdgePadding = 4;
+
+    // Wikipedia summary cache + current display state
+    private readonly Dictionary<string, WikiSummary?> wikiCache = new(StringComparer.OrdinalIgnoreCase);
+    private WikiSummary? wikiSummary;
+    private bool wikiLoading;
+    private string? lastWikiKey;
+
+    /// <summary>Stable cache key for a shape's Wikipedia entry (kind + species). Null for non-plant kinds.</summary>
+    private static string? WikiKeyFor(Shape s) =>
+        (s.Kind == ShapeKind.Tree || s.Kind == ShapeKind.Bush) && !string.IsNullOrEmpty(s.Label)
+            ? $"{s.Kind}:{s.Label}"
+            : null;
+
+    /// <summary>Synthesizes a transient Shape from a palette item so the info panel can preview it before placement.</summary>
+    private static Shape PreviewShapeFromItem(PaletteItem item) => new()
+    {
+        Kind = item.Kind switch
+        {
+            PaletteKind.Tree => ShapeKind.Tree,
+            PaletteKind.Bush => ShapeKind.Bush,
+            PaletteKind.Plant => ShapeKind.Plant,
+            _ => ShapeKind.BedKit,
+        },
+        W = item.WidthFt,
+        H = item.HeightFt,
+        Label = item.Code,
+        Trait = item.Trait,
+    };
+
+    // Stamp ghost preview state
+    private double? ghostX;
+    private double? ghostY;
+    private double stampRotation;
+
+    // drag state
+    private bool isDragging;
+    private double dragStartX, dragStartY;
+    private double dragUnionMinX, dragUnionMinY, dragUnionMaxX, dragUnionMaxY;
+    private readonly List<DragSnap> dragSnaps = new();
+
+    private sealed class DragSnap
+    {
+        public Guid Id;
+        public double X;
+        public double Y;
+        public Point[]? OrigPoints;
+    }
+
+    // New-plot dialog state
+    private bool showNewPlotDialog;
+    private string newPlotName = "My Garden";
+    private string newPlotShape = "Rectangle";
+    private double newPlotWidth = 60;
+    private double newPlotHeight = 8;
+
+    private bool loaded;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!loaded)
+            {
+                loaded = true;
+                try
+                {
+                    var json = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        var loadedLib = JsonSerializer.Deserialize<PlotLibrary>(json);
+                        if (loadedLib is not null) library = loadedLib;
+                    }
+                }
+                catch
+                {
+                    library = new PlotLibrary();
+                }
+
+                if (library.Plots.Count == 0)
+                {
+                    library.Plots.Add(new PlotData { Name = "My Garden", WidthFt = 60, HeightFt = 8 });
+                    library.LastPlotId = library.Plots[0].Id;
+                }
+
+                currentPlot = library.Plots.FirstOrDefault(p => p.Id == library.LastPlotId)
+                              ?? library.Plots[0];
+                library.LastPlotId = currentPlot.Id;
+                await SaveAsync();
+                StateHasChanged();
+
+                try
+                {
+                    jsModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/gardenplot.js");
+                    dotnetRef ??= DotNetObjectReference.Create(this);
+                    wheelHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachWheel", canvasRef, dotnetRef);
+                }
+                catch { /* JS load failed; rotation/zoom via wheel won't work but the page still functions. */ }
+            }
+        }
+
+        // After every render: if the species we're showing details for changed, refresh the Wikipedia summary.
+        // This covers both a real selected shape and a stamp-mode preview (palette item) so previewing details works
+        // before the user clicks to place the item.
+        Shape? detailShape = null;
+        if (PrimarySelectedId is Guid id && currentPlot is not null)
+        {
+            detailShape = currentPlot.Shapes.FirstOrDefault(z => z.Id == id);
+        }
+        else if (currentTool == Tool.Stamp && selectedItem is not null)
+        {
+            detailShape = PreviewShapeFromItem(selectedItem);
+        }
+
+        var key = detailShape is null ? null : WikiKeyFor(detailShape);
+        if (key != lastWikiKey)
+        {
+            lastWikiKey = key;
+            if (detailShape is not null && key is not null)
+            {
+                await EnsureWikiSummaryFor(detailShape);
+            }
+            else
+            {
+                wikiSummary = null;
+                wikiLoading = false;
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { if (wheelHandle is not null) await wheelHandle.InvokeVoidAsync("dispose"); } catch { }
+        try { if (wheelHandle is not null) await wheelHandle.DisposeAsync(); } catch { }
+        try { if (jsModule is not null) await jsModule.DisposeAsync(); } catch { }
+        dotnetRef?.Dispose();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (currentPlot is not null)
+        {
+            currentPlot.ModifiedUtc = DateTime.UtcNow;
+            library.LastPlotId = currentPlot.Id;
+        }
+        try
+        {
+            var json = JsonSerializer.Serialize(library);
+            await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, json);
+        }
+        catch { /* ignore storage failures */ }
+    }
+
+    private async Task OnPlotChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            currentPlot = library.Plots.FirstOrDefault(p => p.Id == id);
+            ClearSelection();
+            selectedItem = null;
+            currentTool = Tool.Select;
+            ghostX = ghostY = null;
+            await SaveAsync();
+        }
+    }
+
+    private void ShowNewPlotDialog()
+    {
+        newPlotName = $"Plot {library.Plots.Count + 1}";
+        newPlotShape = "Rectangle";
+        newPlotWidth = 60;
+        newPlotHeight = 8;
+        showNewPlotDialog = true;
+    }
+
+    private void CancelNewPlot() => showNewPlotDialog = false;
+
+    private async Task CreateNewPlot()
+    {
+        var w = Math.Clamp(newPlotWidth, 1, 500);
+        var h = Math.Clamp(newPlotHeight, 1, 500);
+        var p = new PlotData
+        {
+            Name = string.IsNullOrWhiteSpace(newPlotName) ? "Untitled" : newPlotName.Trim(),
+            WidthFt = w,
+            HeightFt = h,
+        };
+        library.Plots.Add(p);
+        currentPlot = p;
+        ClearSelection();
+        selectedItem = null;
+        currentTool = Tool.Select;
+        showNewPlotDialog = false;
+        await SaveAsync();
+    }
+
+    private async Task DeleteCurrentPlot()
+    {
+        if (currentPlot is null || library.Plots.Count <= 1) return;
+        library.Plots.Remove(currentPlot);
+        currentPlot = library.Plots[0];
+        ClearSelection();
+        selectedItem = null;
+        currentTool = Tool.Select;
+        await SaveAsync();
+    }
+
+    private void SetTool(Tool t)
+    {
+        currentTool = t;
+        if (t != Tool.Stamp)
+        {
+            selectedItem = null;
+            ghostX = ghostY = null;
+        }
+        if (t != Tool.Ruler && drafting?.Kind == ShapeKind.Ruler)
+        {
+            drafting = null;
+        }
+    }
+
+    private void SetCategory(PaletteCategory cat)
+    {
+        currentCategory = cat;
+        // Switching tabs clears the active stamp; user re-picks an item.
+        if (currentTool == Tool.Stamp)
+        {
+            selectedItem = null;
+            ghostX = ghostY = null;
+            currentTool = Tool.Select;
+        }
+    }
+
+    private void OnCategoryChanged(ChangeEventArgs e)
+    {
+        if (System.Enum.TryParse<PaletteCategory>(e.Value?.ToString(), out var cat))
+        {
+            SetCategory(cat);
+        }
+    }
+
+    private static string CategoryLabel(PaletteCategory k) => k switch
+    {
+        PaletteCategory.BedKits => "Bed Kits",
+        PaletteCategory.TreesFruit => "Trees — Fruit",
+        PaletteCategory.TreesOrnamental => "Trees — Ornamental",
+        PaletteCategory.BushesEdible => "Bushes — Edible",
+        PaletteCategory.BushesOrnamental => "Bushes — Ornamental",
+        PaletteCategory.Vegetables => "Vegetables",
+        PaletteCategory.Herbs => "Herbs",
+        _ => k.ToString(),
+    };
+
+    private static string PreviewViewBox(PaletteItem item)
+    {
+        // Plants render with a label below; allocate extra vertical space.
+        if (item.Kind == PaletteKind.BedKit)
+            return $"0 0 {F(item.WidthFt)} {F(item.HeightFt)}";
+        var pad = item.WidthFt * 0.15;
+        var labelRoom = item.HeightFt * 0.35;
+        return $"{F(-pad)} {F(-pad)} {F(item.WidthFt + pad * 2)} {F(item.HeightFt + pad + labelRoom)}";
+    }
+
+    private void SelectItem(PaletteItem item)
+    {
+        selectedItem = item;
+        currentTool = Tool.Stamp;
+        if (currentPlot is not null)
+        {
+            stampRotation = currentPlot.KitRotations.TryGetValue(item.Code, out var r) ? r : 0;
+        }
+    }
+
+    private async Task ClearAll()
+    {
+        if (currentPlot is null) return;
+        currentPlot.Shapes.Clear();
+        ClearSelection();
+        await SaveAsync();
+    }
+
+    private async Task DeleteSelected()
+    {
+        if (currentPlot is null || selectedIds.Count == 0) return;
+        var ids = selectedIds.ToHashSet();
+        currentPlot.Shapes.RemoveAll(s => ids.Contains(s.Id));
+        ClearSelection();
+        await SaveAsync();
+    }
+
+    private (double x, double y) ToFt(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
+        => (e.OffsetX / (PxPerFt * zoom), e.OffsetY / (PxPerFt * zoom));
+
+    private void OnPointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
+    {
+        if (currentPlot is null) return;
+
+        // Ensure the canvas has keyboard focus so Delete/Backspace work.
+        _ = canvasRef.FocusAsync(preventScroll: true).AsTask();
+
+        // Ctrl + drag = pan (except in Ruler tool, where Ctrl+click adds a vertex).
+        if (e.CtrlKey && currentTool != Tool.Ruler)
+        {
+            panPending = true;
+            panActive = false;
+            panLastClientX = e.ClientX;
+            panLastClientY = e.ClientY;
+            return;
+        }
+
+        var (x, y) = ToFt(e);
+        x = Math.Clamp(x, 0, PlotWidthFt);
+        y = Math.Clamp(y, 0, PlotHeightFt);
+
+        switch (currentTool)
+        {
+            case Tool.Select:
+                if (!e.ShiftKey) ClearSelection();
+                break;
+            case Tool.FreeDraw:
+                drafting = new Shape { Kind = ShapeKind.FreeDraw };
+                drafting.Points.Add(new Point(x, y));
+                break;
+            case Tool.Rectangle:
+                drafting = new Shape { Kind = ShapeKind.Rectangle, X = x, Y = y, W = 0, H = 0 };
+                dragStartX = x; dragStartY = y;
+                break;
+            case Tool.Oval:
+                drafting = new Shape { Kind = ShapeKind.Oval, X = x, Y = y, W = 0, H = 0 };
+                dragStartX = x; dragStartY = y;
+                break;
+            case Tool.Ruler:
+                if (drafting is null || drafting.Kind != ShapeKind.Ruler)
+                {
+                    // Start new ruler: anchor + cursor-tracking endpoint.
+                    drafting = new Shape { Kind = ShapeKind.Ruler };
+                    drafting.Points.Add(new Point(x, y));
+                    drafting.Points.Add(new Point(x, y));
+                }
+                else if (e.CtrlKey)
+                {
+                    // Add an intermediate vertex; keep the trailing endpoint following the cursor.
+                    drafting.Points[^1] = new Point(x, y);
+                    drafting.Points.Add(new Point(x, y));
+                }
+                else
+                {
+                    // Finalize the ruler.
+                    drafting.Points[^1] = new Point(x, y);
+                    if (drafting.Points.Count >= 2 &&
+                        Distance(drafting.Points[0], drafting.Points[^1]) > 0 || drafting.Points.Count > 2)
+                    {
+                        currentPlot.Shapes.Add(drafting);
+                        SelectOnly(drafting.Id);
+                        _ = SaveAsync();
+                    }
+                    drafting = null;
+                }
+                break;
+            case Tool.Stamp when selectedItem is not null:
+                var k = selectedItem;
+                var (hx, hy) = RotatedHalfExtents(k.WidthFt, k.HeightFt, stampRotation);
+                var cx = SafeClamp(x, hx, PlotWidthFt - hx);
+                var cy = SafeClamp(y, hy, PlotHeightFt - hy);
+                var s = new Shape
+                {
+                    Kind = k.Kind switch
+                    {
+                        PaletteKind.Tree => ShapeKind.Tree,
+                        PaletteKind.Bush => ShapeKind.Bush,
+                        PaletteKind.Plant => ShapeKind.Plant,
+                        _ => ShapeKind.BedKit,
+                    },
+                    X = cx - k.WidthFt / 2,
+                    Y = cy - k.HeightFt / 2,
+                    W = k.WidthFt, H = k.HeightFt,
+                    Rotation = stampRotation,
+                    Label = k.Code,
+                    Trait = k.Trait,
+                };
+                currentPlot.Shapes.Add(s);
+                _ = SaveAsync();
+                break;
+        }
+    }
+
+    private void OnPointerMove(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
+    {
+        if (currentPlot is null) return;
+
+        // Pan dragging takes precedence over everything else.
+        if (panPending)
+        {
+            var dx = e.ClientX - panLastClientX;
+            var dy = e.ClientY - panLastClientY;
+            if (panActive || Math.Abs(dx) + Math.Abs(dy) > 3)
+            {
+                panActive = true;
+                panLastClientX = e.ClientX;
+                panLastClientY = e.ClientY;
+                if (jsModule is not null)
+                {
+                    _ = jsModule.InvokeVoidAsync("panBy", wrapRef, dx, dy).AsTask();
+                }
+            }
+            return;
+        }
+
+        var (x, y) = ToFt(e);
+
+        if (currentTool == Tool.Stamp && selectedItem is not null)
+        {
+            ghostX = x;
+            ghostY = y;
+        }
+
+        if (isDragging && selectedIds.Count > 0 && currentPlot is not null)
+        {
+            var dx = x - dragStartX;
+            var dy = y - dragStartY;
+            dx = SafeClamp(dx, -dragUnionMinX, PlotWidthFt - dragUnionMaxX);
+            dy = SafeClamp(dy, -dragUnionMinY, PlotHeightFt - dragUnionMaxY);
+            foreach (var snap in dragSnaps)
+            {
+                var s = currentPlot.Shapes.FirstOrDefault(z => z.Id == snap.Id);
+                if (s is null) continue;
+                if (s.Kind == ShapeKind.FreeDraw || s.Kind == ShapeKind.Ruler)
+                {
+                    if (snap.OrigPoints is null) continue;
+                    for (int i = 0; i < s.Points.Count && i < snap.OrigPoints.Length; i++)
+                        s.Points[i] = new Point(snap.OrigPoints[i].X + dx, snap.OrigPoints[i].Y + dy);
+                }
+                else
+                {
+                    s.X = snap.X + dx;
+                    s.Y = snap.Y + dy;
+                }
+            }
+            return;
+        }
+
+        if (drafting is null) return;
+        switch (drafting.Kind)
+        {
+            case ShapeKind.FreeDraw:
+                drafting.Points.Add(new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt)));
+                break;
+            case ShapeKind.Ruler:
+                if (drafting.Points.Count >= 1)
+                    drafting.Points[^1] = new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt));
+                break;
+            case ShapeKind.Rectangle:
+            case ShapeKind.Oval:
+                drafting.X = Math.Min(dragStartX, x);
+                drafting.Y = Math.Min(dragStartY, y);
+                drafting.W = Math.Abs(x - dragStartX);
+                drafting.H = Math.Abs(y - dragStartY);
+                break;
+        }
+    }
+
+    private void OnPointerUp(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
+    {
+        if (currentPlot is null) return;
+
+        if (panPending)
+        {
+            panPending = false;
+            panActive = false;
+            return;
+        }
+
+        if (isDragging)
+        {
+            isDragging = false;
+            _ = SaveAsync();
+            return;
+        }
+
+        if (drafting is null) return;
+        // Rulers are finalized on pointer-down only (multi-click flow).
+        if (drafting.Kind == ShapeKind.Ruler) return;
+        var minSize = 0.1;
+        var added = false;
+        if (drafting.Kind == ShapeKind.FreeDraw)
+        {
+            if (drafting.Points.Count >= 2) { currentPlot.Shapes.Add(drafting); added = true; }
+        }
+        else if (drafting.W >= minSize && drafting.H >= minSize)
+        {
+            currentPlot.Shapes.Add(drafting); added = true;
+        }
+        drafting = null;
+        if (added) _ = SaveAsync();
+    }
+
+    private void OnShapePointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, Shape s)
+    {
+        if (currentTool != Tool.Select) return;
+
+        if (e.ShiftKey)
+        {
+            // Shift-click toggles membership in the selection set; doesn't start a drag.
+            ToggleSelection(s.Id);
+            return;
+        }
+
+        if (!IsSelected(s.Id))
+        {
+            SelectOnly(s.Id);
+        }
+
+        var (x, y) = ToFt(e);
+        StartDrag(x, y);
+    }
+
+    private void StartDrag(double ftX, double ftY)
+    {
+        if (currentPlot is null || selectedIds.Count == 0) return;
+        isDragging = true;
+        dragStartX = ftX;
+        dragStartY = ftY;
+        dragSnaps.Clear();
+        double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+        foreach (var s in SelectedShapes())
+        {
+            var aabb = RotatedAABB(s);
+            if (aabb.minX < minX) minX = aabb.minX;
+            if (aabb.minY < minY) minY = aabb.minY;
+            if (aabb.maxX > maxX) maxX = aabb.maxX;
+            if (aabb.maxY > maxY) maxY = aabb.maxY;
+            dragSnaps.Add(new DragSnap
+            {
+                Id = s.Id,
+                X = s.X,
+                Y = s.Y,
+                OrigPoints = s.Points.Count > 0 ? s.Points.ToArray() : null,
+            });
+        }
+        dragUnionMinX = minX; dragUnionMinY = minY;
+        dragUnionMaxX = maxX; dragUnionMaxY = maxY;
+    }
+
+    private void OnWheel(Microsoft.AspNetCore.Components.Web.WheelEventArgs e)
+    {
+        // Kept for compatibility but no longer wired to the SVG; OnWheelFromJs is the live path.
+        HandleWheel(e.DeltaY, e.ShiftKey, e.CtrlKey);
+    }
+
+    [JSInvokable]
+    public Task OnWheelFromJs(double deltaY, bool shift, bool ctrl)
+    {
+        HandleWheel(deltaY, shift, ctrl);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void HandleWheel(double deltaY, bool shift, bool ctrl)
+    {
+        if (currentPlot is null) return;
+
+        // Shift = zoom (whether or not anything is selected).
+        if (shift)
+        {
+            var factor = deltaY > 0 ? 1.0 / 1.1 : 1.1;
+            SetZoom(zoom * factor);
+            return;
+        }
+
+        // Ctrl = rotate the active shape (or the stamp ghost). 1 deg per tick.
+        if (!ctrl) return;
+
+        var dir = deltaY > 0 ? 1 : -1;
+        var delta = dir * 1.0;
+
+        if (currentTool == Tool.Stamp && selectedItem is not null)
+        {
+            stampRotation = ((stampRotation + delta) % 360 + 360) % 360;
+            currentPlot.KitRotations[selectedItem.Code] = stampRotation;
+            _ = SaveAsync();
+            return;
+        }
+
+        if (selectedIds.Count == 0) return;
+        foreach (var s in SelectedShapes().ToList())
+        {
+            s.Rotation = ((s.Rotation + delta) % 360 + 360) % 360;
+            var aabb = RotatedAABB(s);
+            double tx = 0, ty = 0;
+            if (aabb.minX < 0) tx = -aabb.minX;
+            else if (aabb.maxX > PlotWidthFt) tx = PlotWidthFt - aabb.maxX;
+            if (aabb.minY < 0) ty = -aabb.minY;
+            else if (aabb.maxY > PlotHeightFt) ty = PlotHeightFt - aabb.maxY;
+            if (tx != 0 || ty != 0) ShiftShape(s, tx, ty);
+        }
+        _ = SaveAsync();
+    }
+
+    private void OnPointerLeave(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
+    {
+        ghostX = ghostY = null;
+    }
+
+    private async Task OnKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Delete" || e.Key == "Backspace")
+        {
+            if (selectedIds.Count > 0)
+            {
+                await DeleteSelected();
+            }
+        }
+        else if (e.Key == "Escape")
+        {
+            // Cancel drafting and deselect.
+            drafting = null;
+            ClearSelection();
+        }
+    }
+
+    private static (double x, double y, double w, double h) GetBounds(Shape s)
+    {
+        if ((s.Kind == ShapeKind.FreeDraw || s.Kind == ShapeKind.Ruler) && s.Points.Count > 0)
+        {
+            var minX = s.Points.Min(p => p.X);
+            var minY = s.Points.Min(p => p.Y);
+            var maxX = s.Points.Max(p => p.X);
+            var maxY = s.Points.Max(p => p.Y);
+            return (minX, minY, maxX - minX, maxY - minY);
+        }
+        return (s.X, s.Y, s.W, s.H);
+    }
+
+    private static bool IsPointBased(Shape s) => s.Kind == ShapeKind.FreeDraw || s.Kind == ShapeKind.Ruler;
+
+    private static double Distance(Point a, Point b)
+    {
+        var dx = a.X - b.X;
+        var dy = a.Y - b.Y;
+        return Math.Sqrt(dx * dx + dy * dy);
+    }
+
+    private static double RulerLength(List<Point> pts)
+    {
+        double total = 0;
+        for (int i = 1; i < pts.Count; i++) total += Distance(pts[i - 1], pts[i]);
+        return total;
+    }
+
+    /// <summary>Area of the polygon formed by closing the polyline back to its first point (shoelace formula).</summary>
+    private static double EnclosedArea(List<Point> pts)
+    {
+        if (pts.Count < 3) return 0;
+        double a = 0;
+        for (int i = 0; i < pts.Count; i++)
+        {
+            var j = (i + 1) % pts.Count;
+            a += pts[i].X * pts[j].Y - pts[j].X * pts[i].Y;
+        }
+        return Math.Abs(a) / 2.0;
+    }
+
+    private static string FormatLength(double feet)
+    {
+        var totalInches = feet * 12.0;
+        var ft = (int)Math.Floor(totalInches / 12.0);
+        var inches = totalInches - ft * 12.0;
+        return $"{ft}' {inches:0.0}\"";
+    }
+
+    /// <summary>Builds the SVG fragment for per-segment length labels (uses MarkupString to avoid Razor's &lt;text&gt; directive).</summary>
+    private static string RulerLabelsSvg(List<Point> pts)
+    {
+        if (pts.Count < 2) return string.Empty;
+        var sb = new System.Text.StringBuilder();
+        for (int i = 1; i < pts.Count; i++)
+        {
+            var a = pts[i - 1];
+            var b = pts[i];
+            var mx = (a.X + b.X) / 2;
+            var my = (a.Y + b.Y) / 2;
+            var len = Distance(a, b);
+            sb.Append("<text x=\"").Append(F(mx)).Append("\" y=\"").Append(F(my - 0.15))
+              .Append("\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"0.3\" fill=\"#c81e1e\"")
+              .Append(" style=\"font-family: sans-serif; pointer-events:none;\">")
+              .Append(System.Net.WebUtility.HtmlEncode(FormatLength(len)))
+              .Append("</text>");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Dashed rounded-rect bed-kit ghost (rendered via MarkupString so Razor's &lt;text&gt; rule isn't triggered).</summary>
+    private static string BedKitGhostSvg(double x, double y, double w, double h, string code)
+    {
+        var rxy = Math.Min(w, h) / 3.0;
+        var fontSize = Math.Min(w, h) * 0.18;
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<rect x=\"").Append(F(x)).Append("\" y=\"").Append(F(y))
+          .Append("\" width=\"").Append(F(w)).Append("\" height=\"").Append(F(h))
+          .Append("\" rx=\"").Append(F(rxy)).Append("\" ry=\"").Append(F(rxy))
+          .Append("\" fill=\"#e2725b\" fill-opacity=\"0.5\" stroke=\"#7a3520\" stroke-width=\"0.08\" stroke-dasharray=\"0.2,0.1\" />");
+        sb.Append("<text x=\"").Append(F(x + w / 2)).Append("\" y=\"").Append(F(y + h / 2))
+          .Append("\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"").Append(F(fontSize))
+          .Append("\" fill=\"#3d1c10\" style=\"font-family: sans-serif;\">")
+          .Append(System.Net.WebUtility.HtmlEncode(code))
+          .Append("</text>");
+        return sb.ToString();
+    }
+
+    private static (double hx, double hy) RotatedHalfExtents(double w, double h, double rotationDeg)
+    {
+        var rad = rotationDeg * Math.PI / 180.0;
+        var c = Math.Abs(Math.Cos(rad));
+        var sn = Math.Abs(Math.Sin(rad));
+        return ((c * w + sn * h) / 2.0, (sn * w + c * h) / 2.0);
+    }
+
+    private static double SafeClamp(double v, double min, double max)
+        => max < min ? (min + max) / 2.0 : Math.Clamp(v, min, max);
+
+    // ===== Stroke / fill defaults =====
+
+    /// <summary>Shape kinds whose stroke/fill can be customized via the selection panel.</summary>
+    private static bool IsColorCustomizable(Shape s) => s.Kind is ShapeKind.Rectangle
+        or ShapeKind.Oval or ShapeKind.FreeDraw or ShapeKind.BedKit or ShapeKind.Ruler;
+
+    private static string DefaultStroke(Shape s) => s.Kind switch
+    {
+        ShapeKind.Rectangle => "#2f5a3a",
+        ShapeKind.Oval => "#2f5a3a",
+        ShapeKind.FreeDraw => "#3a3a3a",
+        ShapeKind.BedKit => "#7a3520",
+        ShapeKind.Ruler => "#c81e1e",
+        _ => "#3a3a3a",
+    };
+
+    private static string DefaultFill(Shape s) => s.Kind switch
+    {
+        ShapeKind.Rectangle => "#4a7c59",
+        ShapeKind.Oval => "#4a7c59",
+        ShapeKind.BedKit => "#e2725b",
+        _ => "#000000",
+    };
+
+    private static double DefaultFillOpacity(Shape s) => s.Kind switch
+    {
+        ShapeKind.Rectangle => 0.35,
+        ShapeKind.Oval => 0.35,
+        ShapeKind.BedKit => 0.5,
+        _ => 1.0,
+    };
+
+    private static string EffectiveStroke(Shape s) => s.Stroke ?? DefaultStroke(s);
+
+    private static string EffectiveFill(Shape s) => s.Fill ?? DefaultFill(s);
+
+    private static double EffectiveFillOpacity(Shape s) => s.FillOpacity ?? DefaultFillOpacity(s);
+
+    private async Task OnStrokeChanged(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(color)) return;
+        foreach (var s in SelectedShapes().Where(IsColorCustomizable))
+        {
+            s.Stroke = color;
+        }
+        await SaveAsync();
+    }
+
+    private async Task OnFillChanged(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(color)) return;
+        foreach (var s in SelectedShapes().Where(IsColorCustomizable))
+        {
+            s.Fill = color;
+        }
+        await SaveAsync();
+    }
+
+    private async Task OnFillOpacityChanged(ChangeEventArgs e)
+    {
+        if (!double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
+        {
+            return;
+        }
+
+        v = Math.Clamp(v, 0, 1);
+        foreach (var s in SelectedShapes().Where(IsColorCustomizable))
+        {
+            s.FillOpacity = v;
+        }
+        await SaveAsync();
+    }
+
+    private async Task ResetSelectedColors()
+    {
+        foreach (var s in SelectedShapes().Where(IsColorCustomizable))
+        {
+            s.Stroke = null;
+            s.Fill = null;
+            s.FillOpacity = null;
+        }
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Returns "good" / "partial" / "crowded" based on the worst overlap of <paramref name="plant"/>
+    /// with any other plant in <paramref name="all"/>. Uses center-to-center distance vs. summed spacing radii.
+    /// </summary>
+    private static string ComputeSpacingStatus(Shape plant, IReadOnlyList<Shape> all)
+    {
+        var pcx = plant.X + plant.W / 2;
+        var pcy = plant.Y + plant.H / 2;
+        var pr = plant.W / 2;
+        double worst = 0;
+        foreach (var q in all)
+        {
+            if (ReferenceEquals(q, plant)) continue;
+            var qcx = q.X + q.W / 2;
+            var qcy = q.Y + q.H / 2;
+            var qr = q.W / 2;
+            var dx = pcx - qcx;
+            var dy = pcy - qcy;
+            var dist = Math.Sqrt(dx * dx + dy * dy);
+            var sumR = pr + qr;
+            if (dist >= sumR || sumR <= 0) continue;
+            // overlap fraction in [0,1] where 1 == centers coincident.
+            var frac = (sumR - dist) / sumR;
+            if (frac > worst) worst = frac;
+        }
+        if (worst <= 0.0001) return "good";
+        if (worst < 0.5)     return "partial";
+        return "crowded";
+    }
+
+    /// <summary>Plants within 2x the selected plant's spacing distance, sorted by distance.</summary>
+    private static List<(Shape other, double distFt)> NearbyPlants(Shape sel, IEnumerable<Shape> all)
+    {
+        var pcx = sel.X + sel.W / 2;
+        var pcy = sel.Y + sel.H / 2;
+        var threshold = sel.W * 2.0; // 2x spacing
+        var results = new List<(Shape, double)>();
+        foreach (var q in all)
+        {
+            if (q.Kind != ShapeKind.Plant || ReferenceEquals(q, sel)) continue;
+            var qcx = q.X + q.W / 2;
+            var qcy = q.Y + q.H / 2;
+            var dx = pcx - qcx;
+            var dy = pcy - qcy;
+            var d = Math.Sqrt(dx * dx + dy * dy);
+            if (d <= threshold) results.Add((q, d));
+        }
+        results.Sort((a, b) => a.Item2.CompareTo(b.Item2));
+        return results;
+    }
+
+    // ===== Floating panel drag =====
+
+    private Task StartRulerPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("ruler", e);
+    private Task StartInfoPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("info", e);
+
+    private async Task StartPanelDrag(string name, Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
+    {
+        draggingPanel = name;
+        if (jsModule is not null)
+        {
+            try { /* setPointerCapture is on the element; we use the JS helper indirectly via the @onpointerdown target. */ }
+            catch { }
+        }
+        var (curX, curY) = await GetPanelPositionAsync(name);
+        panelDragOffsetX = e.ClientX - curX;
+        panelDragOffsetY = e.ClientY - curY;
+        // Persist the explicit position immediately so the panel stops using its default-position class.
+        if (name == "ruler")
+        {
+            library.Ui.RulerPanelX = curX;
+            library.Ui.RulerPanelY = curY;
+        }
+        else
+        {
+            library.Ui.InfoPanelX = curX;
+            library.Ui.InfoPanelY = curY;
+        }
+    }
+
+    private void OnPanelDragMove(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
+    {
+        if (draggingPanel is null) return;
+        var x = Math.Max(PanelEdgePadding, e.ClientX - panelDragOffsetX);
+        var y = Math.Max(PanelEdgePadding, e.ClientY - panelDragOffsetY);
+        if (draggingPanel == "ruler")
+        {
+            library.Ui.RulerPanelX = x;
+            library.Ui.RulerPanelY = y;
+        }
+        else if (draggingPanel == "info")
+        {
+            library.Ui.InfoPanelX = x;
+            library.Ui.InfoPanelY = y;
+        }
+    }
+
+    private async Task OnPanelDragEnd()
+    {
+        if (draggingPanel is null) return;
+        draggingPanel = null;
+        await SaveAsync();
+    }
+
+    private async Task<(double x, double y)> GetPanelPositionAsync(string name)
+    {
+        var prefs = library.Ui;
+        if (name == "ruler" && prefs.RulerPanelX is double rx && prefs.RulerPanelY is double ry) return (rx, ry);
+        if (name == "info" && prefs.InfoPanelX is double ix && prefs.InfoPanelY is double iy) return (ix, iy);
+        try
+        {
+            if (jsModule is not null)
+            {
+                var size = await jsModule.InvokeAsync<JsonElement>("viewportSize");
+                var width = size.GetProperty("width").GetDouble();
+                var height = size.GetProperty("height").GetDouble();
+                if (name == "ruler") return (width - 280 - 40, 40);
+                return (width - 320 - 40, height - 220 - 40);
+            }
+        }
+        catch { }
+        return (40, 40);
+    }
+
+    // ===== Selection info panel content =====
+
+    private static string PanelTitleFor(Shape s) => s.Kind switch
+    {
+        ShapeKind.Tree => $"Tree · {s.Label}",
+        ShapeKind.Bush => $"Bush · {s.Label}",
+        ShapeKind.BedKit => $"Bed Kit · {s.Label}",
+        ShapeKind.Rectangle => "Rectangle",
+        ShapeKind.Oval => "Oval",
+        ShapeKind.FreeDraw => "Freehand",
+        ShapeKind.Ruler => "Ruler",
+        _ => "Item",
+    };
+
+    private static List<string> ShapeInfoLines(Shape s)
+    {
+        var lines = new List<string>();
+        switch (s.Kind)
+        {
+            case ShapeKind.BedKit:
+                lines.Add($"<span class=\"text-muted\">Code:</span> <strong>{Esc(s.Label ?? "")}</strong>");
+                lines.Add($"<span class=\"text-muted\">Footprint:</span> {F(s.W)}' × {F(s.H)}'");
+                lines.Add($"<span class=\"text-muted\">Rotation:</span> {F(s.Rotation)}°");
+                break;
+            case ShapeKind.Tree:
+            case ShapeKind.Bush:
+                lines.Add($"<span class=\"text-muted\">Species:</span> <strong>{Esc(s.Label ?? "")}</strong>");
+                lines.Add($"<span class=\"text-muted\">Mature spread:</span> {F(s.W)}' Ø");
+                if (!string.IsNullOrEmpty(s.Trait))
+                    lines.Add($"<span class=\"text-muted\">Trait:</span> {Esc(s.Trait)}");
+                lines.Add($"<span class=\"text-muted\">Rotation:</span> {F(s.Rotation)}°");
+                break;
+            case ShapeKind.Plant:
+                {
+                    lines.Add($"<span class=\"text-muted\">Plant:</span> <strong>{Esc(s.Label ?? "")}</strong>");
+                    var meta = PaletteCatalog.Plants.FirstOrDefault(p => string.Equals(p.Code, s.Label, StringComparison.OrdinalIgnoreCase));
+                    var badges = new List<string>
+                    {
+                        $"<span class=\"badge badge-spacing\">spacing {FormatPlantSpacing(s.W)}</span>",
+                    };
+                    if (meta is not null)
+                    {
+                        if (!string.IsNullOrEmpty(meta.Sunlight)) badges.Add($"<span class=\"badge badge-sun-{meta.Sunlight}\">☀ {meta.Sunlight}</span>");
+                        if (!string.IsNullOrEmpty(meta.Water))    badges.Add($"<span class=\"badge badge-water-{meta.Water}\">💧 {meta.Water}</span>");
+                        if (meta.DaysToMaturity > 0)              badges.Add($"<span class=\"badge badge-days\">⏱ {meta.DaysToMaturity}d</span>");
+                        if (!string.IsNullOrEmpty(meta.Trait))    badges.Add($"<span class=\"badge badge-trait\">{Esc(meta.Trait)}</span>");
+                    }
+                    lines.Add("<div class=\"badge-row\">" + string.Join("", badges) + "</div>");
+                }
+                break;
+            case ShapeKind.Rectangle:
+            case ShapeKind.Oval:
+                lines.Add($"<span class=\"text-muted\">Size:</span> {F(s.W)}' × {F(s.H)}'");
+                lines.Add($"<span class=\"text-muted\">Rotation:</span> {F(s.Rotation)}°");
+                lines.Add($"<span class=\"text-muted\">Area:</span> {F(s.Kind == ShapeKind.Oval ? Math.PI * s.W * s.H / 4 : s.W * s.H)} ft²");
+                break;
+            case ShapeKind.FreeDraw:
+                {
+                    double total = 0;
+                    for (int i = 1; i < s.Points.Count; i++)
+                        total += Distance(s.Points[i - 1], s.Points[i]);
+                    lines.Add($"<span class=\"text-muted\">Vertices:</span> {s.Points.Count}");
+                    lines.Add($"<span class=\"text-muted\">Path length:</span> {F(total)} ft");
+                }
+                break;
+            case ShapeKind.Ruler:
+                lines.Add("<span class=\"text-muted\">See Ruler panel for length and area.</span>");
+                break;
+        }
+        return lines;
+    }
+
+    private static string Esc(string s) => System.Net.WebUtility.HtmlEncode(s);
+
+    // ===== Wikipedia lookup =====
+
+    private static string WikipediaTopic(string code)
+    {
+        var idx = code.IndexOf('(');
+        return (idx > 0 ? code.Substring(0, idx) : code).Trim();
+    }
+
+    private async Task EnsureWikiSummaryFor(Shape s)
+    {
+        if (s.Kind != ShapeKind.Tree && s.Kind != ShapeKind.Bush)
+        {
+            wikiSummary = null;
+            wikiLoading = false;
+            return;
+        }
+        var topic = WikipediaTopic(s.Label ?? "");
+        if (string.IsNullOrEmpty(topic)) { wikiSummary = null; return; }
+        if (wikiCache.TryGetValue(topic, out var cached))
+        {
+            wikiSummary = cached;
+            wikiLoading = false;
+            return;
+        }
+        wikiLoading = true;
+        wikiSummary = null;
+        StateHasChanged();
+        var result = await FetchWikiSummary(topic);
+        wikiCache[topic] = result;
+        if (lastWikiKey == WikiKeyFor(s))
+        {
+            wikiSummary = result;
+            wikiLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<WikiSummary?> FetchWikiSummary(string topic)
+    {
+        try
+        {
+            var http = HttpFactory.CreateClient();
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("GardenPlotWeb/1.0 (+local)");
+            var url = $"https://en.wikipedia.org/api/rest_v1/page/summary/{Uri.EscapeDataString(topic)}";
+            using var resp = await http.GetAsync(url);
+            if (!resp.IsSuccessStatusCode) return null;
+            using var stream = await resp.Content.ReadAsStreamAsync();
+            using var doc = await JsonDocument.ParseAsync(stream);
+            var root = doc.RootElement;
+            var title = root.TryGetProperty("title", out var tEl) ? tEl.GetString() ?? topic : topic;
+            var extract = root.TryGetProperty("extract", out var ex) ? ex.GetString() ?? "" : "";
+            string? thumb = null;
+            if (root.TryGetProperty("thumbnail", out var th) && th.TryGetProperty("source", out var ts))
+                thumb = ts.GetString();
+            string? page = null;
+            if (root.TryGetProperty("content_urls", out var cu)
+                && cu.TryGetProperty("desktop", out var dt)
+                && dt.TryGetProperty("page", out var pg))
+                page = pg.GetString();
+            page ??= $"https://en.wikipedia.org/wiki/{Uri.EscapeDataString(topic)}";
+            return new WikiSummary(title, extract, thumb, page);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Translates a shape by (dx, dy), handling both bounding-box and point-based kinds.</summary>
+    private static void ShiftShape(Shape s, double dx, double dy)
+    {
+        if (s.Kind == ShapeKind.FreeDraw || s.Kind == ShapeKind.Ruler)
+        {
+            for (int i = 0; i < s.Points.Count; i++)
+                s.Points[i] = new Point(s.Points[i].X + dx, s.Points[i].Y + dy);
+        }
+        else
+        {
+            s.X += dx;
+            s.Y += dy;
+        }
+    }
+
+    private async Task AlignSelected(string mode)
+    {
+        if (currentPlot is null || selectedIds.Count < 2) return;
+        var pairs = SelectedShapes().Select(s => (shape: s, aabb: RotatedAABB(s))).ToList();
+        switch (mode)
+        {
+            case "left":
+                {
+                    var target = pairs.Min(p => p.aabb.minX);
+                    foreach (var p in pairs) ShiftShape(p.shape, target - p.aabb.minX, 0);
+                    break;
+                }
+            case "right":
+                {
+                    var target = pairs.Max(p => p.aabb.maxX);
+                    foreach (var p in pairs) ShiftShape(p.shape, target - p.aabb.maxX, 0);
+                    break;
+                }
+            case "top":
+                {
+                    var target = pairs.Min(p => p.aabb.minY);
+                    foreach (var p in pairs) ShiftShape(p.shape, 0, target - p.aabb.minY);
+                    break;
+                }
+            case "bottom":
+                {
+                    var target = pairs.Max(p => p.aabb.maxY);
+                    foreach (var p in pairs) ShiftShape(p.shape, 0, target - p.aabb.maxY);
+                    break;
+                }
+        }
+        await SaveAsync();
+    }
+
+    /// <summary>Distributes selected shapes with equal gaps along the chosen axis, anchored by the outermost shapes.</summary>
+    private async Task DistributeSelected(bool horizontal)
+    {
+        if (currentPlot is null || selectedIds.Count < 3) return;
+        var pairs = SelectedShapes().Select(s => (shape: s, aabb: RotatedAABB(s))).ToList();
+        if (horizontal)
+        {
+            var ordered = pairs.OrderBy(p => p.aabb.minX).ToList();
+            var totalWidth = ordered.Sum(p => p.aabb.maxX - p.aabb.minX);
+            var span = ordered[^1].aabb.maxX - ordered[0].aabb.minX;
+            var gap = (span - totalWidth) / (ordered.Count - 1);
+            var cursor = ordered[0].aabb.minX;
+            foreach (var (shape, aabb) in ordered)
+            {
+                var dx = cursor - aabb.minX;
+                ShiftShape(shape, dx, 0);
+                cursor += (aabb.maxX - aabb.minX) + gap;
+            }
+        }
+        else
+        {
+            var ordered = pairs.OrderBy(p => p.aabb.minY).ToList();
+            var totalHeight = ordered.Sum(p => p.aabb.maxY - p.aabb.minY);
+            var span = ordered[^1].aabb.maxY - ordered[0].aabb.minY;
+            var gap = (span - totalHeight) / (ordered.Count - 1);
+            var cursor = ordered[0].aabb.minY;
+            foreach (var (shape, aabb) in ordered)
+            {
+                var dy = cursor - aabb.minY;
+                ShiftShape(shape, 0, dy);
+                cursor += (aabb.maxY - aabb.minY) + gap;
+            }
+        }
+        await SaveAsync();
+    }
+
+    private static (double minX, double minY, double maxX, double maxY) RotatedAABB(Shape s)
+    {
+        var b = GetBounds(s);
+        var cx = b.x + b.w / 2;
+        var cy = b.y + b.h / 2;
+        if (s.Rotation == 0) return (b.x, b.y, b.x + b.w, b.y + b.h);
+
+        var rad = s.Rotation * Math.PI / 180.0;
+        var cos = Math.Cos(rad);
+        var sin = Math.Sin(rad);
+
+        double minX = double.MaxValue, minY = double.MaxValue;
+        double maxX = double.MinValue, maxY = double.MinValue;
+        Span<(double x, double y)> corners = stackalloc (double, double)[4]
+        {
+            (b.x,         b.y),
+            (b.x + b.w,   b.y),
+            (b.x + b.w,   b.y + b.h),
+            (b.x,         b.y + b.h),
+        };
+        foreach (var (px, py) in corners)
+        {
+            var dx = px - cx;
+            var dy = py - cy;
+            var rx = cx + dx * cos - dy * sin;
+            var ry = cy + dx * sin + dy * cos;
+            if (rx < minX) minX = rx;
+            if (ry < minY) minY = ry;
+            if (rx > maxX) maxX = rx;
+            if (ry > maxY) maxY = ry;
+        }
+        return (minX, minY, maxX, maxY);
+    }
+
+    private static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+
+    /// <summary>Formats a plant spacing diameter (in feet) as feet-or-inches text.</summary>
+    private static string FormatPlantSpacing(double ft)
+    {
+        if (ft >= 1) return $"{ft:0.#}'";
+        var inches = ft * 12.0;
+        return $"{inches:0}\"";
+    }
+    private static string PointsString(List<Point> pts)
+        => string.Join(' ', pts.Select(p => $"{F(p.X)},{F(p.Y)}"));
+}

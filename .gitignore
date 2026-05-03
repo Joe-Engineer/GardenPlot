@@ -1,0 +1,60 @@
+﻿# Build output
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+out/
+
+# .NET / Aspire / SDK caches
+*.user
+*.userprefs
+*.suo
+*.userosscache
+*.sln.docstates
+*.binlog
+artifacts/
+.aspire/
+
+# Visual Studio
+.vs/
+.vscode/
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Rider / ReSharper
+.idea/
+*.DotSettings.user
+
+# Build / publish output
+publish/
+PublishScripts/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!**/packages/build/
+
+# Test result / coverage
+TestResults/
+*.coverage
+*.coveragexml
+coverage/
+*.lcov
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Misc
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+build.log

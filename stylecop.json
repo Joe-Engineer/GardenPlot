@@ -1,0 +1,18 @@
+﻿{
+  "$schema": "https://raw.githubusercontent.com/DotNetAnalyzers/StyleCopAnalyzers/master/StyleCop.Analyzers/StyleCop.Analyzers/Settings/stylecop.schema.json",
+  "settings": {
+    "documentationRules": {
+      "companyName": "Garden Plot",
+      "copyrightText": "<copyright file=\"{fileName}\" company=\"{companyName}\">\nCopyright (c) {companyName}. All rights reserved.\n</copyright>",
+      "variables": {
+        "fileName": "{fileName}",
+        "companyName": "Garden Plot"
+      },
+      "xmlHeader": true,
+      "fileNamingConvention": "metadata"
+    },
+    "orderingRules": {
+      "usingDirectivesPlacement": "outsideNamespace"
+    }
+  }
+}

@@ -1,0 +1,464 @@
+.plot-toolbar {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.zoom-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.zoom-btn {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    line-height: 1;
+    font-weight: bold;
+}
+
+.zoom-slider {
+    width: 140px;
+    accent-color: #2f5a3a;
+}
+
+.zoom-input {
+    width: 70px;
+    text-align: right;
+}
+
+.align-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.5rem;
+    margin-bottom: 0.5rem;
+    background: #eef3e6;
+    border: 1px solid #b8c8a3;
+    border-radius: 4px;
+    width: fit-content;
+}
+
+.align-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 2px;
+    background: #fff;
+    border: 1px solid #c8c2ad;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.align-btn:hover:not(:disabled) {
+    background: #d8e4c8;
+    border-color: #6b8b3a;
+}
+
+.align-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.align-btn svg {
+    width: 22px;
+    height: 22px;
+}
+
+.align-divider {
+    width: 1px;
+    height: 24px;
+    background: #b8c8a3;
+    margin: 0 0.2rem;
+}
+
+.plot-workspace {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.plot-palette {
+    display: flex;
+    flex-direction: column;
+    width: 240px;
+    background: #fafaf5;
+    border: 1px solid #d8d3c2;
+    border-radius: 4px;
+    /* Fixed height so the inner grid has something to scroll inside. */
+    height: calc(100vh - 220px);
+    min-height: 320px;
+    overflow: hidden;
+}
+
+.palette-header {
+    flex: 0 0 auto;
+    padding: 0.5rem;
+    border-bottom: 1px solid #d8d3c2;
+    background: #fafaf5;
+}
+
+.palette-combobox {
+    width: 100%;
+}
+
+.palette-grid {
+    /* min-height: 0 lets this flex child shrink so overflow-y can take effect. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.4rem;
+    align-content: start;
+}
+
+.palette-tabs {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.25rem;
+}
+
+.palette-tab {
+    flex: 1;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.8rem;
+    background: #fff;
+    border: 1px solid #c8c2ad;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.palette-tab.active {
+    background: #2f5a3a;
+    color: #fff;
+    border-color: #2f5a3a;
+}
+
+.palette-item-name {
+    line-height: 1.1;
+    word-break: break-word;
+    text-align: center;
+}
+
+.palette-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.25rem;
+    background: #fff;
+    border: 1px solid #c8c2ad;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: border-color 0.1s, background 0.1s;
+}
+
+.palette-item:hover {
+    border-color: #6b8b3a;
+    background: #f4f6e8;
+}
+
+.palette-item.active {
+    border-color: #2f5a3a;
+    background: #e6efd9;
+    box-shadow: 0 0 0 2px rgba(47,90,58,0.25);
+}
+
+.palette-item svg {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 2px;
+}
+
+.x-small {
+    font-size: 0.7rem;
+}
+
+.plot-canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #d8d3c2;
+    border-radius: 4px;
+    padding: 0.5rem;
+    position: relative;
+}
+
+.ruler-info {
+    position: sticky;
+    top: 0.25rem;
+    margin-left: auto;
+    margin-bottom: 0.25rem;
+    width: max-content;
+    max-width: 320px;
+    padding: 0.4rem 0.6rem;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid #c81e1e;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    font-size: 0.85rem;
+    z-index: 5;
+}
+
+/* ===== Floating panels (ruler info + selected-item info) ===== */
+
+.floating-panel {
+    position: fixed;
+    width: 280px;
+    background: rgba(255,255,255,0.97);
+    border: 1px solid #b8c8a3;
+    border-radius: 5px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    font-size: 0.85rem;
+    z-index: 1050;
+}
+
+.floating-panel.info-panel {
+    width: 320px;
+    border-color: #6b8b3a;
+}
+
+.floating-panel.ruler-panel {
+    border-color: #c81e1e;
+}
+
+.floating-panel.default-ruler-pos {
+    top: 40px;
+    right: 40px;
+}
+
+.floating-panel.default-info-pos {
+    bottom: 40px;
+    right: 40px;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0.6rem;
+    background: #eef3e6;
+    border-bottom: 1px solid #c8c2ad;
+    border-radius: 5px 5px 0 0;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+
+.floating-panel.ruler-panel .panel-header {
+    background: #fdeeee;
+    border-bottom-color: #e6b3b3;
+}
+
+.panel-header:active {
+    cursor: grabbing;
+}
+
+.panel-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.drag-grip {
+    color: #999;
+    font-size: 1rem;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.panel-header:hover .drag-grip {
+    opacity: 1;
+}
+
+.panel-body {
+    padding: 0.5rem 0.6rem;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.wiki-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.wiki-thumb {
+    align-self: center;
+    max-width: 100%;
+    max-height: 120px;
+    border-radius: 3px;
+    margin-bottom: 0.25rem;
+}
+
+.wiki-extract {
+    color: #444;
+    line-height: 1.35;
+}
+
+/* ===== Plant info badges ===== */
+
+.badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 0.25rem 0;
+}
+
+.badge-row .badge {
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 0.18rem 0.4rem;
+    border-radius: 10px;
+    color: #fff;
+}
+
+.badge-spacing      { background: #6c757d; }
+.badge-sun-full     { background: #e0a000; color: #2a1f00; }
+.badge-sun-partial  { background: #b58a3c; }
+.badge-sun-shade    { background: #4a4a6a; }
+.badge-water-low    { background: #c9a35a; }
+.badge-water-medium { background: #2f88c0; }
+.badge-water-high   { background: #1f558a; }
+.badge-days         { background: #6e9a55; }
+.badge-trait        { background: #4a6a8a; }
+
+/* ===== Companion list ===== */
+
+.companion-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0.25rem 0;
+}
+
+.companion-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.1rem 0;
+}
+
+.comp-marker {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+}
+
+.comp-good .comp-marker    { background: #2f8a2f; }
+.comp-bad .comp-marker     { background: #c81e1e; }
+.comp-neutral .comp-marker { background: #b0b0b0; }
+
+.comp-good    { color: #1f5a1f; }
+.comp-bad     { color: #7a1414; }
+.comp-neutral { color: #555; }
+
+/* ===== Takeoff list ===== */
+
+.takeoff-panel {
+    border: 1px solid #d8d3c2;
+    border-radius: 4px;
+    background: #fafaf5;
+    padding: 0.4rem 0.6rem;
+}
+
+.takeoff-panel > summary {
+    cursor: pointer;
+    user-select: none;
+    list-style-position: outside;
+}
+
+.takeoff-body {
+    margin-top: 0.5rem;
+}
+
+.takeoff-table {
+    font-size: 0.85rem;
+}
+
+.takeoff-table th {
+    background: #eef3e6;
+}
+
+/* ===== Selection panel: multi-select list + color controls ===== */
+
+.selection-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0.25rem 0 0.5rem 0;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.selection-list li {
+    padding: 0.1rem 0;
+}
+
+.color-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.25rem 0;
+}
+
+.color-row label {
+    width: 50px;
+    margin: 0;
+}
+
+.color-row input[type="color"] {
+    width: 32px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid #c8c2ad;
+    border-radius: 3px;
+    cursor: pointer;
+    background: transparent;
+}
+
+.color-row input[type="color"].mixed {
+    border-style: dashed;
+    border-color: #b58a3c;
+    background: repeating-linear-gradient(
+        45deg,
+        #ddd 0,
+        #ddd 4px,
+        #fff 4px,
+        #fff 8px);
+}
+
+.color-row input[type="range"] {
+    flex: 1;
+    accent-color: #2f5a3a;
+}
+
+.color-row input[type="range"].mixed {
+    opacity: 0.6;
+}
+
+/* Width/height are set inline per-plot (16 px/ft). Keep PxPerFt in code-behind in sync. */
+.plot-canvas {
+    display: block;
+    touch-action: none;
+    cursor: crosshair;
+    user-select: none;
+}
+
+.plot-canvas:focus,
+.plot-canvas:focus-visible {
+    outline: none;
+}
+
+::deep .shape {
+    cursor: move;
+}
+
+::deep .shape.selected {
+    filter: drop-shadow(0 0 1px #0d6efd);
+}
