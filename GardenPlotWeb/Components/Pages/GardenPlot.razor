@@ -46,7 +46,11 @@ else
             <button class="btn btn-sm @(currentTool == t.Value ? "btn-primary" : "btn-outline-primary")"
                     @onclick="() => SetTool(t.Value)">@t.Key</button>
         }
+        <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="CopySelected" disabled="@(selectedIds.Count == 0)">Copy</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="PasteClipboard" disabled="@(!HasClipboard)">Paste</button>
         <button class="btn btn-sm btn-outline-danger ms-2" @onclick="DeleteSelected" disabled="@(selectedIds.Count == 0)">Delete</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="SendSelectionToBack" disabled="@(selectedIds.Count == 0)" title="Send selected items behind others">Send to Back</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="BringSelectionToFront" disabled="@(selectedIds.Count == 0)" title="Move selected items in front of others">Bring to Front</button>
         <button class="btn btn-sm btn-outline-secondary" @onclick="ClearAll">Clear All</button>
         <span class="ms-3 small text-muted">Tool: <strong>@currentTool</strong></span>
         <span class="zoom-controls ms-3">
@@ -59,6 +63,8 @@ else
                    @oninput="OnZoomTextInput" @onkeydown="OnZoomTextKey" @onblur="ApplyZoomFromText" />
             <button class="btn btn-sm btn-link p-0 ms-1 small" @onclick="ZoomReset" title="Reset zoom">reset</button>
         </span>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ResetControls" title="Reset tool mode, zoom, and floating panel positions">Reset Controls</button>
+        <span class="small text-muted ms-2">Rotate: Ctrl+wheel (fine), Alt+wheel or [ / ] (coarse)</span>
         <span class="ms-auto d-flex gap-1">
             <button class="btn btn-sm btn-outline-secondary" @onclick="ExportPng" title="Export the plot as a PNG image">PNG</button>
             <button class="btn btn-sm btn-outline-secondary" @onclick="PrintPlot" title="Open print preview (use 'Save as PDF' from the print dialog)">Print / PDF</button>
@@ -151,6 +157,7 @@ else
                  viewBox="0 0 @F(PlotWidthFt) @F(PlotHeightFt)"
                  preserveAspectRatio="xMidYMid meet"
                  @onkeydown="OnKeyDown"
+                 @onkeydown:preventDefault="true"
                  @onpointerdown="OnPointerDown"
                  @onpointermove="OnPointerMove"
                  @onpointerup="OnPointerUp"
@@ -194,7 +201,10 @@ else
                        transform="rotate(@F(s.Rotation) @F(scx) @F(scy))"
                        pointer-events="@(currentTool == Tool.Select ? "auto" : "none")"
                        @onpointerdown="(e) => OnShapePointerDown(e, s)"
-                       @onpointerdown:stopPropagation="true">
+                       @onpointerdown:stopPropagation="true"
+                       @oncontextmenu="(e) => OnShapeContextMenu(e, s)"
+                       @oncontextmenu:preventDefault="true"
+                       @oncontextmenu:stopPropagation="true">
                         @switch (s.Kind)
                         {
                             case ShapeKind.Rectangle:
@@ -298,6 +308,76 @@ else
                     }
                 }
 
+                @if (currentTool == Tool.Select && isBoxSelecting)
+                {
+                    var bx = Math.Min(boxSelectStartX, boxSelectCurrentX);
+                    var by = Math.Min(boxSelectStartY, boxSelectCurrentY);
+                    var bw = Math.Abs(boxSelectCurrentX - boxSelectStartX);
+                    var bh = Math.Abs(boxSelectCurrentY - boxSelectStartY);
+                    <rect x="@F(bx)" y="@F(by)" width="@F(bw)" height="@F(bh)"
+                          fill="rgba(13,110,253,0.12)" stroke="#0d6efd" stroke-width="0.05"
+                          stroke-dasharray="0.15,0.1" pointer-events="none" />
+                }
+
+                @if (currentTool == Tool.Select && isPasteMode && pasteHoverX is { } phx && pasteHoverY is { } phy && clipboard.Count > 0)
+                {
+                    var previewShapes = BuildClipboardShapesAt(phx, phy, assignNewIds: false);
+                    <g pointer-events="none" opacity="0.45">
+                        @foreach (var s in previewShapes)
+                        {
+                            var sb = GetBounds(s);
+                            var scx = sb.x + sb.w / 2;
+                            var scy = sb.y + sb.h / 2;
+                            <g transform="rotate(@F(s.Rotation) @F(scx) @F(scy))">
+                                @switch (s.Kind)
+                                {
+                                    case ShapeKind.Rectangle:
+                                        <rect x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
+                                              fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
+                                              stroke="@EffectiveStroke(s)" stroke-width="0.06" stroke-dasharray="0.12,0.08" />
+                                        break;
+                                    case ShapeKind.Oval:
+                                        <ellipse cx="@F(s.X + s.W / 2)" cy="@F(s.Y + s.H / 2)"
+                                                 rx="@F(s.W / 2)" ry="@F(s.H / 2)"
+                                                 fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
+                                                 stroke="@EffectiveStroke(s)" stroke-width="0.06" stroke-dasharray="0.12,0.08" />
+                                        break;
+                                    case ShapeKind.FreeDraw:
+                                        <polyline points="@PointsString(s.Points)"
+                                                  fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.08"
+                                                  stroke-linecap="round" stroke-linejoin="round"
+                                                  stroke-dasharray="0.12,0.08" />
+                                        break;
+                                    case ShapeKind.Ruler:
+                                        <polyline points="@PointsString(s.Points)"
+                                                  fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.06"
+                                                  stroke-linecap="round" stroke-linejoin="round"
+                                                  stroke-dasharray="0.12,0.08" />
+                                        @foreach (var p in s.Points)
+                                        {
+                                            <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.08"
+                                                    fill="#fff" stroke="@EffectiveStroke(s)" stroke-width="0.04" />
+                                        }
+                                        break;
+                                    case ShapeKind.BedKit:
+                                        @((MarkupString)BedKitGhostSvg(s.X, s.Y, s.W, s.H, s.Label ?? string.Empty))
+                                        break;
+                                    case ShapeKind.Tree:
+                                        @((MarkupString)PlantRendering.TreeSvg(s.X, s.Y, s.W, s.H, s.Trait, s.Label))
+                                        break;
+                                    case ShapeKind.Bush:
+                                        @((MarkupString)PlantRendering.BushSvg(s.X, s.Y, s.W, s.H, s.Trait, s.Label))
+                                        break;
+                                    case ShapeKind.Plant:
+                                        @((MarkupString)PlantRendering.SpacingRingsSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, "good"))
+                                        @((MarkupString)PlantRendering.PlantSpriteSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, s.Trait))
+                                        break;
+                                }
+                            </g>
+                        }
+                    </g>
+                }
+
                 @if (currentTool == Tool.Stamp && selectedItem is { } gk && ghostX is { } gx && ghostY is { } gy)
                 {
                     var (ghx, ghy) = RotatedHalfExtents(gk.WidthFt, gk.HeightFt, stampRotation);
@@ -328,6 +408,15 @@ else
             </svg>
         </div>
     </div>
+
+    @if (showShapeContextMenu)
+    {
+        <div class="shape-context-menu" style="left:@F(shapeContextMenuX)px;top:@F(shapeContextMenuY)px;"
+             @onpointerdown:stopPropagation="true">
+            <button type="button" @onclick="BringSelectionToFrontFromMenu">Bring to Front</button>
+            <button type="button" @onclick="SendSelectionToBackFromMenu">Send to Back</button>
+        </div>
+    }
 }
 
 @if (currentPlot is not null)
@@ -392,6 +481,7 @@ else
     var area = EnclosedArea(infoRuler.Points);
     var positioned = library.Ui.RulerPanelX is double && library.Ui.RulerPanelY is double;
     <div class="floating-panel ruler-panel @(positioned ? "" : "default-ruler-pos")"
+         @ref="rulerPanelRef"
          style="@(positioned ? $"left:{library.Ui.RulerPanelX!.Value}px;top:{library.Ui.RulerPanelY!.Value}px;" : "")">
         <div class="panel-header"
              @onpointerdown="StartRulerPanelDrag"
@@ -436,6 +526,7 @@ else
     var opValue     = opMixed     ? 0.5       : (opSet.Count == 1     ? opSet[0]     : 1.0);
 
     <div class="floating-panel info-panel @(positioned ? "" : "default-info-pos")"
+         @ref="infoPanelRef"
          style="@(positioned ? $"left:{library.Ui.InfoPanelX!.Value}px;top:{library.Ui.InfoPanelY!.Value}px;" : "")">
         <div class="panel-header"
              @onpointerdown="StartInfoPanelDrag"
@@ -475,13 +566,18 @@ else
                                           .OrderBy(g => g.Key.Kind, StringComparer.Ordinal)
                                           .ThenBy(g => g.Key.Name, StringComparer.Ordinal))
                     {
-                        <li>
-                            <span class="text-muted">@grp.Key.Kind:</span>
-                            <strong>@grp.Key.Name</strong>
-                            @if (grp.Count() > 1)
-                            {
-                                <span class="text-muted">× @grp.Count()</span>
-                            }
+                        <li class="selection-item-row">
+                            <span class="selection-item-text">
+                                <span class="text-muted">@grp.Key.Kind:</span>
+                                <strong>@grp.Key.Name</strong>
+                                @if (grp.Count() > 1)
+                                {
+                                    <span class="text-muted">× @grp.Count()</span>
+                                }
+                            </span>
+                            <button class="selection-remove-btn"
+                                    title="Remove these items from selection"
+                                    @onclick='() => RemoveSelectionGroup(grp.Key.Kind, grp.Key.Name)'>×</button>
                         </li>
                     }
                 </ul>
@@ -680,8 +776,23 @@ else
     private readonly List<Guid> selectedIds = new();
     private ElementReference canvasRef;
     private ElementReference wrapRef;
+    private ElementReference rulerPanelRef;
+    private ElementReference infoPanelRef;
+    private readonly List<Shape> clipboard = new();
+    private readonly Stack<List<Shape>> undoStack = new();
+    private double? pasteAnchorX;
+    private double? pasteAnchorY;
+    private bool isPasteMode;
+    private double? pasteHoverX;
+    private double? pasteHoverY;
+    private double? lastCanvasX;
+    private double? lastCanvasY;
+    private bool showShapeContextMenu;
+    private double shapeContextMenuX;
+    private double shapeContextMenuY;
 
     private Guid? PrimarySelectedId => selectedIds.Count > 0 ? selectedIds[^1] : null;
+    private bool HasClipboard => clipboard.Count > 0;
     private bool IsSelected(Guid id) => selectedIds.Contains(id);
     private void SelectOnly(Guid id) { selectedIds.Clear(); selectedIds.Add(id); }
     private void ToggleSelection(Guid id) { if (!selectedIds.Remove(id)) selectedIds.Add(id); }
@@ -901,6 +1012,10 @@ else
     private double dragStartX, dragStartY;
     private double dragUnionMinX, dragUnionMinY, dragUnionMaxX, dragUnionMaxY;
     private readonly List<DragSnap> dragSnaps = new();
+    private bool isBoxSelecting;
+    private bool boxSelectAdditive;
+    private double boxSelectStartX, boxSelectStartY;
+    private double boxSelectCurrentX, boxSelectCurrentY;
 
     private sealed class DragSnap
     {
@@ -918,6 +1033,97 @@ else
     private double newPlotHeight = 8;
 
     private bool loaded;
+
+    private void RecordUndoState()
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        undoStack.Push(currentPlot.Shapes.Select(s => CloneShape(s, assignNewId: false)).ToList());
+    }
+
+    private async Task UndoLastOperation()
+    {
+        if (currentPlot is null || undoStack.Count == 0)
+        {
+            return;
+        }
+
+        currentPlot.Shapes = undoStack.Pop();
+        ClearSelection();
+        await SaveAsync();
+    }
+
+    private void HideShapeContextMenu()
+    {
+        showShapeContextMenu = false;
+    }
+
+    private async Task BringSelectionToFront()
+    {
+        if (currentPlot is null || selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        var selected = selectedIds.ToHashSet();
+        var reordered = currentPlot.Shapes.Where(s => !selected.Contains(s.Id))
+            .Concat(currentPlot.Shapes.Where(s => selected.Contains(s.Id)))
+            .ToList();
+
+        if (currentPlot.Shapes.Select(s => s.Id).SequenceEqual(reordered.Select(s => s.Id)))
+        {
+            return;
+        }
+
+        RecordUndoState();
+        currentPlot.Shapes = reordered;
+        await SaveAsync();
+    }
+
+    private async Task SendSelectionToBack()
+    {
+        if (currentPlot is null || selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        var selected = selectedIds.ToHashSet();
+        var reordered = currentPlot.Shapes.Where(s => selected.Contains(s.Id))
+            .Concat(currentPlot.Shapes.Where(s => !selected.Contains(s.Id)))
+            .ToList();
+
+        if (currentPlot.Shapes.Select(s => s.Id).SequenceEqual(reordered.Select(s => s.Id)))
+        {
+            return;
+        }
+
+        RecordUndoState();
+        currentPlot.Shapes = reordered;
+        await SaveAsync();
+    }
+
+    private async Task BringSelectionToFrontFromMenu()
+    {
+        await BringSelectionToFront();
+        HideShapeContextMenu();
+    }
+
+    private async Task SendSelectionToBackFromMenu()
+    {
+        await SendSelectionToBack();
+        HideShapeContextMenu();
+    }
+
+    private void TryCaptureCanvasPointer(long pointerId)
+    {
+        if (jsModule is not null)
+        {
+            _ = jsModule.InvokeVoidAsync("capturePointer", canvasRef, pointerId).AsTask();
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -989,6 +1195,64 @@ else
                 wikiLoading = false;
             }
         }
+
+        await EnsureFloatingPanelsInViewAsync();
+    }
+
+    private async Task EnsureFloatingPanelsInViewAsync()
+    {
+        if (jsModule is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var size = await jsModule.InvokeAsync<JsonElement>("viewportSize");
+            var width = size.GetProperty("width").GetDouble();
+            var height = size.GetProperty("height").GetDouble();
+            var changed = false;
+
+            // Info panel nominal size from CSS: width 320, variable height. Clamp conservatively.
+            if (library.Ui.InfoPanelX is double ix && library.Ui.InfoPanelY is double iy)
+            {
+                var maxX = Math.Max(PanelEdgePadding, width - 320 - PanelEdgePadding);
+                var maxY = Math.Max(PanelEdgePadding, height - 140 - PanelEdgePadding);
+                var nx = Math.Clamp(ix, PanelEdgePadding, maxX);
+                var ny = Math.Clamp(iy, PanelEdgePadding, maxY);
+                if (Math.Abs(nx - ix) > 0.01 || Math.Abs(ny - iy) > 0.01)
+                {
+                    library.Ui.InfoPanelX = nx;
+                    library.Ui.InfoPanelY = ny;
+                    changed = true;
+                }
+            }
+
+            // Ruler panel nominal size from CSS: width 280.
+            if (library.Ui.RulerPanelX is double rx && library.Ui.RulerPanelY is double ry)
+            {
+                var maxX = Math.Max(PanelEdgePadding, width - 280 - PanelEdgePadding);
+                var maxY = Math.Max(PanelEdgePadding, height - 120 - PanelEdgePadding);
+                var nx = Math.Clamp(rx, PanelEdgePadding, maxX);
+                var ny = Math.Clamp(ry, PanelEdgePadding, maxY);
+                if (Math.Abs(nx - rx) > 0.01 || Math.Abs(ny - ry) > 0.01)
+                {
+                    library.Ui.RulerPanelX = nx;
+                    library.Ui.RulerPanelY = ny;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                await SaveAsync();
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+            // ignore viewport/interp failures
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -1019,12 +1283,29 @@ else
         if (Guid.TryParse(e.Value?.ToString(), out var id))
         {
             currentPlot = library.Plots.FirstOrDefault(p => p.Id == id);
+            undoStack.Clear();
             ClearSelection();
             selectedItem = null;
             currentTool = Tool.Select;
             ghostX = ghostY = null;
             await SaveAsync();
         }
+    }
+
+    private async Task ResetControls()
+    {
+        currentTool = Tool.Select;
+        selectedItem = null;
+        drafting = null;
+        ghostX = ghostY = null;
+        isPasteMode = false;
+        pasteHoverX = pasteHoverY = null;
+        SetZoom(1.0);
+        library.Ui.RulerPanelX = null;
+        library.Ui.RulerPanelY = null;
+        library.Ui.InfoPanelX = null;
+        library.Ui.InfoPanelY = null;
+        await SaveAsync();
     }
 
     private void ShowNewPlotDialog()
@@ -1050,6 +1331,7 @@ else
         };
         library.Plots.Add(p);
         currentPlot = p;
+        undoStack.Clear();
         ClearSelection();
         selectedItem = null;
         currentTool = Tool.Select;
@@ -1062,6 +1344,7 @@ else
         if (currentPlot is null || library.Plots.Count <= 1) return;
         library.Plots.Remove(currentPlot);
         currentPlot = library.Plots[0];
+        undoStack.Clear();
         ClearSelection();
         selectedItem = null;
         currentTool = Tool.Select;
@@ -1079,6 +1362,12 @@ else
         if (t != Tool.Ruler && drafting?.Kind == ShapeKind.Ruler)
         {
             drafting = null;
+        }
+
+        if (t != Tool.Select)
+        {
+            isPasteMode = false;
+            pasteHoverX = pasteHoverY = null;
         }
     }
 
@@ -1137,6 +1426,8 @@ else
     private async Task ClearAll()
     {
         if (currentPlot is null) return;
+        if (currentPlot.Shapes.Count == 0) return;
+        RecordUndoState();
         currentPlot.Shapes.Clear();
         ClearSelection();
         await SaveAsync();
@@ -1145,10 +1436,125 @@ else
     private async Task DeleteSelected()
     {
         if (currentPlot is null || selectedIds.Count == 0) return;
+        RecordUndoState();
         var ids = selectedIds.ToHashSet();
         currentPlot.Shapes.RemoveAll(s => ids.Contains(s.Id));
         ClearSelection();
         await SaveAsync();
+    }
+
+    private void CopySelected()
+    {
+        clipboard.Clear();
+        foreach (var s in SelectedShapes())
+        {
+            clipboard.Add(CloneShape(s, assignNewId: false));
+        }
+
+        if (clipboard.Count > 0)
+        {
+            currentTool = Tool.Select;
+            selectedItem = null;
+            ghostX = ghostY = null;
+            isPasteMode = true;
+            var groupAabb = UnionAabb(clipboard);
+            var startX = lastCanvasX ?? pasteHoverX ?? pasteAnchorX ?? Math.Clamp(groupAabb.minX + 1, 0, PlotWidthFt);
+            var startY = lastCanvasY ?? pasteHoverY ?? pasteAnchorY ?? Math.Clamp(groupAabb.minY + 1, 0, PlotHeightFt);
+            pasteHoverX = startX;
+            pasteHoverY = startY;
+            pasteAnchorX = startX;
+            pasteAnchorY = startY;
+        }
+    }
+
+    private async Task PasteClipboard()
+    {
+        if (currentPlot is null || clipboard.Count == 0)
+        {
+            return;
+        }
+
+        var groupAabb = UnionAabb(clipboard);
+        var targetX = pasteAnchorX ?? Math.Clamp(groupAabb.minX + 1, 0, PlotWidthFt);
+        var targetY = pasteAnchorY ?? Math.Clamp(groupAabb.minY + 1, 0, PlotHeightFt);
+        await PasteClipboardAt(targetX, targetY);
+        isPasteMode = true;
+    }
+
+    private async Task PasteClipboardAt(double targetX, double targetY)
+    {
+        if (currentPlot is null || clipboard.Count == 0)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        var pasted = BuildClipboardShapesAt(targetX, targetY, assignNewIds: true);
+
+        foreach (var s in pasted)
+        {
+            currentPlot.Shapes.Add(s);
+        }
+
+        selectedIds.Clear();
+        selectedIds.AddRange(pasted.Select(s => s.Id));
+        await SaveAsync();
+    }
+
+    private List<Shape> BuildClipboardShapesAt(double targetX, double targetY, bool assignNewIds)
+    {
+        var shapes = clipboard.Select(s => CloneShape(s, assignNewId: assignNewIds)).ToList();
+        var groupAabb = UnionAabb(shapes);
+        var dx = targetX - groupAabb.minX;
+        var dy = targetY - groupAabb.minY;
+        dx = SafeClamp(dx, -groupAabb.minX, PlotWidthFt - groupAabb.maxX);
+        dy = SafeClamp(dy, -groupAabb.minY, PlotHeightFt - groupAabb.maxY);
+        foreach (var s in shapes)
+        {
+            ShiftShape(s, dx, dy);
+        }
+
+        return shapes;
+    }
+
+    private static Shape CloneShape(Shape source, bool assignNewId)
+    {
+        return new Shape
+        {
+            Id = assignNewId ? Guid.NewGuid() : source.Id,
+            Kind = source.Kind,
+            X = source.X,
+            Y = source.Y,
+            W = source.W,
+            H = source.H,
+            Rotation = source.Rotation,
+            Points = source.Points.Select(p => new Point(p.X, p.Y)).ToList(),
+            Label = source.Label,
+            Trait = source.Trait,
+            Stroke = source.Stroke,
+            Fill = source.Fill,
+            FillOpacity = source.FillOpacity,
+        };
+    }
+
+    private static (double minX, double minY, double maxX, double maxY) UnionAabb(IReadOnlyList<Shape> shapes)
+    {
+        var first = RotatedAABB(shapes[0]);
+        double minX = first.minX;
+        double minY = first.minY;
+        double maxX = first.maxX;
+        double maxY = first.maxY;
+
+        for (int i = 1; i < shapes.Count; i++)
+        {
+            var b = RotatedAABB(shapes[i]);
+            if (b.minX < minX) minX = b.minX;
+            if (b.minY < minY) minY = b.minY;
+            if (b.maxX > maxX) maxX = b.maxX;
+            if (b.maxY > maxY) maxY = b.maxY;
+        }
+
+        return (minX, minY, maxX, maxY);
     }
 
     private (double x, double y) ToFt(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
@@ -1158,8 +1564,16 @@ else
     {
         if (currentPlot is null) return;
 
+        HideShapeContextMenu();
+
         // Ensure the canvas has keyboard focus so Delete/Backspace work.
         _ = canvasRef.FocusAsync(preventScroll: true).AsTask();
+        TryCaptureCanvasPointer(e.PointerId);
+
+        if (e.Button != 0)
+        {
+            return;
+        }
 
         // Ctrl + drag = pan (except in Ruler tool, where Ctrl+click adds a vertex).
         if (e.CtrlKey && currentTool != Tool.Ruler)
@@ -1174,11 +1588,29 @@ else
         var (x, y) = ToFt(e);
         x = Math.Clamp(x, 0, PlotWidthFt);
         y = Math.Clamp(y, 0, PlotHeightFt);
+        lastCanvasX = x;
+        lastCanvasY = y;
+        pasteAnchorX = x;
+        pasteAnchorY = y;
+        pasteHoverX = x;
+        pasteHoverY = y;
 
         switch (currentTool)
         {
             case Tool.Select:
+                if (isPasteMode)
+                {
+                    _ = PasteClipboardAt(x, y);
+                    break;
+                }
+
                 if (!e.ShiftKey) ClearSelection();
+                isBoxSelecting = true;
+                boxSelectAdditive = e.ShiftKey;
+                boxSelectStartX = x;
+                boxSelectStartY = y;
+                boxSelectCurrentX = x;
+                boxSelectCurrentY = y;
                 break;
             case Tool.FreeDraw:
                 drafting = new Shape { Kind = ShapeKind.FreeDraw };
@@ -1213,6 +1645,7 @@ else
                     if (drafting.Points.Count >= 2 &&
                         Distance(drafting.Points[0], drafting.Points[^1]) > 0 || drafting.Points.Count > 2)
                     {
+                        RecordUndoState();
                         currentPlot.Shapes.Add(drafting);
                         SelectOnly(drafting.Id);
                         _ = SaveAsync();
@@ -1241,6 +1674,7 @@ else
                     Label = k.Code,
                     Trait = k.Trait,
                 };
+                RecordUndoState();
                 currentPlot.Shapes.Add(s);
                 _ = SaveAsync();
                 break;
@@ -1270,6 +1704,23 @@ else
         }
 
         var (x, y) = ToFt(e);
+        x = Math.Clamp(x, 0, PlotWidthFt);
+        y = Math.Clamp(y, 0, PlotHeightFt);
+        lastCanvasX = x;
+        lastCanvasY = y;
+
+        if (currentTool == Tool.Select && isPasteMode)
+        {
+            pasteHoverX = x;
+            pasteHoverY = y;
+        }
+
+        if (isBoxSelecting)
+        {
+            boxSelectCurrentX = x;
+            boxSelectCurrentY = y;
+            return;
+        }
 
         if (currentTool == Tool.Stamp && selectedItem is not null)
         {
@@ -1340,6 +1791,40 @@ else
             return;
         }
 
+        if (isBoxSelecting)
+        {
+            var minX = Math.Min(boxSelectStartX, boxSelectCurrentX);
+            var minY = Math.Min(boxSelectStartY, boxSelectCurrentY);
+            var maxX = Math.Max(boxSelectStartX, boxSelectCurrentX);
+            var maxY = Math.Max(boxSelectStartY, boxSelectCurrentY);
+            isBoxSelecting = false;
+
+            const double minBoxSize = 0.1;
+            if ((maxX - minX) >= minBoxSize && (maxY - minY) >= minBoxSize)
+            {
+                if (!boxSelectAdditive)
+                {
+                    selectedIds.Clear();
+                }
+
+                foreach (var shape in currentPlot.Shapes)
+                {
+                    var aabb = RotatedAABB(shape);
+                    if (aabb.maxX < minX || aabb.minX > maxX || aabb.maxY < minY || aabb.minY > maxY)
+                    {
+                        continue;
+                    }
+
+                    if (!selectedIds.Contains(shape.Id))
+                    {
+                        selectedIds.Add(shape.Id);
+                    }
+                }
+            }
+
+            return;
+        }
+
         if (drafting is null) return;
         // Rulers are finalized on pointer-down only (multi-click flow).
         if (drafting.Kind == ShapeKind.Ruler) return;
@@ -1347,11 +1832,18 @@ else
         var added = false;
         if (drafting.Kind == ShapeKind.FreeDraw)
         {
-            if (drafting.Points.Count >= 2) { currentPlot.Shapes.Add(drafting); added = true; }
+            if (drafting.Points.Count >= 2)
+            {
+                RecordUndoState();
+                currentPlot.Shapes.Add(drafting);
+                added = true;
+            }
         }
         else if (drafting.W >= minSize && drafting.H >= minSize)
         {
-            currentPlot.Shapes.Add(drafting); added = true;
+            RecordUndoState();
+            currentPlot.Shapes.Add(drafting);
+            added = true;
         }
         drafting = null;
         if (added) _ = SaveAsync();
@@ -1360,6 +1852,9 @@ else
     private void OnShapePointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, Shape s)
     {
         if (currentTool != Tool.Select) return;
+        if (e.Button != 0) return;
+
+        TryCaptureCanvasPointer(e.PointerId);
 
         if (e.ShiftKey)
         {
@@ -1374,7 +1869,30 @@ else
         }
 
         var (x, y) = ToFt(e);
+        x = Math.Clamp(x, 0, PlotWidthFt);
+        y = Math.Clamp(y, 0, PlotHeightFt);
+        lastCanvasX = x;
+        lastCanvasY = y;
+        pasteAnchorX = Math.Clamp(x, 0, PlotWidthFt);
+        pasteAnchorY = Math.Clamp(y, 0, PlotHeightFt);
         StartDrag(x, y);
+    }
+
+    private void OnShapeContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, Shape s)
+    {
+        if (currentTool != Tool.Select || currentPlot is null)
+        {
+            return;
+        }
+
+        if (!IsSelected(s.Id))
+        {
+            SelectOnly(s.Id);
+        }
+
+        shapeContextMenuX = e.ClientX;
+        shapeContextMenuY = e.ClientY;
+        showShapeContextMenu = true;
     }
 
     private void StartDrag(double ftX, double ftY)
@@ -1407,18 +1925,18 @@ else
     private void OnWheel(Microsoft.AspNetCore.Components.Web.WheelEventArgs e)
     {
         // Kept for compatibility but no longer wired to the SVG; OnWheelFromJs is the live path.
-        HandleWheel(e.DeltaY, e.ShiftKey, e.CtrlKey);
+        HandleWheel(e.DeltaY, e.ShiftKey, e.CtrlKey, e.AltKey);
     }
 
     [JSInvokable]
-    public Task OnWheelFromJs(double deltaY, bool shift, bool ctrl)
+    public Task OnWheelFromJs(double deltaY, bool shift, bool ctrl, bool alt)
     {
-        HandleWheel(deltaY, shift, ctrl);
+        HandleWheel(deltaY, shift, ctrl, alt);
         StateHasChanged();
         return Task.CompletedTask;
     }
 
-    private void HandleWheel(double deltaY, bool shift, bool ctrl)
+    private void HandleWheel(double deltaY, bool shift, bool ctrl, bool alt)
     {
         if (currentPlot is null) return;
 
@@ -1430,11 +1948,12 @@ else
             return;
         }
 
-        // Ctrl = rotate the active shape (or the stamp ghost). 1 deg per tick.
-        if (!ctrl) return;
+        // Ctrl/Alt = rotate the active shape (or the stamp ghost).
+        // Ctrl = fine (1°), Alt = coarse (15°).
+        if (!ctrl && !alt) return;
 
         var dir = deltaY > 0 ? 1 : -1;
-        var delta = dir * 1.0;
+        var delta = dir * (alt ? 15.0 : 1.0);
 
         if (currentTool == Tool.Stamp && selectedItem is not null)
         {
@@ -1462,23 +1981,117 @@ else
     private void OnPointerLeave(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
         ghostX = ghostY = null;
+        pasteHoverX = pasteHoverY = null;
     }
 
     private async Task OnKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
     {
-        if (e.Key == "Delete" || e.Key == "Backspace")
+        if (e.CtrlKey && string.Equals(e.Key, "z", StringComparison.OrdinalIgnoreCase))
+        {
+            await UndoLastOperation();
+        }
+        else if (e.CtrlKey && string.Equals(e.Key, "a", StringComparison.OrdinalIgnoreCase))
+        {
+            SelectAllShapes();
+        }
+        else if (e.CtrlKey && string.Equals(e.Key, "c", StringComparison.OrdinalIgnoreCase))
+        {
+            CopySelected();
+        }
+        else if (e.CtrlKey && string.Equals(e.Key, "v", StringComparison.OrdinalIgnoreCase))
+        {
+            await PasteClipboard();
+        }
+        else if (e.Key == "Delete" || e.Key == "Backspace")
         {
             if (selectedIds.Count > 0)
             {
                 await DeleteSelected();
             }
         }
+        else if (e.Key == "[" || e.Key == "]")
+        {
+            var delta = e.Key == "[" ? -15.0 : 15.0;
+            await RotateSelectionOrStamp(delta);
+        }
         else if (e.Key == "Escape")
         {
-            // Cancel drafting and deselect.
+            // Cancel drafting and return to select mode.
+            HideShapeContextMenu();
+            currentTool = Tool.Select;
+            isPasteMode = false;
+            pasteHoverX = pasteHoverY = null;
+            selectedItem = null;
+            ghostX = ghostY = null;
             drafting = null;
             ClearSelection();
         }
+    }
+
+    private void SelectAllShapes()
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        selectedIds.Clear();
+        selectedIds.AddRange(currentPlot.Shapes.Select(s => s.Id));
+    }
+
+    private void RemoveSelectionGroup(string kind, string name)
+    {
+        if (currentPlot is null || selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        var drop = SelectedShapes()
+            .Where(s => string.Equals(TakeoffKind(s.Kind), kind, StringComparison.Ordinal)
+                        && string.Equals(TakeoffName(s), name, StringComparison.Ordinal))
+            .Select(s => s.Id)
+            .ToHashSet();
+
+        selectedIds.RemoveAll(id => drop.Contains(id));
+    }
+
+    private async Task RotateSelectionOrStamp(double delta)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        if (currentTool == Tool.Stamp && selectedItem is not null)
+        {
+            stampRotation = ((stampRotation + delta) % 360 + 360) % 360;
+            currentPlot.KitRotations[selectedItem.Code] = stampRotation;
+            await SaveAsync();
+            return;
+        }
+
+        if (selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var s in SelectedShapes().ToList())
+        {
+            s.Rotation = ((s.Rotation + delta) % 360 + 360) % 360;
+            var aabb = RotatedAABB(s);
+            double tx = 0;
+            double ty = 0;
+            if (aabb.minX < 0) tx = -aabb.minX;
+            else if (aabb.maxX > PlotWidthFt) tx = PlotWidthFt - aabb.maxX;
+            if (aabb.minY < 0) ty = -aabb.minY;
+            else if (aabb.maxY > PlotHeightFt) ty = PlotHeightFt - aabb.maxY;
+            if (tx != 0 || ty != 0)
+            {
+                ShiftShape(s, tx, ty);
+            }
+        }
+
+        await SaveAsync();
     }
 
     private static (double x, double y, double w, double h) GetBounds(Shape s)
@@ -1726,12 +2339,8 @@ else
     private async Task StartPanelDrag(string name, Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
         draggingPanel = name;
-        if (jsModule is not null)
-        {
-            try { /* setPointerCapture is on the element; we use the JS helper indirectly via the @onpointerdown target. */ }
-            catch { }
-        }
-        var (curX, curY) = await GetPanelPositionAsync(name);
+        var panelElement = name == "ruler" ? rulerPanelRef : infoPanelRef;
+        var (curX, curY) = await GetPanelClientPositionAsync(panelElement, name);
         panelDragOffsetX = e.ClientX - curX;
         panelDragOffsetY = e.ClientY - curY;
         // Persist the explicit position immediately so the panel stops using its default-position class.
@@ -1745,6 +2354,24 @@ else
             library.Ui.InfoPanelX = curX;
             library.Ui.InfoPanelY = curY;
         }
+    }
+
+    private async Task<(double x, double y)> GetPanelClientPositionAsync(ElementReference panel, string name)
+    {
+        try
+        {
+            if (jsModule is not null)
+            {
+                var pos = await jsModule.InvokeAsync<JsonElement>("elementClientPosition", panel);
+                return (pos.GetProperty("x").GetDouble(), pos.GetProperty("y").GetDouble());
+            }
+        }
+        catch
+        {
+            // fall back to persisted/default positions
+        }
+
+        return await GetPanelPositionAsync(name);
     }
 
     private void OnPanelDragMove(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
@@ -1990,29 +2617,31 @@ else
         if (horizontal)
         {
             var ordered = pairs.OrderBy(p => p.aabb.minX).ToList();
-            var totalWidth = ordered.Sum(p => p.aabb.maxX - p.aabb.minX);
-            var span = ordered[^1].aabb.maxX - ordered[0].aabb.minX;
-            var gap = (span - totalWidth) / (ordered.Count - 1);
-            var cursor = ordered[0].aabb.minX;
-            foreach (var (shape, aabb) in ordered)
+            var firstCenter = (ordered[0].aabb.minX + ordered[0].aabb.maxX) / 2.0;
+            var lastCenter = (ordered[^1].aabb.minX + ordered[^1].aabb.maxX) / 2.0;
+            var step = (lastCenter - firstCenter) / (ordered.Count - 1);
+            for (int i = 1; i < ordered.Count - 1; i++)
             {
-                var dx = cursor - aabb.minX;
+                var (shape, aabb) = ordered[i];
+                var currentCenter = (aabb.minX + aabb.maxX) / 2.0;
+                var targetCenter = firstCenter + (step * i);
+                var dx = targetCenter - currentCenter;
                 ShiftShape(shape, dx, 0);
-                cursor += (aabb.maxX - aabb.minX) + gap;
             }
         }
         else
         {
             var ordered = pairs.OrderBy(p => p.aabb.minY).ToList();
-            var totalHeight = ordered.Sum(p => p.aabb.maxY - p.aabb.minY);
-            var span = ordered[^1].aabb.maxY - ordered[0].aabb.minY;
-            var gap = (span - totalHeight) / (ordered.Count - 1);
-            var cursor = ordered[0].aabb.minY;
-            foreach (var (shape, aabb) in ordered)
+            var firstCenter = (ordered[0].aabb.minY + ordered[0].aabb.maxY) / 2.0;
+            var lastCenter = (ordered[^1].aabb.minY + ordered[^1].aabb.maxY) / 2.0;
+            var step = (lastCenter - firstCenter) / (ordered.Count - 1);
+            for (int i = 1; i < ordered.Count - 1; i++)
             {
-                var dy = cursor - aabb.minY;
+                var (shape, aabb) = ordered[i];
+                var currentCenter = (aabb.minY + aabb.maxY) / 2.0;
+                var targetCenter = firstCenter + (step * i);
+                var dy = targetCenter - currentCenter;
                 ShiftShape(shape, 0, dy);
-                cursor += (aabb.maxY - aabb.minY) + gap;
             }
         }
         await SaveAsync();

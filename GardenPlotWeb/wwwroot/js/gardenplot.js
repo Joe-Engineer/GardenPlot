@@ -1,10 +1,10 @@
 // Garden Plot interop. Loaded as an ES module via JSRuntime.
-// Wheel: only preventDefault when Shift or Ctrl is held (otherwise let the page scroll).
+// Wheel: only preventDefault when Shift/Ctrl/Alt is held (otherwise let the page scroll).
 export function attachWheel(el, dotnetRef) {
     const handler = (e) => {
-        if (e.shiftKey || e.ctrlKey) {
+        if (e.shiftKey || e.ctrlKey || e.altKey) {
             e.preventDefault();
-            dotnetRef.invokeMethodAsync('OnWheelFromJs', e.deltaY, e.shiftKey, e.ctrlKey);
+            dotnetRef.invokeMethodAsync('OnWheelFromJs', e.deltaY, e.shiftKey, e.ctrlKey, e.altKey);
         }
     };
     el.addEventListener('wheel', handler, { passive: false });
@@ -29,6 +29,13 @@ export function capturePointer(el, pointerId) {
 // Returns the current viewport size (used to clamp dragged panels on screen).
 export function viewportSize() {
     return { width: window.innerWidth, height: window.innerHeight };
+}
+
+// Returns the current top-left client position of an element.
+export function elementClientPosition(el) {
+    if (!el) return { x: 0, y: 0 };
+    const r = el.getBoundingClientRect();
+    return { x: r.left, y: r.top };
 }
 
 // Serializes the SVG element to a PNG and triggers a browser download.
