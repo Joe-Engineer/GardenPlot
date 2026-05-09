@@ -1,4 +1,4 @@
-// <copyright file="GardenPlotModels.cs" company="Garden Plot">
+﻿// <copyright file="GardenPlotModels.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -11,6 +11,8 @@ public enum ShapeKind
     FreeDraw,
     BedKit,
     Ruler,
+    CircleRuler,
+    RectRuler,
     Tree,
     Bush,
     Plant,
@@ -24,6 +26,13 @@ public enum PaletteKind
     Tree,
     Bush,
     Plant,
+}
+
+public enum DropPattern
+{
+    One,
+    Line,
+    Array,
 }
 
 /// <summary>
@@ -74,6 +83,29 @@ public class Shape
 
     /// <summary>Optional fill opacity 0..1. Null = use kind default.</summary>
     public double? FillOpacity { get; set; }
+
+    /// <summary>Optional font scale multiplier for shape labels. Null = use kind default.</summary>
+    public double? FontScale { get; set; }
+
+    /// <summary>Optional drop group id when this shape was created as part of a multi-drop placement.</summary>
+    public Guid? GroupId { get; set; }
+
+    /// <summary>Optional index position within a drop group (0-based).</summary>
+    public int? GroupIndex { get; set; }
+}
+
+public class DropGroup
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public DropPattern Pattern { get; set; }
+    public int ItemCount { get; set; }
+    public int Rows { get; set; } = 1;
+    public double CenterSpacingXFt { get; set; }
+    public double CenterSpacingYFt { get; set; }
+    public bool StaggerHalf { get; set; }
+    public double Rotation { get; set; }
+    public double AnchorCenterX { get; set; }
+    public double AnchorCenterY { get; set; }
 }
 
 public class PlotData
@@ -83,6 +115,7 @@ public class PlotData
     public double WidthFt { get; set; } = 60;
     public double HeightFt { get; set; } = 8;
     public List<Shape> Shapes { get; set; } = new();
+    public List<DropGroup> DropGroups { get; set; } = new();
     public Dictionary<string, double> KitRotations { get; set; } = new();
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime ModifiedUtc { get; set; } = DateTime.UtcNow;
@@ -102,6 +135,9 @@ public class UiPreferences
     public double? RulerPanelY { get; set; }
     public double? InfoPanelX { get; set; }
     public double? InfoPanelY { get; set; }
+    public double? Zoom { get; set; }
+    public double? ViewCenterXFt { get; set; }
+    public double? ViewCenterYFt { get; set; }
 }
 
 /// <summary>Cached Wikipedia summary for a plant species.</summary>
@@ -115,7 +151,7 @@ public record WikiSummary(string Title, string Extract, string? ThumbnailUrl, st
 public static class PaletteCatalog
 {
     public static readonly PaletteItem[] BedKits =
-    {
+    [
         new("C2080", PaletteKind.BedKit, 2,    8,   Pieces: 12),
         new("C3565", PaletteKind.BedKit, 3.5,  6.5, Pieces: 12),
         new("C2065", PaletteKind.BedKit, 2,    6.5, Pieces: 10),
@@ -125,10 +161,10 @@ public static class PaletteCatalog
         new("C2050", PaletteKind.BedKit, 2,    5,   Pieces: 8),
         new("C2035", PaletteKind.BedKit, 2,    3.5, Pieces: 6),
         new("C2020", PaletteKind.BedKit, 2,    2,   Pieces: 4),
-    };
+    ];
 
     public static readonly PaletteItem[] Trees =
-    {
+    [
         // Fruit trees
         new("Apple (Standard)",      PaletteKind.Tree, 25, 25, "fruit"),
         new("Apple (Semi-dwarf)",    PaletteKind.Tree, 15, 15, "fruit"),
@@ -185,10 +221,10 @@ public static class PaletteCatalog
         new("Arborvitae",            PaletteKind.Tree, 12, 12, "evergreen"),
         new("Douglas Fir",           PaletteKind.Tree, 25, 25, "evergreen"),
         new("Hemlock",               PaletteKind.Tree, 25, 25, "evergreen"),
-    };
+    ];
 
     public static readonly PaletteItem[] Bushes =
-    {
+    [
         // Edible
         new("Blueberry (Highbush)",  PaletteKind.Bush, 6, 6, "fruit"),
         new("Blueberry (Lowbush)",   PaletteKind.Bush, 2, 2, "fruit"),
@@ -222,23 +258,26 @@ public static class PaletteCatalog
         new("Juniper",               PaletteKind.Bush, 6, 6, "evergreen"),
         new("Rosemary",              PaletteKind.Bush, 3, 3, "foliage"),
         new("Hosta (Large)",         PaletteKind.Bush, 4, 4, "foliage"),
-    };
+    ];
 
-    public static IReadOnlyList<PaletteItem> For(PaletteKind kind) => kind switch
+    public static IReadOnlyList<PaletteItem> For(PaletteKind kind)
     {
-        PaletteKind.BedKit => BedKits,
-        PaletteKind.Tree => Trees,
-        PaletteKind.Bush => Bushes,
-        PaletteKind.Plant => Plants,
-        _ => Array.Empty<PaletteItem>(),
-    };
+        return kind switch
+        {
+            PaletteKind.BedKit => BedKits,
+            PaletteKind.Tree => Trees,
+            PaletteKind.Bush => Bushes,
+            PaletteKind.Plant => Plants,
+            _ => [],
+        };
+    }
 
     /// <summary>
     /// Garden-plant palette: vegetables, herbs, and flowers with recommended spacing in feet
     /// (typical of seed-packet / extension-service guidance), preferred sunlight, water needs, and days to maturity.
     /// </summary>
     public static readonly PaletteItem[] Plants =
-    {
+    [
         // Vegetables
         new("Tomato",         PaletteKind.Plant, 2.0,  2.0,  "vegetable", 0, "full",    "medium", 75),
         new("Pepper",         PaletteKind.Plant, 1.5,  1.5,  "vegetable", 0, "full",    "medium", 70),
@@ -284,43 +323,55 @@ public static class PaletteCatalog
         new("Borage",         PaletteKind.Plant, 1.5,  1.5,  "flower",    0, "full",    "low",    60),
         new("Calendula",      PaletteKind.Plant, 1.0,  1.0,  "flower",    0, "full",    "low",    50),
         new("Zinnia",         PaletteKind.Plant, 0.8,  0.8,  "flower",    0, "full",    "medium", 75),
-    };
+    ];
 
     /// <summary>Filters items by user-facing palette category (combobox option).</summary>
-    public static IReadOnlyList<PaletteItem> For(PaletteCategory category) => category switch
+    public static IReadOnlyList<PaletteItem> For(PaletteCategory category)
     {
-        PaletteCategory.BedKits => BedKits,
-        PaletteCategory.TreesFruit => Trees.Where(IsEdibleTree).ToArray(),
-        PaletteCategory.TreesOrnamental => Trees.Where(t => !IsEdibleTree(t)).ToArray(),
-        PaletteCategory.BushesEdible => Bushes.Where(IsEdibleBush).ToArray(),
-        PaletteCategory.BushesOrnamental => Bushes.Where(b => !IsEdibleBush(b)).ToArray(),
-        PaletteCategory.Vegetables => Plants.Where(IsVegetableOrCompanion).ToArray(),
-        PaletteCategory.Herbs => Plants.Where(p => string.Equals(p.Trait, "herb", StringComparison.OrdinalIgnoreCase)).ToArray(),
-        _ => Array.Empty<PaletteItem>(),
-    };
+        return category switch
+        {
+            PaletteCategory.BedKits => BedKits,
+            PaletteCategory.TreesFruit => [.. Trees.Where(IsEdibleTree)],
+            PaletteCategory.TreesOrnamental => [.. Trees.Where(t => !IsEdibleTree(t))],
+            PaletteCategory.BushesEdible => [.. Bushes.Where(IsEdibleBush)],
+            PaletteCategory.BushesOrnamental => [.. Bushes.Where(b => !IsEdibleBush(b))],
+            PaletteCategory.Vegetables => [.. Plants.Where(IsVegetableOrCompanion)],
+            PaletteCategory.Herbs => [.. Plants.Where(p => string.Equals(p.Trait, "herb", StringComparison.OrdinalIgnoreCase))],
+            _ => [],
+        };
+    }
 
-    public static PaletteCategory CategoryFor(PaletteItem item) => item.Kind switch
+    public static PaletteCategory CategoryFor(PaletteItem item)
     {
-        PaletteKind.BedKit => PaletteCategory.BedKits,
-        PaletteKind.Tree => IsEdibleTree(item) ? PaletteCategory.TreesFruit : PaletteCategory.TreesOrnamental,
-        PaletteKind.Bush => IsEdibleBush(item) ? PaletteCategory.BushesEdible : PaletteCategory.BushesOrnamental,
-        PaletteKind.Plant => string.Equals(item.Trait, "herb", StringComparison.OrdinalIgnoreCase)
-            ? PaletteCategory.Herbs
-            : PaletteCategory.Vegetables,
-        _ => PaletteCategory.BedKits,
-    };
+        return item.Kind switch
+        {
+            PaletteKind.BedKit => PaletteCategory.BedKits,
+            PaletteKind.Tree => IsEdibleTree(item) ? PaletteCategory.TreesFruit : PaletteCategory.TreesOrnamental,
+            PaletteKind.Bush => IsEdibleBush(item) ? PaletteCategory.BushesEdible : PaletteCategory.BushesOrnamental,
+            PaletteKind.Plant => string.Equals(item.Trait, "herb", StringComparison.OrdinalIgnoreCase)
+                ? PaletteCategory.Herbs
+                : PaletteCategory.Vegetables,
+            _ => PaletteCategory.BedKits,
+        };
+    }
 
-    private static bool IsEdibleTree(PaletteItem t) =>
-        string.Equals(t.Trait, "fruit", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(t.Trait, "nut", StringComparison.OrdinalIgnoreCase);
+    private static bool IsEdibleTree(PaletteItem t)
+    {
+        return string.Equals(t.Trait, "fruit", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(t.Trait, "nut", StringComparison.OrdinalIgnoreCase);
+    }
 
-    private static bool IsEdibleBush(PaletteItem b) =>
-        string.Equals(b.Trait, "fruit", StringComparison.OrdinalIgnoreCase);
+    private static bool IsEdibleBush(PaletteItem b)
+    {
+        return string.Equals(b.Trait, "fruit", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>Vegetables tab includes vegetables and companion flowers (commonly co-planted in vegetable beds).</summary>
-    private static bool IsVegetableOrCompanion(PaletteItem p) =>
-        string.Equals(p.Trait, "vegetable", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(p.Trait, "flower", StringComparison.OrdinalIgnoreCase);
+    private static bool IsVegetableOrCompanion(PaletteItem p)
+    {
+        return string.Equals(p.Trait, "vegetable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p.Trait, "flower", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 /// <summary>User-facing palette categories shown in the combobox.</summary>
@@ -345,47 +396,49 @@ public static class CompanionRules
 
     public static readonly Dictionary<string, Pair> Map = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Tomato"]      = new(new[] { "Basil", "Carrot", "Onion", "Parsley", "Marigold", "Nasturtium", "Borage"}, new[] { "Cabbage", "Broccoli", "Cauliflower", "Corn", "Potato", "Dill"}),
-        ["Pepper"]      = new(new[] { "Basil", "Onion", "Carrot", "Marigold"},                              new[] { "Bean (Bush)", "Bean (Pole)"}),
-        ["Eggplant"]    = new(new[] { "Bean (Bush)", "Marigold", "Pepper"},                                Array.Empty<string>()),
-        ["Lettuce"]     = new(new[] { "Carrot", "Radish", "Strawberry", "Onion", "Cucumber"},                Array.Empty<string>()),
-        ["Spinach"]     = new(new[] { "Strawberry", "Pea", "Bean (Bush)"},                                 Array.Empty<string>()),
-        ["Kale"]        = new(new[] { "Onion", "Garlic", "Dill", "Nasturtium"},                             new[] { "Tomato", "Strawberry"}),
-        ["Cabbage"]     = new(new[] { "Onion", "Garlic", "Dill", "Nasturtium", "Sage", "Chives"},              new[] { "Tomato", "Strawberry"}),
-        ["Broccoli"]    = new(new[] { "Onion", "Dill", "Nasturtium", "Sage"},                               new[] { "Tomato", "Strawberry"}),
-        ["Cauliflower"] = new(new[] { "Onion", "Sage", "Dill"},                                            new[] { "Tomato", "Strawberry"}),
-        ["Carrot"]      = new(new[] { "Tomato", "Onion", "Lettuce", "Pea", "Chives", "Sage"},                  new[] { "Dill"}),
-        ["Onion"]       = new(new[] { "Tomato", "Carrot", "Lettuce", "Pepper", "Cabbage", "Broccoli"},         new[] { "Bean (Bush)", "Bean (Pole)", "Pea", "Asparagus"}),
-        ["Garlic"]      = new(new[] { "Tomato", "Cabbage", "Strawberry", "Carrot"},                         new[] { "Bean (Bush)", "Bean (Pole)", "Pea"}),
-        ["Bean (Bush)"] = new(new[] { "Carrot", "Cucumber", "Corn", "Strawberry", "Marigold"},                new[] { "Onion", "Garlic", "Pepper"}),
-        ["Bean (Pole)"] = new(new[] { "Corn", "Cucumber", "Marigold"},                                     new[] { "Onion", "Garlic", "Beet"}),
-        ["Pea"]         = new(new[] { "Carrot", "Cucumber", "Corn", "Radish", "Spinach"},                    new[] { "Onion", "Garlic"}),
-        ["Cucumber"]    = new(new[] { "Bean (Bush)", "Bean (Pole)", "Pea", "Corn", "Radish", "Sunflower", "Nasturtium"}, new[] { "Sage", "Potato"}),
-        ["Squash (Summer)"] = new(new[] { "Corn", "Bean (Pole)", "Nasturtium", "Borage"},                   new[] { "Potato"}),
-        ["Squash (Winter)"] = new(new[] { "Corn", "Bean (Pole)", "Nasturtium", "Borage"},                   new[] { "Potato"}),
-        ["Pumpkin"]     = new(new[] { "Corn", "Bean (Pole)", "Nasturtium"},                                new[] { "Potato"}),
-        ["Corn"]        = new(new[] { "Bean (Pole)", "Squash (Summer)", "Squash (Winter)", "Cucumber", "Pumpkin", "Marigold"}, new[] { "Tomato"}),
-        ["Potato"]      = new(new[] { "Bean (Bush)", "Cabbage", "Corn", "Marigold", "Horseradish"},          new[] { "Tomato", "Cucumber", "Squash (Summer)", "Squash (Winter)", "Pumpkin"}),
-        ["Sweet Potato"]= new(new[] { "Bean (Bush)", "Marigold"},                                         Array.Empty<string>()),
-        ["Beet"]        = new(new[] { "Onion", "Lettuce", "Cabbage"},                                      new[] { "Bean (Pole)"}),
-        ["Radish"]      = new(new[] { "Lettuce", "Pea", "Cucumber", "Carrot", "Spinach", "Nasturtium"},        Array.Empty<string>()),
-        ["Asparagus"]   = new(new[] { "Tomato", "Parsley", "Basil"},                                       new[] { "Onion", "Garlic"}),
-        ["Strawberry"]  = new(new[] { "Lettuce", "Spinach", "Onion", "Borage", "Bean (Bush)"},                new[] { "Cabbage", "Broccoli", "Cauliflower", "Kale"}),
-        ["Basil"]       = new(new[] { "Tomato", "Pepper", "Asparagus", "Marigold"},                         Array.Empty<string>()),
-        ["Parsley"]     = new(new[] { "Tomato", "Asparagus", "Carrot"},                                    Array.Empty<string>()),
-        ["Cilantro"]    = new(new[] { "Spinach", "Tomato"},                                               Array.Empty<string>()),
-        ["Dill"]        = new(new[] { "Cabbage", "Broccoli", "Cauliflower", "Cucumber"},                    new[] { "Tomato", "Carrot"}),
-        ["Chives"]      = new(new[] { "Carrot", "Tomato", "Strawberry"},                                   new[] { "Bean (Bush)", "Pea"}),
-        ["Sage"]        = new(new[] { "Cabbage", "Broccoli", "Cauliflower", "Carrot"},                      new[] { "Cucumber"}),
-        ["Oregano"]     = new(new[] { "Cabbage", "Broccoli", "Cauliflower", "Pepper"},                      Array.Empty<string>()),
-        ["Mint"]        = new(new[] { "Cabbage", "Broccoli", "Cauliflower", "Tomato"},                      new[] { "Parsley"}),
-        ["Marigold"]    = new(new[] { "Tomato", "Pepper", "Bean (Bush)", "Cucumber", "Squash (Summer)", "Potato"}, Array.Empty<string>()),
-        ["Nasturtium"]  = new(new[] { "Cabbage", "Broccoli", "Cauliflower", "Cucumber", "Squash (Summer)", "Pumpkin", "Radish"}, Array.Empty<string>()),
-        ["Sunflower"]   = new(new[] { "Cucumber", "Corn"},                                                new[] { "Potato"}),
-        ["Borage"]      = new(new[] { "Tomato", "Strawberry", "Squash (Summer)", "Squash (Winter)"},         Array.Empty<string>()),
-        ["Calendula"]   = new(new[] { "Tomato", "Carrot"},                                                Array.Empty<string>()),
+        ["Tomato"]      = new(["Basil", "Carrot", "Onion", "Parsley", "Marigold", "Nasturtium", "Borage"], ["Cabbage", "Broccoli", "Cauliflower", "Corn", "Potato", "Dill"]),
+        ["Pepper"]      = new(["Basil", "Onion", "Carrot", "Marigold"], ["Bean (Bush)", "Bean (Pole)"]),
+        ["Eggplant"]    = new(["Bean (Bush)", "Marigold", "Pepper"], []),
+        ["Lettuce"]     = new(["Carrot", "Radish", "Strawberry", "Onion", "Cucumber"], []),
+        ["Spinach"]     = new(["Strawberry", "Pea", "Bean (Bush)"], []),
+        ["Kale"]        = new(["Onion", "Garlic", "Dill", "Nasturtium"], ["Tomato", "Strawberry"]),
+        ["Cabbage"]     = new(["Onion", "Garlic", "Dill", "Nasturtium", "Sage", "Chives"], ["Tomato", "Strawberry"]),
+        ["Broccoli"]    = new(["Onion", "Dill", "Nasturtium", "Sage"], ["Tomato", "Strawberry"]),
+        ["Cauliflower"] = new(["Onion", "Sage", "Dill"], ["Tomato", "Strawberry"]),
+        ["Carrot"]      = new(["Tomato", "Onion", "Lettuce", "Pea", "Chives", "Sage"], ["Dill"]),
+        ["Onion"]       = new(["Tomato", "Carrot", "Lettuce", "Pepper", "Cabbage", "Broccoli"], ["Bean (Bush)", "Bean (Pole)", "Pea", "Asparagus"]),
+        ["Garlic"]      = new(["Tomato", "Cabbage", "Strawberry", "Carrot"], ["Bean (Bush)", "Bean (Pole)", "Pea"]),
+        ["Bean (Bush)"] = new(["Carrot", "Cucumber", "Corn", "Strawberry", "Marigold"], ["Onion", "Garlic", "Pepper"]),
+        ["Bean (Pole)"] = new(["Corn", "Cucumber", "Marigold"], ["Onion", "Garlic", "Beet"]),
+        ["Pea"]         = new(["Carrot", "Cucumber", "Corn", "Radish", "Spinach"], ["Onion", "Garlic"]),
+        ["Cucumber"]    = new(["Bean (Bush)", "Bean (Pole)", "Pea", "Corn", "Radish", "Sunflower", "Nasturtium"], ["Sage", "Potato"]),
+        ["Squash (Summer)"] = new(["Corn", "Bean (Pole)", "Nasturtium", "Borage"], ["Potato"]),
+        ["Squash (Winter)"] = new(["Corn", "Bean (Pole)", "Nasturtium", "Borage"], ["Potato"]),
+        ["Pumpkin"]     = new(["Corn", "Bean (Pole)", "Nasturtium"], ["Potato"]),
+        ["Corn"]        = new(["Bean (Pole)", "Squash (Summer)", "Squash (Winter)", "Cucumber", "Pumpkin", "Marigold"], ["Tomato"]),
+        ["Potato"]      = new(["Bean (Bush)", "Cabbage", "Corn", "Marigold", "Horseradish"], ["Tomato", "Cucumber", "Squash (Summer)", "Squash (Winter)", "Pumpkin"]),
+        ["Sweet Potato"] = new(["Bean (Bush)", "Marigold"], []),
+        ["Beet"]        = new(["Onion", "Lettuce", "Cabbage"], ["Bean (Pole)"]),
+        ["Radish"]      = new(["Lettuce", "Pea", "Cucumber", "Carrot", "Spinach", "Nasturtium"], []),
+        ["Asparagus"]   = new(["Tomato", "Parsley", "Basil"], ["Onion", "Garlic"]),
+        ["Strawberry"]  = new(["Lettuce", "Spinach", "Onion", "Borage", "Bean (Bush)"], ["Cabbage", "Broccoli", "Cauliflower", "Kale"]),
+        ["Basil"]       = new(["Tomato", "Pepper", "Asparagus", "Marigold"], []),
+        ["Parsley"]     = new(["Tomato", "Asparagus", "Carrot"], []),
+        ["Cilantro"]    = new(["Spinach", "Tomato"], []),
+        ["Dill"]        = new(["Cabbage", "Broccoli", "Cauliflower", "Cucumber"], ["Tomato", "Carrot"]),
+        ["Chives"]      = new(["Carrot", "Tomato", "Strawberry"], ["Bean (Bush)", "Pea"]),
+        ["Sage"]        = new(["Cabbage", "Broccoli", "Cauliflower", "Carrot"], ["Cucumber"]),
+        ["Oregano"]     = new(["Cabbage", "Broccoli", "Cauliflower", "Pepper"], []),
+        ["Mint"]        = new(["Cabbage", "Broccoli", "Cauliflower", "Tomato"], ["Parsley"]),
+        ["Marigold"]    = new(["Tomato", "Pepper", "Bean (Bush)", "Cucumber", "Squash (Summer)", "Potato"], []),
+        ["Nasturtium"]  = new(["Cabbage", "Broccoli", "Cauliflower", "Cucumber", "Squash (Summer)", "Pumpkin", "Radish"], []),
+        ["Sunflower"]   = new(["Cucumber", "Corn"], ["Potato"]),
+        ["Borage"]      = new(["Tomato", "Strawberry", "Squash (Summer)", "Squash (Winter)"], []),
+        ["Calendula"]   = new(["Tomato", "Carrot"], []),
     };
 
     public static (IReadOnlyList<string> good, IReadOnlyList<string> bad) ForCode(string code)
-        => Map.TryGetValue(code, out var p) ? (p.Good, p.Bad) : (Array.Empty<string>(), Array.Empty<string>());
+    {
+        return Map.TryGetValue(code, out Pair? p) ? (p.Good, p.Bad) : ([], []);
+    }
 }

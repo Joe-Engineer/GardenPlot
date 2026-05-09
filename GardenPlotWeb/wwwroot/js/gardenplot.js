@@ -1,4 +1,4 @@
-// Garden Plot interop. Loaded as an ES module via JSRuntime.
+﻿// Garden Plot interop. Loaded as an ES module via JSRuntime.
 // Wheel: only preventDefault when Shift/Ctrl/Alt is held (otherwise let the page scroll).
 export function attachWheel(el, dotnetRef) {
     const handler = (e) => {
@@ -17,6 +17,24 @@ export function panBy(el, dx, dy) {
     if (!el) return;
     el.scrollLeft -= dx;
     el.scrollTop -= dy;
+}
+
+export function getViewCenterFt(wrapEl, svgEl, pxPerFt, zoom) {
+    if (!wrapEl || !svgEl || !pxPerFt || !zoom) return { x: 0, y: 0 };
+    const wrapRect = wrapEl.getBoundingClientRect();
+    const svgRect = svgEl.getBoundingClientRect();
+    const scale = pxPerFt * zoom;
+    const xPx = (wrapRect.left + (wrapRect.width / 2)) - svgRect.left;
+    const yPx = (wrapRect.top + (wrapRect.height / 2)) - svgRect.top;
+    return { x: xPx / scale, y: yPx / scale };
+}
+
+export function setViewCenterFt(wrapEl, svgEl, pxPerFt, zoom, xFt, yFt) {
+    if (!wrapEl || !svgEl || !pxPerFt || !zoom) return;
+    const current = getViewCenterFt(wrapEl, svgEl, pxPerFt, zoom);
+    const scale = pxPerFt * zoom;
+    wrapEl.scrollLeft += ((xFt - current.x) * scale);
+    wrapEl.scrollTop += ((yFt - current.y) * scale);
 }
 
 // Captures the pointer to el so subsequent pointermove/up events fire on el

@@ -1,4 +1,4 @@
-// <copyright file="PlantRendering.cs" company="Garden Plot">
+﻿// <copyright file="PlantRendering.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -14,48 +14,49 @@ namespace GardenPlotWeb.Models;
 /// </summary>
 public static class PlantRendering
 {
-    private static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+    private static string F(double v)
+    {
+        return v.ToString("0.###", CultureInfo.InvariantCulture);
+    }
 
     /// <summary>Stylized tree: filled canopy circle with optional fruit/nut/flower indicators.</summary>
     public static string TreeSvg(double x, double y, double w, double h, string trait, string? label = null)
     {
-        var cx = x + w / 2;
-        var cy = y + h / 2;
-        var r = System.Math.Min(w, h) / 2;
-        var sb = new StringBuilder(512);
+        double cx = x + (w / 2);
+        double cy = y + (h / 2);
+        double r = Math.Min(w, h) / 2;
+        StringBuilder sb = new(512);
 
-        var (fill, stroke) = CanopyColors(trait);
+        (string fill, string stroke) = CanopyColors(trait);
 
-        // Canopy
-        sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy)).Append("\" r=\"").Append(F(r))
-          .Append("\" fill=\"").Append(fill).Append("\" fill-opacity=\"0.7\" stroke=\"").Append(stroke)
-          .Append("\" stroke-width=\"").Append(F(r * 0.04)).Append("\" />");
+        _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy)).Append("\" r=\"").Append(F(r))
+            .Append("\" fill=\"").Append(fill).Append("\" fill-opacity=\"0.7\" stroke=\"").Append(stroke)
+            .Append("\" stroke-width=\"").Append(F(r * 0.04)).Append("\" />");
 
-        // Conifer triangular silhouette overlay for evergreens
         if (trait == "evergreen")
         {
-            var t = r * 0.85;
-            sb.Append("<polygon points=\"")
-              .Append(F(cx)).Append(',').Append(F(cy - t)).Append(' ')
-              .Append(F(cx - t * 0.85)).Append(',').Append(F(cy + t * 0.6)).Append(' ')
-              .Append(F(cx + t * 0.85)).Append(',').Append(F(cy + t * 0.6))
-              .Append("\" fill=\"").Append(stroke).Append("\" fill-opacity=\"0.35\" />");
+            double t = r * 0.85;
+            _ = sb.Append("<polygon points=\"")
+                .Append(F(cx)).Append(',').Append(F(cy - t)).Append(' ')
+                .Append(F(cx - (t * 0.85))).Append(',').Append(F(cy + (t * 0.6))).Append(' ')
+                .Append(F(cx + (t * 0.85))).Append(',').Append(F(cy + (t * 0.6)))
+                .Append("\" fill=\"").Append(stroke).Append("\" fill-opacity=\"0.35\" />");
         }
 
-        // Trunk dot at the center
-        sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy)).Append("\" r=\"")
-          .Append(F(r * 0.07)).Append("\" fill=\"#5a3a1a\" />");
+        _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy)).Append("\" r=\"")
+            .Append(F(r * 0.07)).Append("\" fill=\"#5a3a1a\" />");
 
-        AddTraitAccents(sb, cx, cy, r, trait);
+        AddTraitAccents(sb, cx, cy, r, trait, label);
 
         if (!string.IsNullOrEmpty(label))
         {
-            var fontSize = System.Math.Max(0.35, r * 0.18);
-            sb.Append("<text x=\"").Append(F(cx)).Append("\" y=\"").Append(F(cy + r + fontSize * 1.1))
-              .Append("\" text-anchor=\"middle\" font-size=\"").Append(F(fontSize))
-              .Append("\" fill=\"#264a26\" style=\"font-family:sans-serif;pointer-events:none;\">")
-              .Append(WebUtility.HtmlEncode(label)).Append("</text>");
+            double fontSize = Math.Max(0.35, r * 0.18);
+            _ = sb.Append("<text x=\"").Append(F(cx)).Append("\" y=\"").Append(F(cy + r + (fontSize * 1.1)))
+                .Append("\" text-anchor=\"middle\" font-size=\"").Append(F(fontSize))
+                .Append("\" fill=\"#264a26\" style=\"font-family:sans-serif;pointer-events:none;\">")
+                .Append(WebUtility.HtmlEncode(label)).Append("</text>");
         }
+
         return sb.ToString();
     }
 
@@ -65,36 +66,39 @@ public static class PlantRendering
     /// </summary>
     public static string PlantSpriteSvg(double cx, double cy, double diameter, string trait)
     {
-        var sb = new StringBuilder(256);
-        var stemColor = trait switch { "flower" => "#4a8a3a", "herb" => "#3a6a2a", _ => "#3a6a3a" };
-        var leafColor = trait switch
+        StringBuilder sb = new(256);
+        string stemColor = trait switch { "flower" => "#4a8a3a", "herb" => "#3a6a2a", _ => "#3a6a3a" };
+        string leafColor = trait switch
         {
             "flower" => "#7ec46b",
-            "herb"   => "#5a9a4a",
-            _        => "#6ea158",
+            "herb" => "#5a9a4a",
+            _ => "#6ea158",
         };
-        // Visual size independent of spacing so tiny-spaced plants (carrots, etc.) aren't invisible.
-        var glyph = System.Math.Clamp(diameter * 0.45, 0.35, 1.0);
-        var lr = glyph * 0.45;
+
+        double glyph = Math.Clamp(diameter * 0.45, 0.35, 1.0);
+        double lr = glyph * 0.45;
         for (int i = 0; i < 3; i++)
         {
-            var theta = i * 2 * System.Math.PI / 3 - System.Math.PI / 2;
-            var lx = cx + System.Math.Cos(theta) * glyph * 0.30;
-            var ly = cy + System.Math.Sin(theta) * glyph * 0.30;
-            sb.Append("<ellipse cx=\"").Append(F(lx)).Append("\" cy=\"").Append(F(ly))
-              .Append("\" rx=\"").Append(F(lr)).Append("\" ry=\"").Append(F(lr * 0.55))
-              .Append("\" transform=\"rotate(")
-              .Append(F(theta * 180 / System.Math.PI + 90)).Append(' ').Append(F(lx)).Append(' ').Append(F(ly))
-              .Append(")\" fill=\"").Append(leafColor).Append("\" stroke=\"").Append(stemColor)
-              .Append("\" stroke-width=\"").Append(F(glyph * 0.06)).Append("\" />");
+            double theta = (i * 2 * Math.PI / 3) - (Math.PI / 2);
+            double lx = cx + (Math.Cos(theta) * glyph * 0.30);
+            double ly = cy + (Math.Sin(theta) * glyph * 0.30);
+            _ = sb.Append("<ellipse cx=\"").Append(F(lx)).Append("\" cy=\"").Append(F(ly))
+                .Append("\" rx=\"").Append(F(lr)).Append("\" ry=\"").Append(F(lr * 0.55))
+                .Append("\" transform=\"rotate(")
+                .Append(F((theta * 180 / Math.PI) + 90)).Append(' ').Append(F(lx)).Append(' ').Append(F(ly))
+                .Append(")\" fill=\"").Append(leafColor).Append("\" stroke=\"").Append(stemColor)
+                .Append("\" stroke-width=\"").Append(F(glyph * 0.06)).Append("\" />");
         }
-        sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
-          .Append("\" r=\"").Append(F(glyph * 0.12)).Append("\" fill=\"").Append(stemColor).Append("\" />");
+
+        _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
+            .Append("\" r=\"").Append(F(glyph * 0.12)).Append("\" fill=\"").Append(stemColor).Append("\" />");
+
         if (trait == "flower")
         {
-            sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy - glyph * 0.05))
-              .Append("\" r=\"").Append(F(glyph * 0.10)).Append("\" fill=\"#f7d35e\" />");
+            _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy - (glyph * 0.05)))
+                .Append("\" r=\"").Append(F(glyph * 0.10)).Append("\" fill=\"#f7d35e\" />");
         }
+
         return sb.ToString();
     }
 
@@ -104,148 +108,311 @@ public static class PlantRendering
     /// </summary>
     public static string SpacingRingsSvg(double cx, double cy, double diameter, string status)
     {
-        var (fill, stroke) = status switch
+        (string fill, string stroke) = status switch
         {
             "crowded" => ("#d83a3a", "#7a1414"),
             "partial" => ("#dfb22a", "#7a5a14"),
-            _         => ("#5fb55f", "#1f5a1f"),
+            _ => ("#5fb55f", "#1f5a1f"),
         };
-        var r = diameter / 2;
-        var sb = new StringBuilder(384);
-        // 3 rings with opacity stepping outward.
-        double[] radii = { r * 0.4, r * 0.7, r };
-        double[] alphas = { 0.10, 0.13, 0.18 };
+
+        double r = diameter / 2;
+        StringBuilder sb = new(384);
+        double[] radii = [r * 0.4, r * 0.7, r];
+        double[] alphas = [0.10, 0.13, 0.18];
+
         for (int i = 0; i < radii.Length; i++)
         {
-            sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
-              .Append("\" r=\"").Append(F(radii[i]))
-              .Append("\" fill=\"").Append(fill).Append("\" fill-opacity=\"").Append(F(alphas[i]))
-              .Append("\" stroke=\"none\" />");
+            _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
+                .Append("\" r=\"").Append(F(radii[i]))
+                .Append("\" fill=\"").Append(fill).Append("\" fill-opacity=\"").Append(F(alphas[i]))
+                .Append("\" stroke=\"none\" />");
         }
-        sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
-          .Append("\" r=\"").Append(F(r))
-          .Append("\" fill=\"none\" stroke=\"").Append(stroke).Append("\" stroke-width=\"")
-          .Append(F(System.Math.Max(0.02, r * 0.02))).Append("\" stroke-dasharray=\"")
-          .Append(F(r * 0.10)).Append(',').Append(F(r * 0.06)).Append("\" />");
+
+        _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
+            .Append("\" r=\"").Append(F(r))
+            .Append("\" fill=\"none\" stroke=\"").Append(stroke).Append("\" stroke-width=\"")
+            .Append(F(Math.Max(0.02, r * 0.02))).Append("\" stroke-dasharray=\"")
+            .Append(F(r * 0.10)).Append(',').Append(F(r * 0.06)).Append("\" />");
+
         return sb.ToString();
     }
 
     /// <summary>Stylized bush: cluster of overlapping circles with optional accents.</summary>
     public static string BushSvg(double x, double y, double w, double h, string trait, string? label = null)
     {
-        var cx = x + w / 2;
-        var cy = y + h / 2;
-        var r = System.Math.Min(w, h) / 2;
-        var sb = new StringBuilder(512);
+        double cx = x + (w / 2);
+        double cy = y + (h / 2);
+        double r = Math.Min(w, h) / 2;
+        StringBuilder sb = new(512);
 
-        var (fill, stroke) = BushColors(trait);
+        (string fill, string stroke) = BushColors(trait);
 
-        // Cluster of lobes for a "cloud" silhouette
-        var lobes = new (double dx, double dy, double rs)[]
-        {
+        (double dx, double dy, double rs)[] lobes =
+        [
             (-0.45, -0.05, 0.55),
-            ( 0.00, -0.30, 0.55),
-            ( 0.45, -0.05, 0.55),
-            (-0.20,  0.30, 0.50),
-            ( 0.25,  0.30, 0.50),
-        };
-        foreach (var (dx, dy, rs) in lobes)
+            (0.00, -0.30, 0.55),
+            (0.45, -0.05, 0.55),
+            (-0.20, 0.30, 0.50),
+            (0.25, 0.30, 0.50),
+        ];
+
+        foreach ((double dx, double dy, double rs) in lobes)
         {
-            sb.Append("<circle cx=\"").Append(F(cx + dx * r)).Append("\" cy=\"").Append(F(cy + dy * r))
-              .Append("\" r=\"").Append(F(rs * r))
-              .Append("\" fill=\"").Append(fill).Append("\" fill-opacity=\"0.7\" stroke=\"").Append(stroke)
-              .Append("\" stroke-width=\"").Append(F(r * 0.03)).Append("\" />");
+            _ = sb.Append("<circle cx=\"").Append(F(cx + (dx * r))).Append("\" cy=\"").Append(F(cy + (dy * r)))
+                .Append("\" r=\"").Append(F(rs * r))
+                .Append("\" fill=\"").Append(fill).Append("\" fill-opacity=\"0.7\" stroke=\"").Append(stroke)
+                .Append("\" stroke-width=\"").Append(F(r * 0.03)).Append("\" />");
         }
 
-        AddTraitAccents(sb, cx, cy, r * 0.95, trait);
+        AddTraitAccents(sb, cx, cy, r * 0.95, trait, label);
 
         if (!string.IsNullOrEmpty(label))
         {
-            var fontSize = System.Math.Max(0.3, r * 0.22);
-            sb.Append("<text x=\"").Append(F(cx)).Append("\" y=\"").Append(F(cy + r + fontSize * 1.1))
-              .Append("\" text-anchor=\"middle\" font-size=\"").Append(F(fontSize))
-              .Append("\" fill=\"#264a26\" style=\"font-family:sans-serif;pointer-events:none;\">")
-              .Append(WebUtility.HtmlEncode(label)).Append("</text>");
+            double fontSize = Math.Max(0.3, r * 0.22);
+            _ = sb.Append("<text x=\"").Append(F(cx)).Append("\" y=\"").Append(F(cy + r + (fontSize * 1.1)))
+                .Append("\" text-anchor=\"middle\" font-size=\"").Append(F(fontSize))
+                .Append("\" fill=\"#264a26\" style=\"font-family:sans-serif;pointer-events:none;\">")
+                .Append(WebUtility.HtmlEncode(label)).Append("</text>");
         }
+
         return sb.ToString();
     }
 
-    private static (string fill, string stroke) CanopyColors(string trait) => trait switch
+    private static (string fill, string stroke) CanopyColors(string trait)
     {
-        "evergreen" => ("#2d5a36", "#173c1f"),
-        "flower"    => ("#9bbf7a", "#2f5a3a"),
-        "foliage"   => ("#b5894a", "#5a3a1a"),
-        "fruit"     => ("#6ea158", "#264a26"),
-        "nut"       => ("#7a8f55", "#3a4a26"),
-        _           => ("#5e9148", "#264a26"), // shade / default
-    };
+        return trait switch
+        {
+            "evergreen" => ("#2d5a36", "#173c1f"),
+            "flower" => ("#9bbf7a", "#2f5a3a"),
+            "foliage" => ("#b5894a", "#5a3a1a"),
+            "fruit" => ("#6ea158", "#264a26"),
+            "nut" => ("#7a8f55", "#3a4a26"),
+            _ => ("#5e9148", "#264a26"),
+        };
+    }
 
-    private static (string fill, string stroke) BushColors(string trait) => trait switch
+    private static (string fill, string stroke) BushColors(string trait)
     {
-        "evergreen" => ("#356b3a", "#1f4a26"),
-        "flower"    => ("#9fb87b", "#37623c"),
-        "foliage"   => ("#a7b27d", "#56683a"),
-        "fruit"     => ("#7aa760", "#2f5a3a"),
-        _           => ("#6e9a55", "#2f5a3a"),
-    };
+        return trait switch
+        {
+            "evergreen" => ("#356b3a", "#1f4a26"),
+            "flower" => ("#9fb87b", "#37623c"),
+            "foliage" => ("#a7b27d", "#56683a"),
+            "fruit" => ("#7aa760", "#2f5a3a"),
+            _ => ("#6e9a55", "#2f5a3a"),
+        };
+    }
 
-    /// <summary>Adds small symbols inside the canopy denoting fruit, nuts, or flowers.</summary>
-    private static void AddTraitAccents(StringBuilder sb, double cx, double cy, double r, string trait)
+    private static void AddTraitAccents(StringBuilder sb, double cx, double cy, double r, string trait, string? label)
     {
         if (trait == "fruit")
         {
-            foreach (var (px, py) in DecorationPoints(cx, cy, r, 6))
+            FruitProfile profile = FruitStyleFor(label);
+            bool showStemLeafHints = r >= 2.2;
+            foreach ((double px, double py) in DecorationPoints(cx, cy, r, 6))
             {
-                sb.Append("<circle cx=\"").Append(F(px)).Append("\" cy=\"").Append(F(py))
-                  .Append("\" r=\"").Append(F(r * 0.10)).Append("\" fill=\"#c81e1e\" stroke=\"#7a1313\" stroke-width=\"")
-                  .Append(F(r * 0.02)).Append("\" />");
+                AppendFruitGlyph(sb, px, py, r * 0.10, profile, showStemLeafHints);
             }
         }
         else if (trait == "nut")
         {
-            foreach (var (px, py) in DecorationPoints(cx, cy, r, 5))
+            foreach ((double px, double py) in DecorationPoints(cx, cy, r, 5))
             {
-                sb.Append("<ellipse cx=\"").Append(F(px)).Append("\" cy=\"").Append(F(py))
-                  .Append("\" rx=\"").Append(F(r * 0.10)).Append("\" ry=\"").Append(F(r * 0.07))
-                  .Append("\" fill=\"#8b6f3f\" stroke=\"#4a3a1a\" stroke-width=\"")
-                  .Append(F(r * 0.02)).Append("\" />");
+                _ = sb.Append("<ellipse cx=\"").Append(F(px)).Append("\" cy=\"").Append(F(py))
+                    .Append("\" rx=\"").Append(F(r * 0.10)).Append("\" ry=\"").Append(F(r * 0.07))
+                    .Append("\" fill=\"#8b6f3f\" stroke=\"#4a3a1a\" stroke-width=\"")
+                    .Append(F(r * 0.02)).Append("\" />");
             }
         }
         else if (trait == "flower")
         {
-            foreach (var (px, py) in DecorationPoints(cx, cy, r, 7))
+            FlowerProfile profile = FlowerStyleFor(label);
+            foreach ((double px, double py) in DecorationPoints(cx, cy, r, 7))
             {
-                AppendFlower(sb, px, py, r * 0.13);
+                AppendFlower(sb, px, py, r * 0.13, profile);
             }
         }
     }
 
-    /// <summary>Five-petal flower glyph centered at (cx, cy) with overall radius r.</summary>
-    private static void AppendFlower(StringBuilder sb, double cx, double cy, double r)
+    private static void AppendFruitGlyph(StringBuilder sb, double cx, double cy, double fr, FruitProfile profile, bool withStemLeaf)
     {
-        const int petals = 5;
-        for (int i = 0; i < petals; i++)
+        _ = profile.Oval
+            ? sb.Append("<ellipse cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
+                .Append("\" rx=\"").Append(F(fr * 1.2)).Append("\" ry=\"").Append(F(fr * 0.85))
+                .Append("\" fill=\"").Append(profile.Fill).Append("\" stroke=\"").Append(profile.Stroke)
+                .Append("\" stroke-width=\"").Append(F(fr * 0.22)).Append("\" />")
+            : sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
+                .Append("\" r=\"").Append(F(fr)).Append("\" fill=\"").Append(profile.Fill)
+                .Append("\" stroke=\"").Append(profile.Stroke).Append("\" stroke-width=\"")
+                .Append(F(fr * 0.22)).Append("\" />");
+
+        if (withStemLeaf)
         {
-            var theta = i * 2 * System.Math.PI / petals - System.Math.PI / 2;
-            var px = cx + System.Math.Cos(theta) * r * 0.55;
-            var py = cy + System.Math.Sin(theta) * r * 0.55;
-            sb.Append("<circle cx=\"").Append(F(px)).Append("\" cy=\"").Append(F(py))
-              .Append("\" r=\"").Append(F(r * 0.5)).Append("\" fill=\"#f3a6c0\" stroke=\"#8a3a55\" stroke-width=\"")
-              .Append(F(r * 0.08)).Append("\" />");
+            double sx0 = cx + (fr * 0.08);
+            double sy0 = cy - (fr * 0.95);
+            double sx1 = cx + (fr * 0.24);
+            double sy1 = cy - (fr * 1.55);
+            _ = sb.Append("<line x1=\"").Append(F(sx0)).Append("\" y1=\"").Append(F(sy0))
+                .Append("\" x2=\"").Append(F(sx1)).Append("\" y2=\"").Append(F(sy1))
+                .Append("\" stroke=\"").Append(profile.Stem).Append("\" stroke-width=\"").Append(F(fr * 0.16))
+                .Append("\" stroke-linecap=\"round\" />");
+            _ = sb.Append("<ellipse cx=\"").Append(F(sx1 + (fr * 0.24))).Append("\" cy=\"").Append(F(sy1 - (fr * 0.08)))
+                .Append("\" rx=\"").Append(F(fr * 0.42)).Append("\" ry=\"").Append(F(fr * 0.24))
+                .Append("\" fill=\"").Append(profile.Leaf).Append("\" stroke=\"").Append(profile.Stem)
+                .Append("\" stroke-width=\"").Append(F(fr * 0.12)).Append("\" />");
         }
-        sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
-          .Append("\" r=\"").Append(F(r * 0.32)).Append("\" fill=\"#f7d35e\" />");
     }
 
-    /// <summary>Deterministic decoration points distributed inside a circle.</summary>
-    private static System.Collections.Generic.IEnumerable<(double x, double y)> DecorationPoints(double cx, double cy, double r, int n)
+    private static void AppendFlower(StringBuilder sb, double cx, double cy, double r, FlowerProfile profile)
+    {
+        for (int i = 0; i < profile.Petals; i++)
+        {
+            double theta = (i * 2 * Math.PI / profile.Petals) - (Math.PI / 2);
+            double px = cx + (Math.Cos(theta) * r * 0.55);
+            double py = cy + (Math.Sin(theta) * r * 0.55);
+            _ = sb.Append("<circle cx=\"").Append(F(px)).Append("\" cy=\"").Append(F(py))
+                .Append("\" r=\"").Append(F(r * 0.5)).Append("\" fill=\"").Append(profile.Petal)
+                .Append("\" stroke=\"").Append(profile.PetalStroke).Append("\" stroke-width=\"")
+                .Append(F(r * 0.08)).Append("\" />");
+        }
+
+        _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
+            .Append("\" r=\"").Append(F(r * 0.32)).Append("\" fill=\"").Append(profile.Center).Append("\" />");
+    }
+
+    private static FruitProfile FruitStyleFor(string? label)
+    {
+        string key = label?.ToLowerInvariant() ?? string.Empty;
+        if (key.Contains("pear"))
+        {
+            return new FruitProfile("#9acb42", "#5c7f1f", false, "#6ea84a", "#50752f");
+        }
+
+        if (key.Contains("plum"))
+        {
+            return new FruitProfile("#6c4aa3", "#3f2a64", false, "#7aa35d", "#4d6b35");
+        }
+
+        if (key.Contains("peach") || key.Contains("apricot"))
+        {
+            return new FruitProfile("#f08a41", "#944d1f", false, "#7fb35a", "#4f6f31");
+        }
+
+        if (key.Contains("cherry"))
+        {
+            return new FruitProfile("#b6112b", "#6b0f1c", false, "#63a44a", "#3e6b2d");
+        }
+
+        if (key.Contains("citrus") || key.Contains("lemon") || key.Contains("orange"))
+        {
+            return new FruitProfile("#e8c93a", "#8f7a20", false, "#4f8f45", "#346638");
+        }
+
+        if (key.Contains("olive"))
+        {
+            return new FruitProfile("#5a6b2f", "#34401b", true, "#7f9a57", "#4f5f2d");
+        }
+
+        if (key.Contains("pomegranate"))
+        {
+            return new FruitProfile("#b32038", "#691220", false, "#6fae50", "#4e7436");
+        }
+
+        if (key.Contains("fig"))
+        {
+            return new FruitProfile("#7d3f76", "#4a2446", true, "#7a9f5a", "#4d6b35");
+        }
+
+        if (key.Contains("mulberry"))
+        {
+            return new FruitProfile("#4f2c72", "#2d1942", true, "#6d9c55", "#496834");
+        }
+
+        if (key.Contains("persimmon"))
+        {
+            return new FruitProfile("#df6d1d", "#7f3d16", false, "#82a75b", "#5b773a");
+        }
+
+        if (key.Contains("apple"))
+        {
+            return new FruitProfile("#c81e1e", "#7a1313", false, "#6faa4d", "#4a6b31");
+        }
+
+        return new FruitProfile("#c81e1e", "#7a1313", false, "#6faa4d", "#4a6b31");
+    }
+
+    private static FlowerProfile FlowerStyleFor(string? label)
+    {
+        string key = label?.ToLowerInvariant() ?? string.Empty;
+        if (key.Contains("dogwood"))
+        {
+            return new FlowerProfile("#fff8ef", "#b7a59a", "#d9b64a", 4);
+        }
+
+        if (key.Contains("magnolia"))
+        {
+            return new FlowerProfile("#f4efe4", "#a08f81", "#d6b372", 6);
+        }
+
+        if (key.Contains("redbud"))
+        {
+            return new FlowerProfile("#d56aa3", "#8a3e67", "#f0c65f", 5);
+        }
+
+        if (key.Contains("lilac"))
+        {
+            return new FlowerProfile("#b58ad8", "#6f4f8f", "#f4d976", 5);
+        }
+
+        if (key.Contains("azalea") || key.Contains("rhododendron"))
+        {
+            return new FlowerProfile("#d989c7", "#8a4e7e", "#f3d86d", 5);
+        }
+
+        if (key.Contains("hydrangea"))
+        {
+            return new FlowerProfile("#8fb4e8", "#4f6791", "#f5e39b", 4);
+        }
+
+        if (key.Contains("rose"))
+        {
+            return new FlowerProfile("#d6557c", "#7b2d45", "#f4c35e", 5);
+        }
+
+        if (key.Contains("hibiscus"))
+        {
+            return new FlowerProfile("#f06f82", "#923646", "#f7d468", 5);
+        }
+
+        if (key.Contains("forsythia"))
+        {
+            return new FlowerProfile("#f2c63a", "#9a7a1f", "#fff2b1", 4);
+        }
+
+        if (key.Contains("lavender"))
+        {
+            return new FlowerProfile("#9b88d9", "#5c4f8f", "#f1e07e", 4);
+        }
+
+        if (key.Contains("cherry (ornamental)") || key.Contains("crabapple"))
+        {
+            return new FlowerProfile("#f2b1c9", "#94506c", "#f6d872", 5);
+        }
+
+        return new FlowerProfile("#f3a6c0", "#8a3a55", "#f7d35e", 5);
+    }
+
+    private static IEnumerable<(double x, double y)> DecorationPoints(double cx, double cy, double r, int n)
     {
         for (int i = 0; i < n; i++)
         {
-            var theta = i * 2 * System.Math.PI / n + (n % 2 == 0 ? 0.3 : 0);
-            // Two concentric rings so centers don't all share a radius.
-            var rr = (i % 2 == 0 ? 0.45 : 0.7) * r;
-            yield return (cx + System.Math.Cos(theta) * rr, cy + System.Math.Sin(theta) * rr);
+            double theta = (i * 2 * Math.PI / n) + ((n % 2 == 0) ? 0.3 : 0);
+            double rr = (i % 2 == 0 ? 0.45 : 0.7) * r;
+            yield return (cx + (Math.Cos(theta) * rr), cy + (Math.Sin(theta) * rr));
         }
     }
+
+    private sealed record FruitProfile(string Fill, string Stroke, bool Oval, string Leaf, string Stem);
+
+    private sealed record FlowerProfile(string Petal, string PetalStroke, string Center, int Petals);
 }

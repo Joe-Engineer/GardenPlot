@@ -1,4 +1,4 @@
-// <copyright file="Program.cs" company="Garden Plot">
+﻿// <copyright file="Program.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
