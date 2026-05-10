@@ -1,5 +1,6 @@
 # Build and deploy GardenPlotWeb (Blazor Server, .NET 10) to Azure App Service
-# Docs: https://github.com/Azure/webapps-deploy
+# Auth: OIDC federated identity (no secrets/passwords)
+# Docs: https://github.com/Azure/login
 
 name: 'Build and deploy ASP.Net Core app to Azure Web App: gardenplot'
 
@@ -10,6 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  id-token: write   # required for OIDC token request
   contents: read
 
 jobs:
@@ -34,11 +36,18 @@ jobs:
             --configuration Release \
             --output ${{ runner.temp }}/publish
 
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
+        uses: azure/webapps-deploy@v3
         with:
           app-name: 'gardenplot'
           slot-name: 'production'
-          publish-profile: ${{ secrets.AzureAppService_PublishProfile_0dc4d345247740a7bc6eec0497322b0f }}
           package: ${{ runner.temp }}/publish
+
 
