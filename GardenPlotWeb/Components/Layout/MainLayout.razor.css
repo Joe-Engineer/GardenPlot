@@ -1,11 +1,61 @@
-.page {
+﻿.page {
     position: relative;
     display: flex;
     flex-direction: column;
 }
 
+.nav-collapse-toggle {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
 main {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+article {
+    min-width: 0;
+    overflow-x: hidden;
+    padding-right: 3px !important;
+    padding-bottom: 0 !important;
+}
+
+.nav-collapse-btn {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 30px;
+    height: 30px;
+    border: 1px solid #b8c8a3;
+    border-radius: 4px;
+    background: #eef3e6;
+    color: #2f5a3a;
+    font-size: 0.95rem;
+    line-height: 1;
+    z-index: 30;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.nav-collapse-btn:hover {
+    background: #d8e4c8;
+}
+
+.nav-collapse-btn::before {
+    content: "<";
+    font-weight: 700;
+}
+
+#nav-collapse-toggle:checked ~ .page .nav-collapse-btn::before {
+    content: ">";
 }
 
 .sidebar {
@@ -49,19 +99,43 @@ main {
 @media (min-width: 641px) {
     .page {
         flex-direction: row;
+        align-items: flex-start;
     }
 
     .sidebar {
         width: 250px;
+        min-width: 0;
+        flex: 0 0 250px;
         height: 100vh;
         position: sticky;
         top: 0;
+        overflow: hidden;
+        transition: width 160ms ease, flex-basis 160ms ease;
+    }
+
+    #nav-collapse-toggle:checked ~ .page .sidebar {
+        width: 44px;
+        flex-basis: 44px;
+    }
+
+    #nav-collapse-toggle:checked ~ .page .sidebar ::deep .top-row,
+    #nav-collapse-toggle:checked ~ .page .sidebar ::deep .nav-scrollable {
+        display: none;
+    }
+
+    #nav-collapse-toggle:checked ~ .page .nav-collapse-btn {
+        left: 8px;
     }
 
     .top-row {
         position: sticky;
         top: 0;
         z-index: 1;
+    }
+
+    main {
+        min-width: 0;
+        align-self: flex-start;
     }
 
     .top-row.auth ::deep a:first-child {
@@ -71,8 +145,14 @@ main {
     }
 
     .top-row, article {
-        padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
+        padding-left: 3px !important;
+        padding-right: 3px !important;
+    }
+}
+
+@media (max-width: 640.98px) {
+    .nav-collapse-btn {
+        display: none;
     }
 }
 
