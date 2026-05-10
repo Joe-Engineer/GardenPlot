@@ -162,54 +162,27 @@ else
 
             <span class="drop-controls">
             <label class="small text-muted">Drop</label>
-            <select class="form-select form-select-sm drop-select" @bind="dropPattern" title="Drop pattern for stamp placement">
-                @foreach (var pattern in System.Enum.GetValues<DropPattern>())
-                {
-                    <option value="@pattern">@DropPatternLabel(pattern)</option>
-                }
-            </select>
-            @if (dropPattern != DropPattern.One)
-            {
-                <select class="form-select form-select-sm drop-select" @bind="dropActivationMode" title="How multi-drop is activated">
-                    <option value="@DropActivationMode.ClickToggle">Click toggle</option>
-                    <option value="@DropActivationMode.HoldKey">Hold key</option>
-                </select>
-                @if (dropActivationMode == DropActivationMode.ClickToggle)
-                {
-                    <button class="btn btn-sm @(isDropModeLatched ? "btn-success" : "btn-outline-secondary")"
-                            @onclick="ToggleDropModeLatch" title="Enable or disable multi-drop placement. Wheel: Shift/Ctrl rotate item, Alt rotates line/array orientation.">
-                        @(isDropModeLatched ? "Drop On" : "Drop Off")
-                    </button>
-                }
-                else
-                {
-                    <select class="form-select form-select-sm drop-select" @bind="dropModifierKey" title="Modifier key used to activate multi-drop">
-                        <option value="@DropModifierKey.Shift">Shift</option>
-                        <option value="@DropModifierKey.Ctrl">Ctrl</option>
-                        <option value="@DropModifierKey.Alt">Alt</option>
-                    </select>
-                }
-
-                @if (dropPattern == DropPattern.Line)
-                {
-                    <input type="number" min="2" max="400" step="1" class="form-control form-control-sm drop-input" title="Items"
-                           @bind="lineDropCount" />
-                    <input type="number" min="0" max="100" step="0.1" class="form-control form-control-sm drop-input" title="Center spacing (ft), 0 = item default"
-                           @bind="lineCenterSpacingFt" />
-                }
-                else if (dropPattern == DropPattern.Array)
-                {
-                    <input type="number" min="2" max="600" step="1" class="form-control form-control-sm drop-input" title="Items"
-                           @bind="arrayDropCount" />
-                    <input type="number" min="1" max="600" step="1" class="form-control form-control-sm drop-input" title="Rows"
-                           @bind="arrayDropRows" />
-                    <input type="number" min="0" max="100" step="0.1" class="form-control form-control-sm drop-input" title="Column center spacing (ft), 0 = item default"
-                           @bind="arrayCenterSpacingXFt" />
-                    <input type="number" min="0" max="100" step="0.1" class="form-control form-control-sm drop-input" title="Row center spacing (ft), 0 = item default"
-                           @bind="arrayCenterSpacingYFt" />
-                    <label class="drop-check small"><input type="checkbox" @bind="arrayStaggerHalf" /> 1/2 stagger</label>
-                }
-            }
+            <div class="drop-field">
+                <label class="drop-field-label">Qty</label>
+                <input type="number" min="1" max="600" step="1" class="form-control form-control-sm drop-input" title="Items"
+                       @bind="arrayDropCount" />
+            </div>
+            <div class="drop-field">
+                <label class="drop-field-label">Rows</label>
+                <input type="number" min="1" max="600" step="1" class="form-control form-control-sm drop-input" title="Rows"
+                       @bind="arrayDropRows" />
+            </div>
+            <div class="drop-field">
+                <label class="drop-field-label">X ft</label>
+                <input type="number" min="0" max="100" step="0.1" class="form-control form-control-sm drop-input" title="Column center spacing (ft), 0 = item default"
+                       @bind="arrayCenterSpacingXFt" />
+            </div>
+            <div class="drop-field">
+                <label class="drop-field-label">Y ft</label>
+                <input type="number" min="0" max="100" step="0.1" class="form-control form-control-sm drop-input" title="Row center spacing (ft), 0 = item default"
+                       @bind="arrayCenterSpacingYFt" />
+            </div>
+            <label class="drop-check small"><input type="checkbox" @bind="arrayStaggerHalf" /> 1/2 stagger</label>
             </span>
 
             <span class="toolbar-group toolbar-group-right">
@@ -1381,14 +1354,14 @@ else
     private double? ghostY;
     private double stampRotation;
     private double stampOrientation;
-    private DropPattern dropPattern = DropPattern.One;
+    private DropPattern dropPattern = DropPattern.Array;
     private DropActivationMode dropActivationMode = DropActivationMode.ClickToggle;
     private DropModifierKey dropModifierKey = DropModifierKey.Shift;
-    private bool isDropModeLatched;
+    private bool isDropModeLatched = true;
     private int lineDropCount = 5;
     private double lineCenterSpacingFt;
-    private int arrayDropCount = 6;
-    private int arrayDropRows = 2;
+    private int arrayDropCount = 1;
+    private int arrayDropRows = 1;
     private double arrayCenterSpacingXFt;
     private double arrayCenterSpacingYFt;
     private bool arrayStaggerHalf;
@@ -2867,7 +2840,7 @@ else
         }
         else if (pattern == DropPattern.Array)
         {
-            var count = Math.Clamp(arrayDropCount, 2, 600);
+            var count = Math.Clamp(arrayDropCount, 1, 600);
             var rows = Math.Clamp(arrayDropRows, 1, count);
             var cols = (int)Math.Ceiling(count / (double)rows);
             spacingX = arrayCenterSpacingXFt > 0 ? arrayCenterSpacingXFt : item.WidthFt;

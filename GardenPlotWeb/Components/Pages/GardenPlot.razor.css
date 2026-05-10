@@ -111,6 +111,20 @@
     max-width: 82px;
 }
 
+.drop-field {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+}
+
+.drop-field-label {
+    font-size: 0.68rem;
+    line-height: 1;
+    color: #6c757d;
+    margin-left: 0.1rem;
+}
+
 .drop-check {
     display: inline-flex;
     align-items: center;
