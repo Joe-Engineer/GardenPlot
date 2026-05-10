@@ -15,7 +15,6 @@ main {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    position: relative;
 }
 
 article {
@@ -27,17 +26,17 @@ article {
 
 .nav-collapse-btn {
     position: absolute;
-    top: 6px;
-    left: 6px;
+    left: 7px;
+    bottom: 7px;
     width: 30px;
     height: 30px;
     border: 1px solid #b8c8a3;
     border-radius: 4px;
-    background: #eef3e6;
-    color: #2f5a3a;
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
     font-size: 0.95rem;
     line-height: 1;
-    z-index: 30;
+    z-index: 50;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -46,7 +45,7 @@ article {
 }
 
 .nav-collapse-btn:hover {
-    background: #d8e4c8;
+    background: rgba(255, 255, 255, 0.26);
 }
 
 .nav-collapse-btn::before {
@@ -110,6 +109,8 @@ article {
         position: sticky;
         top: 0;
         overflow: hidden;
+        padding-bottom: 42px;
+        box-sizing: border-box;
         transition: width 160ms ease, flex-basis 160ms ease;
     }
 
@@ -121,10 +122,6 @@ article {
     #nav-collapse-toggle:checked ~ .page .sidebar ::deep .top-row,
     #nav-collapse-toggle:checked ~ .page .sidebar ::deep .nav-scrollable {
         display: none;
-    }
-
-    #nav-collapse-toggle:checked ~ .page .nav-collapse-btn {
-        left: 8px;
     }
 
     .top-row {
