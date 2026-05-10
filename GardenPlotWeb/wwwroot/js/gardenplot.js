@@ -1,11 +1,9 @@
 ﻿// Garden Plot interop. Loaded as an ES module via JSRuntime.
-// Wheel: only preventDefault when Shift/Ctrl/Alt is held (otherwise let the page scroll).
+// Wheel: always preventDefault over the plot canvas so wheel controls stay app-specific.
 export function attachWheel(el, dotnetRef) {
     const handler = (e) => {
-        if (e.shiftKey || e.ctrlKey || e.altKey) {
-            e.preventDefault();
-            dotnetRef.invokeMethodAsync('OnWheelFromJs', e.deltaY, e.shiftKey, e.ctrlKey, e.altKey);
-        }
+        e.preventDefault();
+        dotnetRef.invokeMethodAsync('OnWheelFromJs', e.deltaY, e.shiftKey, e.ctrlKey, e.altKey);
     };
     el.addEventListener('wheel', handler, { passive: false });
     return {
@@ -123,4 +121,50 @@ export function downloadText(filename, text, mime) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+const gpDbName = 'gardenplot-db';
+const gpStore = 'kv';
+let gpDbPromise = null;
+
+function openGardenPlotDb() {
+    if (gpDbPromise) return gpDbPromise;
+    gpDbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open(gpDbName, 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(gpStore)) {
+                db.createObjectStore(gpStore);
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('indexedDB open failed'));
+    });
+    return gpDbPromise;
+}
+
+// Durable client storage read. Returns string or null.
+export async function idbGet(key) {
+    if (!key) return null;
+    const db = await openGardenPlotDb();
+    return await new Promise((resolve, reject) => {
+        const tx = db.transaction(gpStore, 'readonly');
+        const store = tx.objectStore(gpStore);
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result ?? null);
+        req.onerror = () => reject(req.error || new Error('indexedDB get failed'));
+    });
+}
+
+// Durable client storage write.
+export async function idbSet(key, value) {
+    if (!key) return;
+    const db = await openGardenPlotDb();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(gpStore, 'readwrite');
+        const store = tx.objectStore(gpStore);
+        const req = store.put(value ?? null, key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error || new Error('indexedDB set failed'));
+    });
 }

@@ -37,6 +37,7 @@
             @F(currentPlot.WidthFt) ft × @F(currentPlot.HeightFt) ft &mdash; flat. Pick a tool, then draw or stamp on the plot.
         </span>
     }
+    <a href="/about" class="ms-auto text-nowrap">Help / About</a>
 </div>
 
 @if (currentPlot is null)
@@ -46,33 +47,122 @@
 else
 {
     <div class="plot-toolbar">
-        @foreach (var t in tools)
-        {
-            <button class="btn btn-sm @(currentTool == t.Value ? "btn-primary" : "btn-outline-primary")"
-                    @onclick="() => SetTool(t.Value)">@t.Key</button>
-        }
-        <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="CopySelected" disabled="@(selectedIds.Count == 0)">Copy</button>
-        <button class="btn btn-sm btn-outline-secondary" @onclick="PasteClipboard" disabled="@(!HasClipboard)">Paste</button>
-        <button class="btn btn-sm btn-outline-danger ms-2" @onclick="DeleteSelected" disabled="@(selectedIds.Count == 0)">Delete</button>
-        <button class="btn btn-sm btn-outline-secondary" @onclick="SendSelectionToBack" disabled="@(selectedIds.Count == 0)" title="Send selected items behind others">Send to Back</button>
-        <button class="btn btn-sm btn-outline-secondary" @onclick="BringSelectionToFront" disabled="@(selectedIds.Count == 0)" title="Move selected items in front of others">Bring to Front</button>
-        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearAll">Clear All</button>
-        <span class="ms-3 small text-muted">Tool: <strong>@currentTool</strong></span>
-        <span class="zoom-controls ms-3">
-            <span class="small text-muted me-1">Zoom:</span>
-            <button class="btn btn-sm btn-outline-secondary zoom-btn" @onclick="ZoomOut" title="Zoom out (−10%)">−</button>
-            <input type="range" class="zoom-slider" min="@((int)(MinZoom*100))" max="@((int)(MaxZoom*100))" step="5"
-                   value="@((int)Math.Round(zoom * 100))" @oninput="OnZoomSliderInput" />
-            <button class="btn btn-sm btn-outline-secondary zoom-btn" @onclick="ZoomIn" title="Zoom in (+10%)">+</button>
-            <input type="text" class="zoom-input form-control form-control-sm" value="@zoomInputText"
-                   @oninput="OnZoomTextInput" @onkeydown="OnZoomTextKey" @onblur="ApplyZoomFromText" />
-            <button class="btn btn-sm btn-link p-0 ms-1 small" @onclick="ZoomReset" title="Reset zoom">reset</button>
-        </span>
-        <button class="btn btn-sm btn-outline-secondary" @onclick="ResetControls" title="Reset tool mode, zoom, and floating panel positions">Reset Controls</button>
-        <span class="small text-muted ms-2">Rotate selection: Shift+wheel (coarse), Ctrl+wheel (fine). Stamp line/array orientation: Alt+wheel.</span>
-        <span class="drop-controls">
+        <div class="toolbar-row toolbar-row-global">
+            <div class="toolbar-group" role="toolbar" aria-label="Drawing tools">
+                @foreach (var t in tools)
+                {
+                    <button class="toolbar-icon-btn @(currentTool == t.Value ? "active" : string.Empty)"
+                            @onclick="() => SetTool(t.Value)" title="@t.Key" aria-label="@t.Key">
+                        @switch (t.Value)
+                        {
+                            case Tool.Select:
+                                <svg viewBox="0 0 24 24"><path d="M4 3L18 13L11 14L12 21L9 22L8 15L3 17Z" fill="currentColor" /></svg>
+                                break;
+                            case Tool.FreeDraw:
+                                <svg viewBox="0 0 24 24"><path d="M4 17C7 14 9 9 14 7C16 6 18 7 19 9C20 11 19 13 17 14C12 17 9 20 4 17Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                                break;
+                            case Tool.Rectangle:
+                                <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                                break;
+                            case Tool.Oval:
+                                <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8" ry="5.5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                                break;
+                            case Tool.Ruler:
+                                <svg viewBox="0 0 24 24"><path d="M4 16L16 4L20 8L8 20L4 20Z" fill="none" stroke="currentColor" stroke-width="2" /><path d="M9 9L11 11M12 6L14 8M6 12L8 14" stroke="currentColor" stroke-width="1.5" /></svg>
+                                break;
+                            case Tool.CircleRuler:
+                                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path d="M12 12L19 12" stroke="currentColor" stroke-width="1.5" /></svg>
+                                break;
+                            case Tool.RectRuler:
+                                <svg viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="10" fill="none" stroke="currentColor" stroke-width="2" /><path d="M12 12L19 12" stroke="currentColor" stroke-width="1.5" /></svg>
+                                break;
+                        }
+                    </button>
+                }
+            </div>
+
+            <div class="toolbar-group zoom-group">
+                <span class="small text-muted">Tool: <strong>@currentTool</strong></span>
+                <span class="zoom-controls">
+                    <button class="toolbar-icon-btn zoom-btn" @onclick="ZoomOut" title="Zoom out (−10%)" aria-label="Zoom out">
+                        <svg viewBox="0 0 24 24"><path d="M6 12H18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="2" /><path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                    </button>
+                    <input type="range" class="zoom-slider" min="@((int)(MinZoom*100))" max="@((int)(MaxZoom*100))" step="5"
+                           value="@((int)Math.Round(zoom * 100))" @oninput="OnZoomSliderInput" />
+                    <button class="toolbar-icon-btn zoom-btn" @onclick="ZoomIn" title="Zoom in (+10%)" aria-label="Zoom in">
+                        <svg viewBox="0 0 24 24"><path d="M6 12H18M12 6V18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="2" /><path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                    </button>
+                    <input type="text" class="zoom-input form-control form-control-sm" value="@zoomInputText"
+                           @oninput="OnZoomTextInput" @onkeydown="OnZoomTextKey" @onblur="ApplyZoomFromText" />
+                    <button class="btn btn-sm btn-link p-0 small" @onclick="ZoomReset" title="Reset zoom">reset</button>
+                </span>
+                <button class="toolbar-icon-btn" @onclick="ResetControls" title="Reset tool mode, zoom, and floating panel positions" aria-label="Reset controls">
+                    <svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-6.6 9.3" fill="none" stroke="currentColor" stroke-width="2" /><path d="M4 4V10H10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </button>
+                <button class="toolbar-icon-btn" @onclick="ClearAll" title="Clear all shapes" aria-label="Clear all">
+                    <svg viewBox="0 0 24 24"><path d="M4 7H20" stroke="currentColor" stroke-width="2" /><path d="M9 7V5H15V7" stroke="currentColor" stroke-width="2" /><rect x="7" y="7" width="10" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="toolbar-row toolbar-row-context">
+            <div class="toolbar-group" role="toolbar" aria-label="Selection actions">
+                <button class="toolbar-icon-btn" @onclick="CopySelected" disabled="@(selectedIds.Count == 0)" title="Copy selection" aria-label="Copy selection">
+                    <svg viewBox="0 0 24 24"><rect x="8" y="8" width="10" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="2" /><rect x="5" y="4" width="10" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                </button>
+                <button class="toolbar-icon-btn" @onclick="PasteClipboard" disabled="@(!HasClipboard)" title="Paste" aria-label="Paste">
+                    <svg viewBox="0 0 24 24"><path d="M8 4H16V7H19V20H5V7H8Z" fill="none" stroke="currentColor" stroke-width="2" /><path d="M10 3H14V6H10Z" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                </button>
+                <button class="toolbar-icon-btn danger" @onclick="DeleteSelected" disabled="@(selectedIds.Count == 0)" title="Delete selection" aria-label="Delete selection">
+                    <svg viewBox="0 0 24 24"><path d="M4 7H20" stroke="currentColor" stroke-width="2" /><path d="M9 7V5H15V7" stroke="currentColor" stroke-width="2" /><rect x="7" y="7" width="10" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                </button>
+                <button class="toolbar-icon-btn" @onclick="SendSelectionToBack" disabled="@(selectedIds.Count == 0)" title="Send selected items behind others" aria-label="Send to back">
+                    <svg viewBox="0 0 24 24"><rect x="5" y="9" width="10" height="10" fill="#7f8790" /><rect x="9" y="5" width="10" height="10" fill="#bcc3ca" stroke="#5f666d" stroke-width="1" /></svg>
+                </button>
+                <button class="toolbar-icon-btn" @onclick="BringSelectionToFront" disabled="@(selectedIds.Count == 0)" title="Move selected items in front of others" aria-label="Bring to front">
+                    <svg viewBox="0 0 24 24"><rect x="5" y="9" width="10" height="10" fill="#bcc3ca" stroke="#5f666d" stroke-width="1" /><rect x="9" y="5" width="10" height="10" fill="#7f8790" /></svg>
+                </button>
+                <button class="toolbar-icon-btn" @onclick="GroupSelectedItems" disabled="@(!CanGroupSelection)" title="Group selection" aria-label="Group selection">
+                    <svg viewBox="0 0 24 24"><rect x="4" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="14" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="9" y="13" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M10 10H14M12 10V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+                </button>
+                <button class="toolbar-icon-btn" @onclick="UngroupSelectedItems" disabled="@(!CanUngroupSelection)" title="Ungroup selection" aria-label="Ungroup selection">
+                    <svg viewBox="0 0 24 24"><rect x="4" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="14" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="9" y="13" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M10 10H14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /><path d="M12 12L12 12" stroke="currentColor" stroke-width="1.6" /></svg>
+                </button>
+            </div>
+
+            <div class="align-toolbar align-toolbar-inline" role="toolbar" aria-label="Position controls">
+                @if (selectedIds.Count >= 2)
+                {
+                    <span class="small text-muted me-2">@selectedIds.Count selected</span>
+                    <button class="align-btn" title="Align Left" @onclick='() => AlignSelected("left")'>
+                        <svg viewBox="0 0 24 24"><line x1="3" y1="2" x2="3" y2="22" stroke="#333" stroke-width="2"/><rect x="4" y="5" width="14" height="4" fill="#5a8a4a"/><rect x="4" y="13" width="9" height="4" fill="#5a8a4a"/></svg>
+                    </button>
+                    <button class="align-btn" title="Align Right" @onclick='() => AlignSelected("right")'>
+                        <svg viewBox="0 0 24 24"><line x1="21" y1="2" x2="21" y2="22" stroke="#333" stroke-width="2"/><rect x="6" y="5" width="14" height="4" fill="#5a8a4a"/><rect x="11" y="13" width="9" height="4" fill="#5a8a4a"/></svg>
+                    </button>
+                    <button class="align-btn" title="Align Top" @onclick='() => AlignSelected("top")'>
+                        <svg viewBox="0 0 24 24"><line x1="2" y1="3" x2="22" y2="3" stroke="#333" stroke-width="2"/><rect x="5" y="4" width="4" height="14" fill="#5a8a4a"/><rect x="13" y="4" width="4" height="9" fill="#5a8a4a"/></svg>
+                    </button>
+                    <button class="align-btn" title="Align Bottom" @onclick='() => AlignSelected("bottom")'>
+                        <svg viewBox="0 0 24 24"><line x1="2" y1="21" x2="22" y2="21" stroke="#333" stroke-width="2"/><rect x="5" y="6" width="4" height="14" fill="#5a8a4a"/><rect x="13" y="11" width="4" height="9" fill="#5a8a4a"/></svg>
+                    </button>
+                    <span class="align-divider"></span>
+                    <button class="align-btn" title="Distribute Horizontally (equal gaps)" disabled="@(selectedIds.Count < 3)" @onclick="() => DistributeSelected(true)">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="6" width="4" height="12" fill="#5a8a4a"/><rect x="10" y="6" width="4" height="12" fill="#5a8a4a"/><rect x="18" y="6" width="4" height="12" fill="#5a8a4a"/><line x1="6" y1="12" x2="10" y2="12" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/><line x1="14" y1="12" x2="18" y2="12" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/></svg>
+                    </button>
+                    <button class="align-btn" title="Distribute Vertically (equal gaps)" disabled="@(selectedIds.Count < 3)" @onclick="() => DistributeSelected(false)">
+                        <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="4" fill="#5a8a4a"/><rect x="6" y="10" width="12" height="4" fill="#5a8a4a"/><rect x="6" y="18" width="12" height="4" fill="#5a8a4a"/><line x1="12" y1="6" x2="12" y2="10" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/><line x1="12" y1="14" x2="12" y2="18" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/></svg>
+                    </button>
+                }
+                else
+                {
+                    <span class="x-small text-muted">Select 2+ items for align/distribute</span>
+                }
+            </div>
+
+            <span class="drop-controls">
             <label class="small text-muted">Drop</label>
-            <select class="form-select form-select-sm drop-select" @bind="dropPattern">
+            <select class="form-select form-select-sm drop-select" @bind="dropPattern" title="Drop pattern for stamp placement">
                 @foreach (var pattern in System.Enum.GetValues<DropPattern>())
                 {
                     <option value="@pattern">@DropPatternLabel(pattern)</option>
@@ -80,20 +170,20 @@ else
             </select>
             @if (dropPattern != DropPattern.One)
             {
-                <select class="form-select form-select-sm drop-select" @bind="dropActivationMode">
+                <select class="form-select form-select-sm drop-select" @bind="dropActivationMode" title="How multi-drop is activated">
                     <option value="@DropActivationMode.ClickToggle">Click toggle</option>
                     <option value="@DropActivationMode.HoldKey">Hold key</option>
                 </select>
                 @if (dropActivationMode == DropActivationMode.ClickToggle)
                 {
                     <button class="btn btn-sm @(isDropModeLatched ? "btn-success" : "btn-outline-secondary")"
-                            @onclick="ToggleDropModeLatch" title="Enable or disable multi-drop placement">
+                            @onclick="ToggleDropModeLatch" title="Enable or disable multi-drop placement. Wheel: Shift/Ctrl rotate item, Alt rotates line/array orientation.">
                         @(isDropModeLatched ? "Drop On" : "Drop Off")
                     </button>
                 }
                 else
                 {
-                    <select class="form-select form-select-sm drop-select" @bind="dropModifierKey">
+                    <select class="form-select form-select-sm drop-select" @bind="dropModifierKey" title="Modifier key used to activate multi-drop">
                         <option value="@DropModifierKey.Shift">Shift</option>
                         <option value="@DropModifierKey.Ctrl">Ctrl</option>
                         <option value="@DropModifierKey.Alt">Alt</option>
@@ -120,105 +210,144 @@ else
                     <label class="drop-check small"><input type="checkbox" @bind="arrayStaggerHalf" /> 1/2 stagger</label>
                 }
             }
-        </span>
-        <span class="ms-auto d-flex gap-1">
-            <button class="btn btn-sm btn-outline-secondary" @onclick="ExportPng" title="Export the plot as a PNG image">PNG</button>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="PrintPlot" title="Open print preview (use 'Save as PDF' from the print dialog)">Print / PDF</button>
-        </span>
+            </span>
+
+            <span class="toolbar-group toolbar-group-right">
+                <button class="toolbar-icon-btn" @onclick="ShowKeyBindingsDialog" title="Keyboard mappings" aria-label="Keyboard mappings">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M7 10H9M11 10H13M15 10H17M7 14H11M13 14H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+                </button>
+                <button class="toolbar-icon-btn" @onclick="ExportPng" title="Export the plot as a PNG image" aria-label="Export PNG">
+                    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M7 15L10 12L13 15L16 11L19 15" fill="none" stroke="currentColor" stroke-width="1.8" /><circle cx="9" cy="8" r="1.4" fill="currentColor" /></svg>
+                </button>
+                <button class="toolbar-icon-btn" @onclick="PrintPlot" title="Open print preview (use 'Save as PDF' from the print dialog)" aria-label="Print or save PDF">
+                    <svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="6" fill="none" stroke="currentColor" stroke-width="2" /><rect x="5" y="10" width="14" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="2" /><rect x="7" y="14" width="10" height="6" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                </button>
+            </span>
+        </div>
     </div>
 
-    @if (selectedIds.Count >= 2)
-    {
-        <div class="align-toolbar">
-            <span class="small text-muted me-2">@selectedIds.Count selected</span>
-            <button class="align-btn" title="Align Left" @onclick='() => AlignSelected("left")'>
-                <svg viewBox="0 0 24 24"><line x1="3" y1="2" x2="3" y2="22" stroke="#333" stroke-width="2"/><rect x="4" y="5" width="14" height="4" fill="#5a8a4a"/><rect x="4" y="13" width="9" height="4" fill="#5a8a4a"/></svg>
-            </button>
-            <button class="align-btn" title="Align Right" @onclick='() => AlignSelected("right")'>
-                <svg viewBox="0 0 24 24"><line x1="21" y1="2" x2="21" y2="22" stroke="#333" stroke-width="2"/><rect x="6" y="5" width="14" height="4" fill="#5a8a4a"/><rect x="11" y="13" width="9" height="4" fill="#5a8a4a"/></svg>
-            </button>
-            <button class="align-btn" title="Align Top" @onclick='() => AlignSelected("top")'>
-                <svg viewBox="0 0 24 24"><line x1="2" y1="3" x2="22" y2="3" stroke="#333" stroke-width="2"/><rect x="5" y="4" width="4" height="14" fill="#5a8a4a"/><rect x="13" y="4" width="4" height="9" fill="#5a8a4a"/></svg>
-            </button>
-            <button class="align-btn" title="Align Bottom" @onclick='() => AlignSelected("bottom")'>
-                <svg viewBox="0 0 24 24"><line x1="2" y1="21" x2="22" y2="21" stroke="#333" stroke-width="2"/><rect x="5" y="6" width="4" height="14" fill="#5a8a4a"/><rect x="13" y="11" width="4" height="9" fill="#5a8a4a"/></svg>
-            </button>
-            <span class="align-divider"></span>
-            <button class="align-btn" title="Distribute Horizontally (equal gaps)" disabled="@(selectedIds.Count < 3)" @onclick="() => DistributeSelected(true)">
-                <svg viewBox="0 0 24 24"><rect x="2" y="6" width="4" height="12" fill="#5a8a4a"/><rect x="10" y="6" width="4" height="12" fill="#5a8a4a"/><rect x="18" y="6" width="4" height="12" fill="#5a8a4a"/><line x1="6" y1="12" x2="10" y2="12" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/><line x1="14" y1="12" x2="18" y2="12" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/></svg>
-            </button>
-            <button class="align-btn" title="Distribute Vertically (equal gaps)" disabled="@(selectedIds.Count < 3)" @onclick="() => DistributeSelected(false)">
-                <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="4" fill="#5a8a4a"/><rect x="6" y="10" width="12" height="4" fill="#5a8a4a"/><rect x="6" y="18" width="12" height="4" fill="#5a8a4a"/><line x1="12" y1="6" x2="12" y2="10" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/><line x1="12" y1="14" x2="12" y2="18" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/></svg>
-            </button>
+@if (showKeyBindingsDialog)
+{
+    var kb = library.Ui.KeyBindings;
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Keyboard mappings</h5>
+                    <button type="button" class="btn-close" @onclick="CloseKeyBindingsDialog"></button>
+                </div>
+                <div class="modal-body keybind-modal-body">
+                    <div class="x-small text-muted mb-2">Use combinations like <code>Ctrl+G</code>, <code>Alt+ArrowLeft</code>, or single keys like <code>Escape</code>.</div>
+                    <div class="keybind-grid">
+                        <label>Stamp spacing left</label><input class="form-control form-control-sm" @bind="kb.StampSpacingLeft" />
+                        <label>Stamp spacing right</label><input class="form-control form-control-sm" @bind="kb.StampSpacingRight" />
+                        <label>Stamp spacing up</label><input class="form-control form-control-sm" @bind="kb.StampSpacingUp" />
+                        <label>Stamp spacing down</label><input class="form-control form-control-sm" @bind="kb.StampSpacingDown" />
+
+                        <label>Undo</label><input class="form-control form-control-sm" @bind="kb.Undo" />
+                        <label>Select all</label><input class="form-control form-control-sm" @bind="kb.SelectAll" />
+                        <label>Copy</label><input class="form-control form-control-sm" @bind="kb.Copy" />
+                        <label>Paste</label><input class="form-control form-control-sm" @bind="kb.Paste" />
+                        <label>Delete</label><input class="form-control form-control-sm" @bind="kb.Delete" />
+                        <label>Rotate counter-clockwise</label><input class="form-control form-control-sm" @bind="kb.RotateCounterClockwise" />
+                        <label>Rotate clockwise</label><input class="form-control form-control-sm" @bind="kb.RotateClockwise" />
+                        <label>Escape / cancel</label><input class="form-control form-control-sm" @bind="kb.Escape" />
+
+                        <label>Group selection</label><input class="form-control form-control-sm" @bind="kb.Group" />
+                        <label>Ungroup selection</label><input class="form-control form-control-sm" @bind="kb.Ungroup" />
+
+                        <label>Zoom in</label><input class="form-control form-control-sm" @bind="kb.ZoomIn" />
+                        <label>Zoom out</label><input class="form-control form-control-sm" @bind="kb.ZoomOut" />
+                        <label>Zoom reset</label><input class="form-control form-control-sm" @bind="kb.ZoomReset" />
+
+                        <label>Pan left</label><input class="form-control form-control-sm" @bind="kb.PanLeft" />
+                        <label>Pan right</label><input class="form-control form-control-sm" @bind="kb.PanRight" />
+                        <label>Pan up</label><input class="form-control form-control-sm" @bind="kb.PanUp" />
+                        <label>Pan down</label><input class="form-control form-control-sm" @bind="kb.PanDown" />
+
+                        <label>Group orientation CCW</label><input class="form-control form-control-sm" @bind="kb.RotateGroupOrientationCounterClockwise" />
+                        <label>Group orientation CW</label><input class="form-control form-control-sm" @bind="kb.RotateGroupOrientationClockwise" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ResetDefaultKeyBindings">Reset defaults</button>
+                    <button class="btn btn-sm btn-primary" @onclick="SaveAndCloseKeyBindingsDialog">Save</button>
+                </div>
+            </div>
         </div>
-    }
+    </div>
+}
 
     <div class="plot-workspace">
-        <aside class="plot-palette">
-            <div class="palette-header">
-                <select class="form-select form-select-sm palette-combobox"
-                        value="@currentCategory"
-                        @onchange="OnCategoryChanged">
-                    @foreach (var cat in System.Enum.GetValues<PaletteCategory>())
+            <aside class="plot-palette">
+                <div class="palette-header">
+                    <select class="form-select form-select-sm palette-combobox"
+                            value="@currentCategory"
+                            @onchange="OnCategoryChanged">
+                        @foreach (var cat in System.Enum.GetValues<PaletteCategory>())
+                        {
+                            <option value="@cat">@CategoryLabel(cat)</option>
+                        }
+                    </select>
+                </div>
+                <div class="palette-grid">
+                    @foreach (var item in PaletteCatalog.For(currentCategory))
                     {
-                        <option value="@cat">@CategoryLabel(cat)</option>
+                        var isActive = selectedItem?.Code == item.Code;
+                        var detail = item.Kind switch
+                        {
+                            PaletteKind.BedKit => $"{item.WidthFt}'×{item.HeightFt}' · {item.Pieces} pcs",
+                            PaletteKind.Plant  => $"spacing {FormatPlantSpacing(item.WidthFt)} · {item.Sunlight} · {item.Water} water",
+                            _                  => $"{item.WidthFt}' Ø · {item.Trait}",
+                        };
+                        <button class="palette-item @(isActive ? "active" : "")"
+                                @onclick="() => SelectItem(item)" title="@item.Code — @detail">
+                            <svg viewBox="@PreviewViewBox(item)" preserveAspectRatio="xMidYMid meet">
+                                @switch (item.Kind)
+                                {
+                                    case PaletteKind.BedKit:
+                                        <rect x="0" y="0" width="@F(item.WidthFt)" height="@F(item.HeightFt)"
+                                              rx="@F(Math.Min(item.WidthFt, item.HeightFt) / 3.0)"
+                                              ry="@F(Math.Min(item.WidthFt, item.HeightFt) / 3.0)"
+                                              fill="#e2725b" fill-opacity="0.5" stroke="#7a3520" stroke-width="0.15" />
+                                        break;
+                                    case PaletteKind.Tree:
+                                        @((MarkupString)PlantRendering.TreeSvg(0, 0, item.WidthFt, item.HeightFt, item.Trait))
+                                        break;
+                                    case PaletteKind.Bush:
+                                        @((MarkupString)PlantRendering.BushSvg(0, 0, item.WidthFt, item.HeightFt, item.Trait))
+                                        break;
+                                    case PaletteKind.Plant:
+                                        @((MarkupString)PlantRendering.SpacingRingsSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, "good"))
+                                        @((MarkupString)PlantRendering.PlantSpriteSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, item.Trait))
+                                        break;
+                                }
+                            </svg>
+                            <div class="small palette-item-name">@item.Code</div>
+                            <div class="x-small text-muted">@detail</div>
+                        </button>
                     }
-                </select>
-            </div>
-            <div class="palette-grid">
-                @foreach (var item in PaletteCatalog.For(currentCategory))
-                {
-                    var isActive = selectedItem?.Code == item.Code;
-                    var detail = item.Kind switch
-                    {
-                        PaletteKind.BedKit => $"{item.WidthFt}'×{item.HeightFt}' · {item.Pieces} pcs",
-                        PaletteKind.Plant  => $"spacing {FormatPlantSpacing(item.WidthFt)} · {item.Sunlight} · {item.Water} water",
-                        _                  => $"{item.WidthFt}' Ø · {item.Trait}",
-                    };
-                    <button class="palette-item @(isActive ? "active" : "")"
-                            @onclick="() => SelectItem(item)" title="@item.Code — @detail">
-                        <svg viewBox="@PreviewViewBox(item)" preserveAspectRatio="xMidYMid meet">
-                            @switch (item.Kind)
-                            {
-                                case PaletteKind.BedKit:
-                                    <rect x="0" y="0" width="@F(item.WidthFt)" height="@F(item.HeightFt)"
-                                          rx="@F(Math.Min(item.WidthFt, item.HeightFt) / 3.0)"
-                                          ry="@F(Math.Min(item.WidthFt, item.HeightFt) / 3.0)"
-                                          fill="#e2725b" fill-opacity="0.5" stroke="#7a3520" stroke-width="0.15" />
-                                    break;
-                                case PaletteKind.Tree:
-                                    @((MarkupString)PlantRendering.TreeSvg(0, 0, item.WidthFt, item.HeightFt, item.Trait))
-                                    break;
-                                case PaletteKind.Bush:
-                                    @((MarkupString)PlantRendering.BushSvg(0, 0, item.WidthFt, item.HeightFt, item.Trait))
-                                    break;
-                                case PaletteKind.Plant:
-                                    @((MarkupString)PlantRendering.SpacingRingsSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, "good"))
-                                    @((MarkupString)PlantRendering.PlantSpriteSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, item.Trait))
-                                    break;
-                            }
-                        </svg>
-                        <div class="small palette-item-name">@item.Code</div>
-                        <div class="x-small text-muted">@detail</div>
-                    </button>
-                }
-            </div>
-        </aside>
+                </div>
+            </aside>
 
-        <div class="plot-canvas-wrap" @ref="wrapRef">
-            <svg class="plot-canvas"
-                 @ref="canvasRef"
-                 tabindex="0"
-                 style="width:@(PlotWidthFt * PxPerFt * zoom)px; height:@(PlotHeightFt * PxPerFt * zoom)px;"
-                 viewBox="0 0 @F(PlotWidthFt) @F(PlotHeightFt)"
-                 preserveAspectRatio="xMidYMid meet"
-                 @onkeydown="OnKeyDown"
-                 @onkeydown:preventDefault="true"
-                 @onpointerdown="OnPointerDown"
-                 @onpointermove="OnPointerMove"
-                 @onpointerup="OnPointerUp"
-                 @onpointerleave="OnPointerLeave"
-                 @onpointerdown:preventDefault="true">
+            <div class="plot-scroll-view" @ref="wrapRef">
+            <div class="plot-canvas-wrap">
+                <svg class="plot-canvas"
+                     @ref="canvasRef"
+                     tabindex="0"
+                     style="width:@(PlotWidthFt * PxPerFt * zoom)px; height:@(PlotHeightFt * PxPerFt * zoom)px;"
+                     viewBox="0 0 @F(PlotWidthFt) @F(PlotHeightFt)"
+                     preserveAspectRatio="xMidYMid meet"
+                     @onkeydown="OnKeyDown"
+                     @onkeydown:preventDefault="true"
+                     @oncontextmenu="OnCanvasContextMenu"
+                     @oncontextmenu:preventDefault="true"
+                     @onpointerdown="OnPointerDown"
+                     @onpointermove="OnPointerMove"
+                     @onpointerup="OnPointerUp"
+                     @onpointerleave="OnPointerLeave"
+                     @onpointerdown:preventDefault="true">
 
                 <defs>
                     <pattern id="ftgrid" width="1" height="1" patternUnits="userSpaceOnUse">
@@ -284,7 +413,8 @@ else
                                 break;
                             case ShapeKind.CircleRuler:
                                 <circle cx="@F(s.X + (s.W / 2))" cy="@F(s.Y + (s.H / 2))" r="@F(s.W / 2)"
-                                        fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.06" />
+                                        fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
+                                        stroke="@EffectiveStroke(s)" stroke-width="0.06" />
                                 @((MarkupString)CircleRulerLabelsSvg(s))
                                 @if (currentTool == Tool.Select)
                                 {
@@ -293,7 +423,8 @@ else
                                 break;
                             case ShapeKind.RectRuler:
                                 <rect x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
-                                      fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.06" />
+                                      fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
+                                      stroke="@EffectiveStroke(s)" stroke-width="0.06" />
                                 @((MarkupString)RectRulerLabelsSvg(s))
                                 @if (currentTool == Tool.Select)
                                 {
@@ -447,12 +578,14 @@ else
                                         break;
                                     case ShapeKind.CircleRuler:
                                         <circle cx="@F(s.X + (s.W / 2))" cy="@F(s.Y + (s.H / 2))" r="@F(s.W / 2)"
-                                                fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.06"
+                                                fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
+                                                stroke="@EffectiveStroke(s)" stroke-width="0.06"
                                                 stroke-dasharray="0.12,0.08" />
                                         break;
                                     case ShapeKind.RectRuler:
                                         <rect x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
-                                              fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.06"
+                                              fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
+                                              stroke="@EffectiveStroke(s)" stroke-width="0.06"
                                               stroke-dasharray="0.12,0.08" />
                                         break;
                                     case ShapeKind.BedKit:
@@ -505,7 +638,8 @@ else
                         }
                     </g>
                 }
-            </svg>
+                </svg>
+            </div>
         </div>
     </div>
 
@@ -562,6 +696,12 @@ else
             }
         </div>
     </details>
+
+    <div class="plot-status-bar" role="status" aria-live="polite">
+        <span class="status-item status-pos"><strong>X:</strong> @(lastCanvasX is double sx ? F(sx) : "--")</span>
+        <span class="status-item status-pos"><strong>Y:</strong> @(lastCanvasY is double sy ? F(sy) : "--")</span>
+        <span class="status-item"><strong>Action:</strong> @CurrentMouseActionLabel()</span>
+    </div>
 }
 
 @{
@@ -575,41 +715,16 @@ else
         : null;
 }
 
-@if (infoRuler is not null)
+@if ((selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null) || infoRuler is not null) && currentPlot is not null)
 {
-    var len = RulerLengthForShape(infoRuler);
-    var area = RulerAreaForShape(infoRuler);
-    var segments = infoRuler.Kind == ShapeKind.Ruler ? Math.Max(0, infoRuler.Points.Count - 1) : 1;
-    var positioned = library.Ui.RulerPanelX is double && library.Ui.RulerPanelY is double;
-    <div class="floating-panel ruler-panel @(positioned ? "" : "default-ruler-pos")"
-         @ref="rulerPanelRef"
-         style="@(positioned ? $"left:{library.Ui.RulerPanelX!.Value}px;top:{library.Ui.RulerPanelY!.Value}px;" : "")">
-        <div class="panel-header"
-             @onpointerdown="StartRulerPanelDrag"
-             @onpointermove="OnPanelDragMove"
-             @onpointerup="OnPanelDragEnd">
-            <span class="panel-title">Ruler</span>
-            <span class="drag-grip" aria-hidden="true">⠿</span>
-        </div>
-        <div class="panel-body">
-            <div><span class="text-muted small">Segments:</span> <strong>@segments</strong></div>
-            <div><span class="text-muted small">Length:</span> <strong>@FormatLength(len)</strong> <span class="text-muted small">(@F(len) ft)</span></div>
-            <div><span class="text-muted small">Area (closed):</span> <strong>@F(area) ft²</strong></div>
-            @if (drafting?.Kind == ShapeKind.Ruler)
-            {
-                <div class="x-small text-muted mt-1">Click to finish · Ctrl+click to add a vertex</div>
-            }
-        </div>
-    </div>
-}
-
-@if ((selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null)) && currentPlot is not null)
-{
-    var stampPreview = (selectedIds.Count == 0 && currentTool == Tool.Stamp && selectedItem is not null)
+    var forceRulerMode = infoRuler is not null && (drafting is not null || selectedIds.Count <= 1);
+    var stampPreview = (!forceRulerMode && selectedIds.Count == 0 && currentTool == Tool.Stamp && selectedItem is not null)
         ? PreviewShapeFromItem(selectedItem)
         : null;
     var isPreview = stampPreview is not null;
-    var selShapes = stampPreview is not null
+    var selShapes = forceRulerMode
+        ? new List<Shape> { infoRuler! }
+        : stampPreview is not null
         ? new List<Shape> { stampPreview }
         : SelectedShapes().ToList();
     var positioned = library.Ui.InfoPanelX is double && library.Ui.InfoPanelY is double;
@@ -678,10 +793,17 @@ else
                     <div class="small">@((MarkupString)line)</div>
                 }
 
+                @if (!isPreview && drafting is not null && drafting.Kind == ShapeKind.Ruler && single!.Id == drafting.Id)
+                {
+                    <div class="x-small text-muted mt-1">Click to finish · Ctrl+click to add a vertex</div>
+                }
+
                 @if (isPreview && previewDropPattern != DropPattern.One)
                 {
                     <div class="small"><span class="text-muted">Drop pattern:</span> <strong>@previewDropPattern</strong></div>
-                    <div class="small"><span class="text-muted">Orientation:</span> <strong>@F(stampRotation)°</strong></div>
+                    <div class="small"><span class="text-muted">Orientation:</span> <strong>@F(stampOrientation)°</strong></div>
+                    <div class="small"><span class="text-muted">Item rotation:</span> <strong>@F(stampRotation)°</strong></div>
+                    <div class="x-small text-muted">Wheel controls: Shift/Ctrl rotate items, Alt rotates line/array orientation.</div>
                 }
             }
             else
@@ -940,7 +1062,15 @@ else
     private const string StorageKeyBackup1 = "gardenplot.library.v2.bak1";
     private const string StorageKeyBackup2 = "gardenplot.library.v2.bak2";
     private const string StorageKeyLegacy = "gardenplot.library.v1";
+    private const string FileStoreSourceKey = "file-index";
+    private const string FileStoreFolderName = "plots";
+    private const string FileStoreIndexFileName = "index.json";
+    private const int FileStoreSchemaVersion = 1;
     private const double PxPerFt = 16.0; // also used by ToFt()
+    private static readonly SemaphoreSlim FileStoreGate = new(1, 1);
+
+    private string FileStoreDirectory => Path.Combine(Env.ContentRootPath, "App_Data", FileStoreFolderName);
+    private string FileStoreIndexPath => Path.Combine(FileStoreDirectory, FileStoreIndexFileName);
 
     private double PlotWidthFt => currentPlot?.WidthFt ?? 60;
     private double PlotHeightFt => currentPlot?.HeightFt ?? 8;
@@ -982,7 +1112,7 @@ else
     private readonly List<Guid> selectedIds = new();
     private ElementReference canvasRef;
     private ElementReference wrapRef;
-    private ElementReference rulerPanelRef;
+    private ElementReference rulerPanelRef = default;
     private ElementReference infoPanelRef;
     private readonly List<Shape> clipboard = new();
     private readonly Stack<List<Shape>> undoStack = new();
@@ -1016,6 +1146,7 @@ else
     private const double MinZoom = 0.25;
     private const double MaxZoom = 6.0;
     private bool restoreViewportPending;
+    private bool showKeyBindingsDialog;
 
     private void SetZoom(double newZoom, bool persist)
     {
@@ -1096,8 +1227,7 @@ else
     {
         return shapes
             .Where(s => s.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant
-                                or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw or ShapeKind.Ruler
-                                or ShapeKind.CircleRuler or ShapeKind.RectRuler)
+                                or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
             .GroupBy(s => (Kind: TakeoffKind(s.Kind), Name: TakeoffName(s)))
             .Select(g => new TakeoffRow(g.Key.Kind, g.Key.Name, g.Count()))
             .OrderBy(r => r.Kind, StringComparer.Ordinal)
@@ -1184,10 +1314,29 @@ else
         return "\"" + s.Replace("\"", "\"\"") + "\"";
     }
 
-    // Pan (Ctrl+drag) state
+    // Pan (Ctrl+drag or right-drag) state
     private bool panPending;
     private bool panActive;
     private double panLastClientX, panLastClientY;
+    private int panButton;
+    private bool suppressContextMenuOnce;
+
+    private void OnCanvasContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
+    {
+        if (suppressContextMenuOnce)
+        {
+            suppressContextMenuOnce = false;
+        }
+    }
+
+    private void BeginPan(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, int button)
+    {
+        panPending = true;
+        panActive = false;
+        panButton = button;
+        panLastClientX = e.ClientX;
+        panLastClientY = e.ClientY;
+    }
 
     // JS interop
     private IJSObjectReference? jsModule;
@@ -1231,6 +1380,7 @@ else
     private double? ghostX;
     private double? ghostY;
     private double stampRotation;
+    private double stampOrientation;
     private DropPattern dropPattern = DropPattern.One;
     private DropActivationMode dropActivationMode = DropActivationMode.ClickToggle;
     private DropModifierKey dropModifierKey = DropModifierKey.Shift;
@@ -1273,12 +1423,98 @@ else
 
     // New-plot dialog state
     private bool showNewPlotDialog;
+    private KeyBindingSettings keyBindingDraft = new();
     private string newPlotName = "My Garden";
     private string newPlotShape = "Rectangle";
     private double newPlotWidth = 60;
     private double newPlotHeight = 8;
 
     private bool loaded;
+
+    private static bool IsBindingMatch(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, string? binding)
+    {
+        if (string.IsNullOrWhiteSpace(binding))
+        {
+            return false;
+        }
+
+        var normalized = binding.Trim();
+        var parts = normalized.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            return false;
+        }
+
+        var wantCtrl = parts.Any(p => string.Equals(p, "Ctrl", StringComparison.OrdinalIgnoreCase) || string.Equals(p, "Control", StringComparison.OrdinalIgnoreCase));
+        var wantShift = parts.Any(p => string.Equals(p, "Shift", StringComparison.OrdinalIgnoreCase));
+        var wantAlt = parts.Any(p => string.Equals(p, "Alt", StringComparison.OrdinalIgnoreCase));
+
+        if (e.CtrlKey != wantCtrl || e.ShiftKey != wantShift || e.AltKey != wantAlt)
+        {
+            return false;
+        }
+
+        var keyPart = parts.Last();
+        if (string.Equals(keyPart, "Control", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(keyPart, "Ctrl", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(keyPart, "Shift", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(keyPart, "Alt", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return string.Equals(e.Key, keyPart, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static KeyBindingSettings CloneKeyBindings(KeyBindingSettings source) => new()
+    {
+        StampSpacingLeft = source.StampSpacingLeft,
+        StampSpacingRight = source.StampSpacingRight,
+        StampSpacingUp = source.StampSpacingUp,
+        StampSpacingDown = source.StampSpacingDown,
+        Undo = source.Undo,
+        SelectAll = source.SelectAll,
+        Copy = source.Copy,
+        Paste = source.Paste,
+        Delete = source.Delete,
+        RotateCounterClockwise = source.RotateCounterClockwise,
+        RotateClockwise = source.RotateClockwise,
+        Escape = source.Escape,
+        Group = source.Group,
+        Ungroup = source.Ungroup,
+        ZoomIn = source.ZoomIn,
+        ZoomOut = source.ZoomOut,
+        ZoomReset = source.ZoomReset,
+        PanLeft = source.PanLeft,
+        PanRight = source.PanRight,
+        PanUp = source.PanUp,
+        PanDown = source.PanDown,
+        RotateGroupOrientationCounterClockwise = source.RotateGroupOrientationCounterClockwise,
+        RotateGroupOrientationClockwise = source.RotateGroupOrientationClockwise,
+    };
+
+    private KeyBindingSettings KeyBindings => library.Ui.KeyBindings ??= new KeyBindingSettings();
+
+    private void ShowKeyBindingsDialog()
+    {
+        keyBindingDraft = CloneKeyBindings(KeyBindings);
+        showKeyBindingsDialog = true;
+    }
+
+    private void CloseKeyBindingsDialog()
+        => showKeyBindingsDialog = false;
+
+    private void ResetDefaultKeyBindings()
+    {
+        keyBindingDraft = new KeyBindingSettings();
+    }
+
+    private async Task SaveAndCloseKeyBindingsDialog()
+    {
+        library.Ui.KeyBindings = CloneKeyBindings(keyBindingDraft);
+        showKeyBindingsDialog = false;
+        await SaveAsync();
+    }
 
     private void RecordUndoState()
     {
@@ -1393,7 +1629,16 @@ else
 
                 try
                 {
-                    var (loadedLibrary, loadedFromKey) = await TryLoadLibraryAsync();
+                    try
+                    {
+                        jsModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/gardenplot.js");
+                    }
+                    catch
+                    {
+                        // Continue; load can still try server-side JS interop calls directly.
+                    }
+
+                    var (loadedLibrary, loadedFromKey, loadWasAuthoritative) = await TryLoadLibraryAsync();
                     library = loadedLibrary ?? new PlotLibrary();
                     var appliedRecovery = false;
 
@@ -1423,7 +1668,7 @@ else
                     restoreViewportPending = true;
 
                     // Save only when migrating storage or creating a new default.
-                    if (createdDefaultPlot || loadedFromKey != StorageKeyPrimary || appliedRecovery)
+                    if (loadWasAuthoritative && (createdDefaultPlot || loadedFromKey != FileStoreSourceKey || appliedRecovery))
                     {
                         await SaveAsync();
                     }
@@ -1432,9 +1677,33 @@ else
 
                     try
                     {
-                        jsModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/gardenplot.js");
                         dotnetRef ??= DotNetObjectReference.Create(this);
-                        wheelHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachWheel", canvasRef, dotnetRef);
+                        if (jsModule is not null)
+                        {
+                            wheelHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachWheel", canvasRef, dotnetRef);
+                        }
+
+                        // If startup load was non-authoritative due a transient circuit disconnect,
+                        // retry once now that JS module wiring is active.
+                        if (!loadWasAuthoritative)
+                        {
+                            var (retryLibrary, _, retryAuthoritative) = await TryLoadLibraryAsync();
+                            if (retryAuthoritative && retryLibrary is not null && TotalShapeCount(retryLibrary) > 0)
+                            {
+                                library = retryLibrary;
+                                currentPlot = library.Plots.FirstOrDefault(p => p.Id == library.LastPlotId)
+                                              ?? library.Plots.FirstOrDefault()
+                                              ?? currentPlot;
+                                if (currentPlot is not null)
+                                {
+                                    library.LastPlotId = currentPlot.Id;
+                                }
+
+                                SetZoom(library.Ui.Zoom ?? 1.0, persist: false);
+                                restoreViewportPending = true;
+                                StateHasChanged();
+                            }
+                        }
                     }
                     catch { /* JS load failed; rotation/zoom via wheel won't work but the page still functions. */ }
                 }
@@ -1446,7 +1715,6 @@ else
                     library.Plots.Add(fallback);
                     library.LastPlotId = fallback.Id;
                     currentPlot = fallback;
-                    await SaveAsync();
                     StateHasChanged();
                 }
             }
@@ -1489,10 +1757,62 @@ else
         await EnsureFloatingPanelsInViewAsync();
     }
 
-    private async Task<(PlotLibrary? Library, string? SourceKey)> TryLoadLibraryAsync()
+    private async Task<(PlotLibrary? Library, string? SourceKey, bool Authoritative)> TryLoadLibraryAsync()
     {
         var sw = Stopwatch.StartNew();
         StorageLoadAttempts.Add(1);
+        var interopFailure = false;
+
+        try
+        {
+            var fileLibrary = await TryLoadFileStoreLibraryAsync();
+            if (fileLibrary is not null && fileLibrary.Plots.Count > 0)
+            {
+                RecordLoadMetrics("loaded", FileStoreSourceKey, fileLibrary, 0, sw.Elapsed.TotalMilliseconds);
+                Logger.LogInformation("GardenPlot storage load succeeded from file store. Plots: {PlotCount}, Shapes: {ShapeCount}.",
+                    fileLibrary.Plots.Count,
+                    TotalShapeCount(fileLibrary));
+                return (fileLibrary, FileStoreSourceKey, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "GardenPlot file-store load failed; falling back to browser storage sources.");
+        }
+
+        if (jsModule is not null)
+        {
+            try
+            {
+                var idbJson = await jsModule.InvokeAsync<string?>("idbGet", StorageKeyPrimary);
+                if (!string.IsNullOrWhiteSpace(idbJson))
+                {
+                    var idbLibrary = NormalizeLibrary(JsonSerializer.Deserialize<PlotLibrary>(idbJson));
+                    var idbBytes = System.Text.Encoding.UTF8.GetByteCount(idbJson);
+                    if (idbLibrary.Plots.Count > 0)
+                    {
+                        RecordLoadMetrics("loaded", "indexeddb", idbLibrary, idbBytes, sw.Elapsed.TotalMilliseconds);
+                        Logger.LogInformation("GardenPlot storage load succeeded from IndexedDB. Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
+                            idbLibrary.Plots.Count,
+                            TotalShapeCount(idbLibrary),
+                            idbBytes);
+                        return (idbLibrary, "indexeddb", true);
+                    }
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                interopFailure = true;
+            }
+            catch (Microsoft.JSInterop.JSDisconnectedException)
+            {
+                interopFailure = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "GardenPlot IndexedDB load failed; falling back to localStorage keys.");
+            }
+        }
 
         string[] keys =
         [
@@ -1534,19 +1854,32 @@ else
                         normalized.Plots.Count,
                         TotalShapeCount(normalized),
                         payloadBytes);
-                    return (normalized, key);
+                    return (normalized, key, true);
                 }
             }
             catch (Exception ex)
             {
+                if (ex is TaskCanceledException or Microsoft.JSInterop.JSDisconnectedException)
+                {
+                    interopFailure = true;
+                    break;
+                }
+
                 Logger.LogWarning(ex, "GardenPlot storage load failed for key {StorageKey}; trying next key.", key);
             }
+        }
+
+        if (interopFailure)
+        {
+            RecordLoadMetrics("unavailable", firstValidKey, firstValidLibrary, payloadBytes, sw.Elapsed.TotalMilliseconds);
+            Logger.LogWarning("GardenPlot storage load was not authoritative due to JS interop disconnect/cancel; preserving in-memory data and skipping migration writes.");
+            return (firstValidLibrary, firstValidKey, false);
         }
 
         var loadOutcome = firstValidLibrary is null ? "empty" : "fallback";
         RecordLoadMetrics(loadOutcome, firstValidKey, firstValidLibrary, payloadBytes, sw.Elapsed.TotalMilliseconds);
         Logger.LogInformation("GardenPlot storage load completed with outcome {Outcome}. Source key: {StorageKey}.", loadOutcome, firstValidKey ?? "(none)");
-        return (firstValidLibrary, firstValidKey);
+        return (firstValidLibrary, firstValidKey, true);
     }
 
     private static PlotLibrary NormalizeLibrary(PlotLibrary? loaded)
@@ -1563,6 +1896,159 @@ else
         }
 
         return safe;
+    }
+
+    private sealed class PlotStoreIndex
+    {
+        public int SchemaVersion { get; set; } = FileStoreSchemaVersion;
+        public Guid? LastPlotId { get; set; }
+        public UiPreferences Ui { get; set; } = new();
+        public List<PlotStoreIndexEntry> Plots { get; set; } = new();
+    }
+
+    private sealed class PlotStoreIndexEntry
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public DateTime ModifiedUtc { get; set; }
+    }
+
+    private static string PlotFileName(Guid id) => $"{id:N}.json";
+
+    private async Task<PlotLibrary?> TryLoadFileStoreLibraryAsync()
+    {
+        if (!File.Exists(FileStoreIndexPath))
+        {
+            return null;
+        }
+
+        await FileStoreGate.WaitAsync();
+        try
+        {
+            var indexJson = await File.ReadAllTextAsync(FileStoreIndexPath);
+            if (string.IsNullOrWhiteSpace(indexJson))
+            {
+                return null;
+            }
+
+            var index = JsonSerializer.Deserialize<PlotStoreIndex>(indexJson);
+            if (index is null)
+            {
+                return null;
+            }
+
+            var lib = new PlotLibrary
+            {
+                LastPlotId = index.LastPlotId,
+                Ui = index.Ui ?? new UiPreferences(),
+                Plots = new List<PlotData>(),
+            };
+
+            foreach (var entry in index.Plots)
+            {
+                if (string.IsNullOrWhiteSpace(entry.FileName))
+                {
+                    continue;
+                }
+
+                var path = Path.Combine(FileStoreDirectory, entry.FileName);
+                if (!File.Exists(path))
+                {
+                    continue;
+                }
+
+                var plotJson = await File.ReadAllTextAsync(path);
+                if (string.IsNullOrWhiteSpace(plotJson))
+                {
+                    continue;
+                }
+
+                var plot = JsonSerializer.Deserialize<PlotData>(plotJson);
+                if (plot is null)
+                {
+                    continue;
+                }
+
+                lib.Plots.Add(plot);
+            }
+
+            return NormalizeLibrary(lib);
+        }
+        finally
+        {
+            FileStoreGate.Release();
+        }
+    }
+
+    private async Task SaveFileStoreLibraryAsync(PlotLibrary source)
+    {
+        await FileStoreGate.WaitAsync();
+        try
+        {
+            Directory.CreateDirectory(FileStoreDirectory);
+
+            var index = new PlotStoreIndex
+            {
+                SchemaVersion = FileStoreSchemaVersion,
+                LastPlotId = source.LastPlotId,
+                Ui = source.Ui,
+                Plots = new List<PlotStoreIndexEntry>(),
+            };
+
+            foreach (var plot in source.Plots)
+            {
+                var fileName = PlotFileName(plot.Id);
+                index.Plots.Add(new PlotStoreIndexEntry
+                {
+                    Id = plot.Id,
+                    Name = plot.Name,
+                    FileName = fileName,
+                    ModifiedUtc = plot.ModifiedUtc,
+                });
+
+                var plotPath = Path.Combine(FileStoreDirectory, fileName);
+                var plotJson = JsonSerializer.Serialize(plot);
+                await WriteAtomicTextFileAsync(plotPath, plotJson);
+            }
+
+            var expectedFiles = index.Plots.Select(p => p.FileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in Directory.EnumerateFiles(FileStoreDirectory, "*.json"))
+            {
+                var name = Path.GetFileName(file);
+                if (string.Equals(name, FileStoreIndexFileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!expectedFiles.Contains(name))
+                {
+                    File.Delete(file);
+                }
+            }
+
+            var indexJson = JsonSerializer.Serialize(index);
+            await WriteAtomicTextFileAsync(FileStoreIndexPath, indexJson);
+        }
+        finally
+        {
+            FileStoreGate.Release();
+        }
+    }
+
+    private static async Task WriteAtomicTextFileAsync(string targetPath, string content)
+    {
+        var tempPath = targetPath + ".tmp";
+        await File.WriteAllTextAsync(tempPath, content);
+
+        if (File.Exists(targetPath))
+        {
+            File.Replace(tempPath, targetPath, null, true);
+        }
+        else
+        {
+            File.Move(tempPath, targetPath);
+        }
     }
 
     private async Task<PlotLibrary?> TryLoadRecoveryLibraryAsync()
@@ -1681,10 +2167,62 @@ else
 
         try
         {
+            var fileSaved = false;
+            try
+            {
+                await SaveFileStoreLibraryAsync(library);
+                fileSaved = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "GardenPlot file-store save failed; attempting browser-storage fallback.");
+            }
+
             var json = JsonSerializer.Serialize(library);
             var payloadBytes = System.Text.Encoding.UTF8.GetByteCount(json);
+            var idbSaved = false;
 
-            // Preferred: keep rolling backups.
+            if (fileSaved)
+            {
+                RecordSaveMetrics("saved", "file-index", payloadBytes, sw.Elapsed.TotalMilliseconds);
+                Logger.LogInformation("GardenPlot storage save succeeded (mode: file-index). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
+                    library.Plots.Count,
+                    TotalShapeCount(library),
+                    payloadBytes);
+            }
+
+            if (jsModule is null)
+            {
+                try
+                {
+                    jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/gardenplot.js");
+                }
+                catch
+                {
+                    // Continue; localStorage mirror may still succeed even if module import fails.
+                }
+            }
+
+            if (fileSaved)
+            {
+                // File store is the authoritative durable store.
+                return;
+            }
+
+            if (jsModule is not null)
+            {
+                try
+                {
+                    await jsModule.InvokeVoidAsync("idbSet", StorageKeyPrimary, json);
+                    idbSaved = true;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "GardenPlot IndexedDB save failed; attempting localStorage mirror.");
+                }
+            }
+
+            // Mirror to localStorage with rolling backups for compatibility/recovery.
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
@@ -1703,7 +2241,7 @@ else
                 await JS.InvokeVoidAsync("localStorage.setItem", cts.Token, StorageKeyPrimary, json);
                 await JS.InvokeVoidAsync("localStorage.setItem", cts.Token, StorageKeyLegacy, json);
 
-                RecordSaveMetrics("saved", "full", payloadBytes, sw.Elapsed.TotalMilliseconds);
+                RecordSaveMetrics("saved", idbSaved ? "idb+full" : "full", payloadBytes, sw.Elapsed.TotalMilliseconds);
                 Logger.LogInformation("GardenPlot storage save succeeded (mode: full). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
                     library.Plots.Count,
                     TotalShapeCount(library),
@@ -1721,7 +2259,7 @@ else
             await JS.InvokeVoidAsync("localStorage.removeItem", StorageKeyLegacy);
             await JS.InvokeVoidAsync("localStorage.setItem", StorageKeyPrimary, json);
 
-            RecordSaveMetrics("saved", "compact", payloadBytes, sw.Elapsed.TotalMilliseconds);
+            RecordSaveMetrics("saved", idbSaved ? "idb+compact" : "compact", payloadBytes, sw.Elapsed.TotalMilliseconds);
             Logger.LogInformation("GardenPlot storage save succeeded (mode: compact). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
                 library.Plots.Count,
                 TotalShapeCount(library),
@@ -1969,14 +2507,103 @@ else
 
     private void SelectItem(PaletteItem item)
     {
+        ClearSelection();
+        HideShapeContextMenu();
         selectedItem = item;
         currentTool = Tool.Stamp;
+        ApplyDefaultDropSpacing(item);
         if (currentPlot is not null)
         {
             stampRotation = currentPlot.KitRotations.TryGetValue(item.Code, out var r) ? r : 0;
+            stampOrientation = stampRotation;
         }
 
         _ = canvasRef.FocusAsync(preventScroll: true).AsTask();
+    }
+
+    private void ApplyDefaultDropSpacing(PaletteItem item)
+    {
+        lineCenterSpacingFt = Math.Max(0.1, item.WidthFt);
+        arrayCenterSpacingXFt = Math.Max(0.1, item.WidthFt);
+        arrayCenterSpacingYFt = Math.Max(0.1, item.HeightFt);
+    }
+
+    private async Task GroupSelectedItems()
+    {
+        if (currentPlot is null || !CanGroupSelection)
+        {
+            return;
+        }
+
+        var members = SelectedShapes().ToList();
+        if (members.Count < 2)
+        {
+            return;
+        }
+
+        RecordUndoState();
+
+        var ordered = members
+            .OrderBy(s => s.Y)
+            .ThenBy(s => s.X)
+            .ThenBy(s => s.Id)
+            .ToList();
+
+        var anchor = ordered[0];
+        var group = new DropGroup
+        {
+            Pattern = DropPattern.Line,
+            ItemCount = ordered.Count,
+            Rows = 1,
+            CenterSpacingXFt = Math.Max(0.1, anchor.W),
+            CenterSpacingYFt = Math.Max(0.1, anchor.H),
+            Rotation = 0,
+            AnchorCenterX = anchor.X + (anchor.W / 2),
+            AnchorCenterY = anchor.Y + (anchor.H / 2),
+        };
+
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            ordered[i].GroupId = group.Id;
+            ordered[i].GroupIndex = i;
+        }
+
+        currentPlot.DropGroups.RemoveAll(g => g.Id == group.Id);
+        currentPlot.DropGroups.Add(group);
+        selectedIds.Clear();
+        selectedIds.AddRange(ordered.Select(s => s.Id));
+
+        await SaveAsync();
+    }
+
+    private async Task UngroupSelectedItems()
+    {
+        if (currentPlot is null || !CanUngroupSelection)
+        {
+            return;
+        }
+
+        RecordUndoState();
+
+        var selectedGroupIds = SelectedShapes()
+            .Where(s => s.GroupId is not null)
+            .Select(s => s.GroupId!.Value)
+            .Distinct()
+            .ToHashSet();
+
+        if (selectedGroupIds.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var shape in currentPlot.Shapes.Where(s => s.GroupId is Guid gid && selectedGroupIds.Contains(gid)))
+        {
+            shape.GroupId = null;
+            shape.GroupIndex = null;
+        }
+
+        currentPlot.DropGroups.RemoveAll(g => selectedGroupIds.Contains(g.Id));
+        await SaveAsync();
     }
 
     private async Task ClearAll()
@@ -2144,6 +2771,14 @@ else
         _ => false,
     };
 
+    private bool CanGroupSelection
+        => currentPlot is not null
+           && selectedIds.Count >= 2
+           && SelectedShapes().All(s => s.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant);
+
+    private bool CanUngroupSelection
+        => selectedIds.Count > 0 && SelectedShapes().Any(s => s.GroupId is not null);
+
     private bool IsMultiDropActive(bool shift, bool ctrl, bool alt)
     {
         if (dropPattern == DropPattern.One)
@@ -2208,12 +2843,12 @@ else
                 Rows = 1,
                 CenterSpacingXFt = spacingX,
                 CenterSpacingYFt = item.HeightFt,
-                Rotation = stampRotation,
+                Rotation = stampOrientation,
                 AnchorCenterX = centerX,
                 AnchorCenterY = centerY,
             };
 
-            var rad = stampRotation * Math.PI / 180.0;
+            var rad = stampOrientation * Math.PI / 180.0;
             var cos = Math.Cos(rad);
             var sin = Math.Sin(rad);
             for (var i = 0; i < count; i++)
@@ -2245,12 +2880,12 @@ else
                 CenterSpacingXFt = spacingX,
                 CenterSpacingYFt = spacingY,
                 StaggerHalf = arrayStaggerHalf,
-                Rotation = stampRotation,
+                Rotation = stampOrientation,
                 AnchorCenterX = centerX,
                 AnchorCenterY = centerY,
             };
 
-            var rad = stampRotation * Math.PI / 180.0;
+            var rad = stampOrientation * Math.PI / 180.0;
             var cos = Math.Cos(rad);
             var sin = Math.Sin(rad);
             for (var i = 0; i < count; i++)
@@ -2305,6 +2940,11 @@ else
     {
         if (currentPlot is null) return;
 
+        if (panPending)
+        {
+            return;
+        }
+
         pointerShiftDown = e.ShiftKey;
         pointerCtrlDown = e.CtrlKey;
         pointerAltDown = e.AltKey;
@@ -2314,6 +2954,13 @@ else
         // Ensure the canvas has keyboard focus so Delete/Backspace work.
         _ = canvasRef.FocusAsync(preventScroll: true).AsTask();
         TryCaptureCanvasPointer(e.PointerId);
+
+        var isRightButtonPan = e.Button == 2;
+        if (isRightButtonPan)
+        {
+            BeginPan(e, 2);
+            return;
+        }
 
         if (e.Button != 0)
         {
@@ -2326,10 +2973,7 @@ else
             && dropModifierKey == DropModifierKey.Ctrl;
         if (e.CtrlKey && currentTool != Tool.Ruler && !ctrlReservedForDrop)
         {
-            panPending = true;
-            panActive = false;
-            panLastClientX = e.ClientX;
-            panLastClientY = e.ClientY;
+            BeginPan(e, 0);
             return;
         }
 
@@ -2442,9 +3086,30 @@ else
         pointerCtrlDown = e.CtrlKey;
         pointerAltDown = e.AltKey;
 
+        // Map-style fallback: if right button is currently down, allow pan to start from move.
+        if (!panPending && (e.Buttons & 2) != 0)
+        {
+            BeginPan(e, 2);
+            return;
+        }
+
         // Pan dragging takes precedence over everything else.
         if (panPending)
         {
+            if ((panButton == 2 && (e.Buttons & 2) == 0) || (panButton == 0 && (e.Buttons & 1) == 0))
+            {
+                if (panActive)
+                {
+                    _ = SaveAsync();
+                    suppressContextMenuOnce = panButton == 2;
+                }
+
+                panPending = false;
+                panActive = false;
+                panButton = 0;
+                return;
+            }
+
             var dx = e.ClientX - panLastClientX;
             var dy = e.ClientY - panLastClientY;
             if (panActive || Math.Abs(dx) + Math.Abs(dy) > 3)
@@ -2560,13 +3225,20 @@ else
 
         if (panPending)
         {
+            if ((panButton == 2 && e.Button != 2) || (panButton == 0 && e.Button != 0))
+            {
+                return;
+            }
+
             if (panActive)
             {
                 _ = SaveAsync();
+                suppressContextMenuOnce = panButton == 2;
             }
 
             panPending = false;
             panActive = false;
+            panButton = 0;
             return;
         }
 
@@ -2647,9 +3319,16 @@ else
     private void OnShapePointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, Shape s)
     {
         if (currentTool != Tool.Select) return;
-        if (e.Button != 0) return;
 
         TryCaptureCanvasPointer(e.PointerId);
+
+        if (e.Button == 2)
+        {
+            BeginPan(e, 2);
+            return;
+        }
+
+        if (e.Button != 0) return;
 
         if (e.ShiftKey)
         {
@@ -2869,6 +3548,12 @@ else
 
     private void OnShapeContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, Shape s)
     {
+        if (suppressContextMenuOnce)
+        {
+            suppressContextMenuOnce = false;
+            return;
+        }
+
         if (currentTool != Tool.Select || currentPlot is null)
         {
             return;
@@ -2911,41 +3596,83 @@ else
         dragUnionMaxX = maxX; dragUnionMaxY = maxY;
     }
 
-    private void OnWheel(Microsoft.AspNetCore.Components.Web.WheelEventArgs e)
+    private Task OnWheel(Microsoft.AspNetCore.Components.Web.WheelEventArgs e)
     {
         // Kept for compatibility but no longer wired to the SVG; OnWheelFromJs is the live path.
-        HandleWheel(e.DeltaY, e.ShiftKey, e.CtrlKey, e.AltKey);
+        return HandleWheel(e.DeltaY, e.ShiftKey, e.CtrlKey, e.AltKey);
     }
 
     [JSInvokable]
-    public Task OnWheelFromJs(double deltaY, bool shift, bool ctrl, bool alt)
+    public async Task OnWheelFromJs(double deltaY, bool shift, bool ctrl, bool alt)
     {
-        HandleWheel(deltaY, shift, ctrl, alt);
+        await HandleWheel(deltaY, shift, ctrl, alt);
         StateHasChanged();
-        return Task.CompletedTask;
     }
 
-    private void HandleWheel(double deltaY, bool shift, bool ctrl, bool alt)
+    private async Task HandleWheel(double deltaY, bool shift, bool ctrl, bool alt)
     {
         if (currentPlot is null) return;
 
+        // Keep modifier state in sync for ghost preview logic (ActiveDropPattern uses these flags).
+        pointerShiftDown = shift;
+        pointerCtrlDown = ctrl;
+        pointerAltDown = alt;
+
         var dir = deltaY > 0 ? 1 : -1;
 
-        // Stamp placement orientation while adding line/array drops.
-        if (currentTool == Tool.Stamp && selectedItem is not null && (alt || ctrl))
+        // Default wheel behavior on canvas is zoom in/out.
+        if (!shift && !ctrl && !alt)
+        {
+            if (dir > 0)
+            {
+                ZoomOut();
+            }
+            else
+            {
+                ZoomIn();
+            }
+
+            return;
+        }
+
+        // Active stamp set while adding line/array drops:
+        // Alt rotates line/array orientation; Shift/Ctrl rotate each item about its own center.
+        if (currentTool == Tool.Stamp && selectedItem is not null && (alt || shift || ctrl))
         {
             var delta = dir * (ctrl ? 1.0 : 15.0);
-            stampRotation = ((stampRotation + delta) % 360 + 360) % 360;
-            currentPlot.KitRotations[selectedItem.Code] = stampRotation;
-            _ = SaveAsync();
+            if (alt)
+            {
+                stampOrientation = ((stampOrientation + delta) % 360 + 360) % 360;
+            }
+            else
+            {
+                stampRotation = ((stampRotation + delta) % 360 + 360) % 360;
+                currentPlot.KitRotations[selectedItem.Code] = stampRotation;
+                EnsureStampSpacingForItemRotation(selectedItem, dropPattern);
+            }
+
+            await SaveAsync();
             return;
+        }
+
+        // Group orientation in select mode: Alt = coarse (15°), Alt+Ctrl = fine (1°).
+        if (alt && currentTool == Tool.Select)
+        {
+            var groups = GetSelectedDropGroups();
+            if (groups.Count > 0)
+            {
+                var orientationDelta = dir * (ctrl ? 1.0 : 15.0);
+                _ = RotateSelectedGroupOrientations(orientationDelta);
+                return;
+            }
         }
 
         // Rotate selected items: Shift = coarse (15°), Ctrl = fine (1°).
         if (!shift && !ctrl) return;
         var selectionDelta = dir * (ctrl ? 1.0 : 15.0);
         if (selectedIds.Count == 0) return;
-        foreach (var s in SelectedShapes().ToList())
+        var rotated = SelectedShapes().ToList();
+        foreach (var s in rotated)
         {
             s.Rotation = ((s.Rotation + selectionDelta) % 360 + 360) % 360;
             var aabb = RotatedAABB(s);
@@ -2957,8 +3684,10 @@ else
             if (tx != 0 || ty != 0) ShiftShape(s, tx, ty);
         }
 
+        await ReflowAffectedGroupsForMemberRotation(rotated);
+
         SyncDropGroupsFromCurrentShapes();
-        _ = SaveAsync();
+        await SaveAsync();
     }
 
     private void SyncDropGroupsFromCurrentShapes()
@@ -2981,53 +3710,188 @@ else
                 continue;
             }
 
-            group.Rotation = first.Rotation;
             group.AnchorCenterX = first.X + (first.W / 2);
             group.AnchorCenterY = first.Y + (first.H / 2);
             group.ItemCount = currentPlot.Shapes.Count(s => s.GroupId == group.Id);
         }
     }
 
+    private List<DropGroup> GetSelectedDropGroups()
+    {
+        if (currentPlot is null || selectedIds.Count == 0)
+        {
+            return new List<DropGroup>();
+        }
+
+        var selectedGroupIds = SelectedShapes()
+            .Where(s => s.GroupId is not null)
+            .Select(s => s.GroupId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (selectedGroupIds.Count == 0)
+        {
+            return new List<DropGroup>();
+        }
+
+        return currentPlot.DropGroups
+            .Where(g => selectedGroupIds.Contains(g.Id))
+            .ToList();
+    }
+
+    private async Task RotateSelectedGroupOrientations(double delta)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        var groups = GetSelectedDropGroups();
+        if (groups.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var group in groups)
+        {
+            group.Rotation = ((group.Rotation + delta) % 360 + 360) % 360;
+            await ReflowDropGroup(group, save: false);
+        }
+
+        await SaveAsync();
+    }
+
     private void OnPointerLeave(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
         ghostX = ghostY = null;
         pasteHoverX = pasteHoverY = null;
+        lastCanvasX = null;
+        lastCanvasY = null;
         pointerShiftDown = false;
         pointerCtrlDown = false;
         pointerAltDown = false;
     }
 
+    private string CurrentMouseActionLabel()
+    {
+        if (panPending || panActive)
+        {
+            return "Pan";
+        }
+
+        if (isHandleDragging)
+        {
+            return "Ruler Handle";
+        }
+
+        if (isDragging)
+        {
+            return "Move Selection";
+        }
+
+        if (isBoxSelecting)
+        {
+            return "Box Select";
+        }
+
+        if (currentTool == Tool.Stamp && selectedItem is not null)
+        {
+            return "Stamp";
+        }
+
+        return currentTool == Tool.Select ? "Select" : currentTool.ToString();
+    }
+
     private async Task OnKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
     {
-        if (e.CtrlKey && string.Equals(e.Key, "z", StringComparison.OrdinalIgnoreCase))
+        var kb = KeyBindings;
+
+        if (currentTool == Tool.Stamp && selectedItem is not null && (dropPattern == DropPattern.Line || dropPattern == DropPattern.Array))
+        {
+            var step = 0.25;
+            if (IsBindingMatch(e, kb.StampSpacingLeft))
+            {
+                AdjustStampDropSpacing(-step, horizontal: true);
+                return;
+            }
+
+            if (IsBindingMatch(e, kb.StampSpacingRight))
+            {
+                AdjustStampDropSpacing(step, horizontal: true);
+                return;
+            }
+
+            if (dropPattern == DropPattern.Array && IsBindingMatch(e, kb.StampSpacingUp))
+            {
+                AdjustStampDropSpacing(step, horizontal: false);
+                return;
+            }
+
+            if (dropPattern == DropPattern.Array && IsBindingMatch(e, kb.StampSpacingDown))
+            {
+                AdjustStampDropSpacing(-step, horizontal: false);
+                return;
+            }
+        }
+
+        if (IsBindingMatch(e, kb.Undo))
         {
             await UndoLastOperation();
         }
-        else if (e.CtrlKey && string.Equals(e.Key, "a", StringComparison.OrdinalIgnoreCase))
+        else if (IsBindingMatch(e, kb.SelectAll))
         {
             SelectAllShapes();
         }
-        else if (e.CtrlKey && string.Equals(e.Key, "c", StringComparison.OrdinalIgnoreCase))
+        else if (IsBindingMatch(e, kb.Copy))
         {
             CopySelected();
         }
-        else if (e.CtrlKey && string.Equals(e.Key, "v", StringComparison.OrdinalIgnoreCase))
+        else if (IsBindingMatch(e, kb.Paste))
         {
             await PasteClipboard();
         }
-        else if (e.Key == "Delete" || e.Key == "Backspace")
+        else if (IsBindingMatch(e, kb.Delete) || IsBindingMatch(e, "Backspace"))
         {
             if (selectedIds.Count > 0)
             {
                 await DeleteSelected();
             }
         }
-        else if (e.Key == "[" || e.Key == "]")
+        else if (IsBindingMatch(e, kb.RotateCounterClockwise) || IsBindingMatch(e, kb.RotateClockwise))
         {
-            var delta = e.Key == "[" ? -15.0 : 15.0;
+            var delta = IsBindingMatch(e, kb.RotateCounterClockwise) ? -15.0 : 15.0;
             await RotateSelectionOrStamp(delta);
         }
-        else if (e.Key == "Escape")
+        else if (IsBindingMatch(e, kb.Group))
+        {
+            await GroupSelectedItems();
+        }
+        else if (IsBindingMatch(e, kb.Ungroup))
+        {
+            await UngroupSelectedItems();
+        }
+        else if (IsBindingMatch(e, kb.ZoomIn))
+        {
+            ZoomIn();
+        }
+        else if (IsBindingMatch(e, kb.ZoomOut))
+        {
+            ZoomOut();
+        }
+        else if (IsBindingMatch(e, kb.ZoomReset))
+        {
+            ZoomReset();
+        }
+        else if (IsBindingMatch(e, kb.PanLeft) || IsBindingMatch(e, kb.PanRight) || IsBindingMatch(e, kb.PanUp) || IsBindingMatch(e, kb.PanDown))
+        {
+            await PanByKeybindingAsync(e, kb);
+        }
+        else if (IsBindingMatch(e, kb.RotateGroupOrientationCounterClockwise) || IsBindingMatch(e, kb.RotateGroupOrientationClockwise))
+        {
+            var delta = IsBindingMatch(e, kb.RotateGroupOrientationCounterClockwise) ? -15.0 : 15.0;
+            await RotateSelectedGroupOrientations(delta);
+        }
+        else if (IsBindingMatch(e, kb.Escape))
         {
             // Cancel drafting and return to select mode.
             HideShapeContextMenu();
@@ -3039,6 +3903,63 @@ else
             drafting = null;
             ClearSelection();
         }
+    }
+
+    private void AdjustStampDropSpacing(double delta, bool horizontal)
+    {
+        if (selectedItem is null)
+        {
+            return;
+        }
+
+        if (dropPattern == DropPattern.Line)
+        {
+            var current = lineCenterSpacingFt > 0 ? lineCenterSpacingFt : selectedItem.WidthFt;
+            lineCenterSpacingFt = Math.Clamp(current + delta, 0.1, 200);
+            return;
+        }
+
+        if (dropPattern != DropPattern.Array)
+        {
+            return;
+        }
+
+        if (horizontal)
+        {
+            var current = arrayCenterSpacingXFt > 0 ? arrayCenterSpacingXFt : selectedItem.WidthFt;
+            arrayCenterSpacingXFt = Math.Clamp(current + delta, 0.1, 200);
+        }
+        else
+        {
+            var current = arrayCenterSpacingYFt > 0 ? arrayCenterSpacingYFt : selectedItem.HeightFt;
+            arrayCenterSpacingYFt = Math.Clamp(current + delta, 0.1, 200);
+        }
+    }
+
+    private async Task PanByKeybindingAsync(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, KeyBindingSettings kb)
+    {
+        if (jsModule is null)
+        {
+            return;
+        }
+
+        const double panStepPx = 80;
+        var dx = 0.0;
+        var dy = 0.0;
+
+        if (IsBindingMatch(e, kb.PanLeft)) dx = -panStepPx;
+        else if (IsBindingMatch(e, kb.PanRight)) dx = panStepPx;
+        else if (IsBindingMatch(e, kb.PanUp)) dy = -panStepPx;
+        else if (IsBindingMatch(e, kb.PanDown)) dy = panStepPx;
+
+        if (dx == 0 && dy == 0)
+        {
+            return;
+        }
+
+        await jsModule.InvokeVoidAsync("panBy", wrapRef, dx, dy);
+        await CaptureViewportStateAsync();
+        await SaveAsync();
     }
 
     private void SelectAllShapes()
@@ -3242,7 +4163,7 @@ else
         }
     }
 
-    private async Task ReflowDropGroup(DropGroup group)
+    private async Task ReflowDropGroup(DropGroup group, bool save = true)
     {
         if (currentPlot is null)
         {
@@ -3260,7 +4181,6 @@ else
         var first = members[0];
         group.AnchorCenterX = first.X + (first.W / 2);
         group.AnchorCenterY = first.Y + (first.H / 2);
-        group.Rotation = first.Rotation;
         group.ItemCount = members.Count;
 
         var rad = group.Rotation * Math.PI / 180.0;
@@ -3278,7 +4198,6 @@ else
                 var shape = members[i];
                 shape.GroupId = group.Id;
                 shape.GroupIndex = i;
-                shape.Rotation = group.Rotation;
                 var localX = i * group.CenterSpacingXFt;
                 var cx = group.AnchorCenterX + (localX * cos);
                 var cy = group.AnchorCenterY + (localX * sin);
@@ -3298,7 +4217,6 @@ else
                 var shape = members[i];
                 shape.GroupId = group.Id;
                 shape.GroupIndex = i;
-                shape.Rotation = group.Rotation;
                 var row = i / cols;
                 var col = i % cols;
                 var localX = (col * group.CenterSpacingXFt) + ((group.StaggerHalf && (row % 2 == 1)) ? group.CenterSpacingXFt * 0.5 : 0);
@@ -3324,7 +4242,10 @@ else
             group.AnchorCenterY += dy;
         }
 
-        await SaveAsync();
+        if (save)
+        {
+            await SaveAsync();
+        }
     }
 
     private async Task RotateSelectionOrStamp(double delta)
@@ -3338,6 +4259,7 @@ else
         {
             stampRotation = ((stampRotation + delta) % 360 + 360) % 360;
             currentPlot.KitRotations[selectedItem.Code] = stampRotation;
+            stampOrientation = stampRotation;
             await SaveAsync();
             return;
         }
@@ -3347,7 +4269,8 @@ else
             return;
         }
 
-        foreach (var s in SelectedShapes().ToList())
+        var rotated = SelectedShapes().ToList();
+        foreach (var s in rotated)
         {
             s.Rotation = ((s.Rotation + delta) % 360 + 360) % 360;
             var aabb = RotatedAABB(s);
@@ -3363,7 +4286,101 @@ else
             }
         }
 
+        await ReflowAffectedGroupsForMemberRotation(rotated);
+
+        SyncDropGroupsFromCurrentShapes();
+
         await SaveAsync();
+    }
+
+    private async Task ReflowAffectedGroupsForMemberRotation(List<Shape> rotatedShapes)
+    {
+        if (currentPlot is null || rotatedShapes.Count == 0)
+        {
+            return;
+        }
+
+        var groupIds = rotatedShapes
+            .Where(s => s.GroupId is not null)
+            .Select(s => s.GroupId!.Value)
+            .Distinct()
+            .ToList();
+
+        foreach (var groupId in groupIds)
+        {
+            var group = currentPlot.DropGroups.FirstOrDefault(g => g.Id == groupId);
+            if (group is null)
+            {
+                continue;
+            }
+
+            EnsureGroupSpacingForRotation(group);
+            await ReflowDropGroup(group, save: false);
+        }
+    }
+
+    private void EnsureGroupSpacingForRotation(DropGroup group)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        var members = GroupShapesOrdered(group.Id);
+        if (members.Count == 0)
+        {
+            return;
+        }
+
+        var maxSizeX = members.Max(m => ProjectedSizeAlongAxis(m, group.Rotation));
+        var maxSizeY = members.Max(m => ProjectedSizeAlongAxis(m, group.Rotation + 90));
+
+        var gapX = Math.Max(0, group.CenterSpacingXFt - maxSizeX);
+        group.CenterSpacingXFt = Math.Max(group.CenterSpacingXFt, maxSizeX + gapX);
+
+        if (group.Pattern == DropPattern.Array)
+        {
+            var gapY = Math.Max(0, group.CenterSpacingYFt - maxSizeY);
+            group.CenterSpacingYFt = Math.Max(group.CenterSpacingYFt, maxSizeY + gapY);
+        }
+    }
+
+    private static double ProjectedSizeAlongAxis(Shape shape, double axisDeg)
+    {
+        var delta = (shape.Rotation - axisDeg) * Math.PI / 180.0;
+        var c = Math.Abs(Math.Cos(delta));
+        var s = Math.Abs(Math.Sin(delta));
+        return (shape.W * c) + (shape.H * s);
+    }
+
+    private void EnsureStampSpacingForItemRotation(PaletteItem item, DropPattern pattern)
+    {
+        if (pattern is not DropPattern.Line and not DropPattern.Array)
+        {
+            return;
+        }
+
+        var previewShape = new Shape
+        {
+            W = item.WidthFt,
+            H = item.HeightFt,
+            Rotation = stampRotation,
+        };
+
+        var neededX = Math.Max(0.1, ProjectedSizeAlongAxis(previewShape, stampOrientation));
+        var neededY = Math.Max(0.1, ProjectedSizeAlongAxis(previewShape, stampOrientation + 90));
+
+        var currentX = lineCenterSpacingFt > 0 ? lineCenterSpacingFt : item.WidthFt;
+        lineCenterSpacingFt = Math.Max(currentX, neededX);
+
+        var currentArrayX = arrayCenterSpacingXFt > 0 ? arrayCenterSpacingXFt : item.WidthFt;
+        arrayCenterSpacingXFt = Math.Max(currentArrayX, neededX);
+
+        if (pattern == DropPattern.Array)
+        {
+            var currentArrayY = arrayCenterSpacingYFt > 0 ? arrayCenterSpacingYFt : item.HeightFt;
+            arrayCenterSpacingYFt = Math.Max(currentArrayY, neededY);
+        }
     }
 
     private static (double x, double y, double w, double h) GetBounds(Shape s)
@@ -3611,6 +4628,8 @@ else
         ShapeKind.Rectangle => "#4a7c59",
         ShapeKind.Oval => "#4a7c59",
         ShapeKind.BedKit => "#e2725b",
+        ShapeKind.CircleRuler => "#c81e1e",
+        ShapeKind.RectRuler => "#c81e1e",
         _ => "#000000",
     };
 
@@ -3619,6 +4638,8 @@ else
         ShapeKind.Rectangle => 0.35,
         ShapeKind.Oval => 0.35,
         ShapeKind.BedKit => 0.5,
+        ShapeKind.CircleRuler => 0,
+        ShapeKind.RectRuler => 0,
         _ => 1.0,
     };
 
@@ -3861,7 +4882,9 @@ else
         ShapeKind.Rectangle => "Rectangle",
         ShapeKind.Oval => "Oval",
         ShapeKind.FreeDraw => "Freehand",
-        ShapeKind.Ruler => "Ruler",
+        ShapeKind.Ruler => "Line Ruler",
+        ShapeKind.CircleRuler => "Circle Ruler",
+        ShapeKind.RectRuler => "Rectangle Ruler",
         _ => "Item",
     };
 
@@ -3918,7 +4941,32 @@ else
                 }
                 break;
             case ShapeKind.Ruler:
-                lines.Add("<span class=\"text-muted\">See Ruler panel for length and area.</span>");
+                {
+                    var segments = Math.Max(0, s.Points.Count - 1);
+                    var len = RulerLengthForShape(s);
+                    var area = RulerAreaForShape(s);
+                    lines.Add($"<span class=\"text-muted\">Segments:</span> <strong>{segments}</strong>");
+                    lines.Add($"<span class=\"text-muted\">Length:</span> <strong>{Esc(FormatLength(len))}</strong> <span class=\"text-muted\">({F(len)} ft)</span>");
+                    lines.Add($"<span class=\"text-muted\">Area (closed):</span> <strong>{F(area)} ft²</strong>");
+                }
+                break;
+            case ShapeKind.CircleRuler:
+                {
+                    var radius = Math.Abs(s.W) / 2.0;
+                    var area = RulerAreaForShape(s);
+                    lines.Add($"<span class=\"text-muted\">Radius:</span> <strong>{F(radius)} ft</strong>");
+                    lines.Add($"<span class=\"text-muted\">Area:</span> <strong>{F(area)} ft²</strong>");
+                }
+                break;
+            case ShapeKind.RectRuler:
+                {
+                    var width = Math.Abs(s.W);
+                    var height = Math.Abs(s.H);
+                    var area = RulerAreaForShape(s);
+                    lines.Add($"<span class=\"text-muted\">Width:</span> <strong>{F(width)} ft</strong>");
+                    lines.Add($"<span class=\"text-muted\">Height:</span> <strong>{F(height)} ft</strong>");
+                    lines.Add($"<span class=\"text-muted\">Area:</span> <strong>{F(area)} ft²</strong>");
+                }
                 break;
         }
         return lines;

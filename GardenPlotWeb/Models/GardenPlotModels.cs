@@ -138,6 +138,39 @@ public class UiPreferences
     public double? Zoom { get; set; }
     public double? ViewCenterXFt { get; set; }
     public double? ViewCenterYFt { get; set; }
+    public KeyBindingSettings KeyBindings { get; set; } = new();
+}
+
+public class KeyBindingSettings
+{
+    public string StampSpacingLeft { get; set; } = "ArrowLeft";
+    public string StampSpacingRight { get; set; } = "ArrowRight";
+    public string StampSpacingUp { get; set; } = "ArrowUp";
+    public string StampSpacingDown { get; set; } = "ArrowDown";
+
+    public string Undo { get; set; } = "Ctrl+Z";
+    public string SelectAll { get; set; } = "Ctrl+A";
+    public string Copy { get; set; } = "Ctrl+C";
+    public string Paste { get; set; } = "Ctrl+V";
+    public string Delete { get; set; } = "Delete";
+    public string RotateCounterClockwise { get; set; } = "[";
+    public string RotateClockwise { get; set; } = "]";
+    public string Escape { get; set; } = "Escape";
+
+    public string Group { get; set; } = "Ctrl+G";
+    public string Ungroup { get; set; } = "Ctrl+Shift+G";
+
+    public string ZoomIn { get; set; } = "Ctrl+=";
+    public string ZoomOut { get; set; } = "Ctrl+-";
+    public string ZoomReset { get; set; } = "Ctrl+0";
+
+    public string PanLeft { get; set; } = "Alt+ArrowLeft";
+    public string PanRight { get; set; } = "Alt+ArrowRight";
+    public string PanUp { get; set; } = "Alt+ArrowUp";
+    public string PanDown { get; set; } = "Alt+ArrowDown";
+
+    public string RotateGroupOrientationCounterClockwise { get; set; } = "Alt+[";
+    public string RotateGroupOrientationClockwise { get; set; } = "Alt+]";
 }
 
 /// <summary>Cached Wikipedia summary for a plant species.</summary>
