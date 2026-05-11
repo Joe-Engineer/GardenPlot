@@ -281,9 +281,9 @@
     flex: 1 1 auto;
     min-width: 0;
     max-width: 100%;
-    height: calc(100vh - 250px);
+    height: calc(100vh - 225px);
     min-height: 200px;
-    max-height: calc(100vh - 250px);
+    max-height: calc(100vh - 225px);
     box-sizing: border-box;
     overflow: hidden;
 }
@@ -310,9 +310,9 @@
     background: #fafaf5;
     border: 1px solid #d8d3c2;
     border-radius: 4px;
-    height: calc(100vh - 250px);
+    height: calc(100vh - 225px);
     min-height: 200px;
-    max-height: calc(100vh - 250px);
+    max-height: calc(100vh - 225px);
     overflow: hidden;
 }
 
@@ -832,7 +832,7 @@
 .view-scale-controls {
     position: absolute;
     right: 20px;
-    bottom: 20px;
+    bottom: 50px;
     display: flex;
     align-items: flex-end;
     gap: 0.45rem;

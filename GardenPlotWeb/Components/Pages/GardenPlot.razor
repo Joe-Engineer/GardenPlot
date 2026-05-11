@@ -40,14 +40,15 @@
     {
         <button class="btn btn-sm btn-outline-danger" @onclick="DeleteCurrentPlot">Delete Plot</button>
     }
-    @if (currentPlot is not null)
-    {
-        <span class="text-muted small ms-2">
-            @F(currentPlot.WidthFt) ft × @F(currentPlot.HeightFt) ft &mdash; flat. Pick a tool, then draw or stamp on the plot.
-        </span>
-    }
     <a href="/about" class="ms-auto text-nowrap">Help / About</a>
 </div>
+
+@if (currentPlot is not null)
+{
+    <div class="text-muted small mb-2 plot-info-line">
+        @F(currentPlot.WidthFt) ft × @F(currentPlot.HeightFt) ft &mdash; flat. Pick a tool, then draw or stamp on the plot.
+    </div>
+}
 
 @if (currentPlot is null)
 {
