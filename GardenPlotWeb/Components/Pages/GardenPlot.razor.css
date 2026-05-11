@@ -279,9 +279,9 @@
     flex: 1 1 auto;
     min-width: 0;
     max-width: 100%;
-    height: calc(100vh - 290px);
+    height: calc(100vh - 250px);
     min-height: 200px;
-    max-height: calc(100vh - 290px);
+    max-height: calc(100vh - 250px);
     box-sizing: border-box;
     overflow: hidden;
 }
@@ -301,13 +301,15 @@
 .plot-palette {
     display: flex;
     flex-direction: column;
+    flex: 0 0 240px;
     width: 240px;
+    min-width: 240px;
     background: #fafaf5;
     border: 1px solid #d8d3c2;
     border-radius: 4px;
-    height: calc(100vh - 290px);
+    height: calc(100vh - 250px);
     min-height: 200px;
-    max-height: calc(100vh - 290px);
+    max-height: calc(100vh - 250px);
     overflow: hidden;
 }
 
@@ -674,16 +676,20 @@
 }
 
 .plot-status-bar {
+    position: sticky;
+    bottom: 0;
+    margin-top: auto;
+    z-index: 5;
     display: flex;
     align-items: center;
     gap: 1rem;
-    min-height: 32px;
-    padding: 0.25rem 0.6rem;
-    margin-top: 0.5rem;
+    min-height: 26px;
+    padding: 0.1rem 0.6rem;
     border: 1px solid #c8c2ad;
     border-radius: 4px;
     background: #eef3e6;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
+    line-height: 1.1;
 }
 
 .status-item {

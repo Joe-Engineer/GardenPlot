@@ -28,9 +28,9 @@ public sealed class DataRootProvider
         TileImagesDirectory = Path.Combine(PlotsDirectory, TileImagesFolderName);
         PlotImagesDirectory = Path.Combine(PlotsDirectory, PlotImagesFolderName);
 
-        Directory.CreateDirectory(PlotsDirectory);
-        Directory.CreateDirectory(TileImagesDirectory);
-        Directory.CreateDirectory(PlotImagesDirectory);
+        _ = Directory.CreateDirectory(PlotsDirectory);
+        _ = Directory.CreateDirectory(TileImagesDirectory);
+        _ = Directory.CreateDirectory(PlotImagesDirectory);
     }
 
     /// <summary>Resolved root directory (absolute path) for all user data.</summary>

@@ -821,18 +821,20 @@ else
         var positioned = library.Ui.TakeoffPanelX is double && library.Ui.TakeoffPanelY is double;
         <div class="floating-panel takeoff-floating @(positioned ? "" : "default-takeoff-pos")"
              @ref="takeoffPanelRef"
-             style="@(positioned ? $"left:{library.Ui.TakeoffPanelX!.Value}px;top:{library.Ui.TakeoffPanelY!.Value}px;" : "")">
+             style="@(positioned ? $"left:{library.Ui.TakeoffPanelX!.Value}px;top:{library.Ui.TakeoffPanelY!.Value}px;" : "")"
+             @onpointermove="OnPanelDragMove"
+             @onpointerup="OnPanelDragEnd"
+             @onpointercancel="OnPanelDragEnd">
             <div class="panel-header"
-                 @onpointerdown="StartTakeoffPanelDrag"
-                 @onpointermove="OnPanelDragMove"
-                 @onpointerup="OnPanelDragEnd">
+                 @onpointerdown="StartTakeoffPanelDrag">
                 <span class="panel-title">
                     Takeoff list
                     <span class="text-muted small ms-2">@takeoff.Count distinct · @totalCount placed</span>
                 </span>
                 <span class="d-flex align-items-center gap-1">
                     <button type="button" class="btn-close btn-close-sm" title="Hide Takeoff" aria-label="Hide Takeoff"
-                            @onclick="HideTakeoffPanel"></button>
+                            @onclick="HideTakeoffPanel"
+                            @onpointerdown:stopPropagation="true"></button>
                 </span>
             </div>
             <div class="panel-body takeoff-floating-body">
@@ -943,11 +945,12 @@ else
 
     <div class="floating-panel info-panel @(positioned ? "" : "default-info-pos")"
          @ref="infoPanelRef"
-         style="@(positioned ? $"left:{library.Ui.InfoPanelX!.Value}px;top:{library.Ui.InfoPanelY!.Value}px;" : "")">
+         style="@(positioned ? $"left:{library.Ui.InfoPanelX!.Value}px;top:{library.Ui.InfoPanelY!.Value}px;" : "")"
+         @onpointermove="OnPanelDragMove"
+         @onpointerup="OnPanelDragEnd"
+         @onpointercancel="OnPanelDragEnd">
         <div class="panel-header"
-             @onpointerdown="StartInfoPanelDrag"
-             @onpointermove="OnPanelDragMove"
-             @onpointerup="OnPanelDragEnd">
+             @onpointerdown="StartInfoPanelDrag">
             <span class="panel-title">
                 @if (isPreview)
                 {
@@ -5990,6 +5993,21 @@ else
         var (curX, curY) = await GetPanelClientPositionAsync(panelElement, name);
         panelDragOffsetX = e.ClientX - curX;
         panelDragOffsetY = e.ClientY - curY;
+
+        // Capture the pointer on the panel so pointermove keeps firing even when the
+        // pointer drifts off the header (prevents stutter when dragging quickly).
+        if (jsModule is not null)
+        {
+            try
+            {
+                await jsModule.InvokeVoidAsync("capturePointer", panelElement, e.PointerId);
+            }
+            catch
+            {
+                // ignore capture failures; drag will still work, just may stutter at high speeds.
+            }
+        }
+
         // Persist the explicit position immediately so the panel stops using its default-position class.
         if (name == "ruler")
         {

@@ -6,7 +6,7 @@ using GardenPlotWeb.Components;
 using GardenPlotWeb.Services;
 using Microsoft.Extensions.FileProviders;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
@@ -20,21 +20,21 @@ builder.Services.AddHttpClient();
 // Per-user data root resolver (LocalAppData by default, override with GARDENPLOT_DATA_DIR).
 builder.Services.AddSingleton<DataRootProvider>();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 app.MapDefaultEndpoints();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    _ = app.UseExceptionHandler("/Error", createScopeForErrors: true);
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    _ = app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
-var dataRoot = app.Services.GetRequiredService<DataRootProvider>();
+DataRootProvider dataRoot = app.Services.GetRequiredService<DataRootProvider>();
 
 app.UseStaticFiles(new StaticFileOptions
 {
