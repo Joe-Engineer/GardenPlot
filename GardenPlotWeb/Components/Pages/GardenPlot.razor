@@ -713,6 +713,17 @@ else
                 </svg>
             </div>
         </div>
+            <div class="plot-status-bar" role="status" aria-live="polite">
+                <span class="status-item status-pos"><strong>X:</strong> @(lastCanvasX is double statusX ? F(statusX) : "--")</span>
+                <span class="status-item status-pos"><strong>Y:</strong> @(lastCanvasY is double statusY ? F(statusY) : "--")</span>
+                <span class="status-item"><strong>Action:</strong> @CurrentMouseActionLabel()</span>
+                <span class="status-item ms-auto">
+                    <button class="btn btn-sm btn-link p-0 takeoff-toggle-btn"
+                            @onclick="ToggleTakeoffPanel">
+                        @(showTakeoffPanel ? "Hide Takeoff" : "Show Takeoff")
+                    </button>
+                </span>
+            </div>
             <div class="view-scale-controls">
                 <button class="btn btn-sm scale-icon-btn"
                         @onclick="BeginCanvasScaleCalibration"
@@ -809,7 +820,6 @@ else
         </div>
     </div>
 }
-}
 
 @if (currentPlot is not null)
 {
@@ -872,18 +882,6 @@ else
             </div>
         </div>
     }
-
-    <div class="plot-status-bar" role="status" aria-live="polite">
-        <span class="status-item status-pos"><strong>X:</strong> @(lastCanvasX is double statusX ? F(statusX) : "--")</span>
-        <span class="status-item status-pos"><strong>Y:</strong> @(lastCanvasY is double statusY ? F(statusY) : "--")</span>
-        <span class="status-item"><strong>Action:</strong> @CurrentMouseActionLabel()</span>
-        <span class="status-item ms-auto">
-            <button class="btn btn-sm btn-link p-0 takeoff-toggle-btn"
-                    @onclick="ToggleTakeoffPanel">
-                @(showTakeoffPanel ? "Hide Takeoff" : "Show Takeoff")
-            </button>
-        </span>
-    </div>
 }
 
 @{
