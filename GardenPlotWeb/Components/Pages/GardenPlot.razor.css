@@ -5,6 +5,17 @@
     margin-bottom: 0.5rem;
 }
 
+.plot-scale-display text {
+    font-family: var(--bs-body-font-family, system-ui, sans-serif);
+}
+
+.palette-footer {
+    flex: 0 0 auto;
+    padding: 0.4rem 0.5rem 0.5rem;
+    border-top: 1px solid #d8d3c2;
+    background: #fafaf5;
+}
+
 .toolbar-row {
     display: flex;
     gap: 0.4rem;
@@ -252,14 +263,32 @@
     width: 100%;
 }
 
-.plot-scroll-view {
+.plot-calibration-image {
+    display: block;
+    width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    border: 1px solid #d8d3c2;
+    border-radius: 4px;
+    background: #f7f7f2;
+    cursor: crosshair;
+}
+
+.plot-viewport-frame {
+    position: relative;
     flex: 1 1 auto;
     min-width: 0;
     max-width: 100%;
-    width: calc(100vw - 420px);
-    height: calc(100vh - 280px);
-    min-height: 320px;
-    max-height: calc(100vh - 280px);
+    height: calc(100vh - 290px);
+    min-height: 200px;
+    max-height: calc(100vh - 290px);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.plot-scroll-view {
+    width: 100%;
+    height: 100%;
     overflow: auto;
     scrollbar-gutter: stable both-edges;
     box-sizing: border-box;
@@ -276,9 +305,9 @@
     background: #fafaf5;
     border: 1px solid #d8d3c2;
     border-radius: 4px;
-    /* Fixed height so the inner grid has something to scroll inside. */
-    height: min(640px, calc(100vh - 360px));
-    min-height: 320px;
+    height: calc(100vh - 290px);
+    min-height: 200px;
+    max-height: calc(100vh - 290px);
     overflow: hidden;
 }
 
@@ -291,6 +320,11 @@
 
 .palette-combobox {
     width: 100%;
+}
+
+.palette-add-btn {
+    width: 100%;
+    margin-top: 0.45rem;
 }
 
 .palette-grid {
@@ -362,6 +396,22 @@
     margin-bottom: 2px;
 }
 
+.palette-item-image {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border: 1px solid #d2ccb8;
+    border-radius: 3px;
+    margin-bottom: 2px;
+}
+
+.custom-color {
+    width: 100%;
+    min-width: 48px;
+    height: 32px;
+    padding: 0.15rem;
+}
+
 .x-small {
     font-size: 0.7rem;
 }
@@ -378,9 +428,6 @@
 }
 
 @media (max-width: 1200px) {
-    .plot-scroll-view {
-        width: calc(100vw - 380px);
-    }
 }
 
 @media (max-width: 992px) {
@@ -393,10 +440,11 @@
         height: 260px;
     }
 
-    .plot-scroll-view {
+    .plot-viewport-frame {
         width: 100%;
         max-width: 100%;
     }
+
 }
 
 .ruler-info {
@@ -437,6 +485,34 @@
     border-color: #c81e1e;
 }
 
+.floating-panel.scale-panel {
+    width: 320px;
+    border-color: #2f5a3a;
+}
+
+.floating-panel.takeoff-floating {
+    width: 320px;
+    max-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    border-color: #6b8b3a;
+}
+
+.takeoff-floating-body {
+    overflow: auto;
+    padding: 0.4rem 0.6rem 0.6rem;
+}
+
+.floating-panel.default-takeoff-pos {
+    top: 90px;
+    right: 40px;
+}
+
+.takeoff-toggle-btn {
+    font-size: 0.78rem;
+    text-decoration: none;
+}
+
 .floating-panel.default-ruler-pos {
     top: 40px;
     right: 40px;
@@ -444,6 +520,11 @@
 
 .floating-panel.default-info-pos {
     bottom: 40px;
+    right: 40px;
+}
+
+.floating-panel.default-scale-pos {
+    top: 90px;
     right: 40px;
 }
 
@@ -588,20 +669,17 @@
 
 .takeoff-body {
     margin-top: 0.5rem;
-    max-height: 240px;
+    max-height: 120px;
     overflow: auto;
 }
 
 .plot-status-bar {
-    position: sticky;
-    bottom: 3px;
-    z-index: 20;
     display: flex;
     align-items: center;
     gap: 1rem;
-    min-height: 30px;
+    min-height: 32px;
     padding: 0.25rem 0.6rem;
-    margin-top: 0.35rem;
+    margin-top: 0.5rem;
     border: 1px solid #c8c2ad;
     border-radius: 4px;
     background: #eef3e6;
@@ -738,6 +816,64 @@
 .plot-canvas:focus,
 .plot-canvas:focus-visible {
     outline: none;
+}
+
+.plot-canvas.scale-capture-active {
+    cursor: crosshair;
+}
+
+.view-scale-controls {
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.45rem;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.view-scale-controls > * {
+    pointer-events: auto;
+}
+
+.scale-icon-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #2f5a3a;
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    transition: border-color 120ms ease, background 120ms ease;
+}
+
+.scale-icon-btn:hover:not(:disabled),
+.scale-icon-btn:focus-visible {
+    border-color: #2f5a3a;
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.scale-icon-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.scale-indicator-overlay {
+    height: 32px;
+    min-width: 60px;
+}
+
+.scale-indicator-overlay svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.floating-panel.anchored-scale-pos {
+    bottom: 84px;
+    right: 46px;
 }
 
 ::deep .shape {

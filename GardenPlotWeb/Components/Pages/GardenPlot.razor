@@ -5,7 +5,10 @@
 @using System.Diagnostics
 @using System.Diagnostics.Metrics
 @using System.Globalization
+@using System.Net
 @using System.Text.Json
+@using System.Text.RegularExpressions
+@using Microsoft.AspNetCore.Components.Forms
 @using GardenPlotWeb.Models
 @inject IJSRuntime JS
 @inject IHttpClientFactory HttpFactory
@@ -27,6 +30,10 @@
         </select>
     }
     <button class="btn btn-sm btn-outline-success" @onclick="ShowNewPlotDialog">+ New Plot</button>
+    @if (currentPlot is not null)
+    {
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ShowEditPlotDialog">Edit Plot</button>
+    }
     @if (currentPlot is not null && library.Plots.Count > 1)
     {
         <button class="btn btn-sm btn-outline-danger" @onclick="DeleteCurrentPlot">Delete Plot</button>
@@ -263,50 +270,86 @@ else
                             <option value="@cat">@CategoryLabel(cat)</option>
                         }
                     </select>
+                    @if (currentCategory == PaletteCategory.CustomTiles)
+                    {
+                        <button class="btn btn-sm btn-outline-primary palette-add-btn" @onclick="ShowAddCustomTileDialog">+ Add Item</button>
+                    }
                 </div>
                 <div class="palette-grid">
-                    @foreach (var item in PaletteCatalog.For(currentCategory))
+                    @foreach (var item in PaletteItemsForCurrentCategory())
                     {
                         var isActive = selectedItem?.Code == item.Code;
                         var detail = item.Kind switch
                         {
                             PaletteKind.BedKit => $"{item.WidthFt}'×{item.HeightFt}' · {item.Pieces} pcs",
                             PaletteKind.Plant  => $"spacing {FormatPlantSpacing(item.WidthFt)} · {item.Sunlight} · {item.Water} water",
+                            PaletteKind.CustomTile => $"{item.StampShapeKind ?? ShapeKind.Rectangle} · {item.WidthFt}'×{item.HeightFt}'",
                             _                  => $"{item.WidthFt}' Ø · {item.Trait}",
                         };
                         <button class="palette-item @(isActive ? "active" : "")"
                                 @onclick="() => SelectItem(item)" title="@item.Code — @detail">
-                            <svg viewBox="@PreviewViewBox(item)" preserveAspectRatio="xMidYMid meet">
-                                @switch (item.Kind)
+                                @if (!string.IsNullOrWhiteSpace(item.TilePreviewImageFileName))
                                 {
-                                    case PaletteKind.BedKit:
-                                        <rect x="0" y="0" width="@F(item.WidthFt)" height="@F(item.HeightFt)"
-                                              rx="@F(Math.Min(item.WidthFt, item.HeightFt) / 3.0)"
-                                              ry="@F(Math.Min(item.WidthFt, item.HeightFt) / 3.0)"
-                                              fill="#e2725b" fill-opacity="0.5" stroke="#7a3520" stroke-width="0.15" />
-                                        break;
-                                    case PaletteKind.Tree:
-                                        @((MarkupString)PlantRendering.TreeSvg(0, 0, item.WidthFt, item.HeightFt, item.Trait))
-                                        break;
-                                    case PaletteKind.Bush:
-                                        @((MarkupString)PlantRendering.BushSvg(0, 0, item.WidthFt, item.HeightFt, item.Trait))
-                                        break;
-                                    case PaletteKind.Plant:
-                                        @((MarkupString)PlantRendering.SpacingRingsSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, "good"))
-                                        @((MarkupString)PlantRendering.PlantSpriteSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, item.Trait))
-                                        break;
+                                    <img class="palette-item-image" src="@TileImageUrl(item.TilePreviewImageFileName!)" alt="" />
                                 }
-                            </svg>
-                            <div class="small palette-item-name">@item.Code</div>
-                            <div class="x-small text-muted">@detail</div>
+                                else
+                                {
+                                    <svg viewBox="@PreviewViewBox(item)" preserveAspectRatio="xMidYMid meet">
+                                        @switch (item.Kind)
+                                        {
+                                            case PaletteKind.BedKit:
+                                                <rect x="0" y="0" width="@F(item.WidthFt)" height="@F(item.HeightFt)"
+                                                      rx="@F(Math.Min(item.WidthFt, item.HeightFt) / 3.0)"
+                                                      ry="@F(Math.Min(item.WidthFt, item.HeightFt) / 3.0)"
+                                                      fill="#e2725b" fill-opacity="0.5" stroke="#7a3520" stroke-width="0.15" />
+                                                break;
+                                            case PaletteKind.Tree:
+                                                @((MarkupString)PlantRendering.TreeSvg(0, 0, item.WidthFt, item.HeightFt, item.Trait))
+                                                break;
+                                            case PaletteKind.Bush:
+                                                @((MarkupString)PlantRendering.BushSvg(0, 0, item.WidthFt, item.HeightFt, item.Trait))
+                                                break;
+                                            case PaletteKind.Plant:
+                                                @((MarkupString)PlantRendering.SpacingRingsSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, "good"))
+                                                @((MarkupString)PlantRendering.PlantSpriteSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, item.Trait))
+                                                break;
+                                            case PaletteKind.CustomTile:
+                                                if (item.StampShapeKind == ShapeKind.Oval)
+                                                {
+                                                    <ellipse cx="@F(item.WidthFt / 2)" cy="@F(item.HeightFt / 2)"
+                                                             rx="@F(item.WidthFt / 2)" ry="@F(item.HeightFt / 2)"
+                                                             fill="@(item.FillColor ?? "#e2725b")" fill-opacity="0.65"
+                                                             stroke="@(item.StrokeColor ?? "#7a3520")" stroke-width="0.12" />
+                                                }
+                                                else
+                                                {
+                                                    <rect x="0" y="0" width="@F(item.WidthFt)" height="@F(item.HeightFt)"
+                                                          fill="@(item.FillColor ?? "#e2725b")" fill-opacity="0.65"
+                                                          stroke="@(item.StrokeColor ?? "#7a3520")" stroke-width="0.12" />
+                                                }
+                                                break;
+                                        }
+                                    </svg>
+                                }
+                                <div class="small palette-item-name">@item.Code</div>
+                                <div class="x-small text-muted">@detail</div>
                         </button>
                     }
                 </div>
+                @if (currentCategory == PaletteCategory.CustomTiles)
+                {
+                    <div class="palette-footer">
+                        <button class="btn btn-sm btn-outline-secondary w-100"
+                                @onclick="ShowEditSelectedCustomTileDialog"
+                                disabled="@(selectedItem?.Kind != PaletteKind.CustomTile)">Edit Item</button>
+                    </div>
+                }
             </aside>
 
+            <div class="plot-viewport-frame">
             <div class="plot-scroll-view" @ref="wrapRef">
             <div class="plot-canvas-wrap">
-                <svg class="plot-canvas"
+                <svg class="plot-canvas @(showCanvasScalePanel ? "scale-capture-active" : string.Empty)"
                      @ref="canvasRef"
                      tabindex="0"
                      style="width:@(PlotWidthFt * PxPerFt * zoom)px; height:@(PlotHeightFt * PxPerFt * zoom)px;"
@@ -323,15 +366,47 @@ else
                      @onpointerdown:preventDefault="true">
 
                 <defs>
-                    <pattern id="ftgrid" width="1" height="1" patternUnits="userSpaceOnUse">
-                        <path d="M 1 0 L 0 0 0 1" fill="none" stroke="#cfd8c5" stroke-width="0.02" />
-                    </pattern>
+                    @if (currentPlot.ShowGrid)
+                    {
+                        <pattern id="ftgrid" width="1" height="1" patternUnits="userSpaceOnUse">
+                            <path d="M 1 0 L 0 0 0 1"
+                                  fill="none"
+                                  stroke="@EffectivePlotGridColor(currentPlot)"
+                                  stroke-width="@F(EffectivePlotGridLineWidth(currentPlot))"
+                                  stroke-opacity="@F(EffectivePlotGridOpacity(currentPlot))" />
+                        </pattern>
+                    }
                 </defs>
 
                 <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="#f3efe3" />
-                <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="url(#ftgrid)" />
+                @if (!string.IsNullOrWhiteSpace(currentPlot.BackgroundImageFileName))
+                {
+                    <image href="@PlotImageUrl(currentPlot.BackgroundImageFileName!)"
+                           x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)"
+                           preserveAspectRatio="none"
+                           opacity="@F(EffectivePlotBackgroundOpacity(currentPlot))" />
+                }
+                @if (currentPlot.ShowGrid)
+                {
+                    <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="url(#ftgrid)" />
+                }
                 <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="none"
                       stroke="#7a6a4a" stroke-width="0.05" />
+
+                @if (showCanvasScalePanel && canvasScaleStartXFt is double sx && canvasScaleStartYFt is double sy)
+                {
+                    var tx = canvasScaleEndXFt ?? canvasScaleCurrentXFt ?? sx;
+                    var ty = canvasScaleEndYFt ?? canvasScaleCurrentYFt ?? sy;
+                    var mx = (sx + tx) / 2;
+                    var my = (sy + ty) / 2;
+                    var md = Math.Sqrt(Math.Pow(tx - sx, 2) + Math.Pow(ty - sy, 2));
+                    <g class="canvas-scale-preview" pointer-events="none">
+                        <line x1="@F(sx)" y1="@F(sy)" x2="@F(tx)" y2="@F(ty)" stroke="#c81e1e" stroke-width="0.08" stroke-dasharray="0.2,0.1" />
+                        <circle cx="@F(sx)" cy="@F(sy)" r="0.12" fill="#fff" stroke="#c81e1e" stroke-width="0.05" />
+                        <circle cx="@F(tx)" cy="@F(ty)" r="0.12" fill="#fff" stroke="#c81e1e" stroke-width="0.05" />
+                        @SvgScalePreviewLabel(mx, my - 0.2, $"{F(md)} ft")
+                    </g>
+                }
 
                 @{
                     // Plant spacing overlay (under shapes): one set of rings per plant, color-coded by overlap.
@@ -366,15 +441,38 @@ else
                         @switch (s.Kind)
                         {
                             case ShapeKind.Rectangle:
+                                var rectClipId = $"tile-clip-{s.Id:N}";
                                 <rect x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
                                       fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
                                       stroke="@EffectiveStroke(s)" stroke-width="0.06" />
+                                @if (!string.IsNullOrWhiteSpace(s.TileBackgroundImageFileName))
+                                {
+                                    <clipPath id="@rectClipId">
+                                        <rect x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)" />
+                                    </clipPath>
+                                    <image href="@TileImageUrl(s.TileBackgroundImageFileName!)"
+                                           x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
+                                           preserveAspectRatio="xMidYMid slice"
+                                           clip-path="url(#@rectClipId)" />
+                                }
                                 break;
                             case ShapeKind.Oval:
+                                var ovalClipId = $"tile-clip-{s.Id:N}";
                                 <ellipse cx="@F(s.X + s.W / 2)" cy="@F(s.Y + s.H / 2)"
                                          rx="@F(s.W / 2)" ry="@F(s.H / 2)"
                                          fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
                                          stroke="@EffectiveStroke(s)" stroke-width="0.06" />
+                                @if (!string.IsNullOrWhiteSpace(s.TileBackgroundImageFileName))
+                                {
+                                    <clipPath id="@ovalClipId">
+                                        <ellipse cx="@F(s.X + s.W / 2)" cy="@F(s.Y + s.H / 2)"
+                                                 rx="@F(s.W / 2)" ry="@F(s.H / 2)" />
+                                    </clipPath>
+                                    <image href="@TileImageUrl(s.TileBackgroundImageFileName!)"
+                                           x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
+                                           preserveAspectRatio="xMidYMid slice"
+                                           clip-path="url(#@ovalClipId)" />
+                                }
                                 break;
                             case ShapeKind.FreeDraw:
                                 <polyline points="@PointsString(s.Points)"
@@ -497,7 +595,6 @@ else
                             break;
                     }
                 }
-
                 @if (currentTool == Tool.Select && isBoxSelecting)
                 {
                     var bx = Math.Min(boxSelectStartX, boxSelectCurrentX);
@@ -614,6 +711,44 @@ else
                 </svg>
             </div>
         </div>
+            <div class="view-scale-controls">
+                <button class="btn btn-sm scale-icon-btn"
+                        @onclick="BeginCanvasScaleCalibration"
+                        disabled="@string.IsNullOrWhiteSpace(currentPlot.BackgroundImageFileName)"
+                        title="Scale the current drawing"
+                        aria-label="Scale the current drawing">📐</button>
+
+                @if (currentPlot.ShowScaleDisplay)
+                {
+                    var pxPerFtNow = PxPerFt * zoom;
+                    var scaleLenFt = NiceScaleLengthFt(pxPerFtNow, maxPx: 180);
+                    var scaleLenPx = scaleLenFt * pxPerFtNow;
+                    var overlayWidth = scaleLenPx + 24;
+                    <div class="scale-indicator-overlay" style="width:@(F(overlayWidth))px;">
+                        <svg viewBox="@($"0 0 {F(overlayWidth)} 30")" preserveAspectRatio="none" aria-label="Scale indicator">
+                            <rect x="0.5" y="0.5" width="@F(overlayWidth - 1)" height="29" rx="4" ry="4" fill="rgba(255,255,255,0.92)" stroke="#b8c8a3" />
+                            <line x1="12" y1="20" x2="@F(12 + scaleLenPx)" y2="20" stroke="#2f5a3a" stroke-width="1.6" />
+                            @{
+                                var tickStep = NiceTickStepFt(scaleLenFt);
+                                var tickCount = (int)Math.Round(scaleLenFt / tickStep);
+                            }
+                            @for (var tick = 0; tick <= tickCount; tick++)
+                            {
+                                var ftAtTick = tick * tickStep;
+                                var x = 12 + (ftAtTick * pxPerFtNow);
+                                var major = tick == 0 || tick == tickCount || (tick % 5 == 0);
+                                <line x1="@F(x)" y1="@(major ? "9" : "13")" x2="@F(x)" y2="21" stroke="#2f5a3a" stroke-width="1" />
+                                if (major)
+                                {
+                                    @SvgOverlayScaleText(x, 8, ftAtTick.ToString(tickStep < 1 ? "0.##" : "0", CultureInfo.InvariantCulture))
+                                }
+                            }
+                            @SvgOverlayScaleText(overlayWidth / 2, 28, $"Scale ({CurrentScaleUnitLabel()})")
+                        </svg>
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 
     @if (showShapeContextMenu)
@@ -624,56 +759,126 @@ else
             <button type="button" @onclick="SendSelectionToBackFromMenu">Send to Back</button>
         </div>
     }
+
+@if (showCanvasScalePanel && currentPlot is not null)
+{
+    <div class="floating-panel scale-panel anchored-scale-pos">
+        <div class="panel-header">
+            <span class="panel-title">Scale calibration</span>
+            <button type="button" class="btn-close btn-close-sm" @onclick="CloseCanvasScaleCalibration"></button>
+        </div>
+        <div class="panel-body">
+            @if (canvasScaleStartXFt is null)
+            {
+                <div class="small">Click the first point</div>
+            }
+            else if (canvasScaleEndXFt is null)
+            {
+                <div class="small">Click the second point</div>
+            }
+            else
+            {
+                <div class="small mb-1">Enter the distance</div>
+                <div class="row g-2 mb-1">
+                    <div class="col-6">
+                        <input type="number" min="0.1" max="1000000" step="0.1" class="form-control form-control-sm" @bind="canvasScaleKnownDistanceValue" />
+                    </div>
+                    <div class="col-6">
+                        <select class="form-select form-select-sm" @bind="canvasScaleKnownDistanceUnit">
+                            <option value="Feet">Feet</option>
+                            <option value="Yards">Yards</option>
+                            <option value="Miles">Miles</option>
+                            <option value="Meters">Meters</option>
+                            <option value="Kilometers">Kilometers</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-primary" @onclick="SetCanvasScaleCalibrationAsync">Set</button>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(canvasScaleStatus))
+            {
+                <div class="x-small text-muted mt-2">@canvasScaleStatus</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(canvasScaleError))
+            {
+                <div class="x-small text-danger mt-1">@canvasScaleError</div>
+            }
+        </div>
+    </div>
+}
 }
 
 @if (currentPlot is not null)
 {
     var takeoff = BuildTakeoff(currentPlot.Shapes);
     var totalCount = takeoff.Sum(t => t.Count);
-    <details class="takeoff-panel mt-2">
-        <summary>
-            <strong>Takeoff list</strong>
-            <span class="text-muted small ms-2">@takeoff.Count distinct items · @totalCount placed</span>
-        </summary>
-        <div class="takeoff-body">
-            @if (takeoff.Count == 0)
-            {
-                <div class="x-small text-muted">Nothing placed yet.</div>
-            }
-            else
-            {
-                <div class="d-flex justify-content-end mb-1">
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="ExportTakeoffCsv" title="Download as CSV">
-                        Download CSV
-                    </button>
-                </div>
-                <table class="table table-sm takeoff-table mb-0">
-                    <thead>
-                        <tr>
-                            <th>Type</th>
-                            <th>Name</th>
-                            <th class="text-end">Count</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var row in takeoff)
-                        {
+
+    @if (showTakeoffPanel)
+    {
+        var positioned = library.Ui.TakeoffPanelX is double && library.Ui.TakeoffPanelY is double;
+        <div class="floating-panel takeoff-floating @(positioned ? "" : "default-takeoff-pos")"
+             @ref="takeoffPanelRef"
+             style="@(positioned ? $"left:{library.Ui.TakeoffPanelX!.Value}px;top:{library.Ui.TakeoffPanelY!.Value}px;" : "")">
+            <div class="panel-header"
+                 @onpointerdown="StartTakeoffPanelDrag"
+                 @onpointermove="OnPanelDragMove"
+                 @onpointerup="OnPanelDragEnd">
+                <span class="panel-title">
+                    Takeoff list
+                    <span class="text-muted small ms-2">@takeoff.Count distinct · @totalCount placed</span>
+                </span>
+                <span class="d-flex align-items-center gap-1">
+                    <button type="button" class="btn-close btn-close-sm" title="Hide Takeoff" aria-label="Hide Takeoff"
+                            @onclick="HideTakeoffPanel"></button>
+                </span>
+            </div>
+            <div class="panel-body takeoff-floating-body">
+                @if (takeoff.Count == 0)
+                {
+                    <div class="x-small text-muted">Nothing placed yet.</div>
+                }
+                else
+                {
+                    <div class="d-flex justify-content-end mb-1">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="ExportTakeoffCsv" title="Download as CSV">
+                            Download CSV
+                        </button>
+                    </div>
+                    <table class="table table-sm takeoff-table mb-0">
+                        <thead>
                             <tr>
-                                <td>@row.Kind</td>
-                                <td>@row.Name</td>
-                                <td class="text-end">@row.Count</td>
+                                <th>Type</th>
+                                <th>Name</th>
+                                <th class="text-end">Count</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
-            }
+                        </thead>
+                        <tbody>
+                            @foreach (var row in takeoff)
+                            {
+                                <tr>
+                                    <td>@row.Kind</td>
+                                    <td>@row.Name</td>
+                                    <td class="text-end">@row.Count</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
         </div>
-    </details>
+    }
 
     <div class="plot-status-bar" role="status" aria-live="polite">
-        <span class="status-item status-pos"><strong>X:</strong> @(lastCanvasX is double sx ? F(sx) : "--")</span>
-        <span class="status-item status-pos"><strong>Y:</strong> @(lastCanvasY is double sy ? F(sy) : "--")</span>
+        <span class="status-item status-pos"><strong>X:</strong> @(lastCanvasX is double statusX ? F(statusX) : "--")</span>
+        <span class="status-item status-pos"><strong>Y:</strong> @(lastCanvasY is double statusY ? F(statusY) : "--")</span>
         <span class="status-item"><strong>Action:</strong> @CurrentMouseActionLabel()</span>
+        <span class="status-item ms-auto">
+            <button class="btn btn-sm btn-link p-0 takeoff-toggle-btn"
+                    @onclick="ToggleTakeoffPanel">
+                @(showTakeoffPanel ? "Hide Takeoff" : "Show Takeoff")
+            </button>
+        </span>
     </div>
 }
 
@@ -784,7 +989,7 @@ else
                 <div class="small text-muted mb-1">Selected items:</div>
                 <ul class="selection-list small">
                     @foreach (var grp in selShapes
-                                          .GroupBy(s => (Kind: TakeoffKind(s.Kind), Name: TakeoffName(s)))
+                                          .GroupBy(s => (Kind: TakeoffKind(s), Name: TakeoffName(s)))
                                           .OrderBy(g => g.Key.Kind, StringComparer.Ordinal)
                                           .ThenBy(g => g.Key.Name, StringComparer.Ordinal))
                     {
@@ -931,6 +1136,39 @@ else
                 }
             }
 
+            @if (isSingle && ResolveCustomTileInfoItem(single!, isPreview) is { } customInfo)
+            {
+                <hr class="my-2" />
+                @if (!string.IsNullOrWhiteSpace(customInfo.TilePreviewImageFileName))
+                {
+                    <img class="wiki-thumb" src="@TileImageUrl(customInfo.TilePreviewImageFileName!)" alt="@customInfo.Code" />
+                }
+
+                @if (customTileCitationLoading)
+                {
+                    <div class="x-small text-muted">Loading citation details…</div>
+                }
+                else if (customTileCitation is not null)
+                {
+                    <div class="wiki-block">
+                        @if (!string.IsNullOrEmpty(customTileCitation.ImageUrl))
+                        {
+                            <img class="wiki-thumb" src="@customTileCitation.ImageUrl" alt="@customTileCitation.Title" />
+                        }
+                        <div class="fw-bold small">@customTileCitation.Title</div>
+                        @if (!string.IsNullOrWhiteSpace(customTileCitation.Extract))
+                        {
+                            <div class="x-small wiki-extract">@customTileCitation.Extract</div>
+                        }
+                        <a class="x-small" href="@customTileCitation.PageUrl" target="_blank" rel="noopener">Open source page →</a>
+                    </div>
+                }
+                else if (!string.IsNullOrWhiteSpace(customInfo.CitationUrl))
+                {
+                    <a class="x-small" href="@customInfo.CitationUrl" target="_blank" rel="noopener">Open source page →</a>
+                }
+            }
+
             @if (isSingle && single!.Kind == ShapeKind.Plant)
             {
                 var rules = CompanionRules.ForCode(single.Label ?? "");
@@ -983,10 +1221,10 @@ else
 {
     <div class="modal-backdrop fade show"></div>
     <div class="modal d-block" tabindex="-1" role="dialog">
-        <div class="modal-dialog" role="document">
+        <div class="modal-dialog @(string.IsNullOrWhiteSpace(newPlotBackgroundImageFileName) ? string.Empty : "modal-xl")" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">New Garden Plot</h5>
+                    <h5 class="modal-title">@(isEditingPlotSettings ? "Edit Garden Plot" : "New Garden Plot")</h5>
                     <button type="button" class="btn-close" @onclick="CancelNewPlot"></button>
                 </div>
                 <div class="modal-body">
@@ -1012,10 +1250,163 @@ else
                                    @bind="newPlotHeight" />
                         </div>
                     </div>
+
+                    <div class="mb-2 mt-2">
+                        <label class="form-label small">Background image</label>
+                        <InputFile OnChange="OnPlotBackgroundImageSelected" accept="image/*" class="form-control form-control-sm" />
+                        @if (!string.IsNullOrWhiteSpace(newPlotBackgroundImageWarning))
+                        {
+                            <div class="x-small text-warning mt-1">@newPlotBackgroundImageWarning</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(newPlotBackgroundImageFileName))
+                        {
+                            <div class="row g-2 mt-2">
+                                <div class="col">
+                                    <label class="form-label x-small">Background opacity</label>
+                                    <input type="range" min="0" max="1" step="0.05" class="form-range"
+                                           @bind="newPlotBackgroundOpacity" />
+                                    <div class="x-small text-muted">@F(newPlotBackgroundOpacity * 100)%</div>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mt-2">
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearPlotBackgroundImage">Remove image</button>
+                                <span class="x-small text-muted">Use the Scale button to calibrate directly on the main canvas.</span>
+                            </div>
+                            <img class="plot-calibration-image mt-2"
+                                 src="@PlotImageUrl(newPlotBackgroundImageFileName!)"
+                                 alt="Plot background calibration preview" />
+                        }
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" @bind="newPlotShowGrid" />
+                            <span class="form-check-label small">Show grid</span>
+                        </label>
+
+                        @if (newPlotShowGrid)
+                        {
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <label class="form-label x-small">Line color</label>
+                                    <input type="color" class="form-control form-control-sm form-control-color custom-color" @bind="newPlotGridColor" />
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label x-small">Line width</label>
+                                    <input type="number" min="0.001" max="0.2" step="0.001" class="form-control form-control-sm" @bind="newPlotGridLineWidth" />
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label x-small">Opacity</label>
+                                    <input type="number" min="0" max="1" step="0.05" class="form-control form-control-sm" @bind="newPlotGridOpacity" />
+                                </div>
+                            </div>
+                        }
+
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" @bind="newPlotShowScaleDisplay" />
+                            <span class="form-check-label small">Show scale display on canvas</span>
+                        </label>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="BeginScaleCalibrationFromDialog">Scale</button>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(newPlotError))
+                    {
+                        <div class="small text-danger mt-2">@newPlotError</div>
+                    }
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-sm btn-secondary" @onclick="CancelNewPlot">Cancel</button>
-                    <button class="btn btn-sm btn-primary" @onclick="CreateNewPlot">Create</button>
+                    <button class="btn btn-sm btn-primary" @onclick="SavePlotSettingsAsync">@(isEditingPlotSettings ? "Save" : "Create")</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showAddCustomTileDialog)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(IsEditingCustomTile ? "Edit Custom Tile" : "Add Custom Tile")</h5>
+                    <button type="button" class="btn-close" @onclick="CancelAddCustomTile"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label small">Name</label>
+                        <input class="form-control form-control-sm" @bind="newCustomTileName" />
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col">
+                            <label class="form-label small">Shape</label>
+                            <select class="form-select form-select-sm" @bind="newCustomTileShape">
+                                <option value="Rectangle">Rectangle</option>
+                                <option value="Oval">Oval</option>
+                            </select>
+                        </div>
+                        <div class="col">
+                            <label class="form-label small">Line color</label>
+                            <input type="color" class="form-control form-control-sm form-control-color custom-color" @bind="newCustomTileStrokeColor" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label small">Fill color</label>
+                            <input type="color" class="form-control form-control-sm form-control-color custom-color" @bind="newCustomTileFillColor" />
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col">
+                            <label class="form-label small">Width (ft)</label>
+                            <input type="number" min="0.1" max="200" step="0.1" class="form-control form-control-sm" @bind="newCustomTileWidthFt" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label small">Height (ft)</label>
+                            <input type="number" min="0.1" max="200" step="0.1" class="form-control form-control-sm" @bind="newCustomTileHeightFt" />
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small">Palette tile image (for button)</label>
+                        <InputFile OnChange="OnCustomTilePreviewImageSelected" accept="image/*" class="form-control form-control-sm" />
+                        @if (!string.IsNullOrWhiteSpace(newCustomTilePreviewImageWarning))
+                        {
+                            <div class="x-small text-warning mt-1">@newCustomTilePreviewImageWarning</div>
+                        }
+                    </div>
+                    <label class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" @bind="newCustomTileUseButtonImageForBackground" />
+                        <span class="form-check-label small">Use button image for tile background</span>
+                    </label>
+                    <div class="mb-2">
+                        <label class="form-label small">Tile background image (for drawn shape)</label>
+                        <InputFile OnChange="OnCustomTileBackgroundImageSelected" accept="image/*" class="form-control form-control-sm" disabled="@newCustomTileUseButtonImageForBackground" />
+                        @if (newCustomTileUseButtonImageForBackground)
+                        {
+                            <div class="x-small text-muted mt-1">The drawn tile will reuse the button image.</div>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(newCustomTileBackgroundImageWarning))
+                        {
+                            <div class="x-small text-warning mt-1">@newCustomTileBackgroundImageWarning</div>
+                        }
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Citation URL</label>
+                        <input type="url" class="form-control form-control-sm" @bind="newCustomTileCitationUrl" placeholder="https://..." />
+                        <div class="x-small text-muted mt-1">Leave blank to auto-link Wikipedia when possible.</div>
+                    </div>
+                    <div class="x-small text-muted">Large image files can impact rendering performance while panning/zooming.</div>
+                    @if (!string.IsNullOrWhiteSpace(addCustomTileError))
+                    {
+                        <div class="small text-danger mt-2">@addCustomTileError</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-secondary" @onclick="CancelAddCustomTile">Cancel</button>
+                    <button class="btn btn-sm btn-primary" @onclick="AddCustomTileAsync">@(IsEditingCustomTile ? "Save" : "Add Item")</button>
                 </div>
             </div>
         </div>
@@ -1038,12 +1429,16 @@ else
     private const string FileStoreSourceKey = "file-index";
     private const string FileStoreFolderName = "plots";
     private const string FileStoreIndexFileName = "index.json";
+    private const string FileStoreTileImageFolderName = "tile-images";
+    private const string FileStorePlotImageFolderName = "plot-images";
     private const int FileStoreSchemaVersion = 1;
     private const double PxPerFt = 16.0; // also used by ToFt()
     private static readonly SemaphoreSlim FileStoreGate = new(1, 1);
 
     private string FileStoreDirectory => Path.Combine(Env.ContentRootPath, "App_Data", FileStoreFolderName);
     private string FileStoreIndexPath => Path.Combine(FileStoreDirectory, FileStoreIndexFileName);
+    private string FileStoreTileImageDirectory => Path.Combine(FileStoreDirectory, FileStoreTileImageFolderName);
+    private string FileStorePlotImageDirectory => Path.Combine(FileStoreDirectory, FileStorePlotImageFolderName);
 
     private double PlotWidthFt => currentPlot?.WidthFt ?? 60;
     private double PlotHeightFt => currentPlot?.HeightFt ?? 8;
@@ -1087,6 +1482,8 @@ else
     private ElementReference wrapRef;
     private ElementReference rulerPanelRef = default;
     private ElementReference infoPanelRef;
+    private ElementReference takeoffPanelRef;
+    private bool showTakeoffPanel;
     private readonly List<Shape> clipboard = new();
     private readonly Stack<List<Shape>> undoStack = new();
     private double? pasteAnchorX;
@@ -1107,6 +1504,46 @@ else
     private void SelectOnly(Guid id) { selectedIds.Clear(); selectedIds.Add(id); }
     private void ToggleSelection(Guid id) { if (!selectedIds.Remove(id)) selectedIds.Add(id); }
     private void ClearSelection() => selectedIds.Clear();
+    private void ExpandSelectionToWholeGroups()
+    {
+        if (currentPlot is null || selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        var selectedSet = selectedIds.ToHashSet();
+        var groupIds = currentPlot.Shapes
+            .Where(s => selectedSet.Contains(s.Id) && s.GroupId is Guid)
+            .Select(s => s.GroupId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (groupIds.Count == 0)
+        {
+            return;
+        }
+
+        var ordered = new List<Guid>(selectedIds.Count);
+        foreach (var id in selectedIds)
+        {
+            if (!ordered.Contains(id))
+            {
+                ordered.Add(id);
+            }
+        }
+
+        foreach (var shape in currentPlot.Shapes)
+        {
+            if (shape.GroupId is Guid gid && groupIds.Contains(gid) && !selectedSet.Contains(shape.Id))
+            {
+                selectedSet.Add(shape.Id);
+                ordered.Add(shape.Id);
+            }
+        }
+
+        selectedIds.Clear();
+        selectedIds.AddRange(ordered);
+    }
     private IEnumerable<Shape> SelectedShapes()
         => currentPlot is null ? Enumerable.Empty<Shape>()
                                : selectedIds.Select(id => currentPlot.Shapes.FirstOrDefault(s => s.Id == id))
@@ -1201,27 +1638,36 @@ else
         return shapes
             .Where(s => s.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant
                                 or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
-            .GroupBy(s => (Kind: TakeoffKind(s.Kind), Name: TakeoffName(s)))
+            .GroupBy(s => (Kind: TakeoffKind(s), Name: TakeoffName(s)))
             .Select(g => new TakeoffRow(g.Key.Kind, g.Key.Name, g.Count()))
             .OrderBy(r => r.Kind, StringComparer.Ordinal)
             .ThenBy(r => r.Name, StringComparer.Ordinal)
             .ToList();
     }
 
-    private static string TakeoffKind(ShapeKind k) => k switch
+    private static string TakeoffKind(Shape s)
     {
-        ShapeKind.BedKit => "Bed Kit",
-        ShapeKind.Tree => "Tree",
-        ShapeKind.Bush => "Bush",
-        ShapeKind.Plant => "Plant",
-        ShapeKind.Rectangle => "Rectangle",
-        ShapeKind.Oval => "Oval",
-        ShapeKind.FreeDraw => "Freehand",
-        ShapeKind.Ruler => "Ruler",
-        ShapeKind.CircleRuler => "Circle Ruler",
-        ShapeKind.RectRuler => "Rectangle Ruler",
-        _ => k.ToString(),
-    };
+        if ((s.Kind == ShapeKind.Rectangle || s.Kind == ShapeKind.Oval)
+            && string.Equals(s.Trait, "custom-tile", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Custom";
+        }
+
+        return s.Kind switch
+        {
+            ShapeKind.BedKit => "Bed Kit",
+            ShapeKind.Tree => "Tree",
+            ShapeKind.Bush => "Bush",
+            ShapeKind.Plant => "Plant",
+            ShapeKind.Rectangle => "Rectangle",
+            ShapeKind.Oval => "Oval",
+            ShapeKind.FreeDraw => "Freehand",
+            ShapeKind.Ruler => "Ruler",
+            ShapeKind.CircleRuler => "Circle Ruler",
+            ShapeKind.RectRuler => "Rectangle Ruler",
+            _ => s.Kind.ToString(),
+        };
+    }
 
     private static string DropPatternLabel(DropPattern pattern) => pattern switch
     {
@@ -1326,6 +1772,12 @@ else
     private WikiSummary? wikiSummary;
     private bool wikiLoading;
     private string? lastWikiKey;
+    private readonly Dictionary<string, WebCitationSummary?> citationCache = new(StringComparer.OrdinalIgnoreCase);
+    private WebCitationSummary? customTileCitation;
+    private bool customTileCitationLoading;
+    private string? lastCustomTileCitationKey;
+
+    private sealed record WebCitationSummary(string Title, string Extract, string? ImageUrl, string PageUrl);
 
     /// <summary>Stable cache key for a shape's Wikipedia entry (kind + species). Null for non-plant kinds.</summary>
     private static string? WikiKeyFor(Shape s) =>
@@ -1336,13 +1788,7 @@ else
     /// <summary>Synthesizes a transient Shape from a palette item so the info panel can preview it before placement.</summary>
     private static Shape PreviewShapeFromItem(PaletteItem item) => new()
     {
-        Kind = item.Kind switch
-        {
-            PaletteKind.Tree => ShapeKind.Tree,
-            PaletteKind.Bush => ShapeKind.Bush,
-            PaletteKind.Plant => ShapeKind.Plant,
-            _ => ShapeKind.BedKit,
-        },
+        Kind = ShapeKindFromPalette(item),
         W = item.WidthFt,
         H = item.HeightFt,
         Label = item.Code,
@@ -1396,11 +1842,52 @@ else
 
     // New-plot dialog state
     private bool showNewPlotDialog;
+    private bool isEditingPlotSettings;
     private KeyBindingSettings keyBindingDraft = new();
     private string newPlotName = "My Garden";
     private string newPlotShape = "Rectangle";
     private double newPlotWidth = 60;
     private double newPlotHeight = 8;
+    private string? newPlotBackgroundImageFileName;
+    private double newPlotBackgroundOpacity = 0.92;
+    private bool newPlotShowGrid = true;
+    private string newPlotGridColor = "#cfd8c5";
+    private double newPlotGridLineWidth = 0.02;
+    private double newPlotGridOpacity = 1.0;
+    private bool newPlotShowScaleDisplay;
+    private string? newPlotBackgroundImageWarning;
+    private string? newPlotError;
+    private double newPlotGeometryScaleFactor = 1.0;
+    private bool showCanvasScalePanel;
+    private double? canvasScaleStartXFt;
+    private double? canvasScaleStartYFt;
+    private double? canvasScaleEndXFt;
+    private double? canvasScaleEndYFt;
+    private double? canvasScaleCurrentXFt;
+    private double? canvasScaleCurrentYFt;
+    private double canvasScaleKnownDistanceValue = 10;
+    private string canvasScaleKnownDistanceUnit = "Feet";
+    private string? canvasScaleStatus;
+    private string? canvasScaleError;
+    private bool showAddCustomTileDialog;
+    private string newCustomTileName = string.Empty;
+    private string newCustomTileShape = "Rectangle";
+    private double newCustomTileWidthFt = 2;
+    private double newCustomTileHeightFt = 2;
+    private string newCustomTileStrokeColor = "#7a3520";
+    private string newCustomTileFillColor = "#e2725b";
+    private string? newCustomTilePreviewImageFileName;
+    private string? newCustomTileBackgroundImageFileName;
+    private string? newCustomTilePreviewImageWarning;
+    private string? newCustomTileBackgroundImageWarning;
+    private string? addCustomTileError;
+    private bool newCustomTileUseButtonImageForBackground;
+    private string? editingCustomTileOriginalCode;
+    private string newCustomTileCitationUrl = string.Empty;
+    private const long CustomTileImageWarnBytes = 2 * 1024 * 1024;
+    private const long CustomTileImageMaxBytes = 20 * 1024 * 1024;
+    private const long PlotImageWarnBytes = 3 * 1024 * 1024;
+    private const long PlotImageMaxBytes = 30 * 1024 * 1024;
 
     private bool loaded;
 
@@ -1638,6 +2125,7 @@ else
                                   ?? library.Plots[0];
                     library.LastPlotId = currentPlot.Id;
                     SetZoom(library.Ui.Zoom ?? 1.0, persist: false);
+                    showTakeoffPanel = library.Ui.TakeoffPanelVisible ?? false;
                     restoreViewportPending = true;
 
                     // Save only when migrating storage or creating a new default.
@@ -1724,6 +2212,33 @@ else
             {
                 wikiSummary = null;
                 wikiLoading = false;
+            }
+        }
+
+        PaletteItem? detailCustomTileItem = null;
+        if (detailShape is not null)
+        {
+            detailCustomTileItem = ResolveCustomTileInfoItem(detailShape, isPreview: false);
+        }
+        else if (currentTool == Tool.Stamp && selectedItem?.Kind == PaletteKind.CustomTile)
+        {
+            detailCustomTileItem = selectedItem;
+        }
+
+        var customTileKey = detailCustomTileItem is null
+            ? null
+            : $"{detailCustomTileItem.Code}|{detailCustomTileItem.CitationUrl}";
+        if (!string.Equals(customTileKey, lastCustomTileCitationKey, StringComparison.Ordinal))
+        {
+            lastCustomTileCitationKey = customTileKey;
+            if (detailCustomTileItem is not null)
+            {
+                await EnsureCitationSummaryForCustomTile(detailCustomTileItem);
+            }
+            else
+            {
+                customTileCitation = null;
+                customTileCitationLoading = false;
             }
         }
 
@@ -1860,6 +2375,7 @@ else
         var safe = loaded ?? new PlotLibrary();
         safe.Plots ??= new List<PlotData>();
         safe.Ui ??= new UiPreferences();
+        safe.CustomPaletteItems ??= new List<PaletteItem>();
 
         foreach (var p in safe.Plots)
         {
@@ -1876,6 +2392,7 @@ else
         public int SchemaVersion { get; set; } = FileStoreSchemaVersion;
         public Guid? LastPlotId { get; set; }
         public UiPreferences Ui { get; set; } = new();
+        public List<PaletteItem> CustomPaletteItems { get; set; } = new();
         public List<PlotStoreIndexEntry> Plots { get; set; } = new();
     }
 
@@ -1915,6 +2432,7 @@ else
             {
                 LastPlotId = index.LastPlotId,
                 Ui = index.Ui ?? new UiPreferences(),
+                CustomPaletteItems = index.CustomPaletteItems ?? new List<PaletteItem>(),
                 Plots = new List<PlotData>(),
             };
 
@@ -1966,6 +2484,7 @@ else
                 SchemaVersion = FileStoreSchemaVersion,
                 LastPlotId = source.LastPlotId,
                 Ui = source.Ui,
+                CustomPaletteItems = source.CustomPaletteItems,
                 Plots = new List<PlotStoreIndexEntry>(),
             };
 
@@ -2368,33 +2887,283 @@ else
 
     private void ShowNewPlotDialog()
     {
+        isEditingPlotSettings = false;
         newPlotName = $"Plot {library.Plots.Count + 1}";
         newPlotShape = "Rectangle";
         newPlotWidth = 60;
         newPlotHeight = 8;
+        newPlotBackgroundImageFileName = null;
+        newPlotBackgroundOpacity = 0.92;
+        newPlotShowGrid = true;
+        newPlotGridColor = "#cfd8c5";
+        newPlotGridLineWidth = 0.02;
+        newPlotGridOpacity = 1.0;
+        newPlotShowScaleDisplay = false;
+        newPlotBackgroundImageWarning = null;
+        newPlotError = null;
+        showCanvasScalePanel = false;
         showNewPlotDialog = true;
     }
 
-    private void CancelNewPlot() => showNewPlotDialog = false;
+    private void ShowEditPlotDialog()
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
 
-    private async Task CreateNewPlot()
+        isEditingPlotSettings = true;
+        newPlotName = currentPlot.Name;
+        newPlotShape = "Rectangle";
+        newPlotWidth = currentPlot.WidthFt;
+        newPlotHeight = currentPlot.HeightFt;
+        newPlotBackgroundImageFileName = currentPlot.BackgroundImageFileName;
+        newPlotBackgroundOpacity = EffectivePlotBackgroundOpacity(currentPlot);
+        newPlotShowGrid = currentPlot.ShowGrid;
+        newPlotGridColor = EffectivePlotGridColor(currentPlot);
+        newPlotGridLineWidth = EffectivePlotGridLineWidth(currentPlot);
+        newPlotGridOpacity = EffectivePlotGridOpacity(currentPlot);
+        newPlotShowScaleDisplay = currentPlot.ShowScaleDisplay;
+        newPlotBackgroundImageWarning = null;
+        newPlotError = null;
+        showCanvasScalePanel = false;
+        showNewPlotDialog = true;
+    }
+
+    private void CancelNewPlot()
+    {
+        showNewPlotDialog = false;
+        newPlotError = null;
+        newPlotBackgroundImageWarning = null;
+    }
+
+    private async Task SavePlotSettingsAsync()
     {
         var w = Math.Clamp(newPlotWidth, 1, 500);
         var h = Math.Clamp(newPlotHeight, 1, 500);
-        var p = new PlotData
+
+        if (!isEditingPlotSettings)
         {
-            Name = string.IsNullOrWhiteSpace(newPlotName) ? "Untitled" : newPlotName.Trim(),
-            WidthFt = w,
-            HeightFt = h,
-        };
-        library.Plots.Add(p);
-        currentPlot = p;
+            var p = new PlotData
+            {
+                Name = string.IsNullOrWhiteSpace(newPlotName) ? "Untitled" : newPlotName.Trim(),
+                WidthFt = w,
+                HeightFt = h,
+                BackgroundImageFileName = newPlotBackgroundImageFileName,
+                BackgroundImageOpacity = Math.Clamp(newPlotBackgroundOpacity, 0, 1),
+                ShowGrid = newPlotShowGrid,
+                GridColor = EffectiveDraftGridColor(),
+                GridLineWidth = Math.Clamp(newPlotGridLineWidth, 0.001, 0.2),
+                GridOpacity = Math.Clamp(newPlotGridOpacity, 0, 1),
+                ShowScaleDisplay = newPlotShowScaleDisplay,
+            };
+            library.Plots.Add(p);
+            currentPlot = p;
+        }
+        else if (currentPlot is not null)
+        {
+            currentPlot.Name = string.IsNullOrWhiteSpace(newPlotName) ? "Untitled" : newPlotName.Trim();
+            if (Math.Abs(newPlotGeometryScaleFactor - 1.0) > 0.0001)
+            {
+                ScalePlotGeometry(currentPlot, newPlotGeometryScaleFactor);
+            }
+            currentPlot.WidthFt = w;
+            currentPlot.HeightFt = h;
+            currentPlot.BackgroundImageFileName = newPlotBackgroundImageFileName;
+            currentPlot.BackgroundImageOpacity = Math.Clamp(newPlotBackgroundOpacity, 0, 1);
+            currentPlot.ShowGrid = newPlotShowGrid;
+            currentPlot.GridColor = EffectiveDraftGridColor();
+            currentPlot.GridLineWidth = Math.Clamp(newPlotGridLineWidth, 0.001, 0.2);
+            currentPlot.GridOpacity = Math.Clamp(newPlotGridOpacity, 0, 1);
+            currentPlot.ShowScaleDisplay = newPlotShowScaleDisplay;
+        }
+
         undoStack.Clear();
         ClearSelection();
         selectedItem = null;
         currentTool = Tool.Select;
         showNewPlotDialog = false;
         await SaveAsync();
+    }
+
+    private async Task OnPlotBackgroundImageSelected(InputFileChangeEventArgs e)
+    {
+        newPlotBackgroundImageFileName = await SavePlotBackgroundImageAsync(e.File);
+    }
+
+    private void ClearPlotBackgroundImage()
+    {
+        newPlotBackgroundImageFileName = null;
+        newPlotBackgroundImageWarning = null;
+        newPlotError = null;
+        showCanvasScalePanel = false;
+    }
+
+    private async Task<string?> SavePlotBackgroundImageAsync(IBrowserFile? file)
+    {
+        if (file is null)
+        {
+            return null;
+        }
+
+        var ext = Path.GetExtension(file.Name);
+        if (string.IsNullOrWhiteSpace(ext))
+        {
+            ext = ".img";
+        }
+
+        if (file.Size > PlotImageWarnBytes)
+        {
+            newPlotBackgroundImageWarning = $"Large file ({Math.Round(file.Size / 1024d / 1024d, 1)} MB). Pan/zoom may feel slower.";
+        }
+        else
+        {
+            newPlotBackgroundImageWarning = null;
+        }
+
+        Directory.CreateDirectory(FileStorePlotImageDirectory);
+        var fileName = $"{Guid.NewGuid():N}{ext}";
+        var path = Path.Combine(FileStorePlotImageDirectory, fileName);
+
+        await using var input = file.OpenReadStream(PlotImageMaxBytes);
+        await using var output = File.Create(path);
+        await input.CopyToAsync(output);
+        newPlotError = null;
+        return fileName;
+    }
+
+    private void BeginScaleCalibrationFromDialog()
+    {
+        BeginCanvasScaleCalibration();
+    }
+
+    private void BeginCanvasScaleCalibration()
+    {
+        if (currentPlot is null || string.IsNullOrWhiteSpace(currentPlot.BackgroundImageFileName))
+        {
+            canvasScaleError = "Upload a background image first, then use Scale.";
+            return;
+        }
+
+        showCanvasScalePanel = true;
+        ResetCanvasScaleCalibrationPoints();
+        canvasScaleKnownDistanceValue = 10;
+        canvasScaleKnownDistanceUnit = "Feet";
+        canvasScaleStatus = "Scale calibration started. Click the first point on the canvas image.";
+        canvasScaleError = null;
+    }
+
+    private void CloseCanvasScaleCalibration()
+    {
+        showCanvasScalePanel = false;
+        canvasScaleError = null;
+    }
+
+    private void ResetCanvasScaleCalibrationPoints()
+    {
+        canvasScaleStartXFt = null;
+        canvasScaleStartYFt = null;
+        canvasScaleEndXFt = null;
+        canvasScaleEndYFt = null;
+        canvasScaleCurrentXFt = null;
+        canvasScaleCurrentYFt = null;
+        canvasScaleStatus = "Click first point on the canvas image.";
+        canvasScaleError = null;
+    }
+
+    private string CanvasScaleInstructionText()
+    {
+        if (canvasScaleStartXFt is null)
+        {
+            return "Step 1: click the first point on the canvas image.";
+        }
+
+        if (canvasScaleEndXFt is null)
+        {
+            return "Step 2: click the second point across that known distance.";
+        }
+
+        return "Step 3: enter the known distance in feet and click Apply scale.";
+    }
+
+    private double CurrentCanvasScaleDistanceFt()
+    {
+        if (canvasScaleStartXFt is null || canvasScaleStartYFt is null || canvasScaleEndXFt is null || canvasScaleEndYFt is null)
+        {
+            return 0;
+        }
+
+        var dx = canvasScaleEndXFt.Value - canvasScaleStartXFt.Value;
+        var dy = canvasScaleEndYFt.Value - canvasScaleStartYFt.Value;
+        return Math.Sqrt((dx * dx) + (dy * dy));
+    }
+
+    private static double UnitToFeetFactor(string unit) => unit switch
+    {
+        "Yards" => 3.0,
+        "Miles" => 5280.0,
+        "Meters" => 3.28084,
+        "Kilometers" => 3280.84,
+        _ => 1.0,
+    };
+
+    private string CurrentScaleUnitLabel() => "Feet";
+
+    private async Task SetCanvasScaleCalibrationAsync()
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        var measured = CurrentCanvasScaleDistanceFt();
+        if (measured <= 0)
+        {
+            canvasScaleError = "Pick two distinct points on the canvas image before applying scale.";
+            return;
+        }
+
+        var known = Math.Clamp(canvasScaleKnownDistanceValue, 0.1, 1_000_000) * UnitToFeetFactor(canvasScaleKnownDistanceUnit);
+        var factor = known / measured;
+
+        RecordUndoState();
+        ScalePlotGeometry(currentPlot, factor);
+        currentPlot.WidthFt = Math.Clamp(currentPlot.WidthFt * factor, 1, 500);
+        currentPlot.HeightFt = Math.Clamp(currentPlot.HeightFt * factor, 1, 500);
+        canvasScaleError = null;
+        canvasScaleStatus = $"Applied {F(factor)}× scale. Plot size is now {F(currentPlot.WidthFt)}' × {F(currentPlot.HeightFt)}'.";
+        showCanvasScalePanel = false;
+
+        await SaveAsync();
+        StateHasChanged();
+    }
+
+    private static void ScalePlotGeometry(PlotData plot, double factor)
+    {
+        if (factor <= 0 || Math.Abs(factor - 1.0) < 0.0001)
+        {
+            return;
+        }
+
+        foreach (var s in plot.Shapes)
+        {
+            s.X *= factor;
+            s.Y *= factor;
+            s.W *= factor;
+            s.H *= factor;
+            if (s.Points.Count > 0)
+            {
+                s.Points = s.Points.Select(pt => new Point(pt.X * factor, pt.Y * factor)).ToList();
+            }
+        }
+
+        foreach (var g in plot.DropGroups)
+        {
+            g.CenterSpacingXFt *= factor;
+            g.CenterSpacingYFt *= factor;
+            g.AnchorCenterX *= factor;
+            g.AnchorCenterY *= factor;
+        }
     }
 
     private async Task DeleteCurrentPlot()
@@ -2448,6 +3217,73 @@ else
         }
     }
 
+    private void ShowAddCustomTileDialog()
+    {
+        ResetCustomTileDraft();
+        addCustomTileError = null;
+        showAddCustomTileDialog = true;
+    }
+
+    private void ShowEditSelectedCustomTileDialog()
+    {
+        if (selectedItem?.Kind != PaletteKind.CustomTile)
+        {
+            return;
+        }
+
+        var item = library.CustomPaletteItems.FirstOrDefault(i => string.Equals(i.Code, selectedItem.Code, StringComparison.OrdinalIgnoreCase));
+        if (item is not null)
+        {
+            ShowEditCustomTileDialog(item);
+        }
+    }
+
+    private void ShowEditCustomTileDialog(PaletteItem item)
+    {
+        editingCustomTileOriginalCode = item.Code;
+        newCustomTileName = item.Code;
+        newCustomTileShape = item.StampShapeKind is ShapeKind.Oval ? "Oval" : "Rectangle";
+        newCustomTileWidthFt = item.WidthFt;
+        newCustomTileHeightFt = item.HeightFt;
+        newCustomTileStrokeColor = item.StrokeColor ?? "#7a3520";
+        newCustomTileFillColor = item.FillColor ?? "#e2725b";
+        newCustomTilePreviewImageFileName = item.TilePreviewImageFileName;
+        newCustomTileBackgroundImageFileName = item.TileBackgroundImageFileName;
+        newCustomTileUseButtonImageForBackground = !string.IsNullOrWhiteSpace(item.TilePreviewImageFileName)
+            && string.Equals(item.TilePreviewImageFileName, item.TileBackgroundImageFileName, StringComparison.OrdinalIgnoreCase);
+        newCustomTileCitationUrl = item.CitationUrl ?? string.Empty;
+        newCustomTilePreviewImageWarning = null;
+        newCustomTileBackgroundImageWarning = null;
+        addCustomTileError = null;
+        showAddCustomTileDialog = true;
+    }
+
+    private void CancelAddCustomTile()
+    {
+        showAddCustomTileDialog = false;
+        addCustomTileError = null;
+        editingCustomTileOriginalCode = null;
+    }
+
+    private void ResetCustomTileDraft()
+    {
+        editingCustomTileOriginalCode = null;
+        newCustomTileName = string.Empty;
+        newCustomTileShape = "Rectangle";
+        newCustomTileWidthFt = 2;
+        newCustomTileHeightFt = 2;
+        newCustomTileStrokeColor = "#7a3520";
+        newCustomTileFillColor = "#e2725b";
+        newCustomTilePreviewImageFileName = null;
+        newCustomTileBackgroundImageFileName = null;
+        newCustomTileUseButtonImageForBackground = false;
+        newCustomTileCitationUrl = string.Empty;
+        newCustomTilePreviewImageWarning = null;
+        newCustomTileBackgroundImageWarning = null;
+    }
+
+    private bool IsEditingCustomTile => !string.IsNullOrWhiteSpace(editingCustomTileOriginalCode);
+
     private void OnCategoryChanged(ChangeEventArgs e)
     {
         if (System.Enum.TryParse<PaletteCategory>(e.Value?.ToString(), out var cat))
@@ -2465,17 +3301,353 @@ else
         PaletteCategory.BushesOrnamental => "Bushes — Ornamental",
         PaletteCategory.Vegetables => "Vegetables",
         PaletteCategory.Herbs => "Herbs",
+        PaletteCategory.CustomTiles => "Custom Tiles",
         _ => k.ToString(),
     };
+
+    private IReadOnlyList<PaletteItem> PaletteItemsForCurrentCategory()
+    {
+        return currentCategory == PaletteCategory.CustomTiles
+            ? library.CustomPaletteItems
+            : PaletteCatalog.For(currentCategory);
+    }
+
+    private async Task AddCustomTileAsync()
+    {
+        addCustomTileError = null;
+
+        var name = (newCustomTileName ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            addCustomTileError = "Name is required.";
+            return;
+        }
+
+        if (newCustomTileWidthFt <= 0 || newCustomTileHeightFt <= 0)
+        {
+            addCustomTileError = "Width and height must be greater than 0.";
+            return;
+        }
+
+        var backgroundImageFileName = newCustomTileUseButtonImageForBackground
+            ? newCustomTilePreviewImageFileName
+            : newCustomTileBackgroundImageFileName;
+        var citationUrl = string.IsNullOrWhiteSpace(newCustomTileCitationUrl) ? null : newCustomTileCitationUrl.Trim();
+        if (!IsEditingCustomTile && string.IsNullOrWhiteSpace(citationUrl))
+        {
+            citationUrl = await TryGetDefaultWikipediaCitationUrl(name);
+        }
+
+        var item = new PaletteItem(
+            Code: name,
+            Kind: PaletteKind.CustomTile,
+            WidthFt: Math.Clamp(newCustomTileWidthFt, 0.1, 200),
+            HeightFt: Math.Clamp(newCustomTileHeightFt, 0.1, 200),
+            Trait: "custom-tile",
+            StampShapeKind: string.Equals(newCustomTileShape, "Oval", StringComparison.OrdinalIgnoreCase) ? ShapeKind.Oval : ShapeKind.Rectangle,
+            StrokeColor: newCustomTileStrokeColor,
+            FillColor: newCustomTileFillColor,
+            TilePreviewImageFileName: newCustomTilePreviewImageFileName,
+            TileBackgroundImageFileName: backgroundImageFileName,
+            CitationUrl: citationUrl);
+
+        if (!string.IsNullOrWhiteSpace(editingCustomTileOriginalCode)
+            && !string.Equals(editingCustomTileOriginalCode, item.Code, StringComparison.OrdinalIgnoreCase))
+        {
+            library.CustomPaletteItems.RemoveAll(i => string.Equals(i.Code, editingCustomTileOriginalCode, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var existingIndex = library.CustomPaletteItems.FindIndex(i => string.Equals(i.Code, item.Code, StringComparison.OrdinalIgnoreCase));
+        if (existingIndex >= 0)
+        {
+            library.CustomPaletteItems[existingIndex] = item;
+        }
+        else
+        {
+            library.CustomPaletteItems.Add(item);
+        }
+
+        showAddCustomTileDialog = false;
+        ResetCustomTileDraft();
+        selectedItem = item;
+        currentCategory = PaletteCategory.CustomTiles;
+        currentTool = Tool.Stamp;
+        ApplyDefaultDropSpacing(item);
+        await SaveAsync();
+    }
+
+    private async Task<string?> TryGetDefaultWikipediaCitationUrl(string code)
+    {
+        var topic = WikipediaTopic(code);
+        if (string.IsNullOrWhiteSpace(topic))
+        {
+            return null;
+        }
+
+        var summary = await FetchWikiSummary(topic);
+        return summary?.PageUrl;
+    }
+
+    private static bool IsCustomTileShape(Shape s)
+        => string.Equals(s.Trait, "custom-tile", StringComparison.OrdinalIgnoreCase);
+
+    private PaletteItem? ResolveCustomTileInfoItem(Shape shape, bool isPreview)
+    {
+        if (isPreview && selectedItem?.Kind == PaletteKind.CustomTile)
+        {
+            return selectedItem;
+        }
+
+        if (!IsCustomTileShape(shape) || string.IsNullOrWhiteSpace(shape.Label))
+        {
+            return null;
+        }
+
+        return library.CustomPaletteItems.FirstOrDefault(i => string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task EnsureCitationSummaryForCustomTile(PaletteItem item)
+    {
+        if (string.IsNullOrWhiteSpace(item.CitationUrl))
+        {
+            customTileCitation = null;
+            customTileCitationLoading = false;
+            return;
+        }
+
+        var key = item.CitationUrl.Trim();
+        if (citationCache.TryGetValue(key, out var cached))
+        {
+            customTileCitation = cached;
+            customTileCitationLoading = false;
+            return;
+        }
+
+        customTileCitationLoading = true;
+        customTileCitation = null;
+        var fetched = await FetchCitationSummary(key);
+        citationCache[key] = fetched;
+        customTileCitation = fetched;
+        customTileCitationLoading = false;
+    }
+
+    private async Task<WebCitationSummary?> FetchCitationSummary(string url)
+    {
+        try
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                return null;
+            }
+
+            if (uri.Host.Contains("wikipedia.org", StringComparison.OrdinalIgnoreCase))
+            {
+                var topic = uri.Segments.LastOrDefault()?.Trim('/');
+                if (!string.IsNullOrWhiteSpace(topic))
+                {
+                    var wiki = await FetchWikiSummary(Uri.UnescapeDataString(topic));
+                    if (wiki is not null)
+                    {
+                        return new WebCitationSummary(wiki.Title, wiki.Extract, wiki.ThumbnailUrl, wiki.PageUrl);
+                    }
+                }
+            }
+
+            var client = HttpFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(8);
+            var html = await client.GetStringAsync(uri);
+            var title = ExtractMetaContent(html, "og:title")
+                        ?? ExtractMetaNameContent(html, "twitter:title")
+                        ?? ExtractTitleTag(html)
+                        ?? uri.Host;
+            var extract = ExtractMetaContent(html, "og:description")
+                          ?? ExtractMetaNameContent(html, "description")
+                          ?? ExtractMetaNameContent(html, "twitter:description")
+                          ?? string.Empty;
+            var image = ExtractMetaContent(html, "og:image");
+            if (!string.IsNullOrWhiteSpace(image) && Uri.TryCreate(image, UriKind.RelativeOrAbsolute, out var imageUri) && !imageUri.IsAbsoluteUri)
+            {
+                image = new Uri(uri, imageUri).ToString();
+            }
+
+            extract = WebUtility.HtmlDecode(Regex.Replace(extract, "<.*?>", string.Empty)).Trim();
+            if (extract.Length > 420)
+            {
+                extract = extract[..420] + "…";
+            }
+
+            return new WebCitationSummary(WebUtility.HtmlDecode(title).Trim(), extract, image, uri.ToString());
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? ExtractMetaContent(string html, string property)
+    {
+        var match = Regex.Match(html, $"<meta\\s+[^>]*property=[\"']{Regex.Escape(property)}[\"'][^>]*content=[\"'](?<content>[^\"']+)[\"'][^>]*>", RegexOptions.IgnoreCase);
+        if (!match.Success)
+        {
+            match = Regex.Match(html, $"<meta\\s+[^>]*content=[\"'](?<content>[^\"']+)[\"'][^>]*property=[\"']{Regex.Escape(property)}[\"'][^>]*>", RegexOptions.IgnoreCase);
+        }
+        return match.Success ? match.Groups["content"].Value : null;
+    }
+
+    private static string? ExtractMetaNameContent(string html, string name)
+    {
+        var match = Regex.Match(html, $"<meta\\s+[^>]*name=[\"']{Regex.Escape(name)}[\"'][^>]*content=[\"'](?<content>[^\"']+)[\"'][^>]*>", RegexOptions.IgnoreCase);
+        if (!match.Success)
+        {
+            match = Regex.Match(html, $"<meta\\s+[^>]*content=[\"'](?<content>[^\"']+)[\"'][^>]*name=[\"']{Regex.Escape(name)}[\"'][^>]*>", RegexOptions.IgnoreCase);
+        }
+        return match.Success ? match.Groups["content"].Value : null;
+    }
+
+    private static string? ExtractTitleTag(string html)
+    {
+        var match = Regex.Match(html, "<title>(?<title>.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        return match.Success ? match.Groups["title"].Value : null;
+    }
+
+    private async Task OnCustomTilePreviewImageSelected(InputFileChangeEventArgs e)
+    {
+        newCustomTilePreviewImageFileName = await SaveCustomTileImageAsync(e.File, isPreview: true);
+        if (newCustomTileUseButtonImageForBackground)
+        {
+            newCustomTileBackgroundImageFileName = newCustomTilePreviewImageFileName;
+            newCustomTileBackgroundImageWarning = newCustomTilePreviewImageWarning;
+        }
+    }
+
+    private async Task OnCustomTileBackgroundImageSelected(InputFileChangeEventArgs e)
+    {
+        newCustomTileBackgroundImageFileName = await SaveCustomTileImageAsync(e.File, isPreview: false);
+    }
+
+    private async Task<string?> SaveCustomTileImageAsync(IBrowserFile? file, bool isPreview)
+    {
+        if (file is null)
+        {
+            return null;
+        }
+
+        var warning = file.Size > CustomTileImageWarnBytes
+            ? "Large image selected. Performance may be impacted while rendering tiles."
+            : null;
+        if (isPreview)
+        {
+            newCustomTilePreviewImageWarning = warning;
+        }
+        else
+        {
+            newCustomTileBackgroundImageWarning = warning;
+        }
+
+        if (file.Size > CustomTileImageMaxBytes)
+        {
+            addCustomTileError = $"Image is too large. Maximum file size is {CustomTileImageMaxBytes / (1024 * 1024)} MB.";
+            return null;
+        }
+
+        var ext = Path.GetExtension(file.Name)?.ToLowerInvariant();
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg" };
+        if (string.IsNullOrWhiteSpace(ext) || !allowed.Contains(ext))
+        {
+            addCustomTileError = "Unsupported image type. Use PNG, JPG, WEBP, GIF, or SVG.";
+            return null;
+        }
+
+        Directory.CreateDirectory(FileStoreTileImageDirectory);
+        var fileName = $"{Guid.NewGuid():N}{ext}";
+        var path = Path.Combine(FileStoreTileImageDirectory, fileName);
+
+        await using var input = file.OpenReadStream(CustomTileImageMaxBytes);
+        await using var output = File.Create(path);
+        await input.CopyToAsync(output);
+        addCustomTileError = null;
+        return fileName;
+    }
 
     private static string PreviewViewBox(PaletteItem item)
     {
         // Plants render with a label below; allocate extra vertical space.
-        if (item.Kind == PaletteKind.BedKit)
+        if (item.Kind is PaletteKind.BedKit or PaletteKind.CustomTile)
             return $"0 0 {F(item.WidthFt)} {F(item.HeightFt)}";
         var pad = item.WidthFt * 0.15;
         var labelRoom = item.HeightFt * 0.35;
         return $"{F(-pad)} {F(-pad)} {F(item.WidthFt + pad * 2)} {F(item.HeightFt + pad + labelRoom)}";
+    }
+
+    private static string TileImageUrl(string fileName)
+        => $"/tile-images/{Uri.EscapeDataString(fileName)}";
+
+    private static string PlotImageUrl(string fileName)
+        => $"/plot-images/{Uri.EscapeDataString(fileName)}";
+
+    private static double EffectivePlotBackgroundOpacity(PlotData plot)
+        => Math.Clamp(plot.BackgroundImageOpacity, 0, 1);
+
+    private static string EffectivePlotGridColor(PlotData plot)
+        => string.IsNullOrWhiteSpace(plot.GridColor) ? "#cfd8c5" : plot.GridColor;
+
+    private static double EffectivePlotGridLineWidth(PlotData plot)
+        => Math.Clamp(plot.GridLineWidth, 0.001, 0.2);
+
+    private static double EffectivePlotGridOpacity(PlotData plot)
+        => Math.Clamp(plot.GridOpacity, 0, 1);
+
+    private string EffectiveDraftGridColor()
+        => string.IsNullOrWhiteSpace(newPlotGridColor) ? "#cfd8c5" : newPlotGridColor;
+
+    private static MarkupString SvgScaleText(double x, double y, string value)
+        => (MarkupString)$"<text x=\"{F(x)}\" y=\"{F(y)}\" text-anchor=\"middle\" font-size=\"0.34\" fill=\"#2f5a3a\">{WebUtility.HtmlEncode(value)}</text>";
+
+    private static MarkupString SvgScalePreviewLabel(double x, double y, string value)
+        => (MarkupString)$"<text x=\"{F(x)}\" y=\"{F(y)}\" text-anchor=\"middle\" font-size=\"0.34\" fill=\"#c81e1e\">{WebUtility.HtmlEncode(value)}</text>";
+
+    private static MarkupString SvgOverlayScaleText(double x, double y, string value)
+        => (MarkupString)$"<text x=\"{F(x)}\" y=\"{F(y)}\" text-anchor=\"middle\" font-size=\"6\" fill=\"#2f5a3a\">{WebUtility.HtmlEncode(value)}</text>";
+
+    /// <summary>
+    /// Picks a "nice" round scale-bar length in feet that fits within <paramref name="maxPx"/>
+    /// at the current pixel-per-foot zoom. Uses a 1/2/5 × 10^n progression.
+    /// </summary>
+    private static double NiceScaleLengthFt(double pxPerFt, double maxPx)
+    {
+        if (pxPerFt <= 0)
+        {
+            return 10;
+        }
+
+        var rawFt = maxPx / pxPerFt;
+        if (rawFt <= 0)
+        {
+            return 1;
+        }
+
+        var pow = Math.Pow(10, Math.Floor(Math.Log10(rawFt)));
+        var mantissa = rawFt / pow;
+        double niceMantissa;
+        if (mantissa >= 5) niceMantissa = 5;
+        else if (mantissa >= 2) niceMantissa = 2;
+        else if (mantissa >= 1) niceMantissa = 1;
+        else if (mantissa >= 0.5) niceMantissa = 0.5;
+        else niceMantissa = 0.2;
+        return Math.Max(0.1, niceMantissa * pow);
+    }
+
+    /// <summary>Picks a tick step in feet that yields a readable number of ticks for the chosen scale length.</summary>
+    private static double NiceTickStepFt(double scaleLenFt)
+    {
+        if (scaleLenFt >= 100) return 20;
+        if (scaleLenFt >= 50) return 10;
+        if (scaleLenFt >= 20) return 5;
+        if (scaleLenFt >= 10) return 2;
+        if (scaleLenFt >= 5) return 1;
+        if (scaleLenFt >= 2) return 0.5;
+        if (scaleLenFt >= 1) return 0.2;
+        return Math.Max(0.05, scaleLenFt / 5);
     }
 
     private void SelectItem(PaletteItem item)
@@ -2767,11 +3939,12 @@ else
     private DropPattern ActiveDropPattern(bool shift, bool ctrl, bool alt)
         => IsMultiDropActive(shift, ctrl, alt) ? dropPattern : DropPattern.One;
 
-    private static ShapeKind ShapeKindFromPalette(PaletteKind kind) => kind switch
+    private static ShapeKind ShapeKindFromPalette(PaletteItem item) => item.Kind switch
     {
         PaletteKind.Tree => ShapeKind.Tree,
         PaletteKind.Bush => ShapeKind.Bush,
         PaletteKind.Plant => ShapeKind.Plant,
+        PaletteKind.CustomTile => item.StampShapeKind is ShapeKind.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
         _ => ShapeKind.BedKit,
     };
 
@@ -2779,14 +3952,17 @@ else
     {
         return new Shape
         {
-            Kind = ShapeKindFromPalette(item.Kind),
+            Kind = ShapeKindFromPalette(item),
             X = centerX - (item.WidthFt / 2),
             Y = centerY - (item.HeightFt / 2),
             W = item.WidthFt,
             H = item.HeightFt,
             Rotation = rotation,
             Label = item.Code,
-            Trait = item.Trait,
+            Trait = item.Kind == PaletteKind.CustomTile ? "custom-tile" : item.Trait,
+            Stroke = item.StrokeColor,
+            Fill = item.FillColor,
+            TileBackgroundImageFileName = item.TileBackgroundImageFileName,
             GroupId = groupId,
             GroupIndex = groupIndex,
         };
@@ -2960,6 +4136,34 @@ else
         pasteHoverX = x;
         pasteHoverY = y;
 
+        if (showCanvasScalePanel && !string.IsNullOrWhiteSpace(currentPlot.BackgroundImageFileName))
+        {
+            if (canvasScaleStartXFt is null || canvasScaleEndXFt is not null)
+            {
+                canvasScaleStartXFt = x;
+                canvasScaleStartYFt = y;
+                canvasScaleEndXFt = null;
+                canvasScaleEndYFt = null;
+                canvasScaleCurrentXFt = x;
+                canvasScaleCurrentYFt = y;
+                canvasScaleStatus = "First point set. Click second point on the canvas image.";
+            }
+            else
+            {
+                canvasScaleEndXFt = x;
+                canvasScaleEndYFt = y;
+                canvasScaleCurrentXFt = x;
+                canvasScaleCurrentYFt = y;
+                var measured = CurrentCanvasScaleDistanceFt();
+                canvasScaleStatus = measured > 0
+                    ? $"Measured span: {F(measured)} ft at current scale."
+                    : "Second point set. Enter known distance and apply scale.";
+            }
+
+            canvasScaleError = null;
+            return;
+        }
+
         switch (currentTool)
         {
             case Tool.Select:
@@ -3103,6 +4307,12 @@ else
         y = Math.Clamp(y, 0, PlotHeightFt);
         lastCanvasX = x;
         lastCanvasY = y;
+
+        if (showCanvasScalePanel)
+        {
+            canvasScaleCurrentXFt = x;
+            canvasScaleCurrentYFt = y;
+        }
 
         if (currentTool == Tool.Select && isPasteMode)
         {
@@ -3545,6 +4755,7 @@ else
     private void StartDrag(double ftX, double ftY)
     {
         if (currentPlot is null || selectedIds.Count == 0) return;
+        ExpandSelectionToWholeGroups();
         isDragging = true;
         dragStartX = ftX;
         dragStartY = ftY;
@@ -3954,7 +5165,7 @@ else
         }
 
         var drop = SelectedShapes()
-            .Where(s => string.Equals(TakeoffKind(s.Kind), kind, StringComparison.Ordinal)
+            .Where(s => string.Equals(TakeoffKind(s), kind, StringComparison.Ordinal)
                         && string.Equals(TakeoffName(s), name, StringComparison.Ordinal))
             .Select(s => s.Id)
             .ToHashSet();
@@ -4762,11 +5973,18 @@ else
 
     private Task StartRulerPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("ruler", e);
     private Task StartInfoPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("info", e);
+    private Task StartTakeoffPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("takeoff", e);
 
     private async Task StartPanelDrag(string name, Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
         draggingPanel = name;
-        var panelElement = name == "ruler" ? rulerPanelRef : infoPanelRef;
+        var panelElement = name switch
+        {
+            "ruler" => rulerPanelRef,
+            "info" => infoPanelRef,
+            "takeoff" => takeoffPanelRef,
+            _ => infoPanelRef,
+        };
         var (curX, curY) = await GetPanelClientPositionAsync(panelElement, name);
         panelDragOffsetX = e.ClientX - curX;
         panelDragOffsetY = e.ClientY - curY;
@@ -4775,6 +5993,11 @@ else
         {
             library.Ui.RulerPanelX = curX;
             library.Ui.RulerPanelY = curY;
+        }
+        else if (name == "takeoff")
+        {
+            library.Ui.TakeoffPanelX = curX;
+            library.Ui.TakeoffPanelY = curY;
         }
         else
         {
@@ -4816,6 +6039,11 @@ else
             library.Ui.InfoPanelX = x;
             library.Ui.InfoPanelY = y;
         }
+        else if (draggingPanel == "takeoff")
+        {
+            library.Ui.TakeoffPanelX = x;
+            library.Ui.TakeoffPanelY = y;
+        }
     }
 
     private async Task OnPanelDragEnd()
@@ -4825,11 +6053,26 @@ else
         await SaveAsync();
     }
 
+    private async Task ToggleTakeoffPanel()
+    {
+        showTakeoffPanel = !showTakeoffPanel;
+        library.Ui.TakeoffPanelVisible = showTakeoffPanel;
+        await SaveAsync();
+    }
+
+    private async Task HideTakeoffPanel()
+    {
+        showTakeoffPanel = false;
+        library.Ui.TakeoffPanelVisible = false;
+        await SaveAsync();
+    }
+
     private async Task<(double x, double y)> GetPanelPositionAsync(string name)
     {
         var prefs = library.Ui;
         if (name == "ruler" && prefs.RulerPanelX is double rx && prefs.RulerPanelY is double ry) return (rx, ry);
         if (name == "info" && prefs.InfoPanelX is double ix && prefs.InfoPanelY is double iy) return (ix, iy);
+        if (name == "takeoff" && prefs.TakeoffPanelX is double tx && prefs.TakeoffPanelY is double ty) return (tx, ty);
         try
         {
             if (jsModule is not null)
@@ -4838,6 +6081,7 @@ else
                 var width = size.GetProperty("width").GetDouble();
                 var height = size.GetProperty("height").GetDouble();
                 if (name == "ruler") return (width - 280 - 40, 40);
+                if (name == "takeoff") return (width - 300 - 40, 90);
                 return (width - 320 - 40, height - 220 - 40);
             }
         }
@@ -4847,19 +6091,29 @@ else
 
     // ===== Selection info panel content =====
 
-    private static string PanelTitleFor(Shape s) => s.Kind switch
+    private static string PanelTitleFor(Shape s)
     {
-        ShapeKind.Tree => $"Tree · {s.Label}",
-        ShapeKind.Bush => $"Bush · {s.Label}",
-        ShapeKind.BedKit => $"Bed Kit · {s.Label}",
-        ShapeKind.Rectangle => "Rectangle",
-        ShapeKind.Oval => "Oval",
-        ShapeKind.FreeDraw => "Freehand",
-        ShapeKind.Ruler => "Line Ruler",
-        ShapeKind.CircleRuler => "Circle Ruler",
-        ShapeKind.RectRuler => "Rectangle Ruler",
-        _ => "Item",
-    };
+        if ((s.Kind == ShapeKind.Rectangle || s.Kind == ShapeKind.Oval)
+            && string.Equals(s.Trait, "custom-tile", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(s.Label))
+        {
+            return $"Custom · {s.Label}";
+        }
+
+        return s.Kind switch
+        {
+            ShapeKind.Tree => $"Tree · {s.Label}",
+            ShapeKind.Bush => $"Bush · {s.Label}",
+            ShapeKind.BedKit => $"Bed Kit · {s.Label}",
+            ShapeKind.Rectangle => "Rectangle",
+            ShapeKind.Oval => "Oval",
+            ShapeKind.FreeDraw => "Freehand",
+            ShapeKind.Ruler => "Line Ruler",
+            ShapeKind.CircleRuler => "Circle Ruler",
+            ShapeKind.RectRuler => "Rectangle Ruler",
+            _ => "Item",
+        };
+    }
 
     private static List<string> ShapeInfoLines(Shape s)
     {
@@ -5030,37 +6284,112 @@ else
         }
     }
 
+    private sealed class SelectionMoveUnit
+    {
+        public List<Shape> Members { get; init; } = new();
+        public (double minX, double minY, double maxX, double maxY) Bounds { get; init; }
+    }
+
+    private List<SelectionMoveUnit> SelectedMoveUnits()
+    {
+        if (currentPlot is null)
+        {
+            return new List<SelectionMoveUnit>();
+        }
+
+        ExpandSelectionToWholeGroups();
+        var selected = SelectedShapes().ToList();
+        var units = new List<SelectionMoveUnit>();
+        var handledGroups = new HashSet<Guid>();
+
+        foreach (var shape in selected)
+        {
+            if (shape.GroupId is Guid gid)
+            {
+                if (!handledGroups.Add(gid))
+                {
+                    continue;
+                }
+
+                var members = currentPlot.Shapes.Where(s => s.GroupId == gid).ToList();
+                if (members.Count == 0)
+                {
+                    members = new List<Shape> { shape };
+                }
+
+                units.Add(new SelectionMoveUnit
+                {
+                    Members = members,
+                    Bounds = UnionAabb(members),
+                });
+            }
+            else
+            {
+                units.Add(new SelectionMoveUnit
+                {
+                    Members = new List<Shape> { shape },
+                    Bounds = RotatedAABB(shape),
+                });
+            }
+        }
+
+        return units;
+    }
+
     private async Task AlignSelected(string mode)
     {
         if (currentPlot is null || selectedIds.Count < 2) return;
-        var pairs = SelectedShapes().Select(s => (shape: s, aabb: RotatedAABB(s))).ToList();
+        var units = SelectedMoveUnits();
+        if (units.Count < 2)
+        {
+            return;
+        }
+
         switch (mode)
         {
             case "left":
                 {
-                    var target = pairs.Min(p => p.aabb.minX);
-                    foreach (var p in pairs) ShiftShape(p.shape, target - p.aabb.minX, 0);
+                    var target = units.Min(u => u.Bounds.minX);
+                    foreach (var unit in units)
+                    {
+                        var dx = target - unit.Bounds.minX;
+                        foreach (var shape in unit.Members) ShiftShape(shape, dx, 0);
+                    }
                     break;
                 }
             case "right":
                 {
-                    var target = pairs.Max(p => p.aabb.maxX);
-                    foreach (var p in pairs) ShiftShape(p.shape, target - p.aabb.maxX, 0);
+                    var target = units.Max(u => u.Bounds.maxX);
+                    foreach (var unit in units)
+                    {
+                        var dx = target - unit.Bounds.maxX;
+                        foreach (var shape in unit.Members) ShiftShape(shape, dx, 0);
+                    }
                     break;
                 }
             case "top":
                 {
-                    var target = pairs.Min(p => p.aabb.minY);
-                    foreach (var p in pairs) ShiftShape(p.shape, 0, target - p.aabb.minY);
+                    var target = units.Min(u => u.Bounds.minY);
+                    foreach (var unit in units)
+                    {
+                        var dy = target - unit.Bounds.minY;
+                        foreach (var shape in unit.Members) ShiftShape(shape, 0, dy);
+                    }
                     break;
                 }
             case "bottom":
                 {
-                    var target = pairs.Max(p => p.aabb.maxY);
-                    foreach (var p in pairs) ShiftShape(p.shape, 0, target - p.aabb.maxY);
+                    var target = units.Max(u => u.Bounds.maxY);
+                    foreach (var unit in units)
+                    {
+                        var dy = target - unit.Bounds.maxY;
+                        foreach (var shape in unit.Members) ShiftShape(shape, 0, dy);
+                    }
                     break;
                 }
         }
+
+        SyncDropGroupsFromCurrentShapes();
         await SaveAsync();
     }
 
@@ -5068,37 +6397,44 @@ else
     private async Task DistributeSelected(bool horizontal)
     {
         if (currentPlot is null || selectedIds.Count < 3) return;
-        var pairs = SelectedShapes().Select(s => (shape: s, aabb: RotatedAABB(s))).ToList();
+        var units = SelectedMoveUnits();
+        if (units.Count < 3)
+        {
+            return;
+        }
+
         if (horizontal)
         {
-            var ordered = pairs.OrderBy(p => p.aabb.minX).ToList();
-            var firstCenter = (ordered[0].aabb.minX + ordered[0].aabb.maxX) / 2.0;
-            var lastCenter = (ordered[^1].aabb.minX + ordered[^1].aabb.maxX) / 2.0;
+            var ordered = units.OrderBy(u => u.Bounds.minX).ToList();
+            var firstCenter = (ordered[0].Bounds.minX + ordered[0].Bounds.maxX) / 2.0;
+            var lastCenter = (ordered[^1].Bounds.minX + ordered[^1].Bounds.maxX) / 2.0;
             var step = (lastCenter - firstCenter) / (ordered.Count - 1);
             for (int i = 1; i < ordered.Count - 1; i++)
             {
-                var (shape, aabb) = ordered[i];
-                var currentCenter = (aabb.minX + aabb.maxX) / 2.0;
+                var unit = ordered[i];
+                var currentCenter = (unit.Bounds.minX + unit.Bounds.maxX) / 2.0;
                 var targetCenter = firstCenter + (step * i);
                 var dx = targetCenter - currentCenter;
-                ShiftShape(shape, dx, 0);
+                foreach (var shape in unit.Members) ShiftShape(shape, dx, 0);
             }
         }
         else
         {
-            var ordered = pairs.OrderBy(p => p.aabb.minY).ToList();
-            var firstCenter = (ordered[0].aabb.minY + ordered[0].aabb.maxY) / 2.0;
-            var lastCenter = (ordered[^1].aabb.minY + ordered[^1].aabb.maxY) / 2.0;
+            var ordered = units.OrderBy(u => u.Bounds.minY).ToList();
+            var firstCenter = (ordered[0].Bounds.minY + ordered[0].Bounds.maxY) / 2.0;
+            var lastCenter = (ordered[^1].Bounds.minY + ordered[^1].Bounds.maxY) / 2.0;
             var step = (lastCenter - firstCenter) / (ordered.Count - 1);
             for (int i = 1; i < ordered.Count - 1; i++)
             {
-                var (shape, aabb) = ordered[i];
-                var currentCenter = (aabb.minY + aabb.maxY) / 2.0;
+                var unit = ordered[i];
+                var currentCenter = (unit.Bounds.minY + unit.Bounds.maxY) / 2.0;
                 var targetCenter = firstCenter + (step * i);
                 var dy = targetCenter - currentCenter;
-                ShiftShape(shape, 0, dy);
+                foreach (var shape in unit.Members) ShiftShape(shape, 0, dy);
             }
         }
+
+        SyncDropGroupsFromCurrentShapes();
         await SaveAsync();
     }
 

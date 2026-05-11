@@ -3,6 +3,7 @@
 // </copyright>
 
 using GardenPlotWeb.Components;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +29,22 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+
+var tileImageDirectory = Path.Combine(app.Environment.ContentRootPath, "App_Data", "plots", "tile-images");
+Directory.CreateDirectory(tileImageDirectory);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(tileImageDirectory),
+    RequestPath = "/tile-images",
+});
+
+var plotImageDirectory = Path.Combine(app.Environment.ContentRootPath, "App_Data", "plots", "plot-images");
+Directory.CreateDirectory(plotImageDirectory);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(plotImageDirectory),
+    RequestPath = "/plot-images",
+});
 
 app.UseAntiforgery();
 

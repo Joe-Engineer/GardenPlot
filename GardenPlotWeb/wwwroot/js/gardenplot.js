@@ -54,6 +54,16 @@ export function elementClientPosition(el) {
     return { x: r.left, y: r.top };
 }
 
+// Returns normalized (0..1) coordinates for a client point relative to an element's box.
+export function normalizedPointInElement(el, clientX, clientY) {
+    if (!el) return { x: 0, y: 0 };
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return { x: 0, y: 0 };
+    const x = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    const y = Math.max(0, Math.min(1, (clientY - r.top) / r.height));
+    return { x, y };
+}
+
 // Serializes the SVG element to a PNG and triggers a browser download.
 export async function exportPng(svgEl, filename, scale) {
     if (!svgEl) return;

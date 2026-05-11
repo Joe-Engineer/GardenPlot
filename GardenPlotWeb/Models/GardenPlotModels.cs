@@ -26,6 +26,7 @@ public enum PaletteKind
     Tree,
     Bush,
     Plant,
+    CustomTile,
 }
 
 public enum DropPattern
@@ -52,7 +53,13 @@ public record PaletteItem(
     string Sunlight = "",      // "full", "partial", "shade"
     string Water = "",          // "low", "medium", "high"
     int DaysToMaturity = 0,
-    string Notes = "");
+    string Notes = "",
+    ShapeKind? StampShapeKind = null,
+    string? StrokeColor = null,
+    string? FillColor = null,
+    string? TilePreviewImageFileName = null,
+    string? TileBackgroundImageFileName = null,
+    string? CitationUrl = null);
 
 /// <summary>Legacy alias kept for compatibility with existing references.</summary>
 public record BedKit(string Code, double WidthFt, double HeightFt, int Pieces);
@@ -92,6 +99,9 @@ public class Shape
 
     /// <summary>Optional index position within a drop group (0-based).</summary>
     public int? GroupIndex { get; set; }
+
+    /// <summary>Optional custom tile background image filename (served from app data store).</summary>
+    public string? TileBackgroundImageFileName { get; set; }
 }
 
 public class DropGroup
@@ -114,6 +124,28 @@ public class PlotData
     public string Name { get; set; } = "Untitled";
     public double WidthFt { get; set; } = 60;
     public double HeightFt { get; set; } = 8;
+
+    /// <summary>Optional plot background image filename (served from app data store).</summary>
+    public string? BackgroundImageFileName { get; set; }
+
+    /// <summary>Background image opacity (0..1) when rendered on the canvas.</summary>
+    public double BackgroundImageOpacity { get; set; } = 0.92;
+
+    /// <summary>Whether to show the 1ft grid overlay for this plot.</summary>
+    public bool ShowGrid { get; set; } = true;
+
+    /// <summary>Gridline color for this plot.</summary>
+    public string GridColor { get; set; } = "#cfd8c5";
+
+    /// <summary>Gridline stroke width in plot units (feet).</summary>
+    public double GridLineWidth { get; set; } = 0.02;
+
+    /// <summary>Gridline opacity (0..1).</summary>
+    public double GridOpacity { get; set; } = 1.0;
+
+    /// <summary>Whether to show the on-canvas scale bar display.</summary>
+    public bool ShowScaleDisplay { get; set; }
+
     public List<Shape> Shapes { get; set; } = new();
     public List<DropGroup> DropGroups { get; set; } = new();
     public Dictionary<string, double> KitRotations { get; set; } = new();
@@ -126,6 +158,7 @@ public class PlotLibrary
     public Guid? LastPlotId { get; set; }
     public List<PlotData> Plots { get; set; } = new();
     public UiPreferences Ui { get; set; } = new();
+    public List<PaletteItem> CustomPaletteItems { get; set; } = new();
 }
 
 /// <summary>Persisted UI state (panel positions, etc.). Stored alongside <see cref="PlotLibrary"/>.</summary>
@@ -135,6 +168,9 @@ public class UiPreferences
     public double? RulerPanelY { get; set; }
     public double? InfoPanelX { get; set; }
     public double? InfoPanelY { get; set; }
+    public double? TakeoffPanelX { get; set; }
+    public double? TakeoffPanelY { get; set; }
+    public bool? TakeoffPanelVisible { get; set; }
     public double? Zoom { get; set; }
     public double? ViewCenterXFt { get; set; }
     public double? ViewCenterYFt { get; set; }
@@ -301,6 +337,7 @@ public static class PaletteCatalog
             PaletteKind.Tree => Trees,
             PaletteKind.Bush => Bushes,
             PaletteKind.Plant => Plants,
+            PaletteKind.CustomTile => [],
             _ => [],
         };
     }
@@ -370,6 +407,7 @@ public static class PaletteCatalog
             PaletteCategory.BushesOrnamental => [.. Bushes.Where(b => !IsEdibleBush(b))],
             PaletteCategory.Vegetables => [.. Plants.Where(IsVegetableOrCompanion)],
             PaletteCategory.Herbs => [.. Plants.Where(p => string.Equals(p.Trait, "herb", StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.CustomTiles => [],
             _ => [],
         };
     }
@@ -384,6 +422,7 @@ public static class PaletteCatalog
             PaletteKind.Plant => string.Equals(item.Trait, "herb", StringComparison.OrdinalIgnoreCase)
                 ? PaletteCategory.Herbs
                 : PaletteCategory.Vegetables,
+            PaletteKind.CustomTile => PaletteCategory.CustomTiles,
             _ => PaletteCategory.BedKits,
         };
     }
@@ -417,6 +456,7 @@ public enum PaletteCategory
     BushesOrnamental,
     Vegetables,
     Herbs,
+    CustomTiles,
 }
 
 /// <summary>
