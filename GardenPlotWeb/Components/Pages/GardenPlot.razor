@@ -10,9 +10,11 @@
 @using System.Text.RegularExpressions
 @using Microsoft.AspNetCore.Components.Forms
 @using GardenPlotWeb.Models
+@using GardenPlotWeb.Services
 @inject IJSRuntime JS
 @inject IHttpClientFactory HttpFactory
 @inject IWebHostEnvironment Env
+@inject DataRootProvider DataRoot
 @inject ILogger<GardenPlot> Logger
 
 <PageTitle>Garden Plot</PageTitle>
@@ -1435,10 +1437,10 @@ else
     private const double PxPerFt = 16.0; // also used by ToFt()
     private static readonly SemaphoreSlim FileStoreGate = new(1, 1);
 
-    private string FileStoreDirectory => Path.Combine(Env.ContentRootPath, "App_Data", FileStoreFolderName);
+    private string FileStoreDirectory => DataRoot.PlotsDirectory;
     private string FileStoreIndexPath => Path.Combine(FileStoreDirectory, FileStoreIndexFileName);
-    private string FileStoreTileImageDirectory => Path.Combine(FileStoreDirectory, FileStoreTileImageFolderName);
-    private string FileStorePlotImageDirectory => Path.Combine(FileStoreDirectory, FileStorePlotImageFolderName);
+    private string FileStoreTileImageDirectory => DataRoot.TileImagesDirectory;
+    private string FileStorePlotImageDirectory => DataRoot.PlotImagesDirectory;
 
     private double PlotWidthFt => currentPlot?.WidthFt ?? 60;
     private double PlotHeightFt => currentPlot?.HeightFt ?? 8;

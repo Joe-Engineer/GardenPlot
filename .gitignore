@@ -5,6 +5,9 @@
 [Ll]ogs/
 out/
 
+# User data — never commit local plot library, uploaded images, etc.
+**/App_Data/
+
 # .NET / Aspire / SDK caches
 *.user
 *.userprefs

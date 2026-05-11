@@ -3,6 +3,7 @@
 // </copyright>
 
 using GardenPlotWeb.Components;
+using GardenPlotWeb.Services;
 using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,9 @@ builder.Services.AddRazorComponents()
 
 // Used by the Garden Plot page to look up plant info from Wikipedia.
 builder.Services.AddHttpClient();
+
+// Per-user data root resolver (LocalAppData by default, override with GARDENPLOT_DATA_DIR).
+builder.Services.AddSingleton<DataRootProvider>();
 
 var app = builder.Build();
 
@@ -30,19 +34,17 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
-var tileImageDirectory = Path.Combine(app.Environment.ContentRootPath, "App_Data", "plots", "tile-images");
-Directory.CreateDirectory(tileImageDirectory);
+var dataRoot = app.Services.GetRequiredService<DataRootProvider>();
+
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(tileImageDirectory),
+    FileProvider = new PhysicalFileProvider(dataRoot.TileImagesDirectory),
     RequestPath = "/tile-images",
 });
 
-var plotImageDirectory = Path.Combine(app.Environment.ContentRootPath, "App_Data", "plots", "plot-images");
-Directory.CreateDirectory(plotImageDirectory);
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(plotImageDirectory),
+    FileProvider = new PhysicalFileProvider(dataRoot.PlotImagesDirectory),
     RequestPath = "/plot-images",
 });
 
