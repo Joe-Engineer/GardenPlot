@@ -156,25 +156,40 @@ function openGardenPlotDb() {
 // Durable client storage read. Returns string or null.
 export async function idbGet(key) {
     if (!key) return null;
-    const db = await openGardenPlotDb();
-    return await new Promise((resolve, reject) => {
-        const tx = db.transaction(gpStore, 'readonly');
-        const store = tx.objectStore(gpStore);
-        const req = store.get(key);
-        req.onsuccess = () => resolve(req.result ?? null);
-        req.onerror = () => reject(req.error || new Error('indexedDB get failed'));
-    });
+    try {
+        const db = await openGardenPlotDb();
+        const result = await new Promise((resolve, reject) => {
+            const tx = db.transaction(gpStore, 'readonly');
+            const store = tx.objectStore(gpStore);
+            const req = store.get(key);
+            req.onsuccess = () => resolve(req.result ?? null);
+            req.onerror = () => reject(req.error || new Error('indexedDB get failed'));
+        });
+        const len = typeof result === 'string' ? result.length : (result == null ? 0 : -1);
+        console.log('[gardenplot] idbGet', key, len === 0 ? 'EMPTY' : (len > 0 ? `${len} chars` : 'non-string'));
+        return result;
+    } catch (e) {
+        console.warn('[gardenplot] idbGet failed', key, e);
+        throw e;
+    }
 }
 
 // Durable client storage write.
 export async function idbSet(key, value) {
     if (!key) return;
-    const db = await openGardenPlotDb();
-    await new Promise((resolve, reject) => {
-        const tx = db.transaction(gpStore, 'readwrite');
-        const store = tx.objectStore(gpStore);
-        const req = store.put(value ?? null, key);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error || new Error('indexedDB set failed'));
-    });
+    try {
+        const db = await openGardenPlotDb();
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction(gpStore, 'readwrite');
+            const store = tx.objectStore(gpStore);
+            const req = store.put(value ?? null, key);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error || new Error('indexedDB set failed'));
+        });
+        const len = typeof value === 'string' ? value.length : (value == null ? 0 : -1);
+        console.log('[gardenplot] idbSet', key, len >= 0 ? `${len} chars` : 'non-string');
+    } catch (e) {
+        console.warn('[gardenplot] idbSet failed', key, e);
+        throw e;
+    }
 }

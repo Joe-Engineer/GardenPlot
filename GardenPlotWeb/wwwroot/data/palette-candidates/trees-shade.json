@@ -1,0 +1,368 @@
+{
+  "Category": "trees-shade",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Ginkgo biloba",
+      "Genus": "Ginkgo",
+      "WikidataItem": "http://www.wikidata.org/entity/Q43284",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ginkgo_biloba",
+      "Sitelinks": 95,
+      "CommonNames": [
+        "Maidenhair Tree",
+        "ginkgo"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Populus tremula",
+      "Genus": "Populus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146110",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Populus_tremula",
+      "Sitelinks": 93,
+      "CommonNames": [
+        "Common Aspen",
+        "European aspen",
+        "aspen"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salix alba",
+      "Genus": "Salix",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156918",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salix_alba",
+      "Sitelinks": 82,
+      "CommonNames": [
+        "White Willow",
+        "golden willow"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Fagus sylvatica",
+      "Genus": "Fagus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146149",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Fagus_sylvatica",
+      "Sitelinks": 77,
+      "CommonNames": [
+        "European Beech"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Fraxinus excelsior",
+      "Genus": "Fraxinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156907",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Fraxinus_excelsior",
+      "Sitelinks": 74,
+      "CommonNames": [
+        "European ash",
+        "ash"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Acer pseudoplatanus",
+      "Genus": "Acer",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156944",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Acer_pseudoplatanus",
+      "Sitelinks": 74,
+      "CommonNames": [
+        "sycamore maple",
+        "Sycamore"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Betula pendula",
+      "Genus": "Betula",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156895",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Betula_pendula",
+      "Sitelinks": 71,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Populus nigra",
+      "Genus": "Populus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147064",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Populus_nigra",
+      "Sitelinks": 70,
+      "CommonNames": [
+        "black poplar"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Populus alba",
+      "Genus": "Populus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146269",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Populus_alba",
+      "Sitelinks": 68,
+      "CommonNames": [
+        "White Poplar"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salix caprea",
+      "Genus": "Salix",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159565",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salix_caprea",
+      "Sitelinks": 67,
+      "CommonNames": [
+        "Goat Willow"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salix babylonica",
+      "Genus": "Salix",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156307",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salix_babylonica",
+      "Sitelinks": 66,
+      "CommonNames": [
+        "weeping willow",
+        "Peking Willow"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Acer campestre",
+      "Genus": "Acer",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158785",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Acer_campestre",
+      "Sitelinks": 63,
+      "CommonNames": [
+        "Field Maple"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Tilia cordata",
+      "Genus": "Tilia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158746",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Tilia_cordata",
+      "Sitelinks": 62,
+      "CommonNames": [
+        "Small-leaved Lime"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Acer platanoides",
+      "Genus": "Acer",
+      "WikidataItem": "http://www.wikidata.org/entity/Q26745",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Acer_platanoides",
+      "Sitelinks": 62,
+      "CommonNames": [
+        "norway maple"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carpinus betulus",
+      "Genus": "Carpinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158776",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carpinus_betulus",
+      "Sitelinks": 61,
+      "CommonNames": [
+        "european hornbeam",
+        "Common Hornbeam",
+        "Caucasian Hornbeam",
+        "Hornbeam"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Betula pubescens",
+      "Genus": "Betula",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157624",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Betula_pubescens",
+      "Sitelinks": 60,
+      "CommonNames": [
+        "Mountain Birch",
+        "Downy Birch",
+        "Brown Birch",
+        "White Birch"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ulmus minor",
+      "Genus": "Ulmus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147487",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ulmus_minor",
+      "Sitelinks": 57,
+      "CommonNames": [
+        "Small-leaved Elm"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ulmus glabra",
+      "Genus": "Ulmus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147498",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ulmus_glabra",
+      "Sitelinks": 57,
+      "CommonNames": [
+        "Wych Elm"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Platanus orientalis",
+      "Genus": "Platanus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161105",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Platanus_orientalis",
+      "Sitelinks": 55,
+      "CommonNames": [
+        "Oriental Plane-tree",
+        "Oriental Plane"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Fraxinus ornus",
+      "Genus": "Fraxinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161421",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Fraxinus_ornus",
+      "Sitelinks": 54,
+      "CommonNames": [
+        "Manna Ash"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Celtis australis",
+      "Genus": "Celtis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q255375",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Celtis_australis",
+      "Sitelinks": 51,
+      "CommonNames": [
+        "Nettle Tree"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Acer negundo",
+      "Genus": "Acer",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161166",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Acer_negundo",
+      "Sitelinks": 51,
+      "CommonNames": [
+        "three-leaf maple",
+        "Manitoba Maple",
+        "california boxelder",
+        "Box Elder",
+        "ash-leaf maple",
+        "Boxelder",
+        "western boxelder",
+        "boxelder maple",
+        "box-elder",
+        "ashleaf maple",
+        "ash-leaved maple"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Acer saccharum",
+      "Genus": "Acer",
+      "WikidataItem": "http://www.wikidata.org/entity/Q214733",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Acer_saccharum",
+      "Sitelinks": 50,
+      "CommonNames": [
+        "sugar maple"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Tilia platyphyllos",
+      "Genus": "Tilia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156831",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Tilia_platyphyllos",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "Large-leaved Lime"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salix viminalis",
+      "Genus": "Salix",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158590",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salix_viminalis",
+      "Sitelinks": 48,
+      "CommonNames": [
+        "Osier",
+        "Common osier"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Platanus \u00D7 hispanica",
+      "Genus": "Platanus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161374",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/London_plane",
+      "Sitelinks": 47,
+      "CommonNames": [
+        "London Plane"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Acer rubrum",
+      "Genus": "Acer",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161364",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Acer_rubrum",
+      "Sitelinks": 47,
+      "CommonNames": [
+        "Swamp Maple",
+        "Red Maple"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Gleditsia triacanthos",
+      "Genus": "Gleditsia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157650",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Honey_locust",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "Thornless honey locust",
+        "Honey shuck",
+        "Honey Locust",
+        "honeylocust"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Betula nana",
+      "Genus": "Betula",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157628",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Betula_nana",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "Scrub birch",
+        "Dwarf Birch",
+        "Bog birch",
+        "Arctic dwarf birch",
+        "Swamp birch"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Acer palmatum",
+      "Genus": "Acer",
+      "WikidataItem": "http://www.wikidata.org/entity/Q269224",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Acer_palmatum",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "Japanese maple"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

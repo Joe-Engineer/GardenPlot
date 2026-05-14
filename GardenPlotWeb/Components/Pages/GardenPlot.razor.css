@@ -332,6 +332,25 @@
     margin-top: 0.45rem;
 }
 
+.palette-filter-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+}
+
+.palette-region-select {
+    width: 100%;
+}
+
+.palette-native-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #4a4a4a;
+    user-select: none;
+}
+
 .palette-grid {
     /* min-height: 0 lets this flex child shrink so overflow-y can take effect. */
     flex: 1 1 auto;
@@ -890,3 +909,118 @@
 ::deep .shape.selected {
     filter: drop-shadow(0 0 1px #0d6efd);
 }
+
+/* Plant profile section in the info panel. */
+.plant-profile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.tox-block {
+    margin-top: 0.35rem;
+    padding: 0.35rem 0.45rem;
+    background: #fff8f4;
+    border: 1px solid #e6b8a0;
+    border-radius: 4px;
+}
+
+.tox-rows {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.tox-row {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.05rem 0.4rem 0.05rem 0.25rem;
+    border-radius: 999px;
+    border: 1px solid #d8c8b8;
+    background: #fff;
+}
+
+.tox-row .tox-icon {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.tox-row .tox-no {
+    color: #c92a2a;
+    font-size: 1.1rem;
+    line-height: 1;
+    margin-left: -0.65rem;
+    margin-right: 0.15rem;
+}
+
+.tox-row.tox-mild {
+    background: #fffaf0;
+    border-color: #e7c97e;
+}
+
+.tox-row.tox-moderate {
+    background: #fff1e6;
+    border-color: #e29a55;
+}
+
+.tox-row.tox-severe {
+    background: #fde8e8;
+    border-color: #c92a2a;
+    color: #7a1d1d;
+}
+
+.badge-hardiness {
+    background: #e0eef9;
+    color: #194c7a;
+}
+
+.badge-drought {
+    background: #f6efe0;
+    color: #7a5a1d;
+}
+
+.badge-frost {
+    background: #e8eef7;
+    color: #2a4a7a;
+}
+
+.badge-evergreen {
+    background: #e3f1e3;
+    color: #1f5a26;
+}
+
+.badge-deer,
+.badge-rabbit {
+    background: #efe9f7;
+    color: #4a2a7a;
+}
+
+.badge-warning {
+    background: #fff5d6;
+    color: #7a5a1d;
+    border: 1px solid #e7c97e;
+}
+
+.badge-danger {
+    background: #fde8e8;
+    color: #7a1d1d;
+    border: 1px solid #c92a2a;
+}
+
+/* === Ground cover feature === */
+.ground-cover-controls { display: inline-flex; align-items: center; gap: 0.4rem; margin-left: 0.5rem; padding-left: 0.5rem; border-left: 1px solid #d8d3c5; }
+.ground-cover-controls .btn-group .btn { padding: 0.15rem 0.5rem; font-size: 0.8rem; }
+.ground-cover-info { font-size: 0.85rem; }
+.ground-cover-info .gc-depth-input { width: 5rem; }
+.ground-cover-info select.form-select-sm { max-width: 11rem; }
+
+
+.gc-swatch { display: inline-block; width: 1.1rem; height: 1.1rem; border: 1px solid #888; border-radius: 3px; background-clip: padding-box; vertical-align: middle; }
+.gc-swatch.gc-swatch-sm { width: 0.85rem; height: 0.85rem; }
+.ground-cover-controls .badge { font-size: 0.75rem; }
+
+
+.gc-depth-toolbar { width: 4.5rem; }
+

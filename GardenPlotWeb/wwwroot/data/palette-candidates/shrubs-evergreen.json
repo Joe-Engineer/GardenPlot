@@ -1,0 +1,365 @@
+{
+  "Category": "shrubs-evergreen",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Arctostaphylos uva-ursi",
+      "Genus": "Arctostaphylos",
+      "WikidataItem": "http://www.wikidata.org/entity/Q208032",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Arctostaphylos_uva-ursi",
+      "Sitelinks": 67,
+      "CommonNames": [
+        "red bearberry",
+        "kinnikinnick",
+        "bearberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ilex aquifolium",
+      "Genus": "Ilex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q192190",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ilex_aquifolium",
+      "Sitelinks": 63,
+      "CommonNames": [
+        "English holly",
+        "holly"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Buxus sempervirens",
+      "Genus": "Buxus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q27344",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Buxus_sempervirens",
+      "Sitelinks": 62,
+      "CommonNames": [
+        "Holaaaaaa",
+        "Common Boxwood",
+        "Common Box",
+        "Boxwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ilex paraguariensis",
+      "Genus": "Ilex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q117068",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Yerba_mate",
+      "Sitelinks": 58,
+      "CommonNames": [
+        "Yerba Mat\u00E9",
+        "Yerba mate",
+        "Paraguay tea",
+        "holly",
+        "mate"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Euonymus europaeus",
+      "Genus": "Euonymus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161379",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Euonymus_europaeus",
+      "Sitelinks": 47,
+      "CommonNames": [
+        "Spindleberry",
+        "Spindle tree",
+        "Skewer wood",
+        "European Spindletree",
+        "European spindle-tree",
+        "European spindle tree",
+        "Common spindle tree",
+        "spindletree",
+        "Spindle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ligustrum vulgare",
+      "Genus": "Ligustrum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1848856",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ligustrum_vulgare",
+      "Sitelinks": 47,
+      "CommonNames": [
+        "Wild Privet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mahonia aquifolium",
+      "Genus": "Mahonia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158303",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mahonia_aquifolium",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "tall Oregon-grape",
+        "shining Oregon-grape",
+        "Piper\u0027s Oregon-grape",
+        "Oregongrape",
+        "Oregon Holly Grape",
+        "Oregon Holly",
+        "Oregon Grapeholly",
+        "Oregon Grape",
+        "Hollyleaved barberry",
+        "holly-leaf Oregon-grape"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Arctostaphylos alpina",
+      "Genus": "Arctostaphylos",
+      "WikidataItem": "http://www.wikidata.org/entity/Q548530",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Arctostaphylos_alpina",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "alpine bearberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Euonymus japonicus",
+      "Genus": "Euonymus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161383",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Euonymus_japonicus",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "Japanese spindletree"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aucuba japonica",
+      "Genus": "Aucuba",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163114",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aucuba_japonica",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "Japanese laurel"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ligustrum lucidum",
+      "Genus": "Ligustrum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q732933",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ligustrum_lucidum",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "glossy privet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Gaultheria procumbens",
+      "Genus": "Gaultheria",
+      "WikidataItem": "http://www.wikidata.org/entity/Q386770",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Gaultheria_procumbens",
+      "Sitelinks": 27,
+      "CommonNames": [
+        "eastern teaberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Euonymus verrucosus",
+      "Genus": "Euonymus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163348",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Euonymus_verrucosus",
+      "Sitelinks": 25,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Euonymus alatus",
+      "Genus": "Euonymus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160578",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Euonymus_alatus",
+      "Sitelinks": 24,
+      "CommonNames": [
+        "Winged Spindle",
+        "Winged Euonymus",
+        "burningbush",
+        "Burning Bush"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ligustrum ovalifolium",
+      "Genus": "Ligustrum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1938923",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ligustrum_ovalifolium",
+      "Sitelinks": 24,
+      "CommonNames": [
+        "California privet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pieris japonica",
+      "Genus": "Pieris",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2333372",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pieris_japonica",
+      "Sitelinks": 23,
+      "CommonNames": [
+        "Japanese pieris"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Nandina domestica",
+      "Genus": "Nandina",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1153858",
+      "Sitelinks": 23,
+      "CommonNames": [
+        "sacred bamboo",
+        "Heavenly Bamboo"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ligustrum sinense",
+      "Genus": "Ligustrum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1074201",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ligustrum_sinense",
+      "Sitelinks": 22,
+      "CommonNames": [
+        "Chinese privet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ilex crenata",
+      "Genus": "Ilex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1328685",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ilex_crenata",
+      "Sitelinks": 21,
+      "CommonNames": [
+        "Japanese holly"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Euonymus fortunei",
+      "Genus": "Euonymus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159331",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Euonymus_fortunei",
+      "Sitelinks": 21,
+      "CommonNames": [
+        "Wintercreeper",
+        "winter creeper",
+        "Fortune\u0027s Spindle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ilex guayusa",
+      "Genus": "Ilex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3772280",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ilex_guayusa",
+      "Sitelinks": 19,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ligustrum japonicum",
+      "Genus": "Ligustrum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1209219",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ligustrum_japonicum",
+      "Sitelinks": 19,
+      "CommonNames": [
+        "Japanese privet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Skimmia japonica",
+      "Genus": "Skimmia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159463",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Skimmia_japonica",
+      "Sitelinks": 19,
+      "CommonNames": [
+        "Japanese Skimmia"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Euonymus latifolius",
+      "Genus": "Euonymus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164379",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Euonymus_latifolius",
+      "Sitelinks": 18,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Gaultheria shallon",
+      "Genus": "Gaultheria",
+      "WikidataItem": "http://www.wikidata.org/entity/Q941600",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Gaultheria_shallon",
+      "Sitelinks": 18,
+      "CommonNames": [
+        "salal"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ilex opaca",
+      "Genus": "Ilex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2712730",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ilex_opaca",
+      "Sitelinks": 17,
+      "CommonNames": [
+        "American Holly"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Buxus microphylla",
+      "Genus": "Buxus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q162432",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Buxus_microphylla",
+      "Sitelinks": 17,
+      "CommonNames": [
+        "Littleleaf Boxwood",
+        "Littleleaf Box",
+        "Boxwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ilex vomitoria",
+      "Genus": "Ilex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1010694",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ilex_vomitoria",
+      "Sitelinks": 16,
+      "CommonNames": [
+        "Yaupon Holly",
+        "Yaupon",
+        "Cassina"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ilex canariensis",
+      "Genus": "Ilex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3315524",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ilex_canariensis",
+      "Sitelinks": 16,
+      "CommonNames": [
+        "Small-leaved holly"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Gaultheria mucronata",
+      "Genus": "Gaultheria",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2699200",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Gaultheria_mucronata",
+      "Sitelinks": 16,
+      "CommonNames": [],
+      "NativeRange": []
+    }
+  ]
+}

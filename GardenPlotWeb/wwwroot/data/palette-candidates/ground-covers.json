@@ -1,0 +1,371 @@
+{
+  "Category": "ground-covers",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Cornus mas",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158642",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_mas",
+      "Sitelinks": 73,
+      "CommonNames": [
+        "European cornel",
+        "Cornelian-cherry",
+        "Cornelian cherry dogwood",
+        "cornelian cherry",
+        "dogwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Galium odoratum",
+      "Genus": "Galium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161090",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Galium_odoratum",
+      "Sitelinks": 59,
+      "CommonNames": [
+        "sweetscented bedstraw",
+        "woodruff"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Galium verum",
+      "Genus": "Galium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156854",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Galium_verum",
+      "Sitelinks": 58,
+      "CommonNames": [
+        "Lady\u0027s Bedstraw"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vinca minor",
+      "Genus": "Vinca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161777",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vinca_minor",
+      "Sitelinks": 58,
+      "CommonNames": [
+        "small periwinkle",
+        "Lesser Periwinkle",
+        "dwarf periwinkle",
+        "creeping myrtle",
+        "Common Periwinkle",
+        "periwinkle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lysimachia arvensis",
+      "Genus": "Lysimachia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q21327968",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lysimachia_arvensis",
+      "Sitelinks": 56,
+      "CommonNames": [
+        "scarlet pimpernel"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus sanguinea",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161416",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_sanguinea",
+      "Sitelinks": 54,
+      "CommonNames": [
+        "bloodtwig dogwood",
+        "dogwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Galium aparine",
+      "Genus": "Galium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161581",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Galium_aparine",
+      "Sitelinks": 51,
+      "CommonNames": [
+        "stickywilly",
+        "Goosegrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sedum acre",
+      "Genus": "Sedum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156823",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sedum_acre",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "goldmoss stonecrop",
+        "Biting Stonecrop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Asarum europaeum",
+      "Genus": "Asarum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156853",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Asarum_europaeum",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "European wild ginger"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ajuga reptans",
+      "Genus": "Ajuga",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157249",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ajuga_reptans",
+      "Sitelinks": 44,
+      "CommonNames": [
+        "Bugle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vinca major",
+      "Genus": "Vinca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161746",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vinca_major",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "Greater Periwinkle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus alba",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158228",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_alba",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "White Dogwood",
+        "Siberian Dogwood",
+        "Red-Barked Dogwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lysimachia vulgaris",
+      "Genus": "Lysimachia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147843",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lysimachia_vulgaris",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "Yellow Loosestrife",
+        "garden yellow loosestrife"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sedum album",
+      "Genus": "Sedum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q253636",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sedum_album",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "White Stonecrop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lysimachia nummularia",
+      "Genus": "Lysimachia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147305",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lysimachia_nummularia",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "twopenny thot",
+        "twopenny grass",
+        "moneywort",
+        "herb twopence",
+        "Creeping-Jenny",
+        "creeping Jenny"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ajuga pyramidalis",
+      "Genus": "Ajuga",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159714",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ajuga_pyramidalis",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "Pyramidal Bugle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Galium palustre",
+      "Genus": "Galium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159757",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Galium_palustre",
+      "Sitelinks": 33,
+      "CommonNames": [
+        "marsh-bedstraw",
+        "Common Marsh-bedstraw"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ajuga genevensis",
+      "Genus": "Ajuga",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158548",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ajuga_genevensis",
+      "Sitelinks": 33,
+      "CommonNames": [
+        "upright bugle",
+        "Geneva bugleweed",
+        "Geneva Bugle",
+        "blue bugleweed",
+        "blue bugle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lysimachia europaea",
+      "Genus": "Lysimachia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q50346430",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lysimachia_europaea",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "Chickweed-wintergreen"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lysimachia maritima",
+      "Genus": "Lysimachia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2720092",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lysimachia_maritima",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "Sea-milkwort"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus suecica",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157677",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_suecica",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Lapland cornel",
+        "Eurasian Dwarf Cornel",
+        "dwarf cornel",
+        "Bunchberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus florida",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q887221",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_florida",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "flowering dogwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus canadensis",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1420828",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_canadensis",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Canadian Bunchberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Phlox paniculata",
+      "Genus": "Phlox",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164553",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Phlox_paniculata",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "fall phlox"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Galium boreale",
+      "Genus": "Galium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158947",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Galium_boreale",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "Northern bedstraw"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Galium mollugo",
+      "Genus": "Galium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159744",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Galium_mollugo",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "White bedstraw",
+        "hedge-bedstraw",
+        "hedge bedstraw",
+        "false baby\u0027s breath"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ajuga chamaepitys",
+      "Genus": "Ajuga",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158310",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ajuga_chamaepitys",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "Ground-pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus sericea",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164130",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_sericea",
+      "Sitelinks": 27,
+      "CommonNames": [
+        "redosier dogwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lysimachia thyrsiflora",
+      "Genus": "Lysimachia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158347",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lysimachia_thyrsiflora",
+      "Sitelinks": 27,
+      "CommonNames": [
+        "Tufted Loosestrife"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Galium spurium",
+      "Genus": "Galium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159316",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Galium_spurium",
+      "Sitelinks": 26,
+      "CommonNames": [
+        "stickwilly",
+        "Marin County bedstraw",
+        "False Cleavers"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

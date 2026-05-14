@@ -1,0 +1,347 @@
+{
+  "Category": "trees-evergreen",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Taxus baccata",
+      "Genus": "Taxus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q179729",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Taxus_baccata",
+      "Sitelinks": 81,
+      "CommonNames": [
+        "European Yew",
+        "Common Yew",
+        "yew"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Picea abies",
+      "Genus": "Picea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q145992",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Picea_abies",
+      "Sitelinks": 81,
+      "CommonNames": [
+        "Norway Spruce"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sequoia sempervirens",
+      "Genus": "Sequoia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q150129",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sequoia_sempervirens",
+      "Sitelinks": 75,
+      "CommonNames": [
+        "Coast Redwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Abies alba",
+      "Genus": "Abies",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146992",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Abies_alba",
+      "Sitelinks": 71,
+      "CommonNames": [
+        "Silver Fir"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sequoiadendron giganteum",
+      "Genus": "Sequoiadendron",
+      "WikidataItem": "http://www.wikidata.org/entity/Q149851",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sequoiadendron_giganteum",
+      "Sitelinks": 70,
+      "CommonNames": [
+        "Giant Sequoia"
+      ],
+      "NativeRange": [
+        "California"
+      ]
+    },
+    {
+      "ScientificName": "Cedrus libani",
+      "Genus": "Cedrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q61105",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cedrus_libani",
+      "Sitelinks": 69,
+      "CommonNames": [
+        "Lebanon Cedar",
+        "Cedar of Lebanon"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cedrus deodara",
+      "Genus": "Cedrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146935",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cedrus_deodara",
+      "Sitelinks": 67,
+      "CommonNames": [
+        "Deodar Cedar"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus pinea",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q106094",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Stone_pine",
+      "Sitelinks": 62,
+      "CommonNames": [
+        "Stone Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Larix decidua",
+      "Genus": "Larix",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146048",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Larix_decidua",
+      "Sitelinks": 60,
+      "CommonNames": [
+        "European Larch"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cupressus sempervirens",
+      "Genus": "Cupressus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147513",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cupressus_sempervirens",
+      "Sitelinks": 56,
+      "CommonNames": [
+        "Mediterranean Cypress"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Thuja occidentalis",
+      "Genus": "Thuja",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147468",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Thuja_occidentalis",
+      "Sitelinks": 55,
+      "CommonNames": [
+        "Northern Whitecedar"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cryptomeria japonica",
+      "Genus": "Cryptomeria",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147388",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cryptomeria",
+      "Sitelinks": 55,
+      "CommonNames": [
+        "Sugi"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Picea omorika",
+      "Genus": "Picea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147824",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Picea_omorika",
+      "Sitelinks": 54,
+      "CommonNames": [
+        "Serbian Spruce"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Picea pungens",
+      "Genus": "Picea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146025",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Blue_spruce",
+      "Sitelinks": 54,
+      "CommonNames": [
+        "Blue Spruce"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cedrus atlantica",
+      "Genus": "Cedrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q623489",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cedrus_atlantica",
+      "Sitelinks": 53,
+      "CommonNames": [
+        "Atlas Cedar",
+        "Atlantic cedar"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus pinaster",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q271582",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_pinaster",
+      "Sitelinks": 53,
+      "CommonNames": [
+        "Maritime Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pseudotsuga menziesii",
+      "Genus": "Pseudotsuga",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156687",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Douglas_fir",
+      "Sitelinks": 51,
+      "CommonNames": [
+        "Douglas-fir"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Abies nordmanniana",
+      "Genus": "Abies",
+      "WikidataItem": "http://www.wikidata.org/entity/Q148920",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Abies_nordmanniana",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "Caucasian Fir"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Picea sitchensis",
+      "Genus": "Picea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147426",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Picea_sitchensis",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "Sitka Spruce"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Thuja plicata",
+      "Genus": "Thuja",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147417",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Thuja_plicata",
+      "Sitelinks": 48,
+      "CommonNames": [
+        "Western Redcedar"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus strobus",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157230",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_strobus",
+      "Sitelinks": 48,
+      "CommonNames": [
+        "Eastern White Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus sibirica",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q774829",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_sibirica",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "Siberian Stone Pine",
+        "Siberian Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Abies balsamea",
+      "Genus": "Abies",
+      "WikidataItem": "http://www.wikidata.org/entity/Q428023",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Abies_balsamea",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "Balsam Fir"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Abies concolor",
+      "Genus": "Abies",
+      "WikidataItem": "http://www.wikidata.org/entity/Q145939",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Abies_concolor",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "White Fir"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus heldreichii",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q460531",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_heldreichii",
+      "Sitelinks": 44,
+      "CommonNames": [
+        "Bosnian Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus pumila",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q243964",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_pumila",
+      "Sitelinks": 44,
+      "CommonNames": [
+        "Dwarf Stone Pine",
+        "Dwarf Siberian Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus wallichiana",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q747652",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_wallichiana",
+      "Sitelinks": 44,
+      "CommonNames": [
+        "Blue Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Larix kaempferi",
+      "Genus": "Larix",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147439",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Larix_kaempferi",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "Japanese Larch"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Chamaecyparis lawsoniana",
+      "Genus": "Chamaecyparis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161360",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Chamaecyparis_lawsoniana",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "Lawson\u0027s Cypress"
+      ],
+      "NativeRange": [
+        "United States"
+      ]
+    },
+    {
+      "ScientificName": "Picea glauca",
+      "Genus": "Picea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q128116",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Picea_glauca",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "White Spruce"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

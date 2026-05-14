@@ -1,0 +1,364 @@
+{
+  "Category": "flowers-perennial",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Salvia rosmarinus",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q102240169",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosemary",
+      "Sitelinks": 114,
+      "CommonNames": [
+        "Rosemary"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Achillea millefolium",
+      "Genus": "Achillea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q25408",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Achillea_millefolium",
+      "Sitelinks": 95,
+      "CommonNames": [
+        "common yarrow",
+        "Milfoil",
+        "Yarrow"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Dianthus caryophyllus",
+      "Genus": "Dianthus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158984",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Dianthus_caryophyllus",
+      "Sitelinks": 78,
+      "CommonNames": [
+        "Clove Pink",
+        "carnation"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia officinalis",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1111359",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_officinalis",
+      "Sitelinks": 76,
+      "CommonNames": [
+        "kitchen sage",
+        "common sage",
+        "Sage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Nepeta cataria",
+      "Genus": "Nepeta",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161139",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Catnip",
+      "Sitelinks": 60,
+      "CommonNames": [
+        "or catmint",
+        "catswort",
+        "Catnip"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lavandula angustifolia",
+      "Genus": "Lavandula",
+      "WikidataItem": "http://www.wikidata.org/entity/Q42081",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lavandula_angustifolia",
+      "Sitelinks": 59,
+      "CommonNames": [
+        "English lavender",
+        "English Lavendar",
+        "Lavender"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia hispanica",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1071585",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_hispanica",
+      "Sitelinks": 56,
+      "CommonNames": [
+        "Spanish sage",
+        "chia sage",
+        "chia"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Geranium robertianum",
+      "Genus": "Geranium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160096",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Geranium_robertianum",
+      "Sitelinks": 52,
+      "CommonNames": [
+        "Herb-Robert"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Geum urbanum",
+      "Genus": "Geum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157407",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Geum_urbanum",
+      "Sitelinks": 51,
+      "CommonNames": [
+        "Wood Avens",
+        "herb bennet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sedum acre",
+      "Genus": "Sedum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156823",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sedum_acre",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "goldmoss stonecrop",
+        "Biting Stonecrop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Dianthus barbatus",
+      "Genus": "Dianthus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161745",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Dianthus_barbatus",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "sweetwilliam"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aquilegia vulgaris",
+      "Genus": "Aquilegia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q148929",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aquilegia_vulgaris",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "Columbine"
+      ],
+      "NativeRange": [
+        "Eurasia"
+      ]
+    },
+    {
+      "ScientificName": "Geranium sylvaticum",
+      "Genus": "Geranium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161644",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Geranium_sylvaticum",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "Wood Crane\u0027s-bill"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia divinorum",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q320584",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_divinorum",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "yerba de la pastora"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia sclarea",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157872",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_sclarea",
+      "Sitelinks": 43,
+      "CommonNames": [
+        "European sage",
+        "Europe sage",
+        "clary sage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia pratensis",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161772",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_pratensis",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "meadow clary",
+        "introduced sage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Geum rivale",
+      "Genus": "Geum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161625",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Geum_rivale",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "Water Avens",
+        "purple avens"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Echinacea purpurea",
+      "Genus": "Echinacea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q272661",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Echinacea_purpurea",
+      "Sitelinks": 40,
+      "CommonNames": [
+        "purple-coneflower",
+        "eastern purple-coneflower",
+        "eastern purple coneflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lupinus polyphyllus",
+      "Genus": "Lupinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159737",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lupinus_polyphyllus",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "many-leaved lupine",
+        "large-leaved lupine",
+        "garden lupin",
+        "bigleaf lupine",
+        "big-leaved lupine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Geranium pratense",
+      "Genus": "Geranium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157585",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Geranium_pratense",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "Meadow Crane\u0027s-bill"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Geranium sanguineum",
+      "Genus": "Geranium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158387",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Geranium_sanguineum",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "Bloody Crane\u0027s-bill"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lupinus albus",
+      "Genus": "Lupinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161372",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lupinus_albus",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "White Lupin"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lavandula stoechas",
+      "Genus": "Lavandula",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1342976",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lavandula_stoechas",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "French lavender"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Paeonia officinalis",
+      "Genus": "Paeonia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159738",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Paeonia_officinalis",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "Common Peony"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Geranium molle",
+      "Genus": "Geranium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164017",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Geranium_molle",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "Dove\u0027s-foot Crane\u0027s-bill"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sedum album",
+      "Genus": "Sedum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q253636",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sedum_album",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "White Stonecrop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Achillea ptarmica",
+      "Genus": "Achillea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1335122",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Achillea_ptarmica",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "Sneezewort Yarrow",
+        "Sneezewort",
+        "Sneezeweed"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Dianthus superbus",
+      "Genus": "Dianthus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161878",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Dianthus_superbus",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "fringed pink"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia splendens",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161080",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_splendens",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "scarlet sage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Hemerocallis fulva",
+      "Genus": "Hemerocallis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1424440",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Hemerocallis_fulva",
+      "Sitelinks": 34,
+      "CommonNames": [
+        "orange daylily"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

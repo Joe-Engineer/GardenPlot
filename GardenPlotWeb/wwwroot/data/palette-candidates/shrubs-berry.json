@@ -1,0 +1,375 @@
+{
+  "Category": "shrubs-berry",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Ribes uva-crispa",
+      "Genus": "Ribes",
+      "WikidataItem": "http://www.wikidata.org/entity/Q41503",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ribes_uva-crispa",
+      "Sitelinks": 100,
+      "CommonNames": [
+        "European gooseberry",
+        "Gooseberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rubus idaeus",
+      "Genus": "Rubus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q12252383",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rubus_idaeus",
+      "Sitelinks": 97,
+      "CommonNames": [
+        "Raspberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vaccinium vitis-idaea",
+      "Genus": "Vaccinium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q93235",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vaccinium_vitis-idaea",
+      "Sitelinks": 97,
+      "CommonNames": [
+        "Cowberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ribes nigrum",
+      "Genus": "Ribes",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146604",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Blackcurrant",
+      "Sitelinks": 90,
+      "CommonNames": [
+        "European black currant",
+        "black currant"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ribes rubrum",
+      "Genus": "Ribes",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146661",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Redcurrant",
+      "Sitelinks": 83,
+      "CommonNames": [
+        "Redcurrant",
+        "Red Currant",
+        "cultivated currant"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sambucus nigra",
+      "Genus": "Sambucus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q22701",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sambucus_nigra",
+      "Sitelinks": 82,
+      "CommonNames": [
+        "black elderberry",
+        "Elder"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rubus chamaemorus",
+      "Genus": "Rubus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160092",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rubus_chamaemorus",
+      "Sitelinks": 65,
+      "CommonNames": [
+        "four-leaved mare\u0027s tail",
+        "baked apple berry",
+        "salmonberry",
+        "cloudberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rubus saxatilis",
+      "Genus": "Rubus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158569",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rubus_saxatilis",
+      "Sitelinks": 54,
+      "CommonNames": [
+        "Stone Bramble"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sambucus ebulus",
+      "Genus": "Sambucus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158515",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sambucus_ebulus",
+      "Sitelinks": 51,
+      "CommonNames": [
+        "Dwarf Elder"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sambucus racemosa",
+      "Genus": "Sambucus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157276",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sambucus_racemosa",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "Red-berried Elder"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lycium barbarum",
+      "Genus": "Lycium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q196332",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lycium_barbarum",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "matrimony vine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rubus fruticosus",
+      "Genus": "Rubus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q13541716",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rubus_fruticosus",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "shrubby blackberry",
+        "blackberry, bramble"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera caprifolium",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158538",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_caprifolium",
+      "Sitelinks": 44,
+      "CommonNames": [
+        "Perfoliate Honeysuckle",
+        "Italian Woodbine",
+        "Italian Honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera japonica",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161083",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_japonica",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "Japanese honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aronia melanocarpa",
+      "Genus": "Aronia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q162774",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aronia_melanocarpa",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "Black Chokeberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera caerulea",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157699",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_caerulea",
+      "Sitelinks": 40,
+      "CommonNames": [
+        "sweetberry honeysuckle",
+        "deepblue honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera periclymenum",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161584",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_periclymenum",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "European honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera xylosteum",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q162760",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_xylosteum",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "fly honeysuckle",
+        "dwarf honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ribes alpinum",
+      "Genus": "Ribes",
+      "WikidataItem": "http://www.wikidata.org/entity/Q149260",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ribes_alpinum",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "Mountain Currant",
+        "alpine currant"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Amelanchier ovalis",
+      "Genus": "Amelanchier",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159560",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Amelanchier_ovalis",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "Snowy Mespilus"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rubus arcticus",
+      "Genus": "Rubus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q210330",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rubus_arcticus",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "arctic raspberry",
+        "arctic blackberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mahonia aquifolium",
+      "Genus": "Mahonia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158303",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mahonia_aquifolium",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "tall Oregon-grape",
+        "shining Oregon-grape",
+        "Piper\u0027s Oregon-grape",
+        "Oregongrape",
+        "Oregon Holly Grape",
+        "Oregon Holly",
+        "Oregon Grapeholly",
+        "Oregon Grape",
+        "Hollyleaved barberry",
+        "holly-leaf Oregon-grape"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ribes sanguineum",
+      "Genus": "Ribes",
+      "WikidataItem": "http://www.wikidata.org/entity/Q149372",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ribes_sanguineum",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "redflower currant",
+        "Red Flowering Currant"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lycium chinense",
+      "Genus": "Lycium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q141303",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lycium_chinense",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "Chinese desert-thorn"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ribes aureum",
+      "Genus": "Ribes",
+      "WikidataItem": "http://www.wikidata.org/entity/Q149376",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ribes_aureum",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "golden currant"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ribes petraeum",
+      "Genus": "Ribes",
+      "WikidataItem": "http://www.wikidata.org/entity/Q149775",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ribes_petraeum",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "Rock Red Currant",
+        "currant"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Amelanchier alnifolia",
+      "Genus": "Amelanchier",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164158",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Amelanchier_alnifolia",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "Saskatoon Serviceberry",
+        "Cusick\u0027s serviceberry",
+        "Serviceberry",
+        "Saskatoon"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rubus spectabilis",
+      "Genus": "Rubus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158361",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rubus_spectabilis",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "salmonberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera tatarica",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158546",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_tatarica",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "Tatarian honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Amelanchier canadensis",
+      "Genus": "Amelanchier",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159030",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Amelanchier_canadensis",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "thicket serviceberry",
+        "swamp shadbush",
+        "Shadblow Serviceberry",
+        "Eastern Serviceberry",
+        "Canadian Serviceberry",
+        "Canada serviceberry",
+        "Shadbush",
+        "shadblow",
+        "Juneberry",
+        "serviceberry"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

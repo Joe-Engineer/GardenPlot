@@ -1,0 +1,352 @@
+{
+  "Category": "grasses-turf",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Lolium perenne",
+      "Genus": "Lolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161722",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_perenne",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "perennial ryegrass",
+        "perennial rye-grass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lolium temulentum",
+      "Genus": "Lolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q162088",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_temulentum",
+      "Sitelinks": 48,
+      "CommonNames": [
+        "Darnel ryegrass",
+        "darnel"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Poa pratensis",
+      "Genus": "Poa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147783",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Poa_pratensis",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "smooth meadow-grass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lolium multiflorum",
+      "Genus": "Lolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157883",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_multiflorum",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "Italian Rye Grass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca ovina",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157885",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Festuca_ovina",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "Sheep\u0027s Fescue",
+        "sheep fescue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca rubra",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159702",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Festuca_rubra",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "red fescue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Poa annua",
+      "Genus": "Poa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157571",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Poa_annua",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "annual meadow-grass",
+        "Annual Meadow Grass",
+        "annual bluegrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lolium arundinaceum",
+      "Genus": "Lolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q50346809",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_arundinaceum",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "Tall fescue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca pratensis",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161791",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_pratense",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "meadow fescue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Agrostis stolonifera",
+      "Genus": "Agrostis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163963",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Agrostis_stolonifera",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "Spreading Bent",
+        "creeping bentgrass",
+        "creeping bent, fiorin",
+        "Creeping Bent Grass",
+        "Creeping Bent",
+        "Fiorin"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Agrostis gigantea",
+      "Genus": "Agrostis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q27835",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Agrostis_gigantea",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "redtop",
+        "black bent"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Poa nemoralis",
+      "Genus": "Poa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158894",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Poa_nemoralis",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "wood bluegrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Poa trivialis",
+      "Genus": "Poa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159118",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Poa_trivialis",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "rough bluegrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Agrostis capillaris",
+      "Genus": "Agrostis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159717",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Agrostis_capillaris",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Common bent",
+        "Colonial bentgrass",
+        "Colonial bent(grass)"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Agrostis canina",
+      "Genus": "Agrostis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159182",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Agrostis_canina",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "velvet bentgrass",
+        "Velvet bent",
+        "Brown bent"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Poa bulbosa",
+      "Genus": "Poa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159237",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Poa_bulbosa",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "bulbous bluegrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Poa alpina",
+      "Genus": "Poa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q162524",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Poa_alpina",
+      "Sitelinks": 26,
+      "CommonNames": [
+        "alpine bluegrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Poa palustris",
+      "Genus": "Poa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161286",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Poa_palustris",
+      "Sitelinks": 25,
+      "CommonNames": [
+        "fowl bluegrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Poa compressa",
+      "Genus": "Poa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159258",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Poa_compressa",
+      "Sitelinks": 25,
+      "CommonNames": [
+        "Canada bluegrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca altissima",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159783",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Festuca_altissima",
+      "Sitelinks": 24,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca gigantea",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159968",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_giganteum",
+      "Sitelinks": 24,
+      "CommonNames": [
+        "Giant Fescue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Paspalum scrobiculatum",
+      "Genus": "Paspalum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3510828",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Paspalum_scrobiculatum",
+      "Sitelinks": 22,
+      "CommonNames": [
+        "kodomillet",
+        "Kodo Millet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca heterophylla",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q165092",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Festuca_heterophylla",
+      "Sitelinks": 21,
+      "CommonNames": [
+        "variousleaf fescue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lolium rigidum",
+      "Genus": "Lolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3156354",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_rigidum",
+      "Sitelinks": 21,
+      "CommonNames": [
+        "Wimmera ryegrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca valesiaca",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163349",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Festuca_valesiaca",
+      "Sitelinks": 20,
+      "CommonNames": [
+        "Volga fescue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca amethystina",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159265",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Festuca_amethystina",
+      "Sitelinks": 19,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lolium remotum",
+      "Genus": "Lolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159830",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_remotum",
+      "Sitelinks": 19,
+      "CommonNames": [
+        "flax darnel"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Agrostis vinealis",
+      "Genus": "Agrostis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q162321",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Agrostis_vinealis",
+      "Sitelinks": 19,
+      "CommonNames": [
+        "brown bent",
+        "brown bentgrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Paspalum distichum",
+      "Genus": "Paspalum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q276897",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Paspalum_distichum",
+      "Sitelinks": 19,
+      "CommonNames": [
+        "Water Couch",
+        "Mercer Grass",
+        "Couch Paspalum",
+        "Buffalo Quick Paspalum",
+        "Knotgrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca glauca",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q944944",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Festuca_glauca",
+      "Sitelinks": 18,
+      "CommonNames": [],
+      "NativeRange": []
+    }
+  ]
+}

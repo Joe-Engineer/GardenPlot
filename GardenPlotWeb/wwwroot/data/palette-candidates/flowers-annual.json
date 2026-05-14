@@ -1,0 +1,375 @@
+{
+  "Category": "flowers-annual",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Helianthus annuus",
+      "Genus": "Helianthus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q171497",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Common_sunflower",
+      "Sitelinks": 138,
+      "CommonNames": [
+        "Common Sunflower",
+        "sunflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia rosmarinus",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q102240169",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosemary",
+      "Sitelinks": 114,
+      "CommonNames": [
+        "Rosemary"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Papaver somniferum",
+      "Genus": "Papaver",
+      "WikidataItem": "http://www.wikidata.org/entity/Q131584",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Papaver_somniferum",
+      "Sitelinks": 94,
+      "CommonNames": [
+        "Opium Poppy"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Helianthus tuberosus",
+      "Genus": "Helianthus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146190",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Jerusalem_artichoke",
+      "Sitelinks": 91,
+      "CommonNames": [
+        "Jerusalem artichoke"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Papaver rhoeas",
+      "Genus": "Papaver",
+      "WikidataItem": "http://www.wikidata.org/entity/Q130201",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Papaver_rhoeas",
+      "Sitelinks": 89,
+      "CommonNames": [
+        "Common Poppy",
+        "corn poppy"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Nigella sativa",
+      "Genus": "Nigella",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160575",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Nigella_sativa",
+      "Sitelinks": 82,
+      "CommonNames": [
+        "black onion seed",
+        "black caraway",
+        "black cumin"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Centaurea cyanus",
+      "Genus": "Centaurea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156921",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Centaurea_cyanus",
+      "Sitelinks": 79,
+      "CommonNames": [
+        "Cornflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia officinalis",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1111359",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_officinalis",
+      "Sitelinks": 76,
+      "CommonNames": [
+        "kitchen sage",
+        "common sage",
+        "Sage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Viola tricolor",
+      "Genus": "Viola",
+      "WikidataItem": "http://www.wikidata.org/entity/Q190326",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Viola_tricolor",
+      "Sitelinks": 66,
+      "CommonNames": [
+        "wild pansy",
+        "Three-colored Violet",
+        "pansy violet",
+        "Johnny-jump-up",
+        "johnny jumpup",
+        "pansy"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Viola odorata",
+      "Genus": "Viola",
+      "WikidataItem": "http://www.wikidata.org/entity/Q108684",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Viola_odorata",
+      "Sitelinks": 65,
+      "CommonNames": [
+        "wood violet",
+        "Sweet Violet",
+        "garden violet",
+        "florist\u0027s violet",
+        "English violet",
+        "common violet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia hispanica",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1071585",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_hispanica",
+      "Sitelinks": 56,
+      "CommonNames": [
+        "Spanish sage",
+        "chia sage",
+        "chia"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Tagetes erecta",
+      "Genus": "Tagetes",
+      "WikidataItem": "http://www.wikidata.org/entity/Q759876",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Tagetes_erecta",
+      "Sitelinks": 53,
+      "CommonNames": [
+        "Aztec marigold"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Tropaeolum majus",
+      "Genus": "Tropaeolum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156288",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Tropaeolum_majus",
+      "Sitelinks": 53,
+      "CommonNames": [
+        "Monks Cress",
+        "Indian Cress",
+        "Garden Nasturtium",
+        "nasturtium"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Impatiens balsamina",
+      "Genus": "Impatiens",
+      "WikidataItem": "http://www.wikidata.org/entity/Q845019",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Impatiens_balsamina",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "spotted snapweed"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Viola \u00D7wittrockiana",
+      "Genus": "Viola",
+      "WikidataItem": "http://www.wikidata.org/entity/Q12861234",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pansy",
+      "Sitelinks": 46,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia divinorum",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q320584",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_divinorum",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "yerba de la pastora"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Antirrhinum majus",
+      "Genus": "Antirrhinum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156843",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Antirrhinum_majus",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "garden snapdragon",
+        "Common snapdragon; garden snapdragon; snapdragon"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Viola arvensis",
+      "Genus": "Viola",
+      "WikidataItem": "http://www.wikidata.org/entity/Q341680",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Viola_arvensis",
+      "Sitelinks": 43,
+      "CommonNames": [
+        "Field Pansy"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia sclarea",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157872",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_sclarea",
+      "Sitelinks": 43,
+      "CommonNames": [
+        "European sage",
+        "Europe sage",
+        "clary sage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia pratensis",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161772",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_pratensis",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "meadow clary",
+        "introduced sage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Impatiens noli-tangere",
+      "Genus": "Impatiens",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158748",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Impatiens_noli-tangere",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "Yellow Balsam",
+        "Wild Balsam",
+        "western jewel-weed",
+        "Touch-me-not Balsam",
+        "Jewelweed",
+        "Touch-me-not"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Viola riviniana",
+      "Genus": "Viola",
+      "WikidataItem": "http://www.wikidata.org/entity/Q74174",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Viola_riviniana",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "common dog-violet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Centaurea jacea",
+      "Genus": "Centaurea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1130177",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Centaurea_jacea",
+      "Sitelinks": 40,
+      "CommonNames": [
+        "hardheads",
+        "common knapweed",
+        "brownray knapweed",
+        "brown-rayed knapweed",
+        "brown-ray knapweed",
+        "brown knapweed"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Impatiens glandulifera",
+      "Genus": "Impatiens",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158035",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Impatiens_glandulifera",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "Himalayan Balsam"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Nigella damascena",
+      "Genus": "Nigella",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158338",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Nigella_damascena",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "love-in-a-mist",
+        "love in a mist",
+        "Devil-in-the-bush",
+        "devil in the bush"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Tagetes patula",
+      "Genus": "Tagetes",
+      "WikidataItem": "http://www.wikidata.org/entity/Q644934",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Tagetes_patula",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "French marigold"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cosmos bipinnatus",
+      "Genus": "Cosmos",
+      "WikidataItem": "http://www.wikidata.org/entity/Q575748",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cosmos_bipinnatus",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "garden cosmos"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Viola reichenbachiana",
+      "Genus": "Viola",
+      "WikidataItem": "http://www.wikidata.org/entity/Q594058",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Viola_reichenbachiana",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "early dog-violet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Viola palustris",
+      "Genus": "Viola",
+      "WikidataItem": "http://www.wikidata.org/entity/Q628878",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Viola_palustris",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "marsh violet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Viola canina",
+      "Genus": "Viola",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1333239",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Viola_canina",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "heath violet",
+        "heath dog-violet",
+        "dog violet"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

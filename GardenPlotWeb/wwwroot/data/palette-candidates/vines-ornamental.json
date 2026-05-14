@@ -1,0 +1,338 @@
+{
+  "Category": "vines-ornamental",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Polygonum aviculare",
+      "Genus": "Polygonum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q242573",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Polygonum_aviculare",
+      "Sitelinks": 64,
+      "CommonNames": [
+        "Yard Knotweed",
+        "prostrate knotweed",
+        "knotgrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Clematis vitalba",
+      "Genus": "Clematis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160100",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Clematis_vitalba",
+      "Sitelinks": 53,
+      "CommonNames": [
+        "Traveller\u0027s-joy"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Parthenocissus quinquefolia",
+      "Genus": "Parthenocissus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157968",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Parthenocissus_quinquefolia",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "Virginia creeper"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera caprifolium",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158538",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_caprifolium",
+      "Sitelinks": 44,
+      "CommonNames": [
+        "Perfoliate Honeysuckle",
+        "Italian Woodbine",
+        "Italian Honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aristolochia clematitis",
+      "Genus": "Aristolochia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158273",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aristolochia_clematitis",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "Birthwort"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera japonica",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161083",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_japonica",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "Japanese honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera caerulea",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157699",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_caerulea",
+      "Sitelinks": 40,
+      "CommonNames": [
+        "sweetberry honeysuckle",
+        "deepblue honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera periclymenum",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161584",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_periclymenum",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "European honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera xylosteum",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q162760",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_xylosteum",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "fly honeysuckle",
+        "dwarf honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Wisteria sinensis",
+      "Genus": "Wisteria",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159116",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Wisteria_sinensis",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "Chinese wisteria"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Akebia quinata",
+      "Genus": "Akebia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1482093",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Akebia_quinata",
+      "Sitelinks": 34,
+      "CommonNames": [
+        "Fiveleaf Akebia",
+        "Five-leaf Akebia",
+        "chocolate vine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Campsis radicans",
+      "Genus": "Campsis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q468778",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Campsis_radicans",
+      "Sitelinks": 33,
+      "CommonNames": [
+        "trumpet creeper"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Parthenocissus tricuspidata",
+      "Genus": "Parthenocissus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157979",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Parthenocissus_tricuspidata",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "Japanese Creeper"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera tatarica",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158546",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_tatarica",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "Tatarian honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Clematis alpina",
+      "Genus": "Clematis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157768",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Clematis_alpina",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "siberian clematis",
+        "alpine clematis"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Clematis flammula",
+      "Genus": "Clematis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q909197",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Clematis_flammula",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "fragrant clematis"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Parthenocissus inserta",
+      "Genus": "Parthenocissus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q18200021",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Parthenocissus_inserta",
+      "Sitelinks": 25,
+      "CommonNames": [
+        "Thicket Creeper",
+        "false virginia creeper"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Celastrus orbiculatus",
+      "Genus": "Celastrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q259033",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Celastrus_orbiculatus",
+      "Sitelinks": 24,
+      "CommonNames": [
+        "Oriental bittersweet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Campsis grandiflora",
+      "Genus": "Campsis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1192466",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Campsis_grandiflora",
+      "Sitelinks": 24,
+      "CommonNames": [
+        "Chinese Trumpet Vine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Clematis recta",
+      "Genus": "Clematis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157887",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Clematis_recta",
+      "Sitelinks": 24,
+      "CommonNames": [
+        "ground virginsbower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Wisteria floribunda",
+      "Genus": "Wisteria",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1329209",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Wisteria_floribunda",
+      "Sitelinks": 24,
+      "CommonNames": [
+        "Japanese wisteria"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera nigra",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163141",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_nigra",
+      "Sitelinks": 23,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera etrusca",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2339065",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_etrusca",
+      "Sitelinks": 22,
+      "CommonNames": [
+        "Etruscan honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera alpigena",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159411",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_alpigena",
+      "Sitelinks": 22,
+      "CommonNames": [
+        "alpine honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Celastrus paniculatus",
+      "Genus": "Celastrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1027724",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Celastrus_paniculatus",
+      "Sitelinks": 21,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Clematis montana",
+      "Genus": "Clematis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164485",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Clematis_montana",
+      "Sitelinks": 21,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Clematis cirrhosa",
+      "Genus": "Clematis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2713360",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Clematis_cirrhosa",
+      "Sitelinks": 20,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera involucrata",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q785106",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_involucrata",
+      "Sitelinks": 19,
+      "CommonNames": [
+        "twinberry honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera maackii",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1076276",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_maackii",
+      "Sitelinks": 19,
+      "CommonNames": [
+        "Bush Honeysuckle",
+        "Amur honeysuckle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lonicera implexa",
+      "Genus": "Lonicera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1537828",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lonicera_implexa",
+      "Sitelinks": 19,
+      "CommonNames": [],
+      "NativeRange": []
+    }
+  ]
+}

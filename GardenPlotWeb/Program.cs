@@ -20,6 +20,9 @@ builder.Services.AddHttpClient();
 // Per-user data root resolver (LocalAppData by default, override with GARDENPLOT_DATA_DIR).
 builder.Services.AddSingleton<DataRootProvider>();
 
+// Optional rich horticultural metadata loaded from wwwroot/data/plant-profiles.json.
+builder.Services.AddSingleton<IPlantProfileService, LocalPlantProfileService>();
+
 WebApplication app = builder.Build();
 
 app.MapDefaultEndpoints();

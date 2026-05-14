@@ -1,0 +1,357 @@
+{
+  "Category": "bulbs",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Allium cepa",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q23485",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Onion",
+      "Sitelinks": 199,
+      "CommonNames": [
+        "garden onion"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium sativum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q23400",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Garlic",
+      "Sitelinks": 186,
+      "CommonNames": [
+        "cultivated garlic"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium schoenoprasum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q51148",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Chives",
+      "Sitelinks": 88,
+      "CommonNames": [
+        "Wild Chives",
+        "Spanish garlic",
+        "cives",
+        "chives"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium ursinum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q130882",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_ursinum",
+      "Sitelinks": 86,
+      "CommonNames": [
+        "Wild Garlic",
+        "Ramsons"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium ascalonicum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q193498",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Shallot",
+      "Sitelinks": 73,
+      "CommonNames": [
+        "wild onion"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Crocus sativus",
+      "Genus": "Crocus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q15041677",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Crocus_sativus",
+      "Sitelinks": 62,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium fistulosum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q27938",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_fistulosum",
+      "Sitelinks": 62,
+      "CommonNames": [
+        "welsh onion"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lilium martagon",
+      "Genus": "Lilium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156363",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lilium_martagon",
+      "Sitelinks": 61,
+      "CommonNames": [
+        "martagon lily"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Galanthus nivalis",
+      "Genus": "Galanthus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q109995",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Galanthus_nivalis",
+      "Sitelinks": 59,
+      "CommonNames": [
+        "Flower of Hope",
+        "Common Snowdrop",
+        "Bucaneve",
+        "Snowdrop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Anemone nemorosa",
+      "Genus": "Anemone",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161056",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Anemone_nemorosa",
+      "Sitelinks": 53,
+      "CommonNames": [
+        "Wood Anemone",
+        "European thimbleweed"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Narcissus pseudonarcissus",
+      "Genus": "Narcissus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q27498",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Narcissus_pseudonarcissus",
+      "Sitelinks": 47,
+      "CommonNames": [
+        "wild daffodil",
+        "Common daffodil",
+        "daffodil"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lilium candidum",
+      "Genus": "Lilium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159811",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lilium_candidum",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "Madonna lily"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Narcissus poeticus",
+      "Genus": "Narcissus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q27983",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Narcissus_poeticus",
+      "Sitelinks": 43,
+      "CommonNames": [
+        "Pheasant\u0027s-eye Daffodil"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium ampeloprasum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q148995",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_ampeloprasum",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "garden leek",
+        "Broadleaf wild leek"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium vineale",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161230",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_vineale",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "wild onion",
+        "wild garlic",
+        "stag\u0027s garlic",
+        "crow garlic"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium tuberosum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q42285",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_tuberosum",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "Chinese chives",
+        "leek"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Crocus vernus",
+      "Genus": "Crocus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q165077",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Crocus_vernus",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "dutch crocus, spring crocus",
+        "dutch crocus"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Hyacinthus orientalis",
+      "Genus": "Hyacinthus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157428",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Hyacinthus_orientalis",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "garden hyacinth",
+        "Common Hyacinth"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lilium bulbiferum",
+      "Genus": "Lilium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163766",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lilium_bulbiferum",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "orange lily"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Eranthis hyemalis",
+      "Genus": "Eranthis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161553",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Eranthis_hyemalis",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "winter-aconite",
+        "winter aconite"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Anemone ranunculoides",
+      "Genus": "Anemone",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161045",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "yellow woodland anemone",
+        "Yellow Anemone"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Anemone coronaria",
+      "Genus": "Anemone",
+      "WikidataItem": "http://www.wikidata.org/entity/Q511179",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Anemone_coronaria",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "poppy anemone",
+        "lilies-of-the-field"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Tulipa sylvestris",
+      "Genus": "Tulipa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163050",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Tulipa_sylvestris",
+      "Sitelinks": 34,
+      "CommonNames": [
+        "Wild tulip",
+        "Dutch-lily",
+        "Tulip"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Erythronium dens-canis",
+      "Genus": "Erythronium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159285",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Erythronium_dens-canis",
+      "Sitelinks": 34,
+      "CommonNames": [
+        "Dog\u0027s-tooth-violet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium scorodoprasum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161099",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_scorodoprasum",
+      "Sitelinks": 34,
+      "CommonNames": [
+        "sand leek"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Tulipa gesneriana",
+      "Genus": "Tulipa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163060",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Tulipa_gesneriana",
+      "Sitelinks": 33,
+      "CommonNames": [
+        "Didier\u0027s Tulip"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Narcissus tazetta",
+      "Genus": "Narcissus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q6965683",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Narcissus_tazetta",
+      "Sitelinks": 33,
+      "CommonNames": [
+        "cream narcissus"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium chinense",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q422240",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_chinense",
+      "Sitelinks": 33,
+      "CommonNames": [
+        "rakkyo"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium oleraceum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161107",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_oleraceum",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "field garlic"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Anemone sylvestris",
+      "Genus": "Anemone",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157358",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Anemonoides_sylvestris",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "snowdrop windflower",
+        "Snowdrop Anemone"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

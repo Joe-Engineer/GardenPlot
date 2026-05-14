@@ -1,0 +1,349 @@
+{
+  "Category": "trees-fruit",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Citrus \u00D7 limon",
+      "Genus": "Citrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q500",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lemon",
+      "Sitelinks": 184,
+      "CommonNames": [
+        "lemon"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carica papaya",
+      "Genus": "Carica",
+      "WikidataItem": "http://www.wikidata.org/entity/Q34887",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Papaya",
+      "Sitelinks": 162,
+      "CommonNames": [
+        "papaya"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Prunus persica",
+      "Genus": "Prunus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q13189",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Peach",
+      "Sitelinks": 160,
+      "CommonNames": [
+        "Peach"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Olea europaea",
+      "Genus": "Olea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q37083",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Olive",
+      "Sitelinks": 145,
+      "CommonNames": [
+        "olive tree",
+        "olive"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Persea americana",
+      "Genus": "Persea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q37153",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Avocado",
+      "Sitelinks": 143,
+      "CommonNames": [
+        "alligator pear",
+        "Avocado"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Punica granatum",
+      "Genus": "Punica",
+      "WikidataItem": "http://www.wikidata.org/entity/Q13188",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pomegranate",
+      "Sitelinks": 135,
+      "CommonNames": [
+        "pomegranate"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Prunus amygdalus",
+      "Genus": "Prunus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q15545507",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Almond",
+      "Sitelinks": 134,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Prunus armeniaca",
+      "Genus": "Prunus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q37453",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Prunus_armeniaca",
+      "Sitelinks": 129,
+      "CommonNames": [
+        "apricot"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Citrus reticulata",
+      "Genus": "Citrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q125337",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mandarin_orange",
+      "Sitelinks": 111,
+      "CommonNames": [
+        "Mandarin orange",
+        "tangerine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Citrus maxima",
+      "Genus": "Citrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q80024",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pomelo",
+      "Sitelinks": 108,
+      "CommonNames": [
+        "shaddock"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Citrus paradisi",
+      "Genus": "Citrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q41350",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Grapefruit",
+      "Sitelinks": 100,
+      "CommonNames": [
+        "grapefruit"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Citrus \u00D7sinensis",
+      "Genus": "Citrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3355098",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Citrus_%C3%97_sinensis",
+      "Sitelinks": 97,
+      "CommonNames": [
+        "sweet orange"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Prunus spinosa",
+      "Genus": "Prunus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q129018",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Prunus_spinosa",
+      "Sitelinks": 91,
+      "CommonNames": [
+        "sloe, blackthorn",
+        "blackthorn"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mangifera indica",
+      "Genus": "Mangifera",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3919027",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mangifera_indica",
+      "Sitelinks": 89,
+      "CommonNames": [
+        "mangoso",
+        "Mango"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Prunus cerasus",
+      "Genus": "Prunus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q131517",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Prunus_cerasus",
+      "Sitelinks": 89,
+      "CommonNames": [
+        "sour cherry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Eriobotrya japonica",
+      "Genus": "Eriobotrya",
+      "WikidataItem": "http://www.wikidata.org/entity/Q41505",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Loquat",
+      "Sitelinks": 86,
+      "CommonNames": [
+        "loquat"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Citrus \u00D7 aurantium",
+      "Genus": "Citrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147096",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Bitter_orange",
+      "Sitelinks": 84,
+      "CommonNames": [
+        "sour orange",
+        "Bitter orange"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Annona muricata",
+      "Genus": "Annona",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1709343",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Soursop",
+      "Sitelinks": 81,
+      "CommonNames": [
+        "soursop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Prunus padus",
+      "Genus": "Prunus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q165424",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Prunus_padus",
+      "Sitelinks": 79,
+      "CommonNames": [
+        "European bird cherry",
+        "birdcherry",
+        "bird cherry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Diospyros kaki",
+      "Genus": "Diospyros",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158482",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Diospyros_kaki",
+      "Sitelinks": 78,
+      "CommonNames": [
+        "Sharon Fruit",
+        "Korean Mango",
+        "Japanese Persimmon",
+        "Asian Persimmon",
+        "Kaki"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Citrus medica",
+      "Genus": "Citrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q150064",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Citron",
+      "Sitelinks": 78,
+      "CommonNames": [
+        "citron"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pyrus communis",
+      "Genus": "Pyrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146281",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pyrus_communis",
+      "Sitelinks": 78,
+      "CommonNames": [
+        "European Pear",
+        "Common Pear",
+        "wild pear",
+        "pear"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Annona squamosa",
+      "Genus": "Annona",
+      "WikidataItem": "http://www.wikidata.org/entity/Q275620",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Annona_squamosa",
+      "Sitelinks": 77,
+      "CommonNames": [
+        "sugar apple"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Malus domestica",
+      "Genus": "Malus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q18674606",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Malus_domestica",
+      "Sitelinks": 72,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Prunus cerasifera",
+      "Genus": "Prunus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146951",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Prunus_cerasifera",
+      "Sitelinks": 70,
+      "CommonNames": [
+        "Myrobalan Plum",
+        "Cherry Plum",
+        "myrobalan"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Morus alba",
+      "Genus": "Morus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157307",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Morus_alba",
+      "Sitelinks": 67,
+      "CommonNames": [
+        "White Mulberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Morus nigra",
+      "Genus": "Morus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161040",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Morus_nigra",
+      "Sitelinks": 67,
+      "CommonNames": [
+        "black mulberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Citrus \u00D7bergamia",
+      "Genus": "Citrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q109196",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Bergamot_orange",
+      "Sitelinks": 64,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Citrus \u00D7aurantifolia",
+      "Genus": "Citrus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q165354",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Key_lime",
+      "Sitelinks": 64,
+      "CommonNames": [
+        "Key lime"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Crataegus monogyna",
+      "Genus": "Crataegus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161511",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Crataegus_monogyna",
+      "Sitelinks": 61,
+      "CommonNames": [
+        "Common Hawthorn",
+        "Hawthorn"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

@@ -1,0 +1,325 @@
+{
+  "Category": "succulents",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Aloe vera",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q80079",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloe_vera",
+      "Sitelinks": 99,
+      "CommonNames": [
+        "Barbados aloe"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Opuntia ficus-indica",
+      "Genus": "Opuntia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q144412",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Opuntia_ficus-indica",
+      "Sitelinks": 63,
+      "CommonNames": [
+        "Tuna Cactus",
+        "Indian-fig",
+        "Barbary Fig",
+        "Indian Fig"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sedum acre",
+      "Genus": "Sedum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156823",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sedum_acre",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "goldmoss stonecrop",
+        "Biting Stonecrop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sempervivum tectorum",
+      "Genus": "Sempervivum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161724",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sempervivum_tectorum",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "common houseleek"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe arborescens",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q162137",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloe_arborescens",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "candelabra aloe"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Crassula ovata",
+      "Genus": "Crassula",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157299",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Crassula_ovata",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "jade plant"
+      ],
+      "NativeRange": [
+        "South Africa"
+      ]
+    },
+    {
+      "ScientificName": "Sedum album",
+      "Genus": "Sedum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q253636",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sedum_album",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "White Stonecrop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe dichotoma",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161263",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloidendron_dichotomum",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "Quiver tree"
+      ],
+      "NativeRange": [
+        "South Africa"
+      ]
+    },
+    {
+      "ScientificName": "Crassula aquatica",
+      "Genus": "Crassula",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159424",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Crassula_aquatica",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "water pygmyweed"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe ferox",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1194889",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloe_ferox",
+      "Sitelinks": 27,
+      "CommonNames": [
+        "Cape aloe"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Crassula arborescens",
+      "Genus": "Crassula",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2705184",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Crassula_arborescens",
+      "Sitelinks": 27,
+      "CommonNames": [],
+      "NativeRange": [
+        "South Africa"
+      ]
+    },
+    {
+      "ScientificName": "Sedum sexangulare",
+      "Genus": "Sedum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159471",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sedum_sexangulare",
+      "Sitelinks": 25,
+      "CommonNames": [
+        "Tasteless Stonecrop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe polyphylla",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q140021",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloe_polyphylla",
+      "Sitelinks": 24,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe succotrina",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q24380",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloe_succotrina",
+      "Sitelinks": 24,
+      "CommonNames": [
+        "Fynbos aloe"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sedum villosum",
+      "Genus": "Sedum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159705",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sedum_villosum",
+      "Sitelinks": 24,
+      "CommonNames": [
+        "hairy stonecrop",
+        "purple stonecrop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sempervivum arachnoideum",
+      "Genus": "Sempervivum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161390",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sempervivum_arachnoideum",
+      "Sitelinks": 24,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe aristata",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q133923",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aristaloe",
+      "Sitelinks": 23,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sedum anglicum",
+      "Genus": "Sedum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3770862",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sedum_anglicum",
+      "Sitelinks": 23,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe helenae",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q135676",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloe_helenae",
+      "Sitelinks": 22,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sedum morganianum",
+      "Genus": "Sedum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2245759",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sedum_morganianum",
+      "Sitelinks": 22,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sedum rupestre",
+      "Genus": "Sedum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158943",
+      "Sitelinks": 22,
+      "CommonNames": [
+        "reflexed stonecrop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Opuntia microdasys",
+      "Genus": "Opuntia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q310523",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Opuntia_microdasys",
+      "Sitelinks": 22,
+      "CommonNames": [
+        "angel\u0027s-wings"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Echeveria elegans",
+      "Genus": "Echeveria",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2783756",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Echeveria_elegans",
+      "Sitelinks": 22,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe variegata",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159136",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloe_variegata",
+      "Sitelinks": 21,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe africana",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q136410",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloe_africana",
+      "Sitelinks": 21,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe brevifolia",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q136896",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloe_brevifolia",
+      "Sitelinks": 21,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Opuntia stricta",
+      "Genus": "Opuntia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q141416",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Opuntia_stricta",
+      "Sitelinks": 21,
+      "CommonNames": [
+        "Erect Pricklypear",
+        "Erect Prickly-Pear",
+        "Erect Prickly Pear"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe maculata",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q135018",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloe_maculata",
+      "Sitelinks": 20,
+      "CommonNames": [
+        "soap aloe"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe marlothii",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q138252",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aloe_marlothii",
+      "Sitelinks": 20,
+      "CommonNames": [
+        "Mountain aloe"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aloe plicatilis",
+      "Genus": "Aloe",
+      "WikidataItem": "http://www.wikidata.org/entity/Q145534",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Kumara_plicatilis",
+      "Sitelinks": 20,
+      "CommonNames": [],
+      "NativeRange": []
+    }
+  ]
+}

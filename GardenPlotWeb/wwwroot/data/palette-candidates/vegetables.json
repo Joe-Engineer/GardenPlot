@@ -1,0 +1,353 @@
+{
+  "Category": "vegetables",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Solanum lycopersicum",
+      "Genus": "Solanum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q23501",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Tomato",
+      "Sitelinks": 207,
+      "CommonNames": [
+        "garden tomato"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium cepa",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q23485",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Onion",
+      "Sitelinks": 199,
+      "CommonNames": [
+        "garden onion"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Solanum tuberosum",
+      "Genus": "Solanum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q10998",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Potato",
+      "Sitelinks": 196,
+      "CommonNames": [
+        "Russian Potato",
+        "potato"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium sativum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q23400",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Garlic",
+      "Sitelinks": 186,
+      "CommonNames": [
+        "cultivated garlic"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cucumis sativus",
+      "Genus": "Cucumis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q23425",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cucumber",
+      "Sitelinks": 180,
+      "CommonNames": [
+        "garden cucumber"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Citrullus lanatus",
+      "Genus": "Citrullus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q17507129",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Watermelon",
+      "Sitelinks": 176,
+      "CommonNames": [
+        "watermelon"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Solanum melongena",
+      "Genus": "Solanum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q7540",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Eggplant",
+      "Sitelinks": 170,
+      "CommonNames": [
+        "aubergine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ipomoea batatas",
+      "Genus": "Ipomoea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q37937",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sweet_potato",
+      "Sitelinks": 152,
+      "CommonNames": [
+        "sweet potato"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pisum sativum",
+      "Genus": "Pisum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q25237",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pea",
+      "Sitelinks": 145,
+      "CommonNames": [
+        "garden pea"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Spinacia oleracea",
+      "Genus": "Spinacia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q81464",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Spinach",
+      "Sitelinks": 134,
+      "CommonNames": [
+        "spinach"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Raphanus sativus",
+      "Genus": "Raphanus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q7224565",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Radish",
+      "Sitelinks": 134,
+      "CommonNames": [
+        "cultivated radish"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lactuca sativa",
+      "Genus": "Lactuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q83193",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lettuce",
+      "Sitelinks": 126,
+      "CommonNames": [
+        "garden lettuce"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cucumis melo",
+      "Genus": "Cucumis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q81602",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cucumis_melo",
+      "Sitelinks": 117,
+      "CommonNames": [
+        "melon"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Abelmoschus esculentus",
+      "Genus": "Abelmoschus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q80531",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Okra",
+      "Sitelinks": 114,
+      "CommonNames": [
+        "okra"
+      ],
+      "NativeRange": [
+        "West Africa"
+      ]
+    },
+    {
+      "ScientificName": "Brassica oleracea",
+      "Genus": "Brassica",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146212",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Brassica_oleracea",
+      "Sitelinks": 114,
+      "CommonNames": [
+        "Wild Mustard",
+        "cabbage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Asparagus officinalis",
+      "Genus": "Asparagus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q28367",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Asparagus",
+      "Sitelinks": 112,
+      "CommonNames": [
+        "wild asparagus",
+        "garden asparagus"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Brassica napus",
+      "Genus": "Brassica",
+      "WikidataItem": "http://www.wikidata.org/entity/Q177932",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rapeseed",
+      "Sitelinks": 93,
+      "CommonNames": [
+        "rape"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Solanum nigrum",
+      "Genus": "Solanum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146400",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Solanum_nigrum",
+      "Sitelinks": 90,
+      "CommonNames": [
+        "Black Nightshade"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Capsicum annuum",
+      "Genus": "Capsicum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1380",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Capsicum_annuum",
+      "Sitelinks": 90,
+      "CommonNames": [
+        "pepper",
+        "cayenne pepper"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Daucus carota",
+      "Genus": "Daucus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q30056",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Daucus_carota",
+      "Sitelinks": 88,
+      "CommonNames": [
+        "Wild Carrot"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium schoenoprasum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q51148",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Chives",
+      "Sitelinks": 88,
+      "CommonNames": [
+        "Wild Chives",
+        "Spanish garlic",
+        "cives",
+        "chives"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium ursinum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q130882",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_ursinum",
+      "Sitelinks": 86,
+      "CommonNames": [
+        "Wild Garlic",
+        "Ramsons"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Apium graveolens",
+      "Genus": "Apium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q28298",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Apium_graveolens",
+      "Sitelinks": 80,
+      "CommonNames": [
+        "Wild Celery"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ipomoea aquatica",
+      "Genus": "Ipomoea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q272754",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ipomoea_aquatica",
+      "Sitelinks": 75,
+      "CommonNames": [
+        "swamp morning-glory"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium ascalonicum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q193498",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Shallot",
+      "Sitelinks": 73,
+      "CommonNames": [
+        "wild onion"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Brassica rapa",
+      "Genus": "Brassica",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3384",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Brassica_rapa",
+      "Sitelinks": 72,
+      "CommonNames": [
+        "wild turnip",
+        "common mustard",
+        "field mustard"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cucurbita pepo",
+      "Genus": "Cucurbita",
+      "WikidataItem": "http://www.wikidata.org/entity/Q7229863",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cucurbita_pepo",
+      "Sitelinks": 67,
+      "CommonNames": [
+        "field pumpkin"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium fistulosum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q27938",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_fistulosum",
+      "Sitelinks": 62,
+      "CommonNames": [
+        "welsh onion"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Brassica nigra",
+      "Genus": "Brassica",
+      "WikidataItem": "http://www.wikidata.org/entity/Q381942",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Brassica_nigra",
+      "Sitelinks": 61,
+      "CommonNames": [
+        "black mustard"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Brassica juncea",
+      "Genus": "Brassica",
+      "WikidataItem": "http://www.wikidata.org/entity/Q504781",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Brassica_juncea",
+      "Sitelinks": 61,
+      "CommonNames": [
+        "leaf mustard",
+        "Indian mustard",
+        "India mustard",
+        "Chinese mustard",
+        "brown mustard"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

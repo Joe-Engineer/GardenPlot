@@ -15,6 +15,7 @@
 @inject IHttpClientFactory HttpFactory
 @inject IWebHostEnvironment Env
 @inject DataRootProvider DataRoot
+@inject IPlantProfileService PlantProfiles
 @inject ILogger<GardenPlot> Logger
 
 <PageTitle>Garden Plot</PageTitle>
@@ -85,6 +86,9 @@ else
                                 break;
                             case Tool.RectRuler:
                                 <svg viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="10" fill="none" stroke="currentColor" stroke-width="2" /><path d="M12 12L19 12" stroke="currentColor" stroke-width="1.5" /></svg>
+                                break;
+                            case Tool.GroundCover:
+                                <svg viewBox="0 0 24 24"><path d="M3 17C5 13 8 13 10 16C12 19 15 13 18 15C20 16 21 18 21 18L21 21L3 21Z" fill="currentColor" opacity="0.6" /><circle cx="7" cy="10" r="1.2" fill="currentColor" /><circle cx="12" cy="7" r="1.2" fill="currentColor" /><circle cx="17" cy="10" r="1.2" fill="currentColor" /></svg>
                                 break;
                         }
                     </button>
@@ -195,6 +199,60 @@ else
             <label class="drop-check small"><input type="checkbox" @bind="arrayStaggerHalf" /> 1/2 stagger</label>
             </span>
 
+            @if (currentTool == Tool.GroundCover)
+            {
+                <span class="ground-cover-controls">
+                    <span class="badge text-bg-success">Ground Cover</span>
+                    <label class="small text-muted">Draw as</label>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Ground cover shape">
+                        <button type="button"
+                                class="btn @(groundCoverSubMode == GroundCoverSubMode.Polygon ? "btn-primary" : "btn-outline-secondary")"
+                                title="Click to add vertices, double-click to finish"
+                                @onclick="() => { groundCoverSubMode = GroundCoverSubMode.Polygon; CancelPolygonInProgress(); }">Polygon</button>
+                        <button type="button"
+                                class="btn @(groundCoverSubMode == GroundCoverSubMode.Rectangle ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick="() => { groundCoverSubMode = GroundCoverSubMode.Rectangle; CancelPolygonInProgress(); }">Rectangle</button>
+                        <button type="button"
+                                class="btn @(groundCoverSubMode == GroundCoverSubMode.Oval ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick="() => { groundCoverSubMode = GroundCoverSubMode.Oval; CancelPolygonInProgress(); }">Oval</button>
+                        <button type="button"
+                                class="btn @(groundCoverSubMode == GroundCoverSubMode.FreehandArea ? "btn-primary" : "btn-outline-secondary")"
+                                title="Click and drag to sketch a freeform area"
+                                @onclick="() => { groundCoverSubMode = GroundCoverSubMode.FreehandArea; CancelPolygonInProgress(); }">Freehand Area</button>
+                    </div>
+                    @if (selectedItem is null || (selectedItem.Kind != PaletteKind.GroundCover && selectedItem.Kind != PaletteKind.GroundCoverSurface))
+                    {
+                        <span class="small text-warning ms-2">Pick a Ground Cover material or surface from the palette.</span>
+                    }
+                    else
+                    {
+                        <span class="small ms-2 d-inline-flex align-items-center gap-1">
+                            <span class="gc-swatch gc-swatch-sm"
+                                  style="@($"background:{selectedItem.FillColor ?? "#8a8276"};border-color:{selectedItem.StrokeColor ?? "#3f3a30"};")"></span>
+                            <strong>@selectedItem.Code</strong>
+                            @if (selectedItem.Kind == PaletteKind.GroundCover)
+                            {
+                                <span class="text-muted">depth</span>
+                                <input type="number" min="0" step="0.1"
+                                       class="form-control form-control-sm gc-depth-toolbar"
+                                       value="@(currentGroundCoverDepthIn ?? 0)"
+                                       @oninput="OnToolbarGroundCoverDepthChanged"
+                                       title="Depth in inches for new ground-cover shapes" />
+                                <span class="text-muted">in</span>
+                            }
+                            @if (groundCoverSubMode == GroundCoverSubMode.Polygon)
+                            {
+                                <span class="text-muted ms-2">Click vertices · double-click to finish · Esc to cancel</span>
+                            }
+                            else if (groundCoverSubMode == GroundCoverSubMode.FreehandArea)
+                            {
+                                <span class="text-muted ms-2">Click and drag to sketch</span>
+                            }
+                        </span>
+                    }
+                </span>
+            }
+
             <span class="toolbar-group toolbar-group-right">
                 <button class="toolbar-icon-btn" @onclick="ShowKeyBindingsDialog" title="Keyboard mappings" aria-label="Keyboard mappings">
                     <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M7 10H9M11 10H13M15 10H17M7 14H11M13 14H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
@@ -273,6 +331,28 @@ else
                             <option value="@cat">@CategoryLabel(cat)</option>
                         }
                     </select>
+                    @if (currentCategory != PaletteCategory.GroundCoverMaterials
+                        && currentCategory != PaletteCategory.GroundCoverSurface
+                        && currentCategory != PaletteCategory.CustomTiles
+                        && currentCategory != PaletteCategory.BedKits)
+                    {
+                        <div class="palette-filter-row">
+                            <select class="form-select form-select-sm palette-region-select"
+                                    value="@(PaletteRegionFilter?.ToString() ?? "")"
+                                    @onchange="OnPaletteRegionChanged"
+                                    title="Show plants suited to a climate region">
+                                <option value="">All regions</option>
+                                @foreach (var d in ClimateRegions.All)
+                                {
+                                    <option value="@d.Region">@d.Label</option>
+                                }
+                            </select>
+                            <label class="x-small palette-native-toggle" title="Show only plants native to the selected region">
+                                <input type="checkbox" checked="@PaletteNativeOnly" @onchange="OnPaletteNativeOnlyChanged" />
+                                Native only
+                            </label>
+                        </div>
+                    }
                     @if (currentCategory == PaletteCategory.CustomTiles)
                     {
                         <button class="btn btn-sm btn-outline-primary palette-add-btn" @onclick="ShowAddCustomTileDialog">+ Add Item</button>
@@ -287,13 +367,15 @@ else
                             PaletteKind.BedKit => $"{item.WidthFt}'×{item.HeightFt}' · {item.Pieces} pcs",
                             PaletteKind.Plant  => $"spacing {FormatPlantSpacing(item.WidthFt)} · {item.Sunlight} · {item.Water} water",
                             PaletteKind.CustomTile => $"{item.StampShapeKind ?? ShapeKind.Rectangle} · {item.WidthFt}'×{item.HeightFt}'",
+                            PaletteKind.GroundCover => item.DefaultDepthIn is double dd ? $"area · {item.Trait} · {dd:0.#}\" default" : $"area · {item.Trait}",
+                            PaletteKind.GroundCoverSurface => $"surface · {item.Trait}",
                             _                  => $"{item.WidthFt}' Ø · {item.Trait}",
                         };
                         <button class="palette-item @(isActive ? "active" : "")"
                                 @onclick="() => SelectItem(item)" title="@item.Code — @detail">
                                 @if (!string.IsNullOrWhiteSpace(item.TilePreviewImageFileName))
                                 {
-                                    <img class="palette-item-image" src="@TileImageUrl(item.TilePreviewImageFileName!)" alt="" />
+                                    <img class="palette-item-image" src="@TileImageUrl(item.TilePreviewImageFileName!)" data-client-image-id="@TileImageClientId(item.TilePreviewImageFileName)" alt="" />
                                 }
                                 else
                                 {
@@ -331,6 +413,17 @@ else
                                                           stroke="@(item.StrokeColor ?? "#7a3520")" stroke-width="0.12" />
                                                 }
                                                 break;
+                                            case PaletteKind.GroundCover:
+                                            case PaletteKind.GroundCoverSurface:
+                                                <rect x="0" y="0" width="@F(item.WidthFt)" height="@F(item.HeightFt)"
+                                                      fill="@(item.FillColor ?? "#8a8276")"
+                                                      stroke="@(item.StrokeColor ?? "#3f3a30")" stroke-width="0.05" />
+                                                @if (!string.IsNullOrWhiteSpace(item.TextureKey))
+                                                {
+                                                    <rect x="0" y="0" width="@F(item.WidthFt)" height="@F(item.HeightFt)"
+                                                          fill="@($"url(#tex-{item.TextureKey})")" opacity="0.95" />
+                                                }
+                                                break;
                                         }
                                     </svg>
                                 }
@@ -366,6 +459,7 @@ else
                      @onpointermove="OnPointerMove"
                      @onpointerup="OnPointerUp"
                      @onpointerleave="OnPointerLeave"
+                     @ondblclick="OnCanvasDoubleClick"
                      @onpointerdown:preventDefault="true">
 
                 <defs>
@@ -378,6 +472,12 @@ else
                                   stroke-width="@F(EffectivePlotGridLineWidth(currentPlot))"
                                   stroke-opacity="@F(EffectivePlotGridOpacity(currentPlot))" />
                         </pattern>
+                    }
+
+                    @* Ground-cover procedural textures. patternUnits=userSpaceOnUse so 1 unit = 1 ft. *@
+                    @foreach (var tex in GroundCoverTexturePatterns)
+                    {
+                        @((MarkupString)tex)
                     }
                 </defs>
 
@@ -448,12 +548,14 @@ else
                                 <rect x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
                                       fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
                                       stroke="@EffectiveStroke(s)" stroke-width="0.06" />
-                                @if (!string.IsNullOrWhiteSpace(s.TileBackgroundImageFileName))
+                                var rectImgRef = !string.IsNullOrWhiteSpace(s.TextureImageId) ? s.TextureImageId : s.TileBackgroundImageFileName;
+                                @if (!string.IsNullOrWhiteSpace(rectImgRef))
                                 {
                                     <clipPath id="@rectClipId">
                                         <rect x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)" />
                                     </clipPath>
-                                    <image href="@TileImageUrl(s.TileBackgroundImageFileName!)"
+                                    <image href="@TileImageUrl(rectImgRef!)"
+                                           data-client-image-id="@TileImageClientId(rectImgRef)"
                                            x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
                                            preserveAspectRatio="xMidYMid slice"
                                            clip-path="url(#@rectClipId)" />
@@ -465,22 +567,46 @@ else
                                          rx="@F(s.W / 2)" ry="@F(s.H / 2)"
                                          fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
                                          stroke="@EffectiveStroke(s)" stroke-width="0.06" />
-                                @if (!string.IsNullOrWhiteSpace(s.TileBackgroundImageFileName))
+                                var ovalImgRef = !string.IsNullOrWhiteSpace(s.TextureImageId) ? s.TextureImageId : s.TileBackgroundImageFileName;
+                                @if (!string.IsNullOrWhiteSpace(ovalImgRef))
                                 {
                                     <clipPath id="@ovalClipId">
                                         <ellipse cx="@F(s.X + s.W / 2)" cy="@F(s.Y + s.H / 2)"
                                                  rx="@F(s.W / 2)" ry="@F(s.H / 2)" />
                                     </clipPath>
-                                    <image href="@TileImageUrl(s.TileBackgroundImageFileName!)"
+                                    <image href="@TileImageUrl(ovalImgRef!)"
+                                           data-client-image-id="@TileImageClientId(ovalImgRef)"
                                            x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
                                            preserveAspectRatio="xMidYMid slice"
                                            clip-path="url(#@ovalClipId)" />
                                 }
                                 break;
                             case ShapeKind.FreeDraw:
-                                <polyline points="@PointsString(s.Points)"
-                                          fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.08"
-                                          stroke-linecap="round" stroke-linejoin="round" />
+                                @if (IsGroundCoverShape(s))
+                                {
+                                    var polyClipId = $"poly-clip-{s.Id:N}";
+                                    <polygon points="@PointsString(s.Points)"
+                                             fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
+                                             stroke="@EffectiveStroke(s)" stroke-width="0.08"
+                                             stroke-linejoin="round" />
+                                    @if (!string.IsNullOrWhiteSpace(s.TextureImageId))
+                                    {
+                                        <clipPath id="@polyClipId">
+                                            <polygon points="@PointsString(s.Points)" />
+                                        </clipPath>
+                                        <image href="@TileImageUrl(s.TextureImageId!)"
+                                               data-client-image-id="@TileImageClientId(s.TextureImageId)"
+                                               x="@F(sb.x)" y="@F(sb.y)" width="@F(sb.w)" height="@F(sb.h)"
+                                               preserveAspectRatio="xMidYMid slice"
+                                               clip-path="url(#@polyClipId)" />
+                                    }
+                                }
+                                else
+                                {
+                                    <polyline points="@PointsString(s.Points)"
+                                              fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.08"
+                                              stroke-linecap="round" stroke-linejoin="round" />
+                                }
                                 <rect x="@F(sb.x - 0.1)" y="@F(sb.y - 0.1)"
                                       width="@F(sb.w + 0.2)" height="@F(sb.h + 0.2)"
                                       fill="transparent" stroke="none" />
@@ -568,9 +694,24 @@ else
                                      stroke-dasharray="0.2,0.1" pointer-events="none" />
                             break;
                         case ShapeKind.FreeDraw:
-                            <polyline points="@PointsString(drafting.Points)"
-                                      fill="none" stroke="#3a3a3a" stroke-width="0.08"
-                                      stroke-linecap="round" stroke-linejoin="round" pointer-events="none" />
+                            @if (buildingPolygon)
+                            {
+                                <polygon points="@PointsString(drafting.Points)"
+                                         fill="@(drafting.Fill ?? "rgba(74,124,89,0.25)")" fill-opacity="0.35"
+                                         stroke="@(drafting.Stroke ?? "#2f5a3a")" stroke-width="0.08"
+                                         stroke-dasharray="0.2,0.1" pointer-events="none" />
+                                @foreach (var p in drafting.Points.Take(drafting.Points.Count - 1))
+                                {
+                                    <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.08"
+                                            fill="#fff" stroke="#2f5a3a" stroke-width="0.04" pointer-events="none" />
+                                }
+                            }
+                            else
+                            {
+                                <polyline points="@PointsString(drafting.Points)"
+                                          fill="none" stroke="#3a3a3a" stroke-width="0.08"
+                                          stroke-linecap="round" stroke-linejoin="round" pointer-events="none" />
+                            }
                             break;
                         case ShapeKind.Ruler:
                             <polyline points="@PointsString(drafting.Points)"
@@ -867,6 +1008,7 @@ else
                                 <th>Type</th>
                                 <th>Name</th>
                                 <th class="text-end">Count</th>
+                                <th class="text-end">Quantity</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -876,6 +1018,7 @@ else
                                     <td>@row.Kind</td>
                                     <td>@row.Name</td>
                                     <td class="text-end">@row.Count</td>
+                                    <td class="text-end">@(row.Quantity ?? "")</td>
                                 </tr>
                             }
                         </tbody>
@@ -979,6 +1122,71 @@ else
                 @if (!isPreview && drafting is not null && drafting.Kind == ShapeKind.Ruler && single!.Id == drafting.Id)
                 {
                     <div class="x-small text-muted mt-1">Click to finish · Ctrl+click to add a vertex</div>
+                }
+
+                @if (!isPreview && IsGroundCoverShape(single!))
+                {
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Ground cover</div>
+                        <div class="small mb-1 d-flex align-items-center gap-2">
+                            <span class="text-muted">Material:</span>
+                            <strong>@(string.IsNullOrWhiteSpace(single!.GroundCoverCode) ? (single!.Label ?? "(unnamed)") : single!.GroundCoverCode)</strong>
+                            <span class="gc-swatch"
+                                  style="@($"background:{single!.Fill ?? "#8a8276"};border-color:{single!.Stroke ?? "#3f3a30"};")"
+                                  title="@(string.IsNullOrWhiteSpace(single!.TextureKey) ? "color" : single!.TextureKey)"></span>
+                            @if (single!.IsGroundCoverSurface)
+                            {
+                                <span class="badge text-bg-secondary">surface</span>
+                            }
+                        </div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Area:</span>
+                            <strong>@($"{GroundCoverMath.AreaFt2(single!):0.#} ft²")</strong>
+                            @if (!single!.IsGroundCoverSurface && single!.GroundCoverDepthIn is double d && d > 0)
+                            {
+                                <span class="text-muted ms-2">Volume:</span>
+                                <strong>@($"{GroundCoverMath.VolumeYd3(GroundCoverMath.AreaFt2(single!), d):0.##} yd³")</strong>
+                            }
+                        </div>
+                        @if (!single!.IsGroundCoverSurface)
+                        {
+                            <div class="d-flex align-items-center gap-1 mb-1">
+                                <label class="small text-muted mb-0">Depth (in):</label>
+                                <input type="number" min="0" step="0.1"
+                                       class="form-control form-control-sm gc-depth-input"
+                                       value="@(single!.GroundCoverDepthIn ?? 0)"
+                                       @oninput="@(e => OnGroundCoverDepthChanged(single!, e.Value?.ToString()))" />
+                            </div>
+                        }
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="small text-muted mb-0">Texture:</label>
+                            <select class="form-select form-select-sm"
+                                    value="@(single!.TextureKey ?? string.Empty)"
+                                    @onchange="@(e => OnGroundCoverTextureChanged(single!, e.Value?.ToString()))">
+                                <option value="">(none)</option>
+                                @foreach (var k in GroundCoverTextureKeys)
+                                {
+                                    <option value="@k">@k</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="small text-muted mb-0">Custom image:</label>
+                            <InputFile class="form-control form-control-sm"
+                                       accept="image/*"
+                                       OnChange="@(args => OnGroundCoverCustomTextureSelected(single!, args))" />
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(single!.TextureImageId))
+                        {
+                            <div class="x-small text-muted mb-1">Using custom image (overrides texture).
+                                <button class="btn btn-link btn-sm p-0" @onclick="() => ClearGroundCoverCustomTexture(single!)">clear</button>
+                            </div>
+                        }
+                        <div>
+                            <button class="btn btn-link btn-sm p-0"
+                                    @onclick="() => ResetGroundCoverToPaletteDefaults(single!)">Reset to defaults</button>
+                        </div>
+                    </div>
                 }
 
                 @if (isPreview && previewDropPattern != DropPattern.One)
@@ -1111,7 +1319,123 @@ else
                 </div>
             }
 
-            @if (isSingle && (single!.Kind == ShapeKind.Tree || single.Kind == ShapeKind.Bush))
+            @if (isSingle && ProfileForShape(single!, isPreview) is { } profile)
+            {
+                <hr class="my-2" />
+                <div class="plant-profile">
+                    @if (!string.IsNullOrWhiteSpace(profile.ScientificName))
+                    {
+                        <div class="x-small"><em>@profile.ScientificName</em>@(string.IsNullOrWhiteSpace(profile.Family) ? "" : $" · {profile.Family}")</div>
+                    }
+                    <div class="badge-row">
+                        @if (profile.Hardiness is { } hz)
+                        {
+                            <span class="badge badge-hardiness" title="USDA hardiness zones">❄ Zones @hz.MinZone–@hz.MaxZone</span>
+                        }
+                        @if (profile.LightTolerance is { Length: > 0 } lights)
+                        {
+                            <span class="badge badge-sun-full" title="Light tolerance">☀ @string.Join(" / ", lights.Select(LightLabel))</span>
+                        }
+                        @if (profile.Water is { } w)
+                        {
+                            <span class="badge badge-water-@(w.ToString().ToLowerInvariant())">💧 @w water</span>
+                        }
+                        @if (profile.DroughtTolerant)
+                        {
+                            <span class="badge badge-drought" title="Drought tolerant">drought ok</span>
+                        }
+                        @if (profile.FrostSensitive)
+                        {
+                            <span class="badge badge-frost" title="Frost sensitive">frost-sensitive</span>
+                        }
+                        @if (profile.Evergreen)
+                        {
+                            <span class="badge badge-evergreen">evergreen</span>
+                        }
+                        @if (profile.DeerResistant)
+                        {
+                            <span class="badge badge-deer">deer-resistant</span>
+                        }
+                        @if (profile.RabbitResistant)
+                        {
+                            <span class="badge badge-rabbit">rabbit-resistant</span>
+                        }
+                        @if (profile.Thorns)
+                        {
+                            <span class="badge badge-warning" title="Has thorns or sharp parts">⚠ thorns</span>
+                        }
+                        @if (profile.Invasive)
+                        {
+                            <span class="badge badge-danger" title="Considered invasive in some regions">⚠ invasive</span>
+                        }
+                    </div>
+                    @if (profile.Toxicity is { } tox && (tox.ToCats != ToxicityLevel.None || tox.ToDogs != ToxicityLevel.None || tox.ToHumans != ToxicityLevel.None))
+                    {
+                        <div class="tox-block">
+                            <div class="x-small text-muted mb-1">Toxicity</div>
+                            <div class="tox-rows">
+                                @if (tox.ToCats != ToxicityLevel.None)
+                                {
+                                    <span class="tox-row tox-@(tox.ToCats.ToString().ToLowerInvariant())" title="@($"Toxic to cats: {tox.ToCats}")">
+                                        <span class="tox-icon">🐈</span><span class="tox-no">⃠</span>
+                                        <span class="x-small">Cats · @tox.ToCats</span>
+                                    </span>
+                                }
+                                @if (tox.ToDogs != ToxicityLevel.None)
+                                {
+                                    <span class="tox-row tox-@(tox.ToDogs.ToString().ToLowerInvariant())" title="@($"Toxic to dogs: {tox.ToDogs}")">
+                                        <span class="tox-icon">🐕</span><span class="tox-no">⃠</span>
+                                        <span class="x-small">Dogs · @tox.ToDogs</span>
+                                    </span>
+                                }
+                                @if (tox.ToHumans != ToxicityLevel.None)
+                                {
+                                    <span class="tox-row tox-@(tox.ToHumans.ToString().ToLowerInvariant())" title="@($"Toxic to humans: {tox.ToHumans}")">
+                                        <span class="tox-icon">🧑</span><span class="tox-no">⃠</span>
+                                        <span class="x-small">Humans · @tox.ToHumans</span>
+                                    </span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(tox.Notes))
+                            {
+                                <div class="x-small text-muted mt-1">@tox.Notes</div>
+                            }
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(profile.NoxiousStatus))
+                    {
+                        <div class="x-small text-warning mt-1">@profile.NoxiousStatus</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(profile.Description))
+                    {
+                        <div class="x-small mt-1">@profile.Description</div>
+                    }
+                    @if (profile.Sources is { Length: > 0 } srcs)
+                    {
+                        <div class="x-small text-muted mt-1">
+                            Sources:
+                            @for (int i = 0; i < srcs.Length; i++)
+                            {
+                                var s = srcs[i];
+                                if (i > 0)
+                                {
+                                    <text>, </text>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(s.Url))
+                                {
+                                    <a href="@s.Url" target="_blank" rel="noopener">@s.Source</a>
+                                }
+                                else
+                                {
+                                    @s.Source
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (isSingle && (single!.Kind == ShapeKind.Tree || single.Kind == ShapeKind.Bush || IsTileShape(single)))
             {
                 <hr class="my-2" />
                 @if (wikiLoading)
@@ -1146,7 +1470,7 @@ else
                 <hr class="my-2" />
                 @if (!string.IsNullOrWhiteSpace(customInfo.TilePreviewImageFileName))
                 {
-                    <img class="wiki-thumb" src="@TileImageUrl(customInfo.TilePreviewImageFileName!)" alt="@customInfo.Code" />
+                    <img class="wiki-thumb" src="@TileImageUrl(customInfo.TilePreviewImageFileName!)" data-client-image-id="@TileImageClientId(customInfo.TilePreviewImageFileName)" alt="@customInfo.Code" />
                 }
 
                 @if (customTileCitationLoading)
@@ -1427,11 +1751,32 @@ else
     private static readonly Counter<long> StorageSaveResults = PersistenceMeter.CreateCounter<long>("gardenplot.storage.save.results");
     private static readonly Histogram<double> StorageSaveDurationMs = PersistenceMeter.CreateHistogram<double>("gardenplot.storage.save.duration.ms");
 
+    // Per-layer save/load counters so we can see in telemetry which storage layer
+    // succeeded for each attempt. Tag dimension: layer = idb|localstorage|file-index.
+    private static readonly Counter<long> StorageSaveLayerOk = PersistenceMeter.CreateCounter<long>("gardenplot.storage.save.layer.ok");
+    private static readonly Counter<long> StorageSaveLayerFail = PersistenceMeter.CreateCounter<long>("gardenplot.storage.save.layer.fail");
+    private static readonly Counter<long> StorageLoadLayerOk = PersistenceMeter.CreateCounter<long>("gardenplot.storage.load.layer.ok");
+    private static readonly Counter<long> StorageLoadLayerMiss = PersistenceMeter.CreateCounter<long>("gardenplot.storage.load.layer.miss");
+    private static readonly Counter<long> StorageSaveSkipped = PersistenceMeter.CreateCounter<long>("gardenplot.storage.save.skipped");
+    private static readonly Counter<long> InitialLoadSeed = PersistenceMeter.CreateCounter<long>("gardenplot.startup.fallback.seeded");
+    private static readonly Counter<long> InitialLoadDefault = PersistenceMeter.CreateCounter<long>("gardenplot.startup.default.created");
+
+    // Unique correlation id stamped on every load/save log line for this circuit;
+    // helps us thread a single page-session through the structured-log stream.
+    private readonly string SessionTraceId = Guid.NewGuid().ToString("N")[..8];
+
     private const string StorageKeyPrimary = "gardenplot.library.v2";
     private const string StorageKeyBackup1 = "gardenplot.library.v2.bak1";
     private const string StorageKeyBackup2 = "gardenplot.library.v2.bak2";
     private const string StorageKeyLegacy = "gardenplot.library.v1";
     private const string FileStoreSourceKey = "file-index";
+
+    // Free tier: server-side file store is disabled so each visitor's plots
+    // live entirely in their own browser (IndexedDB / localStorage). Flip
+    // this to true to re-enable shared server persistence. Declared as static
+    // readonly (not const) so the compiler does not const-fold gated branches
+    // into CS0162 unreachable-code errors.
+    private static readonly bool FileStoreEnabled = false;
     private const string FileStoreFolderName = "plots";
     private const string FileStoreIndexFileName = "index.json";
     private const string FileStoreTileImageFolderName = "tile-images";
@@ -1448,9 +1793,23 @@ else
     private double PlotWidthFt => currentPlot?.WidthFt ?? 60;
     private double PlotHeightFt => currentPlot?.HeightFt ?? 8;
 
-    private enum Tool { Select, FreeDraw, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp }
+    private enum Tool { Select, FreeDraw, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover }
     private enum DropActivationMode { ClickToggle, HoldKey }
     private enum DropModifierKey { Shift, Ctrl, Alt }
+
+    /// <summary>Ground-cover drawing sub-mode (selected when Tool.GroundCover is active).</summary>
+    private enum GroundCoverSubMode { Polygon, Rectangle, Oval, FreehandArea }
+
+    private GroundCoverSubMode groundCoverSubMode = GroundCoverSubMode.Polygon;
+
+    /// <summary>True while a click-by-vertex polygon is being built. The last point in
+    /// <c>drafting.Points</c> is a cursor-tracking endpoint that the user has not committed yet.</summary>
+    private bool buildingPolygon;
+
+    /// <summary>Current ground-cover depth (inches) used for newly-drawn volumetric ground-cover shapes.
+    /// Initialized from the selected palette item's <see cref="PaletteItem.DefaultDepthIn"/> when picked,
+    /// then editable on the toolbar so the user can change depth on the fly without leaving draw mode.</summary>
+    private double? currentGroundCoverDepthIn;
 
     private readonly Dictionary<string, Tool> tools = new()
     {
@@ -1461,6 +1820,7 @@ else
         ["Ruler"] = Tool.Ruler,
         ["Circle Ruler"] = Tool.CircleRuler,
         ["Rectangle Ruler"] = Tool.RectRuler,
+        ["Ground Cover"] = Tool.GroundCover,
     };
 
     private static readonly BedKit[] BedKits =
@@ -1615,6 +1975,7 @@ else
     private async Task ExportPng()
     {
         if (jsModule is null || currentPlot is null) return;
+        await PreloadClientImagesAsync();
         var name = $"{Sanitize(currentPlot.Name)}.png";
         try { await jsModule.InvokeVoidAsync("exportPng", canvasRef, name, 2); }
         catch { /* ignore */ }
@@ -1623,8 +1984,28 @@ else
     private async Task PrintPlot()
     {
         if (jsModule is null || currentPlot is null) return;
+        await PreloadClientImagesAsync();
         try { await jsModule.InvokeVoidAsync("printSvg", canvasRef, currentPlot.Name); }
         catch { /* ignore */ }
+    }
+
+    private async Task PreloadClientImagesAsync()
+    {
+        if (clientImagesModule is null || currentPlot is null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Run the DOM scanner to ensure every visible client-image placeholder
+            // has its blob: URL resolved before the SVG snapshot is taken.
+            await clientImagesModule.InvokeVoidAsync("applyClientImages", null);
+        }
+        catch
+        {
+            // Non-fatal: export may render placeholders instead.
+        }
     }
 
     private static string Sanitize(string name)
@@ -1636,18 +2017,337 @@ else
 
     // ===== Takeoff list =====
 
-    private sealed record TakeoffRow(string Kind, string Name, int Count);
+    private sealed record TakeoffRow(string Kind, string Name, int Count, string? Quantity = null);
 
     private static List<TakeoffRow> BuildTakeoff(IEnumerable<Shape> shapes)
     {
-        return shapes
+        var all = shapes.ToList();
+
+        // Ground-cover shapes get aggregated by (material code, depth, surface flag),
+        // emitting volume (yd³) or area (ft²) instead of a raw count.
+        var groundCovers = all
+            .Where(IsGroundCoverShape)
+            .GroupBy(s => (
+                Code: string.IsNullOrWhiteSpace(s.GroundCoverCode) ? (s.Label ?? "Ground cover") : s.GroundCoverCode!,
+                DepthIn: s.GroundCoverDepthIn,
+                Surface: s.IsGroundCoverSurface))
+            .Select(g =>
+            {
+                var totalArea = g.Sum(GroundCoverMath.AreaFt2);
+                string qty;
+                string name = g.Key.Code;
+                if (g.Key.Surface)
+                {
+                    qty = $"{totalArea:0.#} ft²";
+                }
+                else
+                {
+                    var depth = g.Key.DepthIn ?? 0;
+                    var vol = GroundCoverMath.VolumeYd3(totalArea, depth);
+                    qty = $"{vol:0.##} yd³ ({totalArea:0.#} ft² × {depth:0.#}\")";
+                }
+                var kind = g.Key.Surface ? "Ground Cover — Surface" : "Ground Cover";
+                return new TakeoffRow(kind, name, g.Count(), qty);
+            });
+
+        var others = all
+            .Where(s => !IsGroundCoverShape(s))
             .Where(s => s.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant
                                 or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
             .GroupBy(s => (Kind: TakeoffKind(s), Name: TakeoffName(s)))
-            .Select(g => new TakeoffRow(g.Key.Kind, g.Key.Name, g.Count()))
+            .Select(g => new TakeoffRow(g.Key.Kind, g.Key.Name, g.Count()));
+
+        return groundCovers.Concat(others)
             .OrderBy(r => r.Kind, StringComparer.Ordinal)
             .ThenBy(r => r.Name, StringComparer.Ordinal)
             .ToList();
+    }
+
+    private static bool IsGroundCoverShape(Shape s)
+    {
+        return string.Equals(s.Trait, "ground-cover", StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrWhiteSpace(s.GroundCoverCode);
+    }
+
+    private static readonly string[] GroundCoverTextureKeys =
+    [
+        "gravel-fine",
+        "gravel-coarse",
+        "river-rock",
+        "bark-chips",
+        "mulch-fine",
+        "mulch-coarse",
+        "soil-stipple",
+        "compost",
+        "sand",
+        "decorative-rock",
+        "lava-rock",
+        "grass-blades",
+        "clover",
+        "wildflower",
+        "cross-hatch",
+        "dots",
+        "scales",
+    ];
+
+    // Inline SVG <pattern> defs (1 unit = 1 ft). Each pattern paints onto a
+    // translucent base square so the underlying palette fill bleeds through subtly.
+    private static readonly string[] GroundCoverTexturePatterns =
+    [
+        // gravel-fine: small dense dots over light buff
+        "<pattern id=\"tex-gravel-fine\" width=\"0.5\" height=\"0.5\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.5\" height=\"0.5\" fill=\"#b5a98a\"/>" +
+            "<circle cx=\"0.1\" cy=\"0.12\" r=\"0.05\" fill=\"#6a5e42\"/>" +
+            "<circle cx=\"0.32\" cy=\"0.08\" r=\"0.045\" fill=\"#7a6e4e\"/>" +
+            "<circle cx=\"0.18\" cy=\"0.3\" r=\"0.05\" fill=\"#5e5236\"/>" +
+            "<circle cx=\"0.4\" cy=\"0.34\" r=\"0.045\" fill=\"#8a7e5e\"/>" +
+            "<circle cx=\"0.07\" cy=\"0.42\" r=\"0.04\" fill=\"#6e6244\"/>" +
+            "<circle cx=\"0.28\" cy=\"0.46\" r=\"0.045\" fill=\"#5a4e34\"/>" +
+        "</pattern>",
+        // gravel-coarse: larger pebbles
+        "<pattern id=\"tex-gravel-coarse\" width=\"0.8\" height=\"0.8\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.8\" height=\"0.8\" fill=\"#9a907c\"/>" +
+            "<circle cx=\"0.18\" cy=\"0.2\" r=\"0.1\" fill=\"#6e6650\" stroke=\"#4e4636\" stroke-width=\"0.015\"/>" +
+            "<circle cx=\"0.55\" cy=\"0.32\" r=\"0.12\" fill=\"#7e7460\" stroke=\"#4e4636\" stroke-width=\"0.015\"/>" +
+            "<circle cx=\"0.3\" cy=\"0.6\" r=\"0.1\" fill=\"#574e3c\" stroke=\"#4e4636\" stroke-width=\"0.015\"/>" +
+            "<circle cx=\"0.66\" cy=\"0.66\" r=\"0.09\" fill=\"#8a8270\" stroke=\"#4e4636\" stroke-width=\"0.015\"/>" +
+        "</pattern>",
+        // river-rock: rounded ovals
+        "<pattern id=\"tex-river-rock\" width=\"1.2\" height=\"1.2\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"1.2\" height=\"1.2\" fill=\"#8a8276\"/>" +
+            "<ellipse cx=\"0.3\" cy=\"0.3\" rx=\"0.22\" ry=\"0.14\" fill=\"#a8a094\" stroke=\"#3f3a30\" stroke-width=\"0.02\"/>" +
+            "<ellipse cx=\"0.85\" cy=\"0.45\" rx=\"0.2\" ry=\"0.13\" fill=\"#736b5d\" stroke=\"#3f3a30\" stroke-width=\"0.02\"/>" +
+            "<ellipse cx=\"0.45\" cy=\"0.85\" rx=\"0.24\" ry=\"0.15\" fill=\"#928a7c\" stroke=\"#3f3a30\" stroke-width=\"0.02\"/>" +
+            "<ellipse cx=\"1.0\" cy=\"1.0\" rx=\"0.18\" ry=\"0.12\" fill=\"#665e50\" stroke=\"#3f3a30\" stroke-width=\"0.02\"/>" +
+        "</pattern>",
+        // bark-chips: irregular chunks
+        "<pattern id=\"tex-bark-chips\" width=\"0.7\" height=\"0.7\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.7\" height=\"0.7\" fill=\"#6a4a30\"/>" +
+            "<path d=\"M0.05 0.08 L0.2 0.06 L0.22 0.18 L0.06 0.2 Z\" fill=\"#42301f\"/>" +
+            "<path d=\"M0.32 0.1 L0.5 0.14 L0.46 0.28 L0.3 0.24 Z\" fill=\"#553d28\"/>" +
+            "<path d=\"M0.08 0.35 L0.24 0.38 L0.2 0.52 L0.04 0.5 Z\" fill=\"#4e3825\"/>" +
+            "<path d=\"M0.36 0.42 L0.56 0.46 L0.54 0.6 L0.34 0.58 Z\" fill=\"#42301f\"/>" +
+        "</pattern>",
+        // mulch-fine
+        "<pattern id=\"tex-mulch-fine\" width=\"0.4\" height=\"0.4\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.4\" height=\"0.4\" fill=\"#5a3a26\"/>" +
+            "<rect x=\"0.05\" y=\"0.08\" width=\"0.12\" height=\"0.03\" fill=\"#2a1c10\" transform=\"rotate(20 0.11 0.095)\"/>" +
+            "<rect x=\"0.22\" y=\"0.06\" width=\"0.1\" height=\"0.025\" fill=\"#42281a\" transform=\"rotate(-30 0.27 0.07)\"/>" +
+            "<rect x=\"0.08\" y=\"0.22\" width=\"0.14\" height=\"0.03\" fill=\"#2a1c10\" transform=\"rotate(45 0.15 0.235)\"/>" +
+            "<rect x=\"0.25\" y=\"0.28\" width=\"0.1\" height=\"0.025\" fill=\"#42281a\" transform=\"rotate(-10 0.3 0.29)\"/>" +
+        "</pattern>",
+        // mulch-coarse
+        "<pattern id=\"tex-mulch-coarse\" width=\"0.7\" height=\"0.7\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.7\" height=\"0.7\" fill=\"#947050\"/>" +
+            "<rect x=\"0.08\" y=\"0.1\" width=\"0.22\" height=\"0.05\" fill=\"#42301f\" transform=\"rotate(15 0.19 0.125)\"/>" +
+            "<rect x=\"0.36\" y=\"0.18\" width=\"0.2\" height=\"0.05\" fill=\"#5a3f28\" transform=\"rotate(-25 0.46 0.205)\"/>" +
+            "<rect x=\"0.1\" y=\"0.4\" width=\"0.24\" height=\"0.06\" fill=\"#42301f\" transform=\"rotate(40 0.22 0.43)\"/>" +
+            "<rect x=\"0.4\" y=\"0.5\" width=\"0.2\" height=\"0.05\" fill=\"#5a3f28\" transform=\"rotate(-5 0.5 0.525)\"/>" +
+        "</pattern>",
+        // soil-stipple
+        "<pattern id=\"tex-soil-stipple\" width=\"0.3\" height=\"0.3\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.3\" height=\"0.3\" fill=\"#4a3a2a\"/>" +
+            "<circle cx=\"0.07\" cy=\"0.08\" r=\"0.02\" fill=\"#2a1f15\"/>" +
+            "<circle cx=\"0.2\" cy=\"0.14\" r=\"0.018\" fill=\"#3a2c1c\"/>" +
+            "<circle cx=\"0.12\" cy=\"0.22\" r=\"0.02\" fill=\"#1f1810\"/>" +
+            "<circle cx=\"0.24\" cy=\"0.26\" r=\"0.018\" fill=\"#2a1f15\"/>" +
+        "</pattern>",
+        // compost (darker stipple)
+        "<pattern id=\"tex-compost\" width=\"0.3\" height=\"0.3\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.3\" height=\"0.3\" fill=\"#3a2a1c\"/>" +
+            "<circle cx=\"0.06\" cy=\"0.08\" r=\"0.025\" fill=\"#1f1810\"/>" +
+            "<circle cx=\"0.19\" cy=\"0.12\" r=\"0.02\" fill=\"#15100a\"/>" +
+            "<circle cx=\"0.13\" cy=\"0.22\" r=\"0.025\" fill=\"#1f1810\"/>" +
+            "<circle cx=\"0.24\" cy=\"0.25\" r=\"0.02\" fill=\"#15100a\"/>" +
+        "</pattern>",
+        // sand
+        "<pattern id=\"tex-sand\" width=\"0.25\" height=\"0.25\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.25\" height=\"0.25\" fill=\"#d6c79a\"/>" +
+            "<circle cx=\"0.05\" cy=\"0.07\" r=\"0.012\" fill=\"#8a7a4a\"/>" +
+            "<circle cx=\"0.14\" cy=\"0.1\" r=\"0.01\" fill=\"#a89868\"/>" +
+            "<circle cx=\"0.09\" cy=\"0.18\" r=\"0.012\" fill=\"#8a7a4a\"/>" +
+            "<circle cx=\"0.19\" cy=\"0.2\" r=\"0.011\" fill=\"#a89868\"/>" +
+        "</pattern>",
+        // decorative-rock
+        "<pattern id=\"tex-decorative-rock\" width=\"1.0\" height=\"1.0\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"1.0\" height=\"1.0\" fill=\"#9d9486\"/>" +
+            "<polygon points=\"0.15,0.1 0.35,0.2 0.28,0.4 0.1,0.32\" fill=\"#7e7468\" stroke=\"#4a4438\" stroke-width=\"0.015\"/>" +
+            "<polygon points=\"0.55,0.18 0.78,0.28 0.72,0.5 0.5,0.42\" fill=\"#b0a698\" stroke=\"#4a4438\" stroke-width=\"0.015\"/>" +
+            "<polygon points=\"0.2,0.55 0.46,0.6 0.42,0.85 0.18,0.8\" fill=\"#8a8276\" stroke=\"#4a4438\" stroke-width=\"0.015\"/>" +
+            "<polygon points=\"0.6,0.62 0.85,0.7 0.8,0.95 0.58,0.88\" fill=\"#a89e90\" stroke=\"#4a4438\" stroke-width=\"0.015\"/>" +
+        "</pattern>",
+        // lava-rock (reddish chunks with vesicular dots)
+        "<pattern id=\"tex-lava-rock\" width=\"0.8\" height=\"0.8\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.8\" height=\"0.8\" fill=\"#7a3a2c\"/>" +
+            "<polygon points=\"0.15,0.1 0.32,0.18 0.28,0.35 0.1,0.3\" fill=\"#5a2a1f\"/>" +
+            "<polygon points=\"0.5,0.15 0.7,0.22 0.66,0.4 0.46,0.36\" fill=\"#8a4434\"/>" +
+            "<polygon points=\"0.18,0.5 0.4,0.55 0.36,0.72 0.15,0.7\" fill=\"#5a2a1f\"/>" +
+            "<polygon points=\"0.5,0.55 0.72,0.6 0.68,0.78 0.48,0.75\" fill=\"#8a4434\"/>" +
+            "<circle cx=\"0.22\" cy=\"0.2\" r=\"0.015\" fill=\"#3f1f18\"/>" +
+            "<circle cx=\"0.6\" cy=\"0.32\" r=\"0.018\" fill=\"#3f1f18\"/>" +
+            "<circle cx=\"0.3\" cy=\"0.62\" r=\"0.015\" fill=\"#3f1f18\"/>" +
+            "<circle cx=\"0.62\" cy=\"0.68\" r=\"0.018\" fill=\"#3f1f18\"/>" +
+        "</pattern>",
+        // grass-blades
+        "<pattern id=\"tex-grass-blades\" width=\"0.5\" height=\"0.5\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.5\" height=\"0.5\" fill=\"#6a9a4f\"/>" +
+            "<path d=\"M0.05 0.45 L0.07 0.2 L0.09 0.45 Z\" fill=\"#3f6a2d\"/>" +
+            "<path d=\"M0.15 0.45 L0.17 0.1 L0.19 0.45 Z\" fill=\"#4d7d36\"/>" +
+            "<path d=\"M0.25 0.45 L0.27 0.25 L0.29 0.45 Z\" fill=\"#3f6a2d\"/>" +
+            "<path d=\"M0.35 0.45 L0.37 0.15 L0.39 0.45 Z\" fill=\"#4d7d36\"/>" +
+            "<path d=\"M0.45 0.45 L0.47 0.22 L0.49 0.45 Z\" fill=\"#3f6a2d\"/>" +
+        "</pattern>",
+        // clover
+        "<pattern id=\"tex-clover\" width=\"0.6\" height=\"0.6\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.6\" height=\"0.6\" fill=\"#6e8c4a\"/>" +
+            "<g transform=\"translate(0.15 0.15)\">" +
+                "<circle cx=\"0\" cy=\"-0.06\" r=\"0.05\" fill=\"#3f5a25\"/>" +
+                "<circle cx=\"-0.06\" cy=\"0.03\" r=\"0.05\" fill=\"#3f5a25\"/>" +
+                "<circle cx=\"0.06\" cy=\"0.03\" r=\"0.05\" fill=\"#3f5a25\"/>" +
+            "</g>" +
+            "<g transform=\"translate(0.45 0.42)\">" +
+                "<circle cx=\"0\" cy=\"-0.06\" r=\"0.05\" fill=\"#3f5a25\"/>" +
+                "<circle cx=\"-0.06\" cy=\"0.03\" r=\"0.05\" fill=\"#3f5a25\"/>" +
+                "<circle cx=\"0.06\" cy=\"0.03\" r=\"0.05\" fill=\"#3f5a25\"/>" +
+            "</g>" +
+        "</pattern>",
+        // wildflower (varied dots)
+        "<pattern id=\"tex-wildflower\" width=\"0.7\" height=\"0.7\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.7\" height=\"0.7\" fill=\"#a8b86e\"/>" +
+            "<circle cx=\"0.15\" cy=\"0.18\" r=\"0.05\" fill=\"#d96a8a\"/>" +
+            "<circle cx=\"0.42\" cy=\"0.25\" r=\"0.05\" fill=\"#e0c14a\"/>" +
+            "<circle cx=\"0.2\" cy=\"0.5\" r=\"0.05\" fill=\"#a47fc8\"/>" +
+            "<circle cx=\"0.55\" cy=\"0.55\" r=\"0.05\" fill=\"#e08a4a\"/>" +
+            "<circle cx=\"0.62\" cy=\"0.18\" r=\"0.04\" fill=\"#ffffff\"/>" +
+        "</pattern>",
+        // cross-hatch
+        "<pattern id=\"tex-cross-hatch\" width=\"0.4\" height=\"0.4\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.4\" height=\"0.4\" fill=\"#c9b97a\"/>" +
+            "<path d=\"M0 0 L0.4 0.4 M-0.1 0.3 L0.1 0.5 M0.3 -0.1 L0.5 0.1\" stroke=\"#6e6038\" stroke-width=\"0.025\"/>" +
+            "<path d=\"M0.4 0 L0 0.4 M0.3 -0.1 L0.5 0.1\" stroke=\"#6e6038\" stroke-width=\"0.025\" opacity=\"0\"/>" +
+        "</pattern>",
+        // dots
+        "<pattern id=\"tex-dots\" width=\"0.3\" height=\"0.3\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.3\" height=\"0.3\" fill=\"#e8e0d0\"/>" +
+            "<circle cx=\"0.15\" cy=\"0.15\" r=\"0.05\" fill=\"#5a4e34\"/>" +
+        "</pattern>",
+        // scales
+        "<pattern id=\"tex-scales\" width=\"0.5\" height=\"0.4\" patternUnits=\"userSpaceOnUse\">" +
+            "<rect width=\"0.5\" height=\"0.4\" fill=\"#8a8276\"/>" +
+            "<path d=\"M0 0.2 A0.15 0.15 0 0 0 0.3 0.2 M0.25 0.2 A0.15 0.15 0 0 0 0.55 0.2\" fill=\"none\" stroke=\"#3f3a30\" stroke-width=\"0.025\"/>" +
+        "</pattern>",
+    ];
+
+    private void OnGroundCoverDepthChanged(Shape s, string? value)
+    {
+        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double depth) && depth >= 0)
+        {
+            RecordUndoState();
+            s.GroundCoverDepthIn = depth;
+            _ = SaveAsync();
+        }
+    }
+
+    /// <summary>Updates the on-the-fly depth used for new ground-cover shapes drawn from the toolbar.</summary>
+    private void OnToolbarGroundCoverDepthChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double depth) && depth >= 0)
+        {
+            currentGroundCoverDepthIn = depth;
+        }
+    }
+
+    private void OnGroundCoverTextureChanged(Shape s, string? value)
+    {
+        RecordUndoState();
+        s.TextureKey = string.IsNullOrWhiteSpace(value) ? null : value;
+        _ = SaveAsync();
+    }
+
+    private async Task OnGroundCoverCustomTextureSelected(Shape s, InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Up to 8 MB; bigger images bloat IndexedDB and render slowly.
+            const long maxBytes = 8L * 1024 * 1024;
+            using var stream = file.OpenReadStream(maxBytes);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var base64 = Convert.ToBase64String(ms.ToArray());
+
+            if (jsModule is null)
+            {
+                return;
+            }
+
+            var id = await jsModule.InvokeAsync<string>(
+                "GardenPlot.clientImages.putImageFromBase64",
+                base64,
+                file.ContentType,
+                file.Name);
+
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                RecordUndoState();
+                s.TextureImageId = id;
+                await SaveAsync();
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Custom ground-cover texture upload failed");
+        }
+    }
+
+    private void ClearGroundCoverCustomTexture(Shape s)
+    {
+        if (string.IsNullOrWhiteSpace(s.TextureImageId))
+        {
+            return;
+        }
+        RecordUndoState();
+        s.TextureImageId = null;
+        _ = SaveAsync();
+    }
+
+    private void ResetGroundCoverToPaletteDefaults(Shape s)
+    {
+        if (string.IsNullOrWhiteSpace(s.GroundCoverCode))
+        {
+            return;
+        }
+
+        PaletteItem? item = null;
+        if (!s.IsGroundCoverSurface)
+        {
+            item = PaletteCatalog.GroundCoverMaterials.FirstOrDefault(p => string.Equals(p.Code, s.GroundCoverCode, StringComparison.OrdinalIgnoreCase));
+        }
+        if (item is null)
+        {
+            item = PaletteCatalog.GroundCoverSurfaceCovers.FirstOrDefault(p => string.Equals(p.Code, s.GroundCoverCode, StringComparison.OrdinalIgnoreCase));
+        }
+        if (item is null)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        s.TextureKey = item.TextureKey;
+        s.TextureImageId = null;
+        s.Fill = item.FillColor;
+        s.Stroke = item.StrokeColor;
+        if (!s.IsGroundCoverSurface && item.DefaultDepthIn is double dd)
+        {
+            s.GroundCoverDepthIn = dd;
+        }
+        _ = SaveAsync();
     }
 
     private static string TakeoffKind(Shape s)
@@ -1708,12 +2408,13 @@ else
 
         var rows = BuildTakeoff(currentPlot.Shapes);
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Type,Name,Count");
+        sb.AppendLine("Type,Name,Count,Quantity");
         foreach (var r in rows)
         {
             sb.Append(CsvField(r.Kind)).Append(',')
               .Append(CsvField(r.Name)).Append(',')
-              .Append(r.Count.ToString(CultureInfo.InvariantCulture))
+              .Append(r.Count.ToString(CultureInfo.InvariantCulture)).Append(',')
+              .Append(CsvField(r.Quantity ?? string.Empty))
               .Append('\n');
         }
 
@@ -1764,6 +2465,7 @@ else
 
     // JS interop
     private IJSObjectReference? jsModule;
+    private IJSObjectReference? clientImagesModule;
     private DotNetObjectReference<GardenPlot>? dotnetRef;
     private IJSObjectReference? wheelHandle;
 
@@ -1797,7 +2499,37 @@ else
         W = item.WidthFt,
         H = item.HeightFt,
         Label = item.Code,
-        Trait = item.Trait,
+        Trait = item.Kind == PaletteKind.CustomTile
+            ? (string.IsNullOrWhiteSpace(item.Trait) ? "custom-tile" : item.Trait)
+            : item.Trait,
+        Stroke = item.StrokeColor,
+        Fill = item.FillColor,
+        TileBackgroundImageFileName = item.TileBackgroundImageFileName,
+    };
+
+    /// <summary>Resolves the optional PlantProfile for a placed shape or stamp preview.</summary>
+    private PlantProfile? ProfileForShape(Shape s, bool isPreview)
+    {
+        if (isPreview && selectedItem is not null)
+        {
+            return PlantProfiles.GetProfile(selectedItem);
+        }
+
+        if (!string.IsNullOrWhiteSpace(s.Label))
+        {
+            return PlantProfiles.GetProfile(s.Label!);
+        }
+
+        return null;
+    }
+
+    private static string LightLabel(SunlightLevel level) => level switch
+    {
+        SunlightLevel.FullSun => "full sun",
+        SunlightLevel.PartialSun => "part sun",
+        SunlightLevel.PartialShade => "part shade",
+        SunlightLevel.FullShade => "full shade",
+        _ => level.ToString(),
     };
 
     // Stamp ghost preview state
@@ -1849,7 +2581,7 @@ else
     private bool showNewPlotDialog;
     private bool isEditingPlotSettings;
     private KeyBindingSettings keyBindingDraft = new();
-    private string newPlotName = "My Garden";
+    private string newPlotName = "Garden";
     private string newPlotShape = "Rectangle";
     private double newPlotWidth = 60;
     private double newPlotHeight = 8;
@@ -2080,15 +2812,21 @@ else
             {
                 loaded = true;
 
-                // Always seed a local in-memory plot first so the UI never remains on Loading…
-                // if browser storage interop stalls or fails.
+                // Seed an empty Garden immediately so the UI renders without waiting
+                // for the Blazor SignalR circuit + JSInterop to establish (which can
+                // take 10–60s on a cold initial page load). The load below may replace
+                // this with real data; if the user has drawn on this seed before the
+                // load completes we preserve their work and skip the replacement.
                 if (currentPlot is null)
                 {
-                    var startupFallback = new PlotData { Name = "My Garden", WidthFt = 60, HeightFt = 8 };
+                    var startupFallback = new PlotData { Name = "Garden", WidthFt = 120, HeightFt = 120 };
                     library = new PlotLibrary();
                     library.Plots.Add(startupFallback);
                     library.LastPlotId = startupFallback.Id;
                     currentPlot = startupFallback;
+                    InitialLoadSeed.Add(1);
+                    Logger.LogInformation("[{Sid}] Startup: seeded empty Garden plot {PlotId} for immediate render; background load begins.",
+                        SessionTraceId, startupFallback.Id);
                     StateHasChanged();
                 }
 
@@ -2096,15 +2834,54 @@ else
                 {
                     try
                     {
-                        jsModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/gardenplot.js");
+                        // Hard cap each module import so a single slow/broken JS call cannot wedge the page.
+                        using var importCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                        jsModule ??= await JS.InvokeAsync<IJSObjectReference>("import", importCts.Token, "./js/gardenplot.js");
+                        clientImagesModule ??= await JS.InvokeAsync<IJSObjectReference>("import", importCts.Token, "./js/client-images.js");
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Continue; load can still try server-side JS interop calls directly.
+                        Logger.LogWarning(ex, "[{Sid}] JS module import failed or timed out; continuing without it.", SessionTraceId);
                     }
 
-                    var (loadedLibrary, loadedFromKey, loadWasAuthoritative) = await TryLoadLibraryAsync();
-                    library = loadedLibrary ?? new PlotLibrary();
+                    PlotLibrary? loadedLibrary = null;
+                    string? loadedFromKey = null;
+                    bool loadWasAuthoritative = false;
+                    try
+                    {
+                        // Let the load complete naturally. The seed plot is already on
+                        // screen so the user isn't blocked, and the data we want lives
+                        // in IndexedDB - cutting the load off with an artificial timeout
+                        // forced us into the stale recovery path and clobbered live data.
+                        (loadedLibrary, loadedFromKey, loadWasAuthoritative) = await TryLoadLibraryAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "[{Sid}] Load threw; will use seed plot in-memory.", SessionTraceId);
+                    }
+
+                    Logger.LogInformation("[{Sid}] Load complete. SourceKey={SourceKey}, Authoritative={Authoritative}, Plots={PlotCount}, Shapes={ShapeCount}.",
+                        SessionTraceId, loadedFromKey ?? "(none)", loadWasAuthoritative,
+                        loadedLibrary?.Plots?.Count ?? 0, loadedLibrary is null ? 0 : TotalShapeCount(loadedLibrary));
+
+                    // PRESERVE USER ACTIVITY: if the user has already drawn on the seed
+                    // plot before the slow load finished, do NOT throw away their work.
+                    var userHasDrawn = TotalShapeCount(library) > 0;
+                    if (userHasDrawn && (loadedLibrary is null || TotalShapeCount(loadedLibrary) == 0))
+                    {
+                        Logger.LogWarning("[{Sid}] Load returned empty but user has already drawn {ShapeCount} shapes; keeping in-memory library.",
+                            SessionTraceId, TotalShapeCount(library));
+                    }
+                    else if (userHasDrawn && loadedLibrary is not null)
+                    {
+                        Logger.LogWarning("[{Sid}] Load returned data but user already drew {InMemoryShapes} shapes; keeping in-memory library to preserve their work.",
+                            SessionTraceId, TotalShapeCount(library));
+                    }
+                    else
+                    {
+                        // No user activity yet; safe to install the loaded library.
+                        library = loadedLibrary ?? new PlotLibrary();
+                    }
                     var appliedRecovery = false;
 
                     if (TotalShapeCount(library) == 0)
@@ -2114,6 +2891,8 @@ else
                         {
                             library = recoveredLibrary;
                             appliedRecovery = true;
+                            Logger.LogInformation("[{Sid}] Recovery library applied. Plots={PlotCount}, Shapes={ShapeCount}.",
+                                SessionTraceId, library.Plots.Count, TotalShapeCount(library));
                         }
                     }
 
@@ -2121,9 +2900,12 @@ else
 
                     if (library.Plots.Count == 0)
                     {
-                        library.Plots.Add(new PlotData { Name = "My Garden", WidthFt = 60, HeightFt = 8 });
+                        library.Plots.Add(new PlotData { Name = "Garden", WidthFt = 120, HeightFt = 120 });
                         library.LastPlotId = library.Plots[0].Id;
                         createdDefaultPlot = true;
+                        InitialLoadDefault.Add(1);
+                        Logger.LogWarning("[{Sid}] Created NEW default Garden plot because library was empty after load. SourceKey={SourceKey}, Authoritative={Authoritative}.",
+                            SessionTraceId, loadedFromKey ?? "(none)", loadWasAuthoritative);
                     }
 
                     currentPlot = library.Plots.FirstOrDefault(p => p.Id == library.LastPlotId)
@@ -2133,8 +2915,15 @@ else
                     showTakeoffPanel = library.Ui.TakeoffPanelVisible ?? false;
                     restoreViewportPending = true;
 
-                    // Save only when migrating storage or creating a new default.
-                    if (loadWasAuthoritative && (createdDefaultPlot || loadedFromKey != FileStoreSourceKey || appliedRecovery))
+                    // Only save when we created a fresh default plot for a brand-new
+                    // user. Do NOT save after applying recovery: recovery is a fallback
+                    // that may be STALE relative to primary IndexedDB storage (because
+                    // localStorage backups can lag behind IDB on rapid edits). Saving
+                    // recovery as primary would overwrite newer IDB data with older.
+                    var willSave = createdDefaultPlot && loadedFromKey is null && loadWasAuthoritative;
+                    Logger.LogInformation("[{Sid}] Post-load decision. Authoritative={Authoritative}, CreatedDefault={CreatedDefault}, AppliedRecovery={AppliedRecovery}, SourceKey={SourceKey}, WillSave={WillSave}.",
+                        SessionTraceId, loadWasAuthoritative, createdDefaultPlot, appliedRecovery, loadedFromKey ?? "(none)", willSave);
+                    if (willSave)
                     {
                         await SaveAsync();
                     }
@@ -2177,10 +2966,11 @@ else
                 {
                     // Last-resort recovery so the page does not stay stuck on Loading…
                     library = new PlotLibrary();
-                    var fallback = new PlotData { Name = "My Garden", WidthFt = 60, HeightFt = 8 };
+                    var fallback = new PlotData { Name = "Garden", WidthFt = 120, HeightFt = 120 };
                     library.Plots.Add(fallback);
                     library.LastPlotId = fallback.Id;
                     currentPlot = fallback;
+                    Logger.LogError("[{Sid}] Last-resort recovery: load threw unhandled exception. Created default Garden plot in-memory only (NOT saved).", SessionTraceId);
                     StateHasChanged();
                 }
             }
@@ -2190,6 +2980,19 @@ else
         {
             await RestoreViewportAsync();
             restoreViewportPending = false;
+        }
+
+        // Resolve any client-local image placeholders to blob: URLs after the DOM is updated.
+        if (clientImagesModule is not null)
+        {
+            try
+            {
+                await clientImagesModule.InvokeVoidAsync("applyClientImages", null);
+            }
+            catch
+            {
+                // Non-fatal: legacy filenames continue to load via the /tile-images path.
+            }
         }
 
         // After every render: if the species we're showing details for changed, refresh the Wikipedia summary.
@@ -2258,14 +3061,17 @@ else
 
         try
         {
-            var fileLibrary = await TryLoadFileStoreLibraryAsync();
-            if (fileLibrary is not null && fileLibrary.Plots.Count > 0)
+            if (FileStoreEnabled)
             {
-                RecordLoadMetrics("loaded", FileStoreSourceKey, fileLibrary, 0, sw.Elapsed.TotalMilliseconds);
-                Logger.LogInformation("GardenPlot storage load succeeded from file store. Plots: {PlotCount}, Shapes: {ShapeCount}.",
-                    fileLibrary.Plots.Count,
-                    TotalShapeCount(fileLibrary));
-                return (fileLibrary, FileStoreSourceKey, true);
+                var fileLibrary = await TryLoadFileStoreLibraryAsync();
+                if (fileLibrary is not null && fileLibrary.Plots.Count > 0)
+                {
+                    RecordLoadMetrics("loaded", FileStoreSourceKey, fileLibrary, 0, sw.Elapsed.TotalMilliseconds);
+                    Logger.LogInformation("GardenPlot storage load succeeded from file store. Plots: {PlotCount}, Shapes: {ShapeCount}.",
+                        fileLibrary.Plots.Count,
+                        TotalShapeCount(fileLibrary));
+                    return (fileLibrary, FileStoreSourceKey, true);
+                }
             }
         }
         catch (Exception ex)
@@ -2284,27 +3090,41 @@ else
                     var idbBytes = System.Text.Encoding.UTF8.GetByteCount(idbJson);
                     if (idbLibrary.Plots.Count > 0)
                     {
+                        StorageLoadLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
                         RecordLoadMetrics("loaded", "indexeddb", idbLibrary, idbBytes, sw.Elapsed.TotalMilliseconds);
-                        Logger.LogInformation("GardenPlot storage load succeeded from IndexedDB. Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
-                            idbLibrary.Plots.Count,
-                            TotalShapeCount(idbLibrary),
-                            idbBytes);
+                        Logger.LogInformation("[{Sid}] Load: IndexedDB hit. Plots={PlotCount}, Shapes={ShapeCount}, Bytes={Bytes}.",
+                            SessionTraceId, idbLibrary.Plots.Count, TotalShapeCount(idbLibrary), idbBytes);
                         return (idbLibrary, "indexeddb", true);
                     }
+
+                    StorageLoadLayerMiss.Add(1, new KeyValuePair<string, object?>("layer", "idb-empty-plots"));
+                    Logger.LogWarning("[{Sid}] Load: IndexedDB returned JSON but Plots was empty after normalize. Bytes={Bytes}, Json[0..120]={Preview}.",
+                        SessionTraceId, idbBytes, idbJson.Length > 120 ? idbJson[..120] : idbJson);
+                }
+                else
+                {
+                    StorageLoadLayerMiss.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
+                    Logger.LogInformation("[{Sid}] Load: IndexedDB miss. Key={StorageKey}.", SessionTraceId, StorageKeyPrimary);
                 }
             }
             catch (TaskCanceledException)
             {
                 interopFailure = true;
+                Logger.LogWarning("[{Sid}] Load: IndexedDB TaskCanceled.", SessionTraceId);
             }
             catch (Microsoft.JSInterop.JSDisconnectedException)
             {
                 interopFailure = true;
+                Logger.LogWarning("[{Sid}] Load: IndexedDB JSDisconnected.", SessionTraceId);
             }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "GardenPlot IndexedDB load failed; falling back to localStorage keys.");
+                Logger.LogWarning(ex, "[{Sid}] Load: IndexedDB threw, falling back to localStorage.", SessionTraceId);
             }
+        }
+        else
+        {
+            Logger.LogWarning("[{Sid}] Load: jsModule is null, cannot read IndexedDB. Will try localStorage via JS.", SessionTraceId);
         }
 
         string[] keys =
@@ -2326,10 +3146,13 @@ else
                 var json = await JS.InvokeAsync<string?>("localStorage.getItem", key);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    StorageLoadLayerMiss.Add(1, new KeyValuePair<string, object?>("layer", key));
+                    Logger.LogInformation("[{Sid}] Load: localStorage miss. Key={StorageKey}.", SessionTraceId, key);
                     continue;
                 }
 
                 payloadBytes = System.Text.Encoding.UTF8.GetByteCount(json);
+                Logger.LogInformation("[{Sid}] Load: localStorage raw hit. Key={StorageKey}, Bytes={Bytes}.", SessionTraceId, key, payloadBytes);
 
                 var normalized = NormalizeLibrary(JsonSerializer.Deserialize<PlotLibrary>(json));
 
@@ -2341,24 +3164,25 @@ else
 
                 if (normalized.Plots.Count > 0)
                 {
+                    StorageLoadLayerOk.Add(1, new KeyValuePair<string, object?>("layer", key));
                     RecordLoadMetrics("loaded", key, normalized, payloadBytes, sw.Elapsed.TotalMilliseconds);
-                    Logger.LogInformation("GardenPlot storage load succeeded from {StorageKey}. Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
-                        key,
-                        normalized.Plots.Count,
-                        TotalShapeCount(normalized),
-                        payloadBytes);
+                    Logger.LogInformation("[{Sid}] Load: localStorage decoded ok. Key={StorageKey}, Plots={PlotCount}, Shapes={ShapeCount}.",
+                        SessionTraceId, key, normalized.Plots.Count, TotalShapeCount(normalized));
                     return (normalized, key, true);
                 }
+
+                Logger.LogWarning("[{Sid}] Load: localStorage decoded but Plots empty. Key={StorageKey}, Bytes={Bytes}.", SessionTraceId, key, payloadBytes);
             }
             catch (Exception ex)
             {
                 if (ex is TaskCanceledException or Microsoft.JSInterop.JSDisconnectedException)
                 {
                     interopFailure = true;
+                    Logger.LogWarning("[{Sid}] Load: localStorage interop disconnected on key {StorageKey}.", SessionTraceId, key);
                     break;
                 }
 
-                Logger.LogWarning(ex, "GardenPlot storage load failed for key {StorageKey}; trying next key.", key);
+                Logger.LogWarning(ex, "[{Sid}] Load: localStorage threw on key {StorageKey}; trying next key.", SessionTraceId, key);
             }
         }
 
@@ -2648,11 +3472,23 @@ else
     {
         if (isDisposingOrDisposed)
         {
+            StorageSaveSkipped.Add(1, new KeyValuePair<string, object?>("reason", "disposed"));
+            Logger.LogInformation("[{Sid}] SaveAsync skipped: component is disposing/disposed.", SessionTraceId);
+            return;
+        }
+
+        if (currentPlot is null)
+        {
+            StorageSaveSkipped.Add(1, new KeyValuePair<string, object?>("reason", "no-current-plot"));
+            Logger.LogInformation("[{Sid}] SaveAsync skipped: currentPlot is null (load not finished).", SessionTraceId);
             return;
         }
 
         var sw = Stopwatch.StartNew();
         StorageSaveAttempts.Add(1);
+        var shapeCount = TotalShapeCount(library);
+        Logger.LogInformation("[{Sid}] SaveAsync begin. Plots={PlotCount}, Shapes={ShapeCount}, CurrentPlotId={CurrentPlotId}, LastPlotId={LastPlotId}.",
+            SessionTraceId, library.Plots.Count, shapeCount, currentPlot?.Id, library.LastPlotId);
 
         if (currentPlot is not null)
         {
@@ -2665,14 +3501,17 @@ else
         try
         {
             var fileSaved = false;
-            try
+            if (FileStoreEnabled)
             {
-                await SaveFileStoreLibraryAsync(library);
-                fileSaved = true;
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "GardenPlot file-store save failed; attempting browser-storage fallback.");
+                try
+                {
+                    await SaveFileStoreLibraryAsync(library);
+                    fileSaved = true;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "GardenPlot file-store save failed; attempting browser-storage fallback.");
+                }
             }
 
             var json = JsonSerializer.Serialize(library);
@@ -2712,11 +3551,19 @@ else
                 {
                     await jsModule.InvokeVoidAsync("idbSet", StorageKeyPrimary, json);
                     idbSaved = true;
+                    StorageSaveLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
+                    Logger.LogInformation("[{Sid}] SaveAsync idbSet ok. Key={StorageKey}, Bytes={Bytes}.", SessionTraceId, StorageKeyPrimary, payloadBytes);
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogWarning(ex, "GardenPlot IndexedDB save failed; attempting localStorage mirror.");
+                    StorageSaveLayerFail.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
+                    Logger.LogWarning(ex, "[{Sid}] SaveAsync idbSet failed; will try localStorage. Key={StorageKey}.", SessionTraceId, StorageKeyPrimary);
                 }
+            }
+            else
+            {
+                StorageSaveSkipped.Add(1, new KeyValuePair<string, object?>("reason", "no-jsmodule"));
+                Logger.LogWarning("[{Sid}] SaveAsync idbSet skipped: jsModule is null after import attempt.", SessionTraceId);
             }
 
             // Mirror to localStorage with rolling backups for compatibility/recovery.
@@ -2737,17 +3584,17 @@ else
 
                 await JS.InvokeVoidAsync("localStorage.setItem", cts.Token, StorageKeyPrimary, json);
                 await JS.InvokeVoidAsync("localStorage.setItem", cts.Token, StorageKeyLegacy, json);
+                StorageSaveLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "localstorage"));
 
                 RecordSaveMetrics("saved", idbSaved ? "idb+full" : "full", payloadBytes, sw.Elapsed.TotalMilliseconds);
-                Logger.LogInformation("GardenPlot storage save succeeded (mode: full). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
-                    library.Plots.Count,
-                    TotalShapeCount(library),
-                    payloadBytes);
+                Logger.LogInformation("[{Sid}] SaveAsync localStorage primary+legacy ok. Bytes={Bytes}, idbAlsoSaved={IdbSaved}.",
+                    SessionTraceId, payloadBytes, idbSaved);
                 return;
             }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "GardenPlot storage save full mode failed; trying compact mode.");
+                StorageSaveLayerFail.Add(1, new KeyValuePair<string, object?>("layer", "localstorage"));
+                Logger.LogWarning(ex, "[{Sid}] SaveAsync localStorage full-mode write failed; falling back to compact.", SessionTraceId);
             }
 
             // Fallback: free space and save primary only.
@@ -3301,20 +4148,117 @@ else
     {
         PaletteCategory.BedKits => "Bed Kits",
         PaletteCategory.TreesFruit => "Trees — Fruit",
-        PaletteCategory.TreesOrnamental => "Trees — Ornamental",
-        PaletteCategory.BushesEdible => "Bushes — Edible",
-        PaletteCategory.BushesOrnamental => "Bushes — Ornamental",
+        PaletteCategory.TreesNut => "Trees — Nut",
+        PaletteCategory.TreesOrnamentalFlowering => "Trees — Flowering",
+        PaletteCategory.TreesShade => "Trees — Shade",
+        PaletteCategory.TreesEvergreen => "Trees — Evergreen",
+        PaletteCategory.ShrubsBerry => "Shrubs — Berry",
+        PaletteCategory.ShrubsFlowering => "Shrubs — Flowering",
+        PaletteCategory.ShrubsEvergreen => "Shrubs — Evergreen",
+        PaletteCategory.VinesEdible => "Vines — Edible",
+        PaletteCategory.VinesOrnamental => "Vines — Ornamental",
         PaletteCategory.Vegetables => "Vegetables",
-        PaletteCategory.Herbs => "Herbs",
+        PaletteCategory.HerbsCulinary => "Herbs — Culinary",
+        PaletteCategory.HerbsMedicinal => "Herbs — Medicinal",
+        PaletteCategory.FlowersAnnual => "Flowers — Annual",
+        PaletteCategory.FlowersPerennial => "Flowers — Perennial",
+        PaletteCategory.Bulbs => "Bulbs",
+        PaletteCategory.GroundCoverPlants => "Ground Cover Plants",
+        PaletteCategory.GroundCoverMaterials => "Ground Cover Materials",
+        PaletteCategory.GroundCoverSurface => "Ground Cover — Surface",
+        PaletteCategory.GrassesTurf => "Grasses — Turf",
+        PaletteCategory.GrassesOrnamental => "Grasses — Ornamental",
+        PaletteCategory.Succulents => "Succulents & Cacti",
+        PaletteCategory.PollinatorNatives => "Pollinator Natives",
+        PaletteCategory.CoverCrops => "Cover Crops",
         PaletteCategory.CustomTiles => "Custom Tiles",
         _ => k.ToString(),
     };
 
     private IReadOnlyList<PaletteItem> PaletteItemsForCurrentCategory()
     {
-        return currentCategory == PaletteCategory.CustomTiles
+        IReadOnlyList<PaletteItem> source = currentCategory == PaletteCategory.CustomTiles
             ? library.CustomPaletteItems
             : PaletteCatalog.For(currentCategory);
+
+        ClimateRegion? region = PaletteRegionFilter;
+        bool nativeOnly = PaletteNativeOnly;
+
+        if (region is null && !nativeOnly)
+        {
+            return source;
+        }
+
+        List<PaletteItem> filtered = new();
+        foreach (PaletteItem item in source)
+        {
+            PlantProfile? profile = PlantProfiles.GetProfile(item);
+
+            // Items without a profile (e.g. bed kits) are always shown when the user
+            // is not filtering by region, and always hidden when they are — they have
+            // no climate metadata to compare against.
+            if (region is { } r)
+            {
+                if (profile is null)
+                {
+                    continue;
+                }
+
+                bool fits = profile.GrowRegions is { Length: > 0 } grow
+                    ? grow.Contains(r)
+                    : ClimateRegions.IsPlantSuitable(profile, r);
+
+                if (!fits)
+                {
+                    continue;
+                }
+
+                if (nativeOnly)
+                {
+                    bool isNative = profile.NativeRegions is { Length: > 0 } native && native.Contains(r);
+                    if (!isNative)
+                    {
+                        continue;
+                    }
+                }
+            }
+            else if (nativeOnly)
+            {
+                // Native-only without a region picked: keep anything explicitly marked native somewhere.
+                if (profile?.NativeRegions is not { Length: > 0 })
+                {
+                    continue;
+                }
+            }
+
+            filtered.Add(item);
+        }
+
+        return filtered;
+    }
+
+    private ClimateRegion? PaletteRegionFilter
+    {
+        get => library.Ui.PaletteRegionFilter ?? currentPlot?.ClimateRegion ?? library.Ui.DefaultClimateRegion;
+    }
+
+    private bool PaletteNativeOnly => library.Ui.PaletteNativeOnly;
+
+    private async Task OnPaletteRegionChanged(ChangeEventArgs e)
+    {
+        string raw = e.Value?.ToString() ?? string.Empty;
+        library.Ui.PaletteRegionFilter = string.IsNullOrEmpty(raw)
+            ? null
+            : System.Enum.TryParse<ClimateRegion>(raw, out var region) ? region : null;
+        await SaveAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnPaletteNativeOnlyChanged(ChangeEventArgs e)
+    {
+        library.Ui.PaletteNativeOnly = e.Value is bool b && b;
+        await SaveAsync();
+        StateHasChanged();
     }
 
     private async Task AddCustomTileAsync()
@@ -3396,6 +4340,11 @@ else
     private static bool IsCustomTileShape(Shape s)
         => string.Equals(s.Trait, "custom-tile", StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsTileShape(Shape s)
+        => IsCustomTileShape(s)
+        || string.Equals(s.Trait, "grass", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(s.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase);
+
     private PaletteItem? ResolveCustomTileInfoItem(Shape shape, bool isPreview)
     {
         if (isPreview && selectedItem?.Kind == PaletteKind.CustomTile)
@@ -3403,12 +4352,13 @@ else
             return selectedItem;
         }
 
-        if (!IsCustomTileShape(shape) || string.IsNullOrWhiteSpace(shape.Label))
+        if (!IsTileShape(shape) || string.IsNullOrWhiteSpace(shape.Label))
         {
             return null;
         }
 
-        return library.CustomPaletteItems.FirstOrDefault(i => string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase));
+        return library.CustomPaletteItems.FirstOrDefault(i => string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase))
+            ?? PaletteCatalog.Grasses.FirstOrDefault(i => string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task EnsureCitationSummaryForCustomTile(PaletteItem item)
@@ -3563,15 +4513,33 @@ else
             return null;
         }
 
-        Directory.CreateDirectory(FileStoreTileImageDirectory);
-        var fileName = $"{Guid.NewGuid():N}{ext}";
-        var path = Path.Combine(FileStoreTileImageDirectory, fileName);
+        if (jsModule is null)
+        {
+            addCustomTileError = "Image storage is not ready yet. Try again in a moment.";
+            return null;
+        }
 
-        await using var input = file.OpenReadStream(CustomTileImageMaxBytes);
-        await using var output = File.Create(path);
-        await input.CopyToAsync(output);
-        addCustomTileError = null;
-        return fileName;
+        try
+        {
+            await using var input = file.OpenReadStream(CustomTileImageMaxBytes);
+            using var ms = new MemoryStream();
+            await input.CopyToAsync(ms);
+            var base64 = Convert.ToBase64String(ms.ToArray());
+
+            var id = await jsModule.InvokeAsync<string>(
+                "GardenPlot.clientImages.putImageFromBase64",
+                base64,
+                file.ContentType,
+                file.Name);
+            addCustomTileError = null;
+            return id;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Custom tile image save failed");
+            addCustomTileError = "Could not save image. Check browser storage availability.";
+            return null;
+        }
     }
 
     private static string PreviewViewBox(PaletteItem item)
@@ -3584,8 +4552,31 @@ else
         return $"{F(-pad)} {F(-pad)} {F(item.WidthFt + pad * 2)} {F(item.HeightFt + pad + labelRoom)}";
     }
 
+    // Tiny 1x1 transparent GIF used as a placeholder src/href while the JS
+    // hook resolves a client-local image GUID to a blob: URL.
+    private const string TransparentPixelDataUrl = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+    private static bool IsClientImageId(string? s)
+    {
+        if (string.IsNullOrEmpty(s) || s.Length != 36)
+        {
+            return false;
+        }
+        // Quick GUID-shape check (8-4-4-4-12)
+        return s[8] == '-' && s[13] == '-' && s[18] == '-' && s[23] == '-';
+    }
+
     private static string TileImageUrl(string fileName)
-        => $"/tile-images/{Uri.EscapeDataString(fileName)}";
+        => string.IsNullOrEmpty(fileName)
+            ? string.Empty
+            : IsClientImageId(fileName)
+                ? TransparentPixelDataUrl
+                : $"/tile-images/{Uri.EscapeDataString(fileName)}";
+
+    // When the reference is a client-image GUID, returns the id (caller emits it
+    // as data-client-image-id="..."). Otherwise returns null so no attribute is rendered.
+    private static string? TileImageClientId(string? fileName)
+        => IsClientImageId(fileName) ? fileName : null;
 
     private static string PlotImageUrl(string fileName)
         => $"/plot-images/{Uri.EscapeDataString(fileName)}";
@@ -3660,7 +4651,24 @@ else
         ClearSelection();
         HideShapeContextMenu();
         selectedItem = item;
-        currentTool = Tool.Stamp;
+
+        // Ground cover materials and surface seeds are drawn as area shapes,
+        // not stamped. Pick the area-drawing tool automatically so the user
+        // doesn't need a second click; preserves the prior sub-mode choice.
+        if (item.Kind == PaletteKind.GroundCover || item.Kind == PaletteKind.GroundCoverSurface)
+        {
+            currentTool = Tool.GroundCover;
+            // Seed the toolbar depth control from the palette default; the user can
+            // tweak it on-the-fly before drawing each shape.
+            currentGroundCoverDepthIn = item.Kind == PaletteKind.GroundCover
+                ? (item.DefaultDepthIn ?? 3.0)
+                : null;
+        }
+        else
+        {
+            currentTool = Tool.Stamp;
+        }
+
         ApplyDefaultDropSpacing(item);
         if (currentPlot is not null)
         {
@@ -3964,7 +4972,9 @@ else
             H = item.HeightFt,
             Rotation = rotation,
             Label = item.Code,
-            Trait = item.Kind == PaletteKind.CustomTile ? "custom-tile" : item.Trait,
+            Trait = item.Kind == PaletteKind.CustomTile
+                ? (string.IsNullOrWhiteSpace(item.Trait) ? "custom-tile" : item.Trait)
+                : item.Trait,
             Stroke = item.StrokeColor,
             Fill = item.FillColor,
             TileBackgroundImageFileName = item.TileBackgroundImageFileName,
@@ -4208,6 +5218,85 @@ else
                 dragStartX = x;
                 dragStartY = y;
                 break;
+            case Tool.GroundCover when selectedItem is { } gcItem && (gcItem.Kind == PaletteKind.GroundCover || gcItem.Kind == PaletteKind.GroundCoverSurface):
+                {
+                    var isSurface = gcItem.Kind == PaletteKind.GroundCoverSurface;
+                    // Use the on-the-fly toolbar depth value (which was seeded from
+                    // the palette default when the item was selected). Surface covers
+                    // do not carry depth.
+                    var depth = isSurface
+                        ? (double?)null
+                        : (currentGroundCoverDepthIn ?? gcItem.DefaultDepthIn ?? 3.0);
+                    if (groundCoverSubMode == GroundCoverSubMode.Polygon)
+                    {
+                        // Click-by-vertex polygon. First click: start the shape with an
+                        // anchor + cursor-tracking endpoint. Subsequent clicks add vertices.
+                        // Double-click finalizes (see OnCanvasDoubleClick).
+                        if (drafting is null || !buildingPolygon)
+                        {
+                            drafting = new Shape
+                            {
+                                Kind = ShapeKind.FreeDraw,
+                                Trait = "ground-cover",
+                                Label = gcItem.Code,
+                                Stroke = gcItem.StrokeColor,
+                                Fill = gcItem.FillColor,
+                                GroundCoverCode = gcItem.Code,
+                                GroundCoverDepthIn = depth,
+                                IsGroundCoverSurface = isSurface,
+                                TextureKey = gcItem.TextureKey,
+                            };
+                            drafting.Points.Add(new Point(x, y));
+                            drafting.Points.Add(new Point(x, y));
+                            buildingPolygon = true;
+                        }
+                        else
+                        {
+                            // Commit the previous cursor-tracking endpoint as a real vertex,
+                            // then add a new trailing endpoint at the same spot.
+                            drafting.Points[^1] = new Point(x, y);
+                            drafting.Points.Add(new Point(x, y));
+                        }
+                    }
+                    else if (groundCoverSubMode == GroundCoverSubMode.FreehandArea)
+                    {
+                        drafting = new Shape
+                        {
+                            Kind = ShapeKind.FreeDraw,
+                            Trait = "ground-cover",
+                            Label = gcItem.Code,
+                            Stroke = gcItem.StrokeColor,
+                            Fill = gcItem.FillColor,
+                            GroundCoverCode = gcItem.Code,
+                            GroundCoverDepthIn = depth,
+                            IsGroundCoverSurface = isSurface,
+                            TextureKey = gcItem.TextureKey,
+                        };
+                        drafting.Points.Add(new Point(x, y));
+                    }
+                    else
+                    {
+                        drafting = new Shape
+                        {
+                            Kind = groundCoverSubMode == GroundCoverSubMode.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
+                            X = x,
+                            Y = y,
+                            W = 0,
+                            H = 0,
+                            Trait = "ground-cover",
+                            Label = gcItem.Code,
+                            Stroke = gcItem.StrokeColor,
+                            Fill = gcItem.FillColor,
+                            GroundCoverCode = gcItem.Code,
+                            GroundCoverDepthIn = depth,
+                            IsGroundCoverSurface = isSurface,
+                            TextureKey = gcItem.TextureKey,
+                        };
+                        dragStartX = x;
+                        dragStartY = y;
+                    }
+                }
+                break;
             case Tool.Ruler:
                 if (drafting is null || drafting.Kind != ShapeKind.Ruler)
                 {
@@ -4379,7 +5468,15 @@ else
         switch (drafting.Kind)
         {
             case ShapeKind.FreeDraw:
-                drafting.Points.Add(new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt)));
+                if (buildingPolygon && drafting.Points.Count >= 1)
+                {
+                    // Replace the trailing cursor-tracker so the in-progress edge follows the cursor.
+                    drafting.Points[^1] = new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt));
+                }
+                else
+                {
+                    drafting.Points.Add(new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt)));
+                }
                 break;
             case ShapeKind.Ruler:
                 if (drafting.Points.Count >= 1)
@@ -4483,6 +5580,8 @@ else
         if (drafting is null) return;
         // Rulers are finalized on pointer-down only (multi-click flow).
         if (drafting.Kind == ShapeKind.Ruler) return;
+        // Click-by-vertex polygons are finalized on double-click, not pointer-up.
+        if (buildingPolygon) return;
         var minSize = 0.1;
         var added = false;
         if (drafting.Kind == ShapeKind.FreeDraw)
@@ -4961,6 +6060,57 @@ else
         pointerAltDown = false;
     }
 
+    /// <summary>
+    /// Finalizes a click-by-vertex ground-cover polygon. The last point is the
+    /// cursor-tracking endpoint that has not been committed; drop it before saving.
+    /// </summary>
+    private void OnCanvasDoubleClick(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
+    {
+        if (!buildingPolygon || drafting is null || currentPlot is null)
+        {
+            return;
+        }
+
+        // Drop the trailing cursor-tracking endpoint.
+        if (drafting.Points.Count > 0)
+        {
+            drafting.Points.RemoveAt(drafting.Points.Count - 1);
+        }
+
+        // Also drop the duplicate vertex created by the double-click's two
+        // pointer-down events (which appended a vertex on each click).
+        if (drafting.Points.Count >= 2)
+        {
+            var last = drafting.Points[^1];
+            var prev = drafting.Points[^2];
+            if (Math.Abs(last.X - prev.X) < 0.01 && Math.Abs(last.Y - prev.Y) < 0.01)
+            {
+                drafting.Points.RemoveAt(drafting.Points.Count - 1);
+            }
+        }
+
+        if (drafting.Points.Count >= 3)
+        {
+            RecordUndoState();
+            currentPlot.Shapes.Add(drafting);
+            _ = SaveAsync();
+        }
+
+        drafting = null;
+        buildingPolygon = false;
+        StateHasChanged();
+    }
+
+    /// <summary>Cancel an in-progress click-by-vertex polygon (used when changing sub-mode or Escape).</summary>
+    private void CancelPolygonInProgress()
+    {
+        if (buildingPolygon)
+        {
+            drafting = null;
+            buildingPolygon = false;
+        }
+    }
+
     private string CurrentMouseActionLabel()
     {
         if (panPending || panActive)
@@ -5090,6 +6240,7 @@ else
             selectedItem = null;
             ghostX = ghostY = null;
             drafting = null;
+            buildingPolygon = false;
             ClearSelection();
         }
     }
@@ -5834,7 +6985,16 @@ else
 
     private static string EffectiveStroke(Shape s) => s.Stroke ?? DefaultStroke(s);
 
-    private static string EffectiveFill(Shape s) => s.Fill ?? DefaultFill(s);
+    private static string EffectiveFill(Shape s)
+    {
+        if (IsGroundCoverShape(s)
+            && !string.IsNullOrWhiteSpace(s.TextureKey)
+            && string.IsNullOrWhiteSpace(s.TextureImageId))
+        {
+            return $"url(#tex-{s.TextureKey})";
+        }
+        return s.Fill ?? DefaultFill(s);
+    }
 
     private static double EffectiveFillOpacity(Shape s) => s.FillOpacity ?? DefaultFillOpacity(s);
 
@@ -6113,11 +7273,24 @@ else
 
     private static string PanelTitleFor(Shape s)
     {
+        if (IsGroundCoverShape(s))
+        {
+            var name = !string.IsNullOrWhiteSpace(s.GroundCoverCode) ? s.GroundCoverCode : (s.Label ?? "(unnamed)");
+            return s.IsGroundCoverSurface ? $"Ground Cover — Surface · {name}" : $"Ground Cover · {name}";
+        }
+
         if ((s.Kind == ShapeKind.Rectangle || s.Kind == ShapeKind.Oval)
-            && string.Equals(s.Trait, "custom-tile", StringComparison.OrdinalIgnoreCase)
             && !string.IsNullOrWhiteSpace(s.Label))
         {
-            return $"Custom · {s.Label}";
+            if (string.Equals(s.Trait, "grass", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(s.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"Grass · {s.Label}";
+            }
+            if (string.Equals(s.Trait, "custom-tile", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"Custom · {s.Label}";
+            }
         }
 
         return s.Kind switch
@@ -6231,7 +7404,7 @@ else
 
     private async Task EnsureWikiSummaryFor(Shape s)
     {
-        if (s.Kind != ShapeKind.Tree && s.Kind != ShapeKind.Bush)
+        if (s.Kind != ShapeKind.Tree && s.Kind != ShapeKind.Bush && !IsTileShape(s))
         {
             wikiSummary = null;
             wikiLoading = false;

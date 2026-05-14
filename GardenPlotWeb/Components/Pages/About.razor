@@ -1,4 +1,6 @@
 ﻿@page "/about"
+@using GardenPlotWeb.Services
+@inject IPlantProfileService PlantProfiles
 
 <PageTitle>About Garden Plot</PageTitle>
 
@@ -49,3 +51,75 @@
     <li>Editable shortcuts now cover spacing, edit ops, group/ungroup, zoom, pan, and group orientation.</li>
     <li>Mappings persist in app UI preferences.</li>
 </ul>
+
+<h2>Data sources &amp; attribution</h2>
+<p>
+    Plant profile data in Garden Plot is curated and merged from the following public sources by the
+    <code>GardenPlot.DataFetcher</code> tool. Every <em>PlantProfile</em> records the sources it pulled from,
+    surfaced inline in the info panel.
+</p>
+
+@{
+    string? lastRefresh = (PlantProfiles as LocalPlantProfileService)?.DataVersion?.ToString("yyyy-MM-dd");
+}
+<p class="text-muted small">
+    Last plant-data refresh: <strong>@(lastRefresh ?? "unknown")</strong> (rebuild and re-run the data fetcher to update).
+</p>
+
+<table class="table table-sm">
+    <thead>
+        <tr>
+            <th>Source</th>
+            <th>Used for</th>
+            <th>License</th>
+            <th>Attribution</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <a href="https://plants.usda.gov/" target="_blank" rel="noopener">USDA PLANTS Database</a>
+            </td>
+            <td>Accepted scientific name, family/genus, common name, U.S. and territory native/introduced status.</td>
+            <td>U.S. Government work — Public Domain (17 U.S.C. § 105).</td>
+            <td>Courtesy credit; no attribution required.</td>
+        </tr>
+        <tr>
+            <td>
+                <a href="https://www.wikidata.org/" target="_blank" rel="noopener">Wikidata</a>
+            </td>
+            <td>Cross-reference IDs, family/genus, common names (multilingual), native range hints, Wikipedia links.</td>
+            <td>
+                <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0 1.0</a>
+                for structured data.
+            </td>
+            <td>"Wikidata contributors" (requested).</td>
+        </tr>
+        <tr>
+            <td>
+                <a href="https://en.wikipedia.org/" target="_blank" rel="noopener">Wikipedia</a>
+            </td>
+            <td>Live summary excerpts shown in the selection info panel.</td>
+            <td>
+                <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>.
+                Excerpts are fetched live and not redistributed by Garden Plot itself.
+            </td>
+            <td>"Wikipedia contributors", with link back to the source article.</td>
+        </tr>
+        <tr>
+            <td>
+                <a href="https://www.aspca.org/pet-care/animal-poison-control/toxic-and-non-toxic-plants" target="_blank" rel="noopener">ASPCA toxic plant list</a>
+            </td>
+            <td>Hand-curated pet-toxicity notes (cat/dog/human severity).</td>
+            <td>Factual material from a public reference. Garden Plot does not republish ASPCA prose.</td>
+            <td>Reference link included on individual entries where applicable.</td>
+        </tr>
+    </tbody>
+</table>
+
+<p class="small">
+    Fetch policy: Garden Plot ships pre-merged data in <code>wwwroot/data/plant-profiles.json</code> so the
+    running app makes no outbound calls for built-in palette items. The fetcher uses a real
+    <code>User-Agent</code>, ETag-based conditional requests, and bounded concurrency to minimise
+    bandwidth on upstream providers.
+</p>

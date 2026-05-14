@@ -1,0 +1,352 @@
+{
+  "Category": "trees-nut",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Juglans regia",
+      "Genus": "Juglans",
+      "WikidataItem": "http://www.wikidata.org/entity/Q46871",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Juglans_regia",
+      "Sitelinks": 92,
+      "CommonNames": [
+        "Persian Walnut"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Corylus avellana",
+      "Genus": "Corylus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q124969",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Corylus_avellana",
+      "Sitelinks": 91,
+      "CommonNames": [
+        "European hazel",
+        "Common Hazel",
+        "Cobnut",
+        "Hazel"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pistacia vera",
+      "Genus": "Pistacia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q36071",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pistachio",
+      "Sitelinks": 86,
+      "CommonNames": [
+        "pistachio"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Castanea sativa",
+      "Genus": "Castanea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q22699",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Sweet_chestnut",
+      "Sitelinks": 77,
+      "CommonNames": [
+        "Sweet Chestnut"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus pinea",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q106094",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Stone_pine",
+      "Sitelinks": 62,
+      "CommonNames": [
+        "Stone Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pistacia lentiscus",
+      "Genus": "Pistacia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159812",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pistacia_lentiscus",
+      "Sitelinks": 59,
+      "CommonNames": [
+        "mastic tree",
+        "Lentisk"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carya illinoinensis",
+      "Genus": "Carya",
+      "WikidataItem": "http://www.wikidata.org/entity/Q333877",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pecan",
+      "Sitelinks": 54,
+      "CommonNames": [
+        "sweet pecan",
+        "pecan"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus pinaster",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q271582",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_pinaster",
+      "Sitelinks": 53,
+      "CommonNames": [
+        "Maritime Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus strobus",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157230",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_strobus",
+      "Sitelinks": 48,
+      "CommonNames": [
+        "Eastern White Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus sibirica",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q774829",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_sibirica",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "Siberian Stone Pine",
+        "Siberian Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pistacia terebinthus",
+      "Genus": "Pistacia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q63045",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pistacia_terebinthus",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "Turpentine tree",
+        "Cyprus Turpentine",
+        "Terebinth"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus pumila",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q243964",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_pumila",
+      "Sitelinks": 44,
+      "CommonNames": [
+        "Dwarf Stone Pine",
+        "Dwarf Siberian Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus heldreichii",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q460531",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_heldreichii",
+      "Sitelinks": 44,
+      "CommonNames": [
+        "Bosnian Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus wallichiana",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q747652",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_wallichiana",
+      "Sitelinks": 44,
+      "CommonNames": [
+        "Blue Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Juglans nigra",
+      "Genus": "Juglans",
+      "WikidataItem": "http://www.wikidata.org/entity/Q852572",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Juglans_nigra",
+      "Sitelinks": 43,
+      "CommonNames": [
+        "Black Walnut"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Corylus colurna",
+      "Genus": "Corylus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q148939",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Corylus_colurna",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "Turkish Hazel"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus longaeva",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1116374",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_longaeva",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "Intermountain Bristlecone Pine",
+        "Great Basin Bristlecone Pine",
+        "Bristlecone Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Corylus maxima",
+      "Genus": "Corylus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1801446",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Corylus_maxima",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "Giant Filbert",
+        "Filbert"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus palustris",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q148542",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Longleaf_pine",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "Longleaf Pine",
+        "Georgia Pine",
+        "Florida Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus lambertiana",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q227779",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_lambertiana",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "Sugar Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus aristata",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q936888",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_aristata",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "Rocky Mountains Bristlecone Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus roxburghii",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3239892",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_roxburghii",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "Chir Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus koraiensis",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q301636",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_koraiensis",
+      "Sitelinks": 33,
+      "CommonNames": [
+        "Korean Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus elliottii",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1249109",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_elliottii",
+      "Sitelinks": 33,
+      "CommonNames": [
+        "Slash Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus taeda",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q368248",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_taeda",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "Southern Pine",
+        "Loblolly Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Castanea mollissima",
+      "Genus": "Castanea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q699584",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Castanea_mollissima",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "Chinese Chestnut"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Castanea crenata",
+      "Genus": "Castanea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q717827",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Castanea_crenata",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "Japanese chestnut"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pinus yunnanensis",
+      "Genus": "Pinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3074730",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pinus_yunnanensis",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Yunnan Pine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Pistacia atlantica",
+      "Genus": "Pistacia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1788810",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Pistacia_atlantica",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Mt. Atlas mastic tree"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Juglans cinerea",
+      "Genus": "Juglans",
+      "WikidataItem": "http://www.wikidata.org/entity/Q630288",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Juglans_cinerea",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "butternut"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

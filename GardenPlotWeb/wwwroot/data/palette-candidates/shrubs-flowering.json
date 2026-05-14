@@ -1,0 +1,355 @@
+{
+  "Category": "shrubs-flowering",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Camellia sinensis",
+      "Genus": "Camellia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q101815",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Camellia_sinensis",
+      "Sitelinks": 93,
+      "CommonNames": [
+        "Tea plant",
+        "tea"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Hibiscus \u00D7 rosa-sinensis",
+      "Genus": "Hibiscus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159534",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Hibiscus_%C3%97_rosa-sinensis",
+      "Sitelinks": 74,
+      "CommonNames": [
+        "Chinese Hibiscus"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Viburnum opulus",
+      "Genus": "Viburnum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156928",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Viburnum_opulus",
+      "Sitelinks": 68,
+      "CommonNames": [
+        "Guelder-rose",
+        "European cranberrybush",
+        "Cranberry-tree",
+        "guelder rose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Hibiscus syriacus",
+      "Genus": "Hibiscus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157756",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Hibiscus_syriacus",
+      "Sitelinks": 56,
+      "CommonNames": [
+        "rose of Sharon"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Hibiscus sabdariffa",
+      "Genus": "Hibiscus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q319390",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Roselle_(plant)",
+      "Sitelinks": 56,
+      "CommonNames": [
+        "roselle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Camellia japonica",
+      "Genus": "Camellia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160121",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Camellia_japonica",
+      "Sitelinks": 50,
+      "CommonNames": [
+        "camellia"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Hydrangea macrophylla",
+      "Genus": "Hydrangea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159219",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Hydrangea_macrophylla",
+      "Sitelinks": 48,
+      "CommonNames": [
+        "Bigleaf Hydrangea"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rosa rugosa",
+      "Genus": "Rosa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q634975",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosa_rugosa",
+      "Sitelinks": 47,
+      "CommonNames": [
+        "rugosa rose",
+        "japanese rose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Viburnum lantana",
+      "Genus": "Viburnum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158508",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Viburnum_lantana",
+      "Sitelinks": 46,
+      "CommonNames": [
+        "Wayfaringtree",
+        "Wayfaring-tree",
+        "wayfaring tree"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rhododendron tomentosum",
+      "Genus": "Rhododendron",
+      "WikidataItem": "http://www.wikidata.org/entity/Q247714",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rhododendron_tomentosum",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "northern Labrador tea"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Hibiscus cannabinus",
+      "Genus": "Hibiscus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1137540",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Kenaf",
+      "Sitelinks": 44,
+      "CommonNames": [
+        "Kenaf",
+        "brown Indianhemp"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Buddleja davidii",
+      "Genus": "Buddleja",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161538",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Buddleja_davidii",
+      "Sitelinks": 43,
+      "CommonNames": [
+        "Butterfly-bush"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rosa gallica",
+      "Genus": "Rosa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157668",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosa_gallica",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "French rose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Kerria japonica",
+      "Genus": "Kerria",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157401",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Kerria_japonica",
+      "Sitelinks": 40,
+      "CommonNames": [
+        "Japanese rose",
+        "Yellow rose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rosa \u00D7 damascena",
+      "Genus": "Rosa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q578904",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosa_%C3%97_damascena",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "damask rose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rosa rubiginosa",
+      "Genus": "Rosa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q15546415",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosa_rubiginosa",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "Sweet-briar"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rhododendron ponticum",
+      "Genus": "Rhododendron",
+      "WikidataItem": "http://www.wikidata.org/entity/Q557928",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rhododendron_ponticum",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "rhododendron"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rosa chinensis",
+      "Genus": "Rosa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q344900",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosa_chinensis",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "Chinese rose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Viburnum tinus",
+      "Genus": "Viburnum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1321268",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Viburnum_tinus",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "Laurustinus"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rosa spinosissima",
+      "Genus": "Rosa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158359",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosa_pimpinellifolia",
+      "Sitelinks": 34,
+      "CommonNames": [
+        "Burnet Rose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rosa multiflora",
+      "Genus": "Rosa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q133617",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosa_multiflora",
+      "Sitelinks": 34,
+      "CommonNames": [
+        "seven sisters rose",
+        "Multiflora Rose",
+        "Rambler Rose",
+        "Baby Rose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rhododendron ferrugineum",
+      "Genus": "Rhododendron",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1341190",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rhododendron_ferrugineum",
+      "Sitelinks": 33,
+      "CommonNames": [
+        "snow-rose",
+        "Rusty-leaved Alpenrose",
+        "Rhododendron",
+        "alpine-rose",
+        "Alpine Rose",
+        "alpenrose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Spiraea japonica",
+      "Genus": "Spiraea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158201",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Spiraea_japonica",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "Japanese spiraea",
+        "Japanese meadowsweet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Hibiscus trionum",
+      "Genus": "Hibiscus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157854",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Hibiscus_trionum",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "Flower-of-an-Hour",
+        "flower of an hour"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rosa acicularis",
+      "Genus": "Rosa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q218368",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosa_acicularis",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "prickly rose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Hibiscus tiliaceus",
+      "Genus": "Hibiscus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q15768656",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Hibiscus_tiliaceus",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "sea hibiscus"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rosa \u00D7 centifolia",
+      "Genus": "Rosa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q640505",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosa_%C3%97_centifolia",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "cabbage rose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rosa majalis",
+      "Genus": "Rosa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q162787",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosa_majalis",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "double cinnamon rose",
+        "cinnamom rose"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Philadelphus coronarius",
+      "Genus": "Philadelphus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163791",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Philadelphus_coronarius",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "sweet mock orange"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rhododendron luteum",
+      "Genus": "Rhododendron",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2591210",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rhododendron_luteum",
+      "Sitelinks": 29,
+      "CommonNames": [],
+      "NativeRange": []
+    }
+  ]
+}

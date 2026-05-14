@@ -1,0 +1,355 @@
+{
+  "Category": "vines-edible",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Humulus lupulus",
+      "Genus": "Humulus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q104212",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Humulus_lupulus",
+      "Sitelinks": 86,
+      "CommonNames": [
+        "common hop",
+        "hop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora edulis",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156790",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_edulis",
+      "Sitelinks": 81,
+      "CommonNames": [
+        "purple granadilla",
+        "Passion fruit"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora caerulea",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161120",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_caerulea",
+      "Sitelinks": 43,
+      "CommonNames": [
+        "bluecrown passionflower",
+        "Blue Passion Flower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora incarnata",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q128939",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_incarnata",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "purple passionflower",
+        "Maypop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora foetida",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1766333",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_foetida",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "pohapoha",
+        "lani wai (Ni\u0060ihau)",
+        "fetid passionflower",
+        "love-in-a-mist",
+        "passion flower",
+        "wild water lemon",
+        "running pop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Actinidia arguta",
+      "Genus": "Actinidia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q848074",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Actinidia_arguta",
+      "Sitelinks": 34,
+      "CommonNames": [
+        "tara vine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Actinidia chinensis",
+      "Genus": "Actinidia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163522",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Actinidia_chinensis",
+      "Sitelinks": 33,
+      "CommonNames": [
+        "Chinese gooseberry",
+        "kiwi fruit",
+        "kiwi"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Actinidia kolomikta",
+      "Genus": "Actinidia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q132741",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Actinidia_kolomikta",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "Arctic Beauty"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora quadrangularis",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159105",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_quadrangularis",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "giant granadilla",
+        "Badea",
+        "passion flower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora ligularis",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q917921",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_ligularis",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "sweet granadilla"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Actinidia polygama",
+      "Genus": "Actinidia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1357333",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Actinidia_polygama",
+      "Sitelinks": 27,
+      "CommonNames": [
+        "silver vine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora alata",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2914497",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_alata",
+      "Sitelinks": 23,
+      "CommonNames": [
+        "passionflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora laurifolia",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164659",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_laurifolia",
+      "Sitelinks": 23,
+      "CommonNames": [
+        "yellow water lemon",
+        "yellow granadilla",
+        "golden bellapple",
+        "bell apple",
+        "passion flower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vitis coignetiae",
+      "Genus": "Vitis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1367334",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vitis_coignetiae",
+      "Sitelinks": 23,
+      "CommonNames": [
+        "crimson glory vine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Humulus japonicus",
+      "Genus": "Humulus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q162736",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Humulus_japonicus",
+      "Sitelinks": 21,
+      "CommonNames": [
+        "Japanese hop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vitis rotundifolia",
+      "Genus": "Vitis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2701573",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vitis_rotundifolia",
+      "Sitelinks": 21,
+      "CommonNames": [
+        "muscadine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora tarminiana",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q135365",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_tarminiana",
+      "Sitelinks": 20,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora vitifolia",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q133962",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_vitifolia",
+      "Sitelinks": 18,
+      "CommonNames": [
+        "perfumed passionflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora coccinea",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3437545",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_coccinea",
+      "Sitelinks": 17,
+      "CommonNames": [
+        "scarlet passionflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vitis vulpina",
+      "Genus": "Vitis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1264038",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vitis_vulpina",
+      "Sitelinks": 16,
+      "CommonNames": [
+        "winter grape",
+        "frost grape",
+        "fox grape"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora maliformis",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q3448230",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_maliformis",
+      "Sitelinks": 15,
+      "CommonNames": [
+        "conch apple"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora suberosa",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2068761",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_suberosa",
+      "Sitelinks": 15,
+      "CommonNames": [
+        "corkystem passionflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora rubra",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2554347",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_rubra",
+      "Sitelinks": 15,
+      "CommonNames": [
+        "dutchman\u0027s laudanum"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora subpeltata",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2669089",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_subpeltata",
+      "Sitelinks": 15,
+      "CommonNames": [
+        "white passionflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora antioquiensis",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164934",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_antioquiensis",
+      "Sitelinks": 15,
+      "CommonNames": [
+        "passionflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora morifolia",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q310234",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_morifolia",
+      "Sitelinks": 15,
+      "CommonNames": [
+        "woodland passionflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vitis davidii",
+      "Genus": "Vitis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1177651",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vitis_davidii",
+      "Sitelinks": 15,
+      "CommonNames": [
+        "Davids rebe grape",
+        "Chinese bramble grape"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Passiflora lutea",
+      "Genus": "Passiflora",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2511038",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Passiflora_lutea",
+      "Sitelinks": 14,
+      "CommonNames": [
+        "yellow passionflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vitis arizonica",
+      "Genus": "Vitis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2713015",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vitis_arizonica",
+      "Sitelinks": 14,
+      "CommonNames": [
+        "canyon grape",
+        "Arizona Grape"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vitis flexuosa",
+      "Genus": "Vitis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1031569",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vitis_flexuosa",
+      "Sitelinks": 14,
+      "CommonNames": [],
+      "NativeRange": []
+    }
+  ]
+}

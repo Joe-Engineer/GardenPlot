@@ -1,0 +1,385 @@
+{
+  "Category": "trees-flowering",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Aesculus hippocastanum",
+      "Genus": "Aesculus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q26899",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aesculus_hippocastanum",
+      "Sitelinks": 74,
+      "CommonNames": [
+        "Horse-chestnut"
+      ],
+      "NativeRange": [
+        "Balkans"
+      ]
+    },
+    {
+      "ScientificName": "Cornus mas",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158642",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_mas",
+      "Sitelinks": 73,
+      "CommonNames": [
+        "European cornel",
+        "Cornelian-cherry",
+        "Cornelian cherry dogwood",
+        "cornelian cherry",
+        "dogwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Crataegus monogyna",
+      "Genus": "Crataegus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161511",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Crataegus_monogyna",
+      "Sitelinks": 61,
+      "CommonNames": [
+        "Common Hawthorn",
+        "Hawthorn"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus sanguinea",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161416",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_sanguinea",
+      "Sitelinks": 54,
+      "CommonNames": [
+        "bloodtwig dogwood",
+        "dogwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Magnolia grandiflora",
+      "Genus": "Magnolia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161116",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Magnolia_grandiflora",
+      "Sitelinks": 54,
+      "CommonNames": [
+        "Southern Magnolia",
+        "Evergreen Magnolia",
+        "Bull-bay",
+        "Big-laurel"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cercis siliquastrum",
+      "Genus": "Cercis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q29488",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cercis_siliquastrum",
+      "Sitelinks": 54,
+      "CommonNames": [
+        "Judas-tree"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Magnolia champaca",
+      "Genus": "Magnolia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q167027",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Magnolia_champaca",
+      "Sitelinks": 44,
+      "CommonNames": [
+        "Champak"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Catalpa bignonioides",
+      "Genus": "Catalpa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163831",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Catalpa_bignonioides",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "southern catalpa"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lagerstroemia speciosa",
+      "Genus": "Lagerstroemia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1137593",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lagerstroemia_speciosa",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "pride of India",
+        "Giant Crape-myrtle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Crataegus laevigata",
+      "Genus": "Crataegus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159553",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Crataegus_laevigata",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "smooth hawthorn",
+        "Midland Hawthorn"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Koelreuteria paniculata",
+      "Genus": "Koelreuteria",
+      "WikidataItem": "http://www.wikidata.org/entity/Q844835",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Koelreuteria_paniculata",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "Panicled Goldenrain Tree",
+        "Golden-rain tree",
+        "goldenrain tree"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus alba",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158228",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_alba",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "White Dogwood",
+        "Siberian Dogwood",
+        "Red-Barked Dogwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lagerstroemia indica",
+      "Genus": "Lagerstroemia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1148692",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lagerstroemia_indica",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "crapemyrtle",
+        "Crape myrtle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Amelanchier ovalis",
+      "Genus": "Amelanchier",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159560",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Amelanchier_ovalis",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "Snowy Mespilus"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Crataegus azarolus",
+      "Genus": "Crataegus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q793606",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Crataegus_azarolus",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "Oriental Hawthorn",
+        "Mosfilia",
+        "Mediterranian Medler",
+        "Mediterranean Hawthorn",
+        "Crete Hawthorn",
+        "Azarole"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Magnolia kobus",
+      "Genus": "Magnolia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q942409",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Magnolia_kobus",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "Northern Japanese Magnolia",
+        "Kobushi Magnolia",
+        "Kobus magnolia"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Magnolia denudata",
+      "Genus": "Magnolia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q794061",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Magnolia_denudata",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "Yulan Magnolia",
+        "lilytree",
+        "Lily Tree"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Magnolia virginiana",
+      "Genus": "Magnolia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1859063",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Magnolia_virginiana",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "Swamp Laurel",
+        "Swamp Bay",
+        "Sweet Bay",
+        "White Bay",
+        "sweetbay",
+        "Sweet Magnolia"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus canadensis",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1420828",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_canadensis",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Canadian Bunchberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus suecica",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157677",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_suecica",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Lapland cornel",
+        "Eurasian Dwarf Cornel",
+        "dwarf cornel",
+        "Bunchberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus florida",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q887221",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_florida",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "flowering dogwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Magnolia stellata",
+      "Genus": "Magnolia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q839507",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Magnolia_stellata",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Star Magnolia"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aesculus \u00D7 carnea",
+      "Genus": "Aesculus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q163779",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aesculus_%C3%97_carnea",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "red horse-chestnut"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Amelanchier alnifolia",
+      "Genus": "Amelanchier",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164158",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Amelanchier_alnifolia",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "Saskatoon Serviceberry",
+        "Cusick\u0027s serviceberry",
+        "Serviceberry",
+        "Saskatoon"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Magnolia liliiflora",
+      "Genus": "Magnolia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q942031",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Magnolia_liliiflora",
+      "Sitelinks": 29,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Amelanchier canadensis",
+      "Genus": "Amelanchier",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159030",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Amelanchier_canadensis",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "thicket serviceberry",
+        "swamp shadbush",
+        "Shadblow Serviceberry",
+        "Eastern Serviceberry",
+        "Canadian Serviceberry",
+        "Canada serviceberry",
+        "Shadbush",
+        "shadblow",
+        "Juneberry",
+        "serviceberry"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cercis canadensis",
+      "Genus": "Cercis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2452407",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cercis_canadensis",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "eastern redbud"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cornus sericea",
+      "Genus": "Cornus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164130",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cornus_sericea",
+      "Sitelinks": 27,
+      "CommonNames": [
+        "redosier dogwood"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Magnolia \u00D7soulangeana",
+      "Genus": "Magnolia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q731443",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Magnolia_%C3%97_soulangeana",
+      "Sitelinks": 27,
+      "CommonNames": [
+        "Tulip Magnolia",
+        "Saucer Magnolia"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Magnolia obovata",
+      "Genus": "Magnolia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2386378",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Magnolia_obovata",
+      "Sitelinks": 26,
+      "CommonNames": [
+        "Whiteleaf Japanese Magnolia",
+        "Japanese Whitebark Magnolia",
+        "Japanese Big Leaf Magnolia"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

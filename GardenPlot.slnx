@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="GardenPlot.AppHost/GardenPlot.AppHost.csproj" />
+  <Project Path="GardenPlot.DataFetcher/GardenPlot.DataFetcher.csproj" />
   <Project Path="GardenPlot.ServiceDefaults/GardenPlot.ServiceDefaults.csproj" />
   <Project Path="GardenPlotWeb/GardenPlotWeb.csproj" />
 </Solution>

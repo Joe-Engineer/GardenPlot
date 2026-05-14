@@ -1,0 +1,356 @@
+{
+  "Category": "cover-crops",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Avena sativa",
+      "Genus": "Avena",
+      "WikidataItem": "http://www.wikidata.org/entity/Q12104",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Oat",
+      "Sitelinks": 152,
+      "CommonNames": [
+        "Common Oat",
+        "Oat"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Secale cereale",
+      "Genus": "Secale",
+      "WikidataItem": "http://www.wikidata.org/entity/Q12099",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rye",
+      "Sitelinks": 146,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Raphanus sativus",
+      "Genus": "Raphanus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q7224565",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Radish",
+      "Sitelinks": 134,
+      "CommonNames": [
+        "cultivated radish"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vicia faba",
+      "Genus": "Vicia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q131342",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vicia_faba",
+      "Sitelinks": 105,
+      "CommonNames": [
+        "horsebean",
+        "Broad Bean"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Fagopyrum esculentum",
+      "Genus": "Fagopyrum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q132734",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Buckwheat",
+      "Sitelinks": 104,
+      "CommonNames": [
+        "Common Buckwheat",
+        "buckwheat"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Medicago sativa",
+      "Genus": "Medicago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156106",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Alfalfa",
+      "Sitelinks": 93,
+      "CommonNames": [
+        "Lucerne"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Trifolium pratense",
+      "Genus": "Trifolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156635",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Trifolium_pratense",
+      "Sitelinks": 66,
+      "CommonNames": [
+        "Red Clover"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Trifolium repens",
+      "Genus": "Trifolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q148675",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Trifolium_repens",
+      "Sitelinks": 63,
+      "CommonNames": [
+        "White Clover"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sinapis alba",
+      "Genus": "Sinapis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146202",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/White_mustard",
+      "Sitelinks": 59,
+      "CommonNames": [
+        "yellow mustard",
+        "white mustard"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vicia sativa",
+      "Genus": "Vicia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157071",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vicia_sativa",
+      "Sitelinks": 55,
+      "CommonNames": [
+        "garden vetch",
+        "Common Vetch"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Avena fatua",
+      "Genus": "Avena",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158634",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Avena_fatua",
+      "Sitelinks": 54,
+      "CommonNames": [
+        "wild oat"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vicia cracca",
+      "Genus": "Vicia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q147159",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vicia_cracca",
+      "Sitelinks": 53,
+      "CommonNames": [
+        "tufted vetch",
+        "cow vetch",
+        "boreal vetch",
+        "blue vetch",
+        "bird vetch"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Sinapis arvensis",
+      "Genus": "Sinapis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q27986",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rhamphospermum_arvense",
+      "Sitelinks": 51,
+      "CommonNames": [
+        "Charlock"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lolium perenne",
+      "Genus": "Lolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161722",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_perenne",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "perennial ryegrass",
+        "perennial rye-grass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lolium temulentum",
+      "Genus": "Lolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q162088",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_temulentum",
+      "Sitelinks": 48,
+      "CommonNames": [
+        "Darnel ryegrass",
+        "darnel"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Raphanus raphanistrum",
+      "Genus": "Raphanus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q28017",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Raphanus_raphanistrum",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "wild radish"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Trifolium arvense",
+      "Genus": "Trifolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q125813",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Trifolium_arvense",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "Hare\u0027s-foot Clover"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Trifolium campestre",
+      "Genus": "Trifolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157334",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Trifolium_campestre",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "low hop clover",
+        "hop trefoil",
+        "field clover"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vicia villosa",
+      "Genus": "Vicia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159752",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vicia_villosa",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "fodder vetch"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lupinus polyphyllus",
+      "Genus": "Lupinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159737",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lupinus_polyphyllus",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "many-leaved lupine",
+        "large-leaved lupine",
+        "garden lupin",
+        "bigleaf lupine",
+        "big-leaved lupine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lolium multiflorum",
+      "Genus": "Lolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157883",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_multiflorum",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "Italian Rye Grass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Medicago lupulina",
+      "Genus": "Medicago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157923",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Medicago_lupulina",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "nonesuch",
+        "hop clover",
+        "black medick"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Trifolium dubium",
+      "Genus": "Trifolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158179",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Trifolium_dubium",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "suckling clover",
+        "Lesser Hop Trefoil"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Trifolium incarnatum",
+      "Genus": "Trifolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161361",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Trifolium_incarnatum",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "Crimson Clover"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vicia sepium",
+      "Genus": "Vicia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q148570",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vicia_sepium",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "bush vetch"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Trifolium medium",
+      "Genus": "Trifolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161369",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Trifolium_medium",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "zigzag clover"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lupinus albus",
+      "Genus": "Lupinus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161372",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lupinus_albus",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "White Lupin"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lolium arundinaceum",
+      "Genus": "Lolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q50346809",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_arundinaceum",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "Tall fescue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Trifolium hybridum",
+      "Genus": "Trifolium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159745",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Trifolium_hybridum",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "alsike clover"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Vicia hirsuta",
+      "Genus": "Vicia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159732",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Vicia_hirsuta",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "tiny vetch",
+        "Hairy Tare"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

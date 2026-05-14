@@ -1,0 +1,350 @@
+{
+  "Category": "pollinator-natives",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Helianthus annuus",
+      "Genus": "Helianthus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q171497",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Common_sunflower",
+      "Sitelinks": 138,
+      "CommonNames": [
+        "Common Sunflower",
+        "sunflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Helianthus tuberosus",
+      "Genus": "Helianthus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q146190",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Jerusalem_artichoke",
+      "Sitelinks": 91,
+      "CommonNames": [
+        "Jerusalem artichoke"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Verbena officinalis",
+      "Genus": "Verbena",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161417",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Verbena_officinalis",
+      "Sitelinks": 54,
+      "CommonNames": [
+        "vervain",
+        "herb of the cross"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aquilegia vulgaris",
+      "Genus": "Aquilegia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q148929",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aquilegia_vulgaris",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "Columbine"
+      ],
+      "NativeRange": [
+        "Eurasia"
+      ]
+    },
+    {
+      "ScientificName": "Solidago virgaurea",
+      "Genus": "Solidago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q599435",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Solidago_virgaurea",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "goldenrod"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Echinacea purpurea",
+      "Genus": "Echinacea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q272661",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Echinacea_purpurea",
+      "Sitelinks": 40,
+      "CommonNames": [
+        "purple-coneflower",
+        "eastern purple-coneflower",
+        "eastern purple coneflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Solidago canadensis",
+      "Genus": "Solidago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q254436",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Solidago_canadensis",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "canadian goldenrod",
+        "Canada goldenrod"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Asclepias curassavica",
+      "Genus": "Asclepias",
+      "WikidataItem": "http://www.wikidata.org/entity/Q939991",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Asclepias_curassavica",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "tropical milkweed",
+        "bloodflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lobelia erinus",
+      "Genus": "Lobelia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158858",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lobelia_erinus",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "edging lobelia"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Phlox paniculata",
+      "Genus": "Phlox",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164553",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Phlox_paniculata",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "fall phlox"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Asclepias syriaca",
+      "Genus": "Asclepias",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158295",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Asclepias_syriaca",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "common milkweed"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Verbena bonariensis",
+      "Genus": "Verbena",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2047281",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Verbena_bonariensis",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "purpletop vervain"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Monarda didyma",
+      "Genus": "Monarda",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164010",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Monarda_didyma",
+      "Sitelinks": 27,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Solidago gigantea",
+      "Genus": "Solidago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q609627",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Solidago_gigantea",
+      "Sitelinks": 27,
+      "CommonNames": [
+        "giant goldenrod"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lobelia dortmanna",
+      "Genus": "Lobelia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158068",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lobelia_dortmanna",
+      "Sitelinks": 26,
+      "CommonNames": [
+        "Water Lobelia",
+        "Dortmann\u0027s cardinalflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rudbeckia laciniata",
+      "Genus": "Rudbeckia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1194614",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rudbeckia_laciniata",
+      "Sitelinks": 26,
+      "CommonNames": [
+        "greenheaded coneflower",
+        "Green-Head Coneflower",
+        "golden glow. thimbleweed",
+        "cutleaf coneflower",
+        "brown-eyed Susan"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Rudbeckia hirta",
+      "Genus": "Rudbeckia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2532820",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rudbeckia_hirta",
+      "Sitelinks": 26,
+      "CommonNames": [
+        "blackeyed Susan"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Agastache foeniculum",
+      "Genus": "Agastache",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1264088",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Agastache_foeniculum",
+      "Sitelinks": 24,
+      "CommonNames": [
+        "lavender giant-hyssop",
+        "blue giant hyssop"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Asclepias tuberosa",
+      "Genus": "Asclepias",
+      "WikidataItem": "http://www.wikidata.org/entity/Q311131",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Asclepias_tuberosa",
+      "Sitelinks": 23,
+      "CommonNames": [
+        "butterfly milkweed",
+        "butterfly weed"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Phlox drummondii",
+      "Genus": "Phlox",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164835",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Phlox_drummondii",
+      "Sitelinks": 22,
+      "CommonNames": [
+        "annual phlox"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Coreopsis grandiflora",
+      "Genus": "Coreopsis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1319071",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Coreopsis_grandiflora",
+      "Sitelinks": 22,
+      "CommonNames": [
+        "largeflower tickseed"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Symphyotrichum novae-angliae",
+      "Genus": "Symphyotrichum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1894641",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Symphyotrichum_novae-angliae",
+      "Sitelinks": 22,
+      "CommonNames": [
+        "New England aster",
+        "Michaelmas daisy",
+        "hairy Michaelmas daisy"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Lobelia inflata",
+      "Genus": "Lobelia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1661351",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lobelia_inflata",
+      "Sitelinks": 21,
+      "CommonNames": [
+        "Indian-tobacco"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Symphyotrichum novi-belgii",
+      "Genus": "Symphyotrichum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1537333",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Symphyotrichum_novi-belgii",
+      "Sitelinks": 21,
+      "CommonNames": [
+        "New York aster"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aquilegia formosa",
+      "Genus": "Aquilegia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1093527",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aquilegia_formosa",
+      "Sitelinks": 20,
+      "CommonNames": [
+        "western columbine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Phlox subulata",
+      "Genus": "Phlox",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1045366",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Phlox_subulata",
+      "Sitelinks": 20,
+      "CommonNames": [
+        "moss phlox"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Monarda fistulosa",
+      "Genus": "Monarda",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1521039",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Monarda_fistulosa",
+      "Sitelinks": 20,
+      "CommonNames": [
+        "wild bergamot"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Asclepias incarnata",
+      "Genus": "Asclepias",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1057909",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Asclepias_incarnata",
+      "Sitelinks": 20,
+      "CommonNames": [
+        "swamp milkweed"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Aquilegia canadensis",
+      "Genus": "Aquilegia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2846008",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Aquilegia_canadensis",
+      "Sitelinks": 19,
+      "CommonNames": [
+        "red columbine"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Agastache rugosa",
+      "Genus": "Agastache",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1195985",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Agastache_rugosa",
+      "Sitelinks": 19,
+      "CommonNames": [],
+      "NativeRange": []
+    }
+  ]
+}

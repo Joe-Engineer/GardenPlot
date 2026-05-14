@@ -1,0 +1,351 @@
+{
+  "Category": "grasses-ornamental",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Panicum miliaceum",
+      "Genus": "Panicum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q165196",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Proso_millet",
+      "Sitelinks": 65,
+      "CommonNames": [
+        "broomcorn millet"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca ovina",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157885",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Festuca_ovina",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "Sheep\u0027s Fescue",
+        "sheep fescue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca rubra",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159702",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Festuca_rubra",
+      "Sitelinks": 38,
+      "CommonNames": [
+        "red fescue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex arenaria",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157574",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_arenaria",
+      "Sitelinks": 37,
+      "CommonNames": [
+        "sand sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Festuca pratensis",
+      "Genus": "Festuca",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161791",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lolium_pratense",
+      "Sitelinks": 36,
+      "CommonNames": [
+        "meadow fescue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Calamagrostis epigejos",
+      "Genus": "Calamagrostis",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157988",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Calamagrostis_epigejos",
+      "Sitelinks": 35,
+      "CommonNames": [],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Cortaderia selloana",
+      "Genus": "Cortaderia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q470109",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Cortaderia_selloana",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "Uruguayan pampas grass",
+        "pampas grass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex limosa",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159734",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_limosa",
+      "Sitelinks": 34,
+      "CommonNames": [
+        "mud sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex acuta",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157908",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_acuta",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "Slender Tufted-sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex echinata",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158165",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_echinata",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "Star Sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex sylvatica",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158168",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_sylvatica",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "wood-sedge",
+        "European woodland sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex nigra",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158190",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_nigra",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "smooth black sedge",
+        "Common Sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex flacca",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158524",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_flacca",
+      "Sitelinks": 32,
+      "CommonNames": [
+        "heath sedge",
+        "glaucous sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex hirta",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158312",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_hirta",
+      "Sitelinks": 31,
+      "CommonNames": [
+        "hammer sedge",
+        "Hairy Sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex rostrata",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157924",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_rostrata",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "beaked sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex vesicaria",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157765",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_vesicaria",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "blister sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex acutiformis",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157895",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_acutiformis",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Lesser Pond-Sedge",
+        "lesser pond sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex pendula",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1466032",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_pendula",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "hanging sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex lasiocarpa",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158026",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_lasiocarpa",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "woollyfruit sedge",
+        "slender sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex paniculata",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158234",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_paniculata",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Greater Tussock-sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex riparia",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161125",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_riparia",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Greater Pond-Sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex elata",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161128",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_elata",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "Tufted Sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Stipa pennata",
+      "Genus": "Stipa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160008",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Stipa_pennata",
+      "Sitelinks": 30,
+      "CommonNames": [
+        "European feather grass",
+        "needlegrass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex canescens",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157766",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_canescens",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "White Sedge",
+        "Silvery Sedge",
+        "Hoary Sedge",
+        "Gray Bog Sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex buxbaumii",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158160",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_buxbaumii",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "Club sedge",
+        "Buxbaum\u0027s sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex diandra",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158166",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_diandra",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "lesser tussock-sedge",
+        "lesser panicled sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex pseudocyperus",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q159021",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_pseudocyperus",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "cypress-like sedge",
+        "Cyperus Sedge"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Macrochloa tenacissima",
+      "Genus": "Stipa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q831011",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Stipa_tenacissima",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "esparto"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Panicum maximum",
+      "Genus": "Panicum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q2701553",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Megathyrsus_maximus",
+      "Sitelinks": 29,
+      "CommonNames": [
+        "Guinea grass"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Carex caryophyllea",
+      "Genus": "Carex",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157929",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Carex_caryophyllea",
+      "Sitelinks": 28,
+      "CommonNames": [
+        "vernal sedge",
+        "spring-sedge"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

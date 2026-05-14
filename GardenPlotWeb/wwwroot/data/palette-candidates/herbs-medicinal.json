@@ -1,0 +1,382 @@
+{
+  "Category": "herbs-medicinal",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Achillea millefolium",
+      "Genus": "Achillea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q25408",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Achillea_millefolium",
+      "Sitelinks": 95,
+      "CommonNames": [
+        "common yarrow",
+        "Milfoil",
+        "Yarrow"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Urtica dioica",
+      "Genus": "Urtica",
+      "WikidataItem": "http://www.wikidata.org/entity/Q155909",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Urtica_dioica",
+      "Sitelinks": 88,
+      "CommonNames": [
+        "Stinging nettle",
+        "Common Nettle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Matricaria chamomilla",
+      "Genus": "Matricaria",
+      "WikidataItem": "http://www.wikidata.org/entity/Q28437",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Matricaria_chamomilla",
+      "Sitelinks": 79,
+      "CommonNames": [
+        "Wild Chamomile",
+        "scented mayweed",
+        "mayweed",
+        "blue chamomile",
+        "German chamomile",
+        "camomile",
+        "chamomile"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Calendula officinalis",
+      "Genus": "Calendula",
+      "WikidataItem": "http://www.wikidata.org/entity/Q145930",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Calendula_officinalis",
+      "Sitelinks": 78,
+      "CommonNames": [
+        "pot marigold"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Melissa officinalis",
+      "Genus": "Melissa",
+      "WikidataItem": "http://www.wikidata.org/entity/Q148396",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lemon_balm",
+      "Sitelinks": 78,
+      "CommonNames": [
+        "Lemon balm",
+        "Balm"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Valeriana officinalis",
+      "Genus": "Valeriana",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157819",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Valerian_(herb)",
+      "Sitelinks": 78,
+      "CommonNames": [
+        "Common Valerian"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Hypericum perforatum",
+      "Genus": "Hypericum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158289",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Hypericum_perforatum",
+      "Sitelinks": 77,
+      "CommonNames": [
+        "perforate St John\u0027s-wort",
+        "common St. Johnswort",
+        "St John\u0027s wort"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Plantago major",
+      "Genus": "Plantago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157154",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Plantago_major",
+      "Sitelinks": 77,
+      "CommonNames": [
+        "white man\u0027s foot",
+        "Greater Plantain",
+        "Common Plantain",
+        "Broadleaf Plantain"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha \u00D7piperita",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156037",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Peppermint",
+      "Sitelinks": 76,
+      "CommonNames": [
+        "peppermint"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha arvensis",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160585",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mentha_arvensis",
+      "Sitelinks": 69,
+      "CommonNames": [
+        "wild mint",
+        "field mint",
+        "corn mint"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Plantago lanceolata",
+      "Genus": "Plantago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157408",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Plantago_lanceolata",
+      "Sitelinks": 69,
+      "CommonNames": [
+        "ribwort plantain"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha spicata",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160114",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Spearmint",
+      "Sitelinks": 60,
+      "CommonNames": [
+        "spear mint",
+        "Spearmint"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha pulegium",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161235",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mentha_pulegium",
+      "Sitelinks": 59,
+      "CommonNames": [
+        "pennyroyal",
+        "penny-royal"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Symphytum officinale",
+      "Genus": "Symphytum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157561",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Symphytum_officinale",
+      "Sitelinks": 58,
+      "CommonNames": [
+        "true comfrey",
+        "slippery-root",
+        "quaker comfrey",
+        "knitbone",
+        "cultivated comfrey",
+        "consound",
+        "common comfrey",
+        "boneset"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Tanacetum vulgare",
+      "Genus": "Tanacetum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q27079",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Tansy",
+      "Sitelinks": 57,
+      "CommonNames": [
+        "common tansy",
+        "tansy"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Verbascum thapsus",
+      "Genus": "Verbascum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160095",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Verbascum_thapsus",
+      "Sitelinks": 55,
+      "CommonNames": [
+        "Great Mullein"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha aquatica",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161232",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mentha_aquatica",
+      "Sitelinks": 53,
+      "CommonNames": [
+        "Water Mint"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Urtica urens",
+      "Genus": "Urtica",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157175",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Urtica_urens",
+      "Sitelinks": 49,
+      "CommonNames": [
+        "Small Nettle",
+        "dwarf nettle",
+        "annual nettle"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Tanacetum parthenium",
+      "Genus": "Tanacetum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q818481",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Tanacetum_parthenium",
+      "Sitelinks": 43,
+      "CommonNames": [
+        "feverfew"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha longifolia",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161924",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mentha_longifolia",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "horsemint",
+        "Horse Mint"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Plantago media",
+      "Genus": "Plantago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157272",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Plantago_media",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "Hoary Plantain"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Echinacea purpurea",
+      "Genus": "Echinacea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q272661",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Echinacea_purpurea",
+      "Sitelinks": 40,
+      "CommonNames": [
+        "purple-coneflower",
+        "eastern purple-coneflower",
+        "eastern purple coneflower"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha suaveolens",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q158892",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mentha_suaveolens",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "Round-leaved Mint",
+        "Apple Mint"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Plantago maritima",
+      "Genus": "Plantago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q21126",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Plantago_maritima",
+      "Sitelinks": 39,
+      "CommonNames": [
+        "sea plantain",
+        "goose tongue"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Achillea ptarmica",
+      "Genus": "Achillea",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1335122",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Achillea_ptarmica",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "Sneezewort Yarrow",
+        "Sneezewort",
+        "Sneezeweed"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Matricaria discoidea",
+      "Genus": "Matricaria",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1144217",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Matricaria_discoidea",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "wild chamomile",
+        "rayless mayweed",
+        "pineappleweed",
+        "pineapple-weed",
+        "pineapple weed",
+        "pineapple mayweed",
+        "disc mayweed"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Tanacetum balsamita",
+      "Genus": "Tanacetum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1451844",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Tanacetum_balsamita",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "Costmary",
+        "Alecost or Balsam Herb"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Plantago coronopus",
+      "Genus": "Plantago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q164030",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Plantago_coronopus",
+      "Sitelinks": 35,
+      "CommonNames": [
+        "buckhorn plantain"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Plantago indica",
+      "Genus": "Plantago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q25399593",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Plantago_indica",
+      "Sitelinks": 34,
+      "CommonNames": [
+        "Branched Plantain"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Plantago ovata",
+      "Genus": "Plantago",
+      "WikidataItem": "http://www.wikidata.org/entity/Q311228",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Plantago_ovata",
+      "Sitelinks": 34,
+      "CommonNames": [
+        "ispaghu",
+        "desert Indianwheat",
+        "blond plantain"
+      ],
+      "NativeRange": []
+    }
+  ]
+}

@@ -1,0 +1,358 @@
+{
+  "Category": "herbs-culinary",
+  "Generated": "2026-05-11",
+  "TotalFound": 30,
+  "Candidates": [
+    {
+      "ScientificName": "Allium cepa",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q23485",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Onion",
+      "Sitelinks": 199,
+      "CommonNames": [
+        "garden onion"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium sativum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q23400",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Garlic",
+      "Sitelinks": 186,
+      "CommonNames": [
+        "cultivated garlic"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Coriandrum sativum",
+      "Genus": "Coriandrum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q41611",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Coriander",
+      "Sitelinks": 130,
+      "CommonNames": [
+        "coriander"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Foeniculum vulgare",
+      "Genus": "Foeniculum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q43511",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Fennel",
+      "Sitelinks": 123,
+      "CommonNames": [
+        "Fennel"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ocimum basilicum",
+      "Genus": "Ocimum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q38859",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Basil",
+      "Sitelinks": 121,
+      "CommonNames": [
+        "sweet basil"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Petroselinum crispum",
+      "Genus": "Petroselinum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q25284",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Parsley",
+      "Sitelinks": 118,
+      "CommonNames": [
+        "parsley"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia rosmarinus",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q102240169",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Rosemary",
+      "Sitelinks": 114,
+      "CommonNames": [
+        "Rosemary"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Anethum graveolens",
+      "Genus": "Anethum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q26686",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Dill",
+      "Sitelinks": 112,
+      "CommonNames": [
+        "dill"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Origanum vulgare",
+      "Genus": "Origanum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q134283",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Oregano",
+      "Sitelinks": 103,
+      "CommonNames": [
+        "wild marjoram",
+        "oregano"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Origanum majorana",
+      "Genus": "Origanum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q22694",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Marjoram",
+      "Sitelinks": 91,
+      "CommonNames": [
+        "sweet marjoram"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium schoenoprasum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q51148",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Chives",
+      "Sitelinks": 88,
+      "CommonNames": [
+        "Wild Chives",
+        "Spanish garlic",
+        "cives",
+        "chives"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Laurus nobilis",
+      "Genus": "Laurus",
+      "WikidataItem": "http://www.wikidata.org/entity/Q26006",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Laurus_nobilis",
+      "Sitelinks": 86,
+      "CommonNames": [
+        "sweet bay"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium ursinum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q130882",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_ursinum",
+      "Sitelinks": 86,
+      "CommonNames": [
+        "Wild Garlic",
+        "Ramsons"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia officinalis",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1111359",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_officinalis",
+      "Sitelinks": 76,
+      "CommonNames": [
+        "kitchen sage",
+        "common sage",
+        "Sage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha \u00D7piperita",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q156037",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Peppermint",
+      "Sitelinks": 76,
+      "CommonNames": [
+        "peppermint"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium ascalonicum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q193498",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Shallot",
+      "Sitelinks": 73,
+      "CommonNames": [
+        "wild onion"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha arvensis",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160585",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mentha_arvensis",
+      "Sitelinks": 69,
+      "CommonNames": [
+        "wild mint",
+        "field mint",
+        "corn mint"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Ocimum tenuiflorum",
+      "Genus": "Ocimum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q960124",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Ocimum_tenuiflorum",
+      "Sitelinks": 63,
+      "CommonNames": [
+        "holy basil"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium fistulosum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q27938",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_fistulosum",
+      "Sitelinks": 62,
+      "CommonNames": [
+        "welsh onion"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha spicata",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q160114",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Spearmint",
+      "Sitelinks": 60,
+      "CommonNames": [
+        "spear mint",
+        "Spearmint"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha pulegium",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161235",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mentha_pulegium",
+      "Sitelinks": 59,
+      "CommonNames": [
+        "pennyroyal",
+        "penny-royal"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Levisticum officinale",
+      "Genus": "Levisticum",
+      "WikidataItem": "http://www.wikidata.org/entity/Q27615",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Lovage",
+      "Sitelinks": 56,
+      "CommonNames": [
+        "garden lovage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia hispanica",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q1071585",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_hispanica",
+      "Sitelinks": 56,
+      "CommonNames": [
+        "Spanish sage",
+        "chia sage",
+        "chia"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha aquatica",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161232",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mentha_aquatica",
+      "Sitelinks": 53,
+      "CommonNames": [
+        "Water Mint"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia divinorum",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q320584",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_divinorum",
+      "Sitelinks": 45,
+      "CommonNames": [
+        "yerba de la pastora"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia sclarea",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q157872",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_sclarea",
+      "Sitelinks": 43,
+      "CommonNames": [
+        "European sage",
+        "Europe sage",
+        "clary sage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Salvia pratensis",
+      "Genus": "Salvia",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161772",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Salvia_pratensis",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "meadow clary",
+        "introduced sage"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Mentha longifolia",
+      "Genus": "Mentha",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161924",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Mentha_longifolia",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "horsemint",
+        "Horse Mint"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium ampeloprasum",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q148995",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_ampeloprasum",
+      "Sitelinks": 42,
+      "CommonNames": [
+        "garden leek",
+        "Broadleaf wild leek"
+      ],
+      "NativeRange": []
+    },
+    {
+      "ScientificName": "Allium vineale",
+      "Genus": "Allium",
+      "WikidataItem": "http://www.wikidata.org/entity/Q161230",
+      "WikipediaUrl": "https://en.wikipedia.org/wiki/Allium_vineale",
+      "Sitelinks": 41,
+      "CommonNames": [
+        "wild onion",
+        "wild garlic",
+        "stag\u0027s garlic",
+        "crow garlic"
+      ],
+      "NativeRange": []
+    }
+  ]
+}
