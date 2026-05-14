@@ -766,6 +766,7 @@ public partial class GardenPlot
     private IJSObjectReference? clientImagesModule;
     private DotNetObjectReference<GardenPlot>? dotnetRef;
     private IJSObjectReference? wheelHandle;
+    private IJSObjectReference? gestureHandle;
 
     // Floating-panel drag state
     private string? draggingPanel;
@@ -1235,6 +1236,7 @@ public partial class GardenPlot
                         if (jsModule is not null)
                         {
                             wheelHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachWheel", canvasRef, dotnetRef);
+                            gestureHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachTouchGestures", canvasRef, wrapRef, dotnetRef);
                         }
 
                         // If startup load was non-authoritative due a transient circuit disconnect,
@@ -1763,6 +1765,8 @@ public partial class GardenPlot
         isDisposingOrDisposed = true;
         try { if (wheelHandle is not null) await wheelHandle.InvokeVoidAsync("dispose"); } catch { }
         try { if (wheelHandle is not null) await wheelHandle.DisposeAsync(); } catch { }
+        try { if (gestureHandle is not null) await gestureHandle.InvokeVoidAsync("dispose"); } catch { }
+        try { if (gestureHandle is not null) await gestureHandle.DisposeAsync(); } catch { }
         try { if (jsModule is not null) await jsModule.DisposeAsync(); } catch { }
         dotnetRef?.Dispose();
     }
@@ -4196,6 +4200,31 @@ public partial class GardenPlot
     {
         await HandleWheel(deltaY, shift, ctrl, alt);
         StateHasChanged();
+    }
+
+    /// <summary>Invoked from JS when a multi-touch gesture begins so any in-progress
+    /// draft, drag, or pan is abandoned and the gesture can take over cleanly.</summary>
+    [JSInvokable]
+    public Task CancelActiveDragFromJs()
+    {
+        drafting = null;
+        buildingPolygon = false;
+        panPending = false;
+        panActive = false;
+        panButton = 0;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Invoked from JS during pinch-to-zoom. Does not persist on each frame;
+    /// the gesture is treated as transient and the final zoom is saved on the next
+    /// persistence trigger (e.g., next save).</summary>
+    [JSInvokable]
+    public Task SetZoomFromJs(double newZoom)
+    {
+        SetZoom(newZoom, persist: false);
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private async Task HandleWheel(double deltaY, bool shift, bool ctrl, bool alt)

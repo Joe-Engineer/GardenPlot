@@ -449,6 +449,7 @@ else
                 <svg class="plot-canvas @(showCanvasScalePanel ? "scale-capture-active" : string.Empty)"
                      @ref="canvasRef"
                      tabindex="0"
+                     data-zoom="@F(zoom)"
                      style="width:@(PlotWidthFt * PxPerFt * zoom)px; height:@(PlotHeightFt * PxPerFt * zoom)px;"
                      viewBox="0 0 @F(PlotWidthFt) @F(PlotHeightFt)"
                      preserveAspectRatio="xMidYMid meet"
