@@ -42,6 +42,136 @@ export function capturePointer(el, pointerId) {
     try { el.setPointerCapture(pointerId); } catch { /* ignore */ }
 }
 
+// Multi-touch gesture handler for mobile users: two-finger pan and pinch-to-zoom.
+// Single-touch events pass through to Blazor pointer handlers (used for drawing).
+// When a 2nd touch lands, any in-progress draft is cancelled via dotnetRef so the
+// user doesn't accidentally draw while gesturing, and subsequent move/up events
+// from those two touches are intercepted at the capture phase so Blazor never sees them.
+export function attachTouchGestures(canvasEl, wrapEl, dotnetRef) {
+    if (!canvasEl || !wrapEl) return { dispose: () => { } };
+
+    const touches = new Map(); // pointerId -> { x, y }
+    let gestureActive = false;
+    let startDist = 0;
+    let startZoom = 1;
+    let lastMidX = 0, lastMidY = 0;
+    let currentZoom = 1;
+    let pendingZoom = null;
+    let zoomRafScheduled = false;
+
+    const isTouch = (e) => e.pointerType === 'touch';
+
+    const midpoint = () => {
+        let sx = 0, sy = 0, n = 0;
+        for (const p of touches.values()) { sx += p.x; sy += p.y; n++; }
+        return n ? { x: sx / n, y: sy / n } : { x: 0, y: 0 };
+    };
+    const distance = () => {
+        if (touches.size < 2) return 0;
+        const it = touches.values();
+        const a = it.next().value;
+        const b = it.next().value;
+        return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+
+    const flushZoom = () => {
+        zoomRafScheduled = false;
+        if (pendingZoom == null) return;
+        const z = pendingZoom;
+        pendingZoom = null;
+        try { dotnetRef.invokeMethodAsync('SetZoomFromJs', z); } catch { /* circuit gone */ }
+    };
+    const requestZoom = (z) => {
+        pendingZoom = z;
+        currentZoom = z;
+        if (!zoomRafScheduled) {
+            zoomRafScheduled = true;
+            requestAnimationFrame(flushZoom);
+        }
+    };
+
+    const startGesture = () => {
+        gestureActive = true;
+        startDist = distance();
+        // Read the latest Blazor-side zoom so pinch deltas compose correctly even
+        // if the user has changed zoom via the toolbar/wheel between gestures.
+        const dz = parseFloat(canvasEl.dataset.zoom);
+        currentZoom = isFinite(dz) && dz > 0 ? dz : currentZoom;
+        startZoom = currentZoom;
+        const m = midpoint();
+        lastMidX = m.x; lastMidY = m.y;
+        try { dotnetRef.invokeMethodAsync('CancelActiveDragFromJs'); } catch { /* ignore */ }
+    };
+
+    const endGesture = () => {
+        gestureActive = false;
+        startDist = 0;
+    };
+
+    const onDown = (e) => {
+        if (!isTouch(e)) return;
+        touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (touches.size >= 2 && !gestureActive) {
+            startGesture();
+            e.stopImmediatePropagation();
+            e.preventDefault();
+        } else if (gestureActive) {
+            e.stopImmediatePropagation();
+        }
+    };
+    const onMove = (e) => {
+        if (!isTouch(e)) return;
+        if (!touches.has(e.pointerId)) return;
+        touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (!gestureActive) return;
+
+        e.stopImmediatePropagation();
+        e.preventDefault();
+
+        const m = midpoint();
+        // Two-finger pan: instant scroll, no server roundtrip.
+        wrapEl.scrollLeft -= (m.x - lastMidX);
+        wrapEl.scrollTop -= (m.y - lastMidY);
+        lastMidX = m.x; lastMidY = m.y;
+
+        // Pinch zoom: throttled to one server call per animation frame.
+        const d = distance();
+        if (startDist > 0 && d > 0) {
+            const ratio = d / startDist;
+            const next = Math.max(0.25, Math.min(6, startZoom * ratio));
+            if (Math.abs(next - currentZoom) > 0.005) {
+                requestZoom(next);
+            }
+        }
+    };
+    const onUp = (e) => {
+        if (!isTouch(e)) return;
+        if (gestureActive) e.stopImmediatePropagation();
+        touches.delete(e.pointerId);
+        if (touches.size < 2 && gestureActive) {
+            endGesture();
+        }
+    };
+
+    // Capture phase so Blazor's bubble-phase handlers never see these events while gesturing.
+    canvasEl.addEventListener('pointerdown', onDown, { capture: true, passive: false });
+    canvasEl.addEventListener('pointermove', onMove, { capture: true, passive: false });
+    canvasEl.addEventListener('pointerup', onUp, { capture: true, passive: false });
+    canvasEl.addEventListener('pointercancel', onUp, { capture: true, passive: false });
+    canvasEl.addEventListener('pointerleave', onUp, { capture: true, passive: false });
+
+    return {
+        setZoom: (z) => { currentZoom = z; },
+        dispose: () => {
+            canvasEl.removeEventListener('pointerdown', onDown, { capture: true });
+            canvasEl.removeEventListener('pointermove', onMove, { capture: true });
+            canvasEl.removeEventListener('pointerup', onUp, { capture: true });
+            canvasEl.removeEventListener('pointercancel', onUp, { capture: true });
+            canvasEl.removeEventListener('pointerleave', onUp, { capture: true });
+        },
+    };
+}
+
 // Returns the current viewport size (used to clamp dragged panels on screen).
 export function viewportSize() {
     return { width: window.innerWidth, height: window.innerHeight };
