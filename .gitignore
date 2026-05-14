@@ -65,3 +65,7 @@ build.log
 # Local agent/tool cache
 .cache/
 
+
+# Local user data (personal plots) - must not be published
+GardenPlotWeb/App_Data/
+

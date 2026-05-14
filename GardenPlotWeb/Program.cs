@@ -8,35 +8,32 @@ using Microsoft.Extensions.FileProviders;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+// 1. Aspire service defaults (logging, telemetry, health, etc.).
 builder.AddServiceDefaults();
 
-// Add services to the container.
+// 2. Interactive Server Blazor.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Used by the Garden Plot page to look up plant info from Wikipedia.
-builder.Services.AddHttpClient();
-
-// Per-user data root resolver (LocalAppData by default, override with GARDENPLOT_DATA_DIR).
-builder.Services.AddSingleton<DataRootProvider>();
-
-// Optional rich horticultural metadata loaded from wwwroot/data/plant-profiles.json.
-builder.Services.AddSingleton<IPlantProfileService, LocalPlantProfileService>();
+// 3. Garden Plot application services (HTTP, data root, plant profiles).
+builder.Services.AddGardenPlotServices();
 
 WebApplication app = builder.Build();
 
+// Pipeline: errors -> static assets (incl. per-user image roots) -> antiforgery -> components.
 app.MapDefaultEndpoints();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     _ = app.UseExceptionHandler("/Error", createScopeForErrors: true);
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     _ = app.UseHsts();
 }
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+// Serve per-user uploaded tile and plot images from the resolved data root.
 DataRootProvider dataRoot = app.Services.GetRequiredService<DataRootProvider>();
 
 app.UseStaticFiles(new StaticFileOptions

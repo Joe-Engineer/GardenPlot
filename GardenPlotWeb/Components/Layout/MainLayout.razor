@@ -1,6 +1,20 @@
 ﻿@inherits LayoutComponentBase
 
 <input id="nav-collapse-toggle" type="checkbox" class="nav-collapse-toggle" aria-label="Toggle navigation" />
+@* Restore the collapsed state from localStorage synchronously, before paint, to avoid
+   a jarring flash where the sidebar starts expanded and then snaps closed. *@
+<script>
+    (function () {
+        try {
+            var cb = document.getElementById('nav-collapse-toggle');
+            if (!cb) return;
+            cb.checked = localStorage.getItem('navCollapsed') === '1';
+            cb.addEventListener('change', function () {
+                try { localStorage.setItem('navCollapsed', cb.checked ? '1' : '0'); } catch (_) { }
+            });
+        } catch (_) { }
+    })();
+</script>
 
 <div class="page">
     <div class="sidebar">

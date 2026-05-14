@@ -1,0 +1,58 @@
+// <copyright file="Plot.cs" company="Garden Plot">
+// Copyright (c) Garden Plot. All rights reserved.
+// </copyright>
+
+namespace GardenPlotWeb.Models;
+
+public class PlotData
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = "Garden";
+    public double WidthFt { get; set; } = 120;
+    public double HeightFt { get; set; } = 120;
+
+    /// <summary>Climate region this plot sits in (drives plant suitability checks).</summary>
+    public ClimateRegion? ClimateRegion { get; set; }
+
+    /// <summary>Water availability on this plot (irrigation, rainfall, drainage).</summary>
+    public WaterAvailability? Water { get; set; }
+
+    /// <summary>Dominant sun exposure for the plot.</summary>
+    public SunExposure? Sun { get; set; }
+
+    /// <summary>Optional plot background image filename (served from app data store).</summary>
+    public string? BackgroundImageFileName { get; set; }
+
+    /// <summary>Background image opacity (0..1) when rendered on the canvas.</summary>
+    public double BackgroundImageOpacity { get; set; } = 0.92;
+
+    /// <summary>Whether to show the 1ft grid overlay for this plot.</summary>
+    public bool ShowGrid { get; set; } = true;
+
+    /// <summary>Gridline color for this plot.</summary>
+    public string GridColor { get; set; } = "#cfd8c5";
+
+    /// <summary>Gridline stroke width in plot units (feet).</summary>
+    public double GridLineWidth { get; set; } = 0.02;
+
+    /// <summary>Gridline opacity (0..1).</summary>
+    public double GridOpacity { get; set; } = 1.0;
+
+    /// <summary>Whether to show the on-canvas scale bar display.</summary>
+    public bool ShowScaleDisplay { get; set; }
+
+    public List<Shape> Shapes { get; set; } = new();
+    public List<DropGroup> DropGroups { get; set; } = new();
+    public Dictionary<string, double> KitRotations { get; set; } = new();
+    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+    public DateTime ModifiedUtc { get; set; } = DateTime.UtcNow;
+}
+
+public class PlotLibrary
+{
+    public Guid? LastPlotId { get; set; }
+    public List<PlotData> Plots { get; set; } = new();
+    public UiPreferences Ui { get; set; } = new();
+    public List<PaletteItem> CustomPaletteItems { get; set; } = new();
+}
+

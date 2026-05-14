@@ -3,11 +3,7 @@
   "settings": {
     "documentationRules": {
       "companyName": "Garden Plot",
-      "copyrightText": "<copyright file=\"{fileName}\" company=\"{companyName}\">\nCopyright (c) {companyName}. All rights reserved.\n</copyright>",
-      "variables": {
-        "fileName": "{fileName}",
-        "companyName": "Garden Plot"
-      },
+      "copyrightText": "Copyright (c) {companyName}. All rights reserved.",
       "xmlHeader": true,
       "fileNamingConvention": "metadata"
     },
