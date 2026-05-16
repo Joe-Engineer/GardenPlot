@@ -74,6 +74,31 @@ if (app.Environment.IsDevelopment())
             plotCount = library?.Plots?.Count ?? 0,
         });
     }).WithName("PlotMigrationProbe");
+
+    _ = app.MapPost("/dev/plot-repository-probe", async (
+        GardenPlotWeb.Services.Persistence.IPlotRepository repo) =>
+    {
+        // Synthetic save -> load -> list round-trip so the Aspire dashboard shows the
+        // repository's op counter/histogram firing without needing a browser.
+        GardenPlotWeb.Models.PlotLibrary lib = new();
+        lib.Plots.Add(new GardenPlotWeb.Models.PlotData
+        {
+            Name = $"probe-{DateTime.UtcNow:HHmmss}",
+            WidthFt = 20,
+            HeightFt = 15,
+        });
+
+        await repo.SaveLibraryAsync(lib);
+        GardenPlotWeb.Models.PlotLibrary? loaded = await repo.LoadLibraryAsync();
+        IReadOnlyList<GardenPlotWeb.Services.Persistence.PlotSummary> summaries = await repo.ListAsync();
+
+        return Results.Json(new
+        {
+            savedPlots = lib.Plots.Count,
+            loadedPlots = loaded?.Plots?.Count ?? 0,
+            indexed = summaries.Count,
+        });
+    }).WithName("PlotRepositoryProbe");
 }
 
 app.Run();
