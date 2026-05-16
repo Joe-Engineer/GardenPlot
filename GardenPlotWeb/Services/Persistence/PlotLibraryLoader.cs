@@ -1,40 +1,43 @@
-﻿// <copyright file="PlotMigrationRunner.cs" company="Garden Plot">
+﻿// <copyright file="PlotLibraryLoader.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
-namespace GardenPlotWeb.Services.Persistence;
-
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using GardenPlotWeb.Models;
-using Microsoft.Extensions.Logging;
+
+namespace GardenPlotWeb.Services.Persistence;
 
 /// <summary>
-/// Loads a persisted <see cref="PlotLibrary"/> JSON document through the registered
-/// migration chain so that every consumer in the app sees a document at
-/// <see cref="PlotSchema.Current"/>.
+/// Loads a persisted <see cref="PlotLibrary"/> JSON document and returns it shaped as the
+/// current schema version. Each historical on-disk schema gets a dedicated
+/// <c>LoadFromVersion&lt;N&gt;</c> method that knows how to read the old shape and produce a
+/// current <see cref="PlotLibrary"/>. Saves always write <see cref="PlotSchema.Current"/>;
+/// older shapes are only ever upgraded on read.
 /// </summary>
 /// <remarks>
 /// <para>
-/// All deserialization of persisted libraries should be routed through this runner. It
-/// emits OpenTelemetry metrics on the <c>GardenPlotWeb.Persistence</c> meter and
-/// structured logs so migration activity is visible in the Aspire dashboard.
+/// Adding a new schema version:
 /// </para>
-/// <para>
-/// Metric names emitted:
-/// <list type="bullet">
-///   <item><c>gardenplot.schema.load</c> (counter; tag <c>outcome</c>=loaded|empty|error,
-///   tag <c>from_version</c>, tag <c>to_version</c>, tag <c>migrations_applied</c>).</item>
-///   <item><c>gardenplot.schema.migration.applied</c> (counter; tag <c>from_version</c>,
-///   tag <c>to_version</c>).</item>
-///   <item><c>gardenplot.schema.load.duration.ms</c> (histogram).</item>
+/// <list type="number">
+///   <item>Bump <see cref="PlotSchema.Current"/>.</item>
+///   <item>Add a new <c>LoadFromVersion&lt;newCurrent&gt;</c> method that does the direct typed deserialize.</item>
+///   <item>Update the previous <c>LoadFromVersion&lt;N-1&gt;</c> method so it reads the old shape (e.g. via a
+///   private DTO) and returns a current-shaped <see cref="PlotLibrary"/>.</item>
+///   <item>Wire the new version into the switch in <see cref="Load(string?, string, JsonSerializerOptions?)"/>.</item>
 /// </list>
+/// <para>
+/// Metrics emitted on the <c>GardenPlotWeb.Persistence</c> meter (visible in the Aspire dashboard):
 /// </para>
+/// <list type="bullet">
+///   <item><c>gardenplot.schema.load</c> (counter; tags <c>outcome</c>=loaded|empty|error,
+///   <c>source</c>, <c>from_version</c>, <c>to_version</c>).</item>
+///   <item><c>gardenplot.schema.load.duration.ms</c> (histogram; tags <c>outcome</c>, <c>source</c>).</item>
+/// </list>
 /// </remarks>
-public sealed class PlotMigrationRunner
+public sealed class PlotLibraryLoader
 {
     /// <summary>Public meter name so tests and dashboards can subscribe.</summary>
     public const string MeterName = "GardenPlotWeb.Persistence";
@@ -42,47 +45,27 @@ public sealed class PlotMigrationRunner
     private static readonly Meter Meter = new(MeterName);
     private static readonly Counter<long> LoadCounter =
         Meter.CreateCounter<long>("gardenplot.schema.load");
-    private static readonly Counter<long> MigrationCounter =
-        Meter.CreateCounter<long>("gardenplot.schema.migration.applied");
     private static readonly Histogram<double> LoadDurationMs =
         Meter.CreateHistogram<double>("gardenplot.schema.load.duration.ms");
 
-    private readonly ILogger<PlotMigrationRunner> logger;
-    private readonly Dictionary<int, IPlotMigration> migrationsByFromVersion;
+    private readonly ILogger<PlotLibraryLoader> logger;
 
-    public PlotMigrationRunner(
-        IEnumerable<IPlotMigration> migrations,
-        ILogger<PlotMigrationRunner> logger)
+    public PlotLibraryLoader(ILogger<PlotLibraryLoader> logger)
     {
-        ArgumentNullException.ThrowIfNull(migrations);
         ArgumentNullException.ThrowIfNull(logger);
-
         this.logger = logger;
-
-        Dictionary<int, IPlotMigration> byFrom = new();
-        foreach (IPlotMigration m in migrations)
-        {
-            if (byFrom.ContainsKey(m.FromVersion))
-            {
-                throw new InvalidOperationException(
-                    $"Duplicate IPlotMigration registered for FromVersion={m.FromVersion}.");
-            }
-
-            byFrom[m.FromVersion] = m;
-        }
-
-        migrationsByFromVersion = byFrom;
     }
 
     /// <summary>
-    /// Reads <paramref name="json"/>, applies any required migrations, and returns the
-    /// deserialized <see cref="PlotLibrary"/>. Returns <see langword="null"/> if
+    /// Reads <paramref name="json"/>, dispatches to the loader for the document's recorded
+    /// <c>SchemaVersion</c>, and returns a <see cref="PlotLibrary"/> shaped as
+    /// <see cref="PlotSchema.Current"/>. Returns <see langword="null"/> when
     /// <paramref name="json"/> is null/whitespace.
     /// </summary>
     /// <param name="json">Raw persisted JSON for a <see cref="PlotLibrary"/> document.</param>
-    /// <param name="source">Free-form tag describing where the JSON came from (e.g. <c>indexeddb</c>),
+    /// <param name="source">Free-form tag describing where the JSON came from (e.g. <c>indexeddb</c>);
     /// recorded on emitted metrics/logs for triage.</param>
-    /// <param name="options">Serializer options used for the final typed deserialization. When
+    /// <param name="options">Serializer options used for the typed deserialization. When
     /// <see langword="null"/>, <see cref="JsonSerializerOptions.Default"/> is used.</param>
     public PlotLibrary? Load(string? json, string source, JsonSerializerOptions? options = null)
     {
@@ -120,42 +103,23 @@ public sealed class PlotMigrationRunner
             }
 
             int fromVersion = ReadVersion(root);
-            int currentVersion = fromVersion;
-            int migrationsApplied = 0;
 
-            while (currentVersion < PlotSchema.Current)
+            PlotLibrary? library = fromVersion switch
             {
-                if (!migrationsByFromVersion.TryGetValue(currentVersion, out IPlotMigration? migration))
-                {
-                    throw new InvalidOperationException(
-                        $"No IPlotMigration registered to upgrade plot schema from v{currentVersion} to v{currentVersion + 1}.");
-                }
+                1 => LoadFromVersion1(root, options),
 
-                migration.Migrate(root);
-                migrationsApplied++;
-                int nextVersion = currentVersion + 1;
+                // Future versions: add a 'N => LoadFromVersionN(root, options),' line here when
+                // PlotSchema.Current is bumped. The previous version's method is then updated to
+                // read the old shape and project onto the current PlotLibrary.
+                _ when fromVersion > PlotSchema.Current =>
+                    // Forward-from-future: the document was written by a newer build than this one.
+                    // Best effort: try to deserialize directly as current; the user's newer fields
+                    // will be tolerated (PlotLibrary uses default opts) and dropped on next save.
+                    LoadFromVersion1(root, options),
+                _ => throw new InvalidOperationException(
+                    $"No loader registered for plot library schema v{fromVersion}."),
+            };
 
-                MigrationCounter.Add(
-                    1,
-                    new KeyValuePair<string, object?>("from_version", currentVersion),
-                    new KeyValuePair<string, object?>("to_version", nextVersion),
-                    new KeyValuePair<string, object?>("source", source));
-
-                if (logger.IsEnabled(LogLevel.Information))
-                {
-                    logger.LogInformation(
-                        "Plot schema migration applied: v{FromVersion} -> v{ToVersion} (source={Source}).",
-                        currentVersion,
-                        nextVersion,
-                        source);
-                }
-
-                currentVersion = nextVersion;
-            }
-
-            root["SchemaVersion"] = currentVersion;
-
-            PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? JsonSerializerOptions.Default);
             if (library is null)
             {
                 LoadCounter.Add(
@@ -165,15 +129,14 @@ public sealed class PlotMigrationRunner
                 return null;
             }
 
-            library.SchemaVersion = currentVersion;
+            library.SchemaVersion = PlotSchema.Current;
 
             LoadCounter.Add(
                 1,
                 new KeyValuePair<string, object?>("outcome", "loaded"),
                 new KeyValuePair<string, object?>("source", source),
                 new KeyValuePair<string, object?>("from_version", fromVersion),
-                new KeyValuePair<string, object?>("to_version", currentVersion),
-                new KeyValuePair<string, object?>("migrations_applied", migrationsApplied));
+                new KeyValuePair<string, object?>("to_version", PlotSchema.Current));
             LoadDurationMs.Record(
                 sw.Elapsed.TotalMilliseconds,
                 new KeyValuePair<string, object?>("outcome", "loaded"),
@@ -183,11 +146,10 @@ public sealed class PlotMigrationRunner
             {
                 int plotCount = library.Plots?.Count ?? 0;
                 logger.LogInformation(
-                    "Plot library loaded from {Source}: FromVersion={FromVersion}, ToVersion={ToVersion}, MigrationsApplied={MigrationsApplied}, Plots={PlotCount}.",
+                    "Plot library loaded from {Source}: FromVersion={FromVersion}, ToVersion={ToVersion}, Plots={PlotCount}.",
                     source,
                     fromVersion,
-                    currentVersion,
-                    migrationsApplied,
+                    PlotSchema.Current,
                     plotCount);
             }
 
@@ -203,16 +165,28 @@ public sealed class PlotMigrationRunner
                 sw.Elapsed.TotalMilliseconds,
                 new KeyValuePair<string, object?>("outcome", "error"),
                 new KeyValuePair<string, object?>("source", source));
-            logger.LogError(ex, "Plot library load/migration failed for source {Source}.", source);
+            logger.LogError(ex, "Plot library load failed for source {Source}.", source);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Loader for schema v1 — the current shape. Direct typed deserialization onto
+    /// <see cref="PlotLibrary"/>. When <see cref="PlotSchema.Current"/> is bumped past 1,
+    /// this method must be rewritten to read the v1 shape (typically via a small private
+    /// <c>PlotLibraryV1</c> DTO) and project the result onto the new current
+    /// <see cref="PlotLibrary"/>.
+    /// </summary>
+    private static PlotLibrary? LoadFromVersion1(JsonObject root, JsonSerializerOptions? options)
+    {
+        return root.Deserialize<PlotLibrary>(options ?? JsonSerializerOptions.Default);
     }
 
     private static int ReadVersion(JsonObject root)
     {
         if (root.TryGetPropertyValue("SchemaVersion", out JsonNode? versionNode) &&
             versionNode is JsonValue jv &&
-            jv.TryGetValue<int>(out int v))
+            jv.TryGetValue(out int v))
         {
             return v;
         }

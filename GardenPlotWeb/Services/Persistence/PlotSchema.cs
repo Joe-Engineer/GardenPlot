@@ -10,13 +10,12 @@ namespace GardenPlotWeb.Services.Persistence;
 /// <remarks>
 /// <para>
 /// Every time the on-disk / in-browser shape of <c>GardenPlotWeb.Models.PlotLibrary</c>
-/// changes in a breaking way, bump <see cref="Current"/> and register an
-/// <see cref="IPlotMigration"/> whose <see cref="IPlotMigration.FromVersion"/> matches the
-/// version it migrates away from.
+/// changes in a breaking way, bump <see cref="Current"/> and add a corresponding
+/// <c>LoadFromVersion&lt;N&gt;</c> method on <see cref="PlotLibraryLoader"/>.
 /// </para>
 /// <para>
 /// Documents persisted before the <c>SchemaVersion</c> field existed have no marker on
-/// disk; <see cref="PlotMigrationRunner"/> treats those as <see cref="LegacyVersion"/>.
+/// disk; <see cref="PlotLibraryLoader"/> treats those as <see cref="LegacyVersion"/>.
 /// </para>
 /// </remarks>
 public static class PlotSchema

@@ -61,11 +61,11 @@ if (app.Environment.IsDevelopment())
 {
     _ = app.MapPost("/dev/plot-migration-probe", async (
         HttpContext ctx,
-        GardenPlotWeb.Services.Persistence.PlotMigrationRunner runner) =>
+        GardenPlotWeb.Services.Persistence.PlotLibraryLoader loader) =>
     {
         using StreamReader reader = new(ctx.Request.Body);
         string json = await reader.ReadToEndAsync();
-        GardenPlotWeb.Models.PlotLibrary? library = runner.Load(json, source: "dev-probe");
+        GardenPlotWeb.Models.PlotLibrary? library = loader.Load(json, source: "dev-probe");
         return Results.Json(new
         {
             schemaCurrent = GardenPlotWeb.Services.Persistence.PlotSchema.Current,

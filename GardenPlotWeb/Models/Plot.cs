@@ -2,9 +2,9 @@
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
-namespace GardenPlotWeb.Models;
-
 using GardenPlotWeb.Services.Persistence;
+
+namespace GardenPlotWeb.Models;
 
 public class PlotData
 {

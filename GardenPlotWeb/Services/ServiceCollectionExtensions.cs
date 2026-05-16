@@ -31,9 +31,9 @@ public static class ServiceCollectionExtensions
         // Optional rich horticultural metadata loaded from wwwroot/data/plant-profiles.json.
         _ = services.AddSingleton<IPlantProfileService, LocalPlantProfileService>();
 
-        // Plot persistence: schema migration runner. Migrations are registered separately as
-        // IPlotMigration implementations and discovered by IEnumerable<IPlotMigration> injection.
-        _ = services.AddSingleton<Persistence.PlotMigrationRunner>();
+        // Plot persistence: per-version loader. New schemas add a LoadFromVersionN method
+        // on this type and a switch entry; saves always write PlotSchema.Current.
+        _ = services.AddSingleton<Persistence.PlotLibraryLoader>();
 
         return services;
     }
