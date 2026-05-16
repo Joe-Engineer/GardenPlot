@@ -1,5 +1,6 @@
 ﻿@page "/about"
 @using GardenPlotWeb.Services
+@using GardenPlotWeb.Services.Persistence
 @inject IPlantProfileService PlantProfiles
 
 <PageTitle>About Garden Plot</PageTitle>
@@ -122,4 +123,9 @@
     running app makes no outbound calls for built-in palette items. The fetcher uses a real
     <code>User-Agent</code>, ETag-based conditional requests, and bounded concurrency to minimise
     bandwidth on upstream providers.
+</p>
+
+<hr />
+<p class="text-muted small mb-0">
+    Plot data schema: <strong>v@PlotSchema.Current</strong>
 </p>
