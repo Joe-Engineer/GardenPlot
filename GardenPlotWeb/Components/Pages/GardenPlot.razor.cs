@@ -1,4 +1,4 @@
-﻿// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
+// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -70,18 +70,7 @@ public partial class GardenPlot
     // readonly (not const) so the compiler does not const-fold gated branches
     // into CS0162 unreachable-code errors.
     private static readonly bool FileStoreEnabled = false;
-    private const string FileStoreFolderName = "plots";
-    private const string FileStoreIndexFileName = "index.json";
-    private const string FileStoreTileImageFolderName = "tile-images";
-    private const string FileStorePlotImageFolderName = "plot-images";
-    private const int FileStoreSchemaVersion = 1;
     private const double PxPerFt = 16.0; // also used by ToFt()
-    private static readonly SemaphoreSlim FileStoreGate = new(1, 1);
-
-    private string FileStoreDirectory => DataRoot.PlotsDirectory;
-    private string FileStoreIndexPath => Path.Combine(FileStoreDirectory, FileStoreIndexFileName);
-    private string FileStoreTileImageDirectory => DataRoot.TileImagesDirectory;
-    private string FileStorePlotImageDirectory => DataRoot.PlotImagesDirectory;
 
     private double PlotWidthFt => currentPlot?.WidthFt ?? 60;
     private double PlotHeightFt => currentPlot?.HeightFt ?? 8;
@@ -1364,8 +1353,8 @@ public partial class GardenPlot
         {
             if (FileStoreEnabled)
             {
-                var fileLibrary = await TryLoadFileStoreLibraryAsync();
-                if (fileLibrary is not null && fileLibrary.Plots.Count > 0)
+                var fileLibrary = NormalizeLibrary(await PlotRepository.LoadLibraryAsync());
+                if (fileLibrary.Plots.Count > 0)
                 {
                     RecordLoadMetrics("loaded", FileStoreSourceKey, fileLibrary, 0, sw.Elapsed.TotalMilliseconds);
                     Logger.LogInformation("GardenPlot storage load succeeded from file store. Plots: {PlotCount}, Shapes: {ShapeCount}.",
@@ -1517,162 +1506,6 @@ public partial class GardenPlot
         return safe;
     }
 
-    private sealed class PlotStoreIndex
-    {
-        public int SchemaVersion { get; set; } = FileStoreSchemaVersion;
-        public Guid? LastPlotId { get; set; }
-        public UiPreferences Ui { get; set; } = new();
-        public List<PaletteItem> CustomPaletteItems { get; set; } = new();
-        public List<PlotStoreIndexEntry> Plots { get; set; } = new();
-    }
-
-    private sealed class PlotStoreIndexEntry
-    {
-        public Guid Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string FileName { get; set; } = string.Empty;
-        public DateTime ModifiedUtc { get; set; }
-    }
-
-    private static string PlotFileName(Guid id) => $"{id:N}.json";
-
-    private async Task<PlotLibrary?> TryLoadFileStoreLibraryAsync()
-    {
-        if (!File.Exists(FileStoreIndexPath))
-        {
-            return null;
-        }
-
-        await FileStoreGate.WaitAsync();
-        try
-        {
-            var indexJson = await File.ReadAllTextAsync(FileStoreIndexPath);
-            if (string.IsNullOrWhiteSpace(indexJson))
-            {
-                return null;
-            }
-
-            var index = JsonSerializer.Deserialize<PlotStoreIndex>(indexJson);
-            if (index is null)
-            {
-                return null;
-            }
-
-            var lib = new PlotLibrary
-            {
-                LastPlotId = index.LastPlotId,
-                Ui = index.Ui ?? new UiPreferences(),
-                CustomPaletteItems = index.CustomPaletteItems ?? new List<PaletteItem>(),
-                Plots = new List<PlotData>(),
-            };
-
-            foreach (var entry in index.Plots)
-            {
-                if (string.IsNullOrWhiteSpace(entry.FileName))
-                {
-                    continue;
-                }
-
-                var path = Path.Combine(FileStoreDirectory, entry.FileName);
-                if (!File.Exists(path))
-                {
-                    continue;
-                }
-
-                var plotJson = await File.ReadAllTextAsync(path);
-                if (string.IsNullOrWhiteSpace(plotJson))
-                {
-                    continue;
-                }
-
-                var plot = JsonSerializer.Deserialize<PlotData>(plotJson);
-                if (plot is null)
-                {
-                    continue;
-                }
-
-                lib.Plots.Add(plot);
-            }
-
-            return NormalizeLibrary(lib);
-        }
-        finally
-        {
-            FileStoreGate.Release();
-        }
-    }
-
-    private async Task SaveFileStoreLibraryAsync(PlotLibrary source)
-    {
-        await FileStoreGate.WaitAsync();
-        try
-        {
-            Directory.CreateDirectory(FileStoreDirectory);
-
-            var index = new PlotStoreIndex
-            {
-                SchemaVersion = FileStoreSchemaVersion,
-                LastPlotId = source.LastPlotId,
-                Ui = source.Ui,
-                CustomPaletteItems = source.CustomPaletteItems,
-                Plots = new List<PlotStoreIndexEntry>(),
-            };
-
-            foreach (var plot in source.Plots)
-            {
-                var fileName = PlotFileName(plot.Id);
-                index.Plots.Add(new PlotStoreIndexEntry
-                {
-                    Id = plot.Id,
-                    Name = plot.Name,
-                    FileName = fileName,
-                    ModifiedUtc = plot.ModifiedUtc,
-                });
-
-                var plotPath = Path.Combine(FileStoreDirectory, fileName);
-                var plotJson = JsonSerializer.Serialize(plot);
-                await WriteAtomicTextFileAsync(plotPath, plotJson);
-            }
-
-            var expectedFiles = index.Plots.Select(p => p.FileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var file in Directory.EnumerateFiles(FileStoreDirectory, "*.json"))
-            {
-                var name = Path.GetFileName(file);
-                if (string.Equals(name, FileStoreIndexFileName, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (!expectedFiles.Contains(name))
-                {
-                    File.Delete(file);
-                }
-            }
-
-            var indexJson = JsonSerializer.Serialize(index);
-            await WriteAtomicTextFileAsync(FileStoreIndexPath, indexJson);
-        }
-        finally
-        {
-            FileStoreGate.Release();
-        }
-    }
-
-    private static async Task WriteAtomicTextFileAsync(string targetPath, string content)
-    {
-        var tempPath = targetPath + ".tmp";
-        await File.WriteAllTextAsync(tempPath, content);
-
-        if (File.Exists(targetPath))
-        {
-            File.Replace(tempPath, targetPath, null, true);
-        }
-        else
-        {
-            File.Move(tempPath, targetPath);
-        }
-    }
-
     private async Task<PlotLibrary?> TryLoadRecoveryLibraryAsync()
     {
         try
@@ -1808,7 +1641,7 @@ public partial class GardenPlot
             {
                 try
                 {
-                    await SaveFileStoreLibraryAsync(library);
+                    await PlotRepository.SaveLibraryAsync(library);
                     fileSaved = true;
                 }
                 catch (Exception ex)
@@ -2176,9 +2009,9 @@ public partial class GardenPlot
             newPlotBackgroundImageWarning = null;
         }
 
-        Directory.CreateDirectory(FileStorePlotImageDirectory);
+        Directory.CreateDirectory(DataRoot.PlotImagesDirectory);
         var fileName = $"{Guid.NewGuid():N}{ext}";
-        var path = Path.Combine(FileStorePlotImageDirectory, fileName);
+        var path = Path.Combine(DataRoot.PlotImagesDirectory, fileName);
 
         await using var input = file.OpenReadStream(PlotImageMaxBytes);
         await using var output = File.Create(path);

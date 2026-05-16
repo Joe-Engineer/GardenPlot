@@ -35,6 +35,10 @@ public static class ServiceCollectionExtensions
         // on this type and a switch entry; saves always write PlotSchema.Current.
         _ = services.AddSingleton<Persistence.PlotLibraryLoader>();
 
+        // Plot persistence: filesystem-backed repository under DataRootProvider.PlotsDirectory.
+        // Phase 2 (accounts + cloud plots) will swap this registration for a DB-backed impl.
+        _ = services.AddSingleton<Persistence.IPlotRepository, Persistence.FileSystemPlotRepository>();
+
         return services;
     }
 }
