@@ -39,6 +39,9 @@ public static class ServiceCollectionExtensions
         // Phase 2 (accounts + cloud plots) will swap this registration for a DB-backed impl.
         _ = services.AddSingleton<Persistence.IPlotRepository, Persistence.FileSystemPlotRepository>();
 
+        // Catalog of static facts behind each takeoff item kind (Base + future Packs + per-library Custom).
+        _ = services.AddSingleton<Catalog.ICatalogService, Catalog.CatalogService>();
+
         return services;
     }
 }

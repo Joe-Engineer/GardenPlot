@@ -46,6 +46,17 @@ public class PlotData
     public List<Shape> Shapes { get; set; } = new();
     public List<DropGroup> DropGroups { get; set; } = new();
     public Dictionary<string, double> KitRotations { get; set; } = new();
+
+    /// <summary>
+    /// First-class takeoff items for this plot. Each item is either bound to a <see cref="Shape"/>
+    /// via <see cref="TakeoffItem.ShapeId"/> or stands alone (a planned-to-buy line with no
+    /// canvas footprint yet). See <see cref="TakeoffMath"/> for effective-value resolution.
+    /// </summary>
+    public List<TakeoffItem> Takeoff { get; set; } = new();
+
+    /// <summary>Monotonic, never-reused integer source for <see cref="TakeoffItem.Id"/>.</summary>
+    public TakeoffSequence TakeoffIds { get; set; } = new();
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime ModifiedUtc { get; set; } = DateTime.UtcNow;
 }
@@ -63,5 +74,8 @@ public class PlotLibrary
     public List<PlotData> Plots { get; set; } = new();
     public UiPreferences Ui { get; set; } = new();
     public List<PaletteItem> CustomPaletteItems { get; set; } = new();
+
+    /// <summary>User-defined catalog items that round-trip with the library.</summary>
+    public List<CatalogItem> CustomCatalogItems { get; set; } = new();
 }
 

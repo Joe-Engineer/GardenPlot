@@ -107,6 +107,7 @@ public sealed class PlotLibraryLoader
             PlotLibrary? library = fromVersion switch
             {
                 1 => LoadFromVersion1(root, options),
+                2 => LoadFromVersion2(root, options),
 
                 // Future versions: add a 'N => LoadFromVersionN(root, options),' line here when
                 // PlotSchema.Current is bumped. The previous version's method is then updated to
@@ -115,7 +116,7 @@ public sealed class PlotLibraryLoader
                     // Forward-from-future: the document was written by a newer build than this one.
                     // Best effort: try to deserialize directly as current; the user's newer fields
                     // will be tolerated (PlotLibrary uses default opts) and dropped on next save.
-                    LoadFromVersion1(root, options),
+                    LoadFromVersion2(root, options),
                 _ => throw new InvalidOperationException(
                     $"No loader registered for plot library schema v{fromVersion}."),
             };
@@ -171,15 +172,98 @@ public sealed class PlotLibraryLoader
     }
 
     /// <summary>
-    /// Loader for schema v1 — the current shape. Direct typed deserialization onto
-    /// <see cref="PlotLibrary"/>. When <see cref="PlotSchema.Current"/> is bumped past 1,
-    /// this method must be rewritten to read the v1 shape (typically via a small private
-    /// <c>PlotLibraryV1</c> DTO) and project the result onto the new current
-    /// <see cref="PlotLibrary"/>.
+    /// Loader for schema v1. v1 documents predate the per-plot <c>Takeoff</c> list and
+    /// <c>TakeoffIds</c> sequence, and library-level <c>CustomCatalogItems</c>. We deserialize as
+    /// the current shape (forward-compatible — extra absent fields are tolerated by
+    /// <c>JsonSerializer</c>) and then synthesize one <see cref="TakeoffItem"/> per existing
+    /// <see cref="Shape"/> so the new Item view lights up without data loss.
     /// </summary>
     private static PlotLibrary? LoadFromVersion1(JsonObject root, JsonSerializerOptions? options)
     {
+        PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? JsonSerializerOptions.Default);
+        if (library is null)
+        {
+            return null;
+        }
+
+        foreach (PlotData plot in library.Plots)
+        {
+            BackfillTakeoffItemsForLegacyPlot(plot);
+        }
+
+        return library;
+    }
+
+    /// <summary>Loader for schema v2 — the current shape. Direct typed deserialization.</summary>
+    private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
+    {
         return root.Deserialize<PlotLibrary>(options ?? JsonSerializerOptions.Default);
+    }
+
+    /// <summary>
+    /// Mints a <see cref="TakeoffItem"/> for every <see cref="Shape"/> in <paramref name="plot"/>
+    /// that doesn't already have a corresponding takeoff entry. Used by the v1 -> v2 migration
+    /// path. <see cref="TakeoffSequence.Next"/> is initialised to <c>max(synthesized Id) + 1</c>.
+    /// </summary>
+    private static void BackfillTakeoffItemsForLegacyPlot(PlotData plot)
+    {
+        plot.Takeoff ??= new List<TakeoffItem>();
+        plot.TakeoffIds ??= new TakeoffSequence();
+
+        HashSet<Guid> alreadyBound = new();
+        foreach (TakeoffItem t in plot.Takeoff)
+        {
+            if (t.ShapeId is Guid g)
+            {
+                _ = alreadyBound.Add(g);
+            }
+        }
+
+        int nextId = plot.TakeoffIds.Next;
+        foreach (TakeoffItem t in plot.Takeoff)
+        {
+            if (t.Id >= nextId)
+            {
+                nextId = t.Id + 1;
+            }
+        }
+
+        foreach (Shape shape in plot.Shapes)
+        {
+            if (alreadyBound.Contains(shape.Id))
+            {
+                continue;
+            }
+
+            (CatalogSource source, string? packId, string code) = ResolveLegacyShapeCatalogRef(shape);
+
+            plot.Takeoff.Add(new TakeoffItem
+            {
+                Id = nextId++,
+                CatalogSource = source,
+                CatalogPackId = packId,
+                CatalogCode = code,
+                Quantity = 1,
+                ShapeId = shape.Id,
+            });
+        }
+
+        plot.TakeoffIds.Next = nextId;
+    }
+
+    private static (CatalogSource Source, string? PackId, string Code) ResolveLegacyShapeCatalogRef(Shape shape)
+    {
+        // Ground-cover shapes carry their material code; other shapes use the Label as a catalog
+        // hint (best effort — unresolved refs render as 'Unbound' in the UI).
+        string? gc = shape.GroundCoverCode;
+        if (!string.IsNullOrWhiteSpace(gc))
+        {
+            return (CatalogSource.Base, null, gc);
+        }
+
+        string? label = shape.Label;
+        string code = string.IsNullOrWhiteSpace(label) ? shape.Kind.ToString() : label;
+        return (CatalogSource.Base, null, code);
     }
 
     private static int ReadVersion(JsonObject root)

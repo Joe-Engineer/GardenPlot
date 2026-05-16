@@ -1,4 +1,4 @@
-// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
+﻿// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -305,6 +305,129 @@ public partial class GardenPlot
     // ===== Takeoff list =====
 
     private sealed record TakeoffRow(string Kind, string Name, int Count, string? Quantity = null);
+
+    /// <summary>
+    /// Keeps <see cref="PlotData.Takeoff"/> in lockstep with <see cref="PlotData.Shapes"/>:
+    /// mints a <see cref="TakeoffItem"/> for any new shape lacking one, and reconciles orphan
+    /// items whose <see cref="TakeoffItem.ShapeId"/> no longer matches a shape (deletes them
+    /// when <see cref="UiPreferences.AutoDeleteTakeoffOnShapeDelete"/> is on, otherwise clears
+    /// the binding to convert them to virtual items).
+    /// </summary>
+    private void ReconcileTakeoff()
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        HashSet<Guid> presentShapeIds = new();
+        foreach (Shape s in currentPlot.Shapes)
+        {
+            _ = presentShapeIds.Add(s.Id);
+        }
+
+        HashSet<Guid> boundShapeIds = new();
+        foreach (TakeoffItem t in currentPlot.Takeoff)
+        {
+            if (t.ShapeId is Guid g)
+            {
+                _ = boundShapeIds.Add(g);
+            }
+        }
+
+        int nextId = currentPlot.TakeoffIds.Next;
+        foreach (TakeoffItem t in currentPlot.Takeoff)
+        {
+            if (t.Id >= nextId)
+            {
+                nextId = t.Id + 1;
+            }
+        }
+
+        // 1. New shapes -> mint a takeoff item bound to each.
+        foreach (Shape shape in currentPlot.Shapes)
+        {
+            if (boundShapeIds.Contains(shape.Id))
+            {
+                continue;
+            }
+
+            (CatalogSource src, string? packId, string code) = ResolveCatalogRefForShape(shape);
+            currentPlot.Takeoff.Add(new TakeoffItem
+            {
+                Id = nextId++,
+                CatalogSource = src,
+                CatalogPackId = packId,
+                CatalogCode = code,
+                Quantity = 1,
+                ShapeId = shape.Id,
+            });
+        }
+
+        // 2. Orphan takeoff items whose bound shape was deleted.
+        bool autoDelete = library.Ui.AutoDeleteTakeoffOnShapeDelete;
+        for (int i = currentPlot.Takeoff.Count - 1; i >= 0; i--)
+        {
+            TakeoffItem t = currentPlot.Takeoff[i];
+            if (t.ShapeId is Guid sid && !presentShapeIds.Contains(sid))
+            {
+                if (autoDelete)
+                {
+                    currentPlot.Takeoff.RemoveAt(i);
+                }
+                else
+                {
+                    t.ShapeId = null;
+                }
+            }
+        }
+
+        currentPlot.TakeoffIds.Next = nextId;
+    }
+
+    private static (CatalogSource Source, string? PackId, string Code) ResolveCatalogRefForShape(Shape shape)
+    {
+        string? gc = shape.GroundCoverCode;
+        if (!string.IsNullOrWhiteSpace(gc))
+        {
+            return (CatalogSource.Base, null, gc);
+        }
+
+        string? label = shape.Label;
+        string code = string.IsNullOrWhiteSpace(label) ? shape.Kind.ToString() : label;
+        return (CatalogSource.Base, null, code);
+    }
+
+    /// <summary>Resolves the catalog item bound to <paramref name="item"/>, or null when unbound.</summary>
+    private CatalogItem? CatalogFor(TakeoffItem item)
+    {
+        return Catalog.Get(new CatalogItemRef(item.CatalogSource, item.CatalogPackId, item.CatalogCode));
+    }
+
+    /// <summary>Per-LaborType sum of effective labor hours for the current plot's takeoff.</summary>
+    private IReadOnlyList<(LaborType Type, double Hours)> LaborRollup()
+    {
+        if (currentPlot is null)
+        {
+            return Array.Empty<(LaborType, double)>();
+        }
+
+        Dictionary<LaborType, double> by = new();
+        foreach (TakeoffItem t in currentPlot.Takeoff)
+        {
+            CatalogItem? c = CatalogFor(t);
+            LaborType type = TakeoffMath.EffectiveLaborType(t, c);
+            double hours = TakeoffMath.EffectiveLaborHours(t, c);
+            if (hours <= 0)
+            {
+                continue;
+            }
+
+            by[type] = by.TryGetValue(type, out double existing) ? existing + hours : hours;
+        }
+
+        return by.OrderBy(kv => kv.Key).Select(kv => (kv.Key, kv.Value)).ToList();
+    }
 
     private static List<TakeoffRow> BuildTakeoff(IEnumerable<Shape> shapes)
     {
@@ -693,16 +816,40 @@ public partial class GardenPlot
             return;
         }
 
-        var rows = BuildTakeoff(currentPlot.Shapes);
+        ReconcileTakeoff();
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Type,Name,Count,Quantity");
-        foreach (var r in rows)
+
+        if (library.Ui.TakeoffViewMode == TakeoffViewMode.Item)
         {
-            sb.Append(CsvField(r.Kind)).Append(',')
-              .Append(CsvField(r.Name)).Append(',')
-              .Append(r.Count.ToString(CultureInfo.InvariantCulture)).Append(',')
-              .Append(CsvField(r.Quantity ?? string.Empty))
-              .Append('\n');
+            sb.AppendLine("Id,Kind,Name,Quantity,Unit,WastePercent,LaborType,LaborHours,Bound,Notes");
+            foreach (var t in currentPlot.Takeoff.OrderBy(t => t.Id))
+            {
+                var c = CatalogFor(t);
+                sb.Append(t.Id.ToString(CultureInfo.InvariantCulture)).Append(',')
+                  .Append(CsvField(TakeoffMath.Kind(c))).Append(',')
+                  .Append(CsvField(TakeoffMath.DisplayName(t, c))).Append(',')
+                  .Append(t.Quantity.ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
+                  .Append(CsvField(TakeoffMath.EffectiveUnit(t, c))).Append(',')
+                  .Append(TakeoffMath.EffectiveWastePercent(t, c).ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
+                  .Append(TakeoffMath.EffectiveLaborType(t, c).ToString()).Append(',')
+                  .Append(TakeoffMath.EffectiveLaborHours(t, c).ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
+                  .Append(t.ShapeId.HasValue ? "yes" : "no").Append(',')
+                  .Append(CsvField(t.Notes ?? string.Empty))
+                  .Append('\n');
+            }
+        }
+        else
+        {
+            var rows = BuildTakeoff(currentPlot.Shapes);
+            sb.AppendLine("Type,Name,Count,Quantity");
+            foreach (var r in rows)
+            {
+                sb.Append(CsvField(r.Kind)).Append(',')
+                  .Append(CsvField(r.Name)).Append(',')
+                  .Append(r.Count.ToString(CultureInfo.InvariantCulture)).Append(',')
+                  .Append(CsvField(r.Quantity ?? string.Empty))
+                  .Append('\n');
+            }
         }
 
         var name = $"{Sanitize(currentPlot.Name)}-takeoff.csv";
@@ -714,6 +861,53 @@ public partial class GardenPlot
         {
             // ignore
         }
+    }
+
+    private void SetTakeoffViewMode(TakeoffViewMode mode)
+    {
+        if (library.Ui.TakeoffViewMode == mode)
+        {
+            return;
+        }
+
+        library.Ui.TakeoffViewMode = mode;
+        _ = SaveAsync();
+    }
+
+    /// <summary>
+    /// Adds a virtual takeoff item (no <see cref="TakeoffItem.ShapeId"/>). For now the user
+    /// edits its fields in a follow-up; this PR ships the create-virtual path so the
+    /// "items can exist without drawing" requirement is testable end-to-end.
+    /// </summary>
+    private void AddVirtualTakeoffItem()
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        ReconcileTakeoff();
+
+        int nextId = currentPlot.TakeoffIds.Next;
+        foreach (TakeoffItem t in currentPlot.Takeoff)
+        {
+            if (t.Id >= nextId)
+            {
+                nextId = t.Id + 1;
+            }
+        }
+
+        currentPlot.Takeoff.Add(new TakeoffItem
+        {
+            Id = nextId,
+            CatalogSource = CatalogSource.Custom,
+            CatalogPackId = null,
+            CatalogCode = "(new item)",
+            Quantity = 1,
+            ShapeId = null,
+        });
+        currentPlot.TakeoffIds.Next = nextId + 1;
+        _ = SaveAsync();
     }
 
     private static string CsvField(string s)

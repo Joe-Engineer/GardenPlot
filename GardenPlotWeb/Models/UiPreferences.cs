@@ -14,6 +14,16 @@ public class UiPreferences
     public double? TakeoffPanelX { get; set; }
     public double? TakeoffPanelY { get; set; }
     public bool? TakeoffPanelVisible { get; set; }
+
+    /// <summary>Selected takeoff view mode (Item vs. Summary). Default is Item.</summary>
+    public TakeoffViewMode TakeoffViewMode { get; set; } = TakeoffViewMode.Item;
+
+    /// <summary>
+    /// When true (default), deleting a shape also deletes its bound takeoff item.
+    /// When false, the takeoff item is preserved with its <c>ShapeId</c> cleared.
+    /// </summary>
+    public bool AutoDeleteTakeoffOnShapeDelete { get; set; } = true;
+
     public double? Zoom { get; set; }
     public double? ViewCenterXFt { get; set; }
     public double? ViewCenterYFt { get; set; }
