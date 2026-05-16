@@ -23,13 +23,17 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         // Used by the Garden Plot page to look up plant info from Wikipedia.
-        services.AddHttpClient();
+        _ = services.AddHttpClient();
 
         // Per-user data root resolver (LocalAppData by default, override with GARDENPLOT_DATA_DIR).
-        services.AddSingleton<DataRootProvider>();
+        _ = services.AddSingleton<DataRootProvider>();
 
         // Optional rich horticultural metadata loaded from wwwroot/data/plant-profiles.json.
-        services.AddSingleton<IPlantProfileService, LocalPlantProfileService>();
+        _ = services.AddSingleton<IPlantProfileService, LocalPlantProfileService>();
+
+        // Plot persistence: per-version loader. New schemas add a LoadFromVersionN method
+        // on this type and a switch entry; saves always write PlotSchema.Current.
+        _ = services.AddSingleton<Persistence.PlotLibraryLoader>();
 
         return services;
     }

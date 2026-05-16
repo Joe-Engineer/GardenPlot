@@ -1,5 +1,6 @@
 ﻿@page "/about"
 @using GardenPlotWeb.Services
+@using GardenPlotWeb.Services.Persistence
 @inject IPlantProfileService PlantProfiles
 
 <PageTitle>About Garden Plot</PageTitle>
@@ -35,21 +36,6 @@
     <li><strong>Delete / Backspace</strong>: delete selected items.</li>
     <li><strong>[</strong> / <strong>]</strong>: rotate selection or active stamp.</li>
     <li><strong>Escape</strong>: cancel current draft/preview and return to Select.</li>
-</ul>
-
-<h2>Opportunities to improve control</h2>
-<ul>
-    <li>Viewport movement should have direct keyboard panning for fine framing.</li>
-    <li>Group operations should be keyboard-accessible for rapid layout iteration.</li>
-    <li>Group orientation should have explicit keyboard shortcuts, not only wheel modifiers.</li>
-    <li>Key mappings should be discoverable and user-editable.</li>
-</ul>
-
-<h2>Implemented improvements</h2>
-<ul>
-    <li>Keyboard Mapping Settings editor added (toolbar keyboard icon).</li>
-    <li>Editable shortcuts now cover spacing, edit ops, group/ungroup, zoom, pan, and group orientation.</li>
-    <li>Mappings persist in app UI preferences.</li>
 </ul>
 
 <h2>Data sources &amp; attribution</h2>
@@ -122,4 +108,9 @@
     running app makes no outbound calls for built-in palette items. The fetcher uses a real
     <code>User-Agent</code>, ETag-based conditional requests, and bounded concurrency to minimise
     bandwidth on upstream providers.
+</p>
+
+<hr />
+<p class="text-muted small mb-0">
+    Plot data schema: <strong>v@(PlotSchema.Current)</strong>
 </p>
