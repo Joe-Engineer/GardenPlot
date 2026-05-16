@@ -1387,7 +1387,7 @@ public partial class GardenPlot
                 var idbJson = await jsModule.InvokeAsync<string?>("idbGet", StorageKeyPrimary);
                 if (!string.IsNullOrWhiteSpace(idbJson))
                 {
-                    var idbLibrary = NormalizeLibrary(JsonSerializer.Deserialize<PlotLibrary>(idbJson));
+                    var idbLibrary = NormalizeLibrary(PlotMigrations.Load(idbJson, "indexeddb"));
                     var idbBytes = System.Text.Encoding.UTF8.GetByteCount(idbJson);
                     if (idbLibrary.Plots.Count > 0)
                     {
@@ -1455,7 +1455,7 @@ public partial class GardenPlot
                 payloadBytes = System.Text.Encoding.UTF8.GetByteCount(json);
                 Logger.LogInformation("[{Sid}] Load: localStorage raw hit. Key={StorageKey}, Bytes={Bytes}.", SessionTraceId, key, payloadBytes);
 
-                var normalized = NormalizeLibrary(JsonSerializer.Deserialize<PlotLibrary>(json));
+                var normalized = NormalizeLibrary(PlotMigrations.Load(json, $"localstorage:{key}"));
 
                 if (firstValidLibrary is null)
                 {
@@ -1684,7 +1684,7 @@ public partial class GardenPlot
             }
 
             var json = await File.ReadAllTextAsync(recoveryPath);
-            var recovered = JsonSerializer.Deserialize<PlotLibrary>(json);
+            var recovered = PlotMigrations.Load(json, "recovery-file");
             return NormalizeLibrary(recovered);
         }
         catch

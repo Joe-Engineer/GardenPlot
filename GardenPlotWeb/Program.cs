@@ -54,4 +54,26 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+// Development-only probe so we can exercise the plot-library migration runner
+// from curl and watch the resulting metrics/logs in the Aspire dashboard.
+// POST /dev/plot-migration-probe with raw PlotLibrary JSON in the body.
+if (app.Environment.IsDevelopment())
+{
+    _ = app.MapPost("/dev/plot-migration-probe", async (
+        HttpContext ctx,
+        GardenPlotWeb.Services.Persistence.PlotMigrationRunner runner) =>
+    {
+        using StreamReader reader = new(ctx.Request.Body);
+        string json = await reader.ReadToEndAsync();
+        GardenPlotWeb.Models.PlotLibrary? library = runner.Load(json, source: "dev-probe");
+        return Results.Json(new
+        {
+            schemaCurrent = GardenPlotWeb.Services.Persistence.PlotSchema.Current,
+            loaded = library is not null,
+            schemaVersion = library?.SchemaVersion,
+            plotCount = library?.Plots?.Count ?? 0,
+        });
+    }).WithName("PlotMigrationProbe");
+}
+
 app.Run();

@@ -1,8 +1,10 @@
-// <copyright file="Plot.cs" company="Garden Plot">
+﻿// <copyright file="Plot.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
 namespace GardenPlotWeb.Models;
+
+using GardenPlotWeb.Services.Persistence;
 
 public class PlotData
 {
@@ -50,6 +52,13 @@ public class PlotData
 
 public class PlotLibrary
 {
+    /// <summary>
+    /// Persisted plot-library schema version. Documents written without this property
+    /// are treated as <see cref="PlotSchema.LegacyVersion"/>
+    /// (v1) by the migration runner.
+    /// </summary>
+    public int SchemaVersion { get; set; } = PlotSchema.Current;
+
     public Guid? LastPlotId { get; set; }
     public List<PlotData> Plots { get; set; } = new();
     public UiPreferences Ui { get; set; } = new();
