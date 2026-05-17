@@ -12,14 +12,19 @@ public sealed class LayerResolverTests
     [Fact]
     public void GetLayerKey_GroundCoverPlant_MapsToGroundCover()
     {
+        // Ground-cover plants such as Creeping Thyme live in the GroundCoverSurface catalog
+        // (moved from Plants by the grasses/ground-covers categorization fix). The shape's
+        // ShapeKind is therefore one of the area kinds (Oval here), with IsGroundCoverSurface
+        // set by the loader-time rebind step.
         Shape shape = new()
         {
-            Kind = ShapeKind.Plant,
+            Kind = ShapeKind.Oval,
             Label = "Creeping Thyme",
-            Trait = "groundcover",
+            Trait = "ground-cover",
+            IsGroundCoverSurface = true,
         };
 
-        PaletteItem item = PaletteCatalog.Plants.First(i => i.Code == "Creeping Thyme");
+        PaletteItem item = PaletteCatalog.GroundCoverSurfaceCovers.First(i => i.Code == "Creeping Thyme");
 
         Assert.Equal(LayerKeys.GroundCover, LayerResolver.GetLayerKey(shape, item));
     }
