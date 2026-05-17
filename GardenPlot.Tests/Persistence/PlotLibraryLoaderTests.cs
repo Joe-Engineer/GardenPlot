@@ -56,6 +56,12 @@ public class PlotLibraryLoaderTests
         Assert.Single(lib.Plots);
         Assert.Equal("Legacy Garden", lib.Plots[0].Name);
         Assert.Equal(BackgroundFit.Fit, lib.Plots[0].BackgroundFit);
+        Assert.Equal(8, lib.Plots[0].LayerStates.Count);
+        Assert.All(lib.Plots[0].LayerStates.Values, state =>
+        {
+            Assert.True(state.Visible);
+            Assert.False(state.Locked);
+        });
     }
 
     [Fact]
@@ -89,6 +95,12 @@ public class PlotLibraryLoaderTests
         Assert.Equal(BackgroundFit.Fit, lib.Plots[0].BackgroundFit);
         Assert.Single(lib.Plots[0].Takeoff);
         Assert.Equal(8, lib.Plots[0].TakeoffIds.Next);
+        Assert.Equal(8, lib.Plots[0].LayerStates.Count);
+        Assert.All(lib.Plots[0].LayerStates.Values, state =>
+        {
+            Assert.True(state.Visible);
+            Assert.False(state.Locked);
+        });
     }
 
     [Fact]
@@ -184,16 +196,95 @@ public class PlotLibraryLoaderTests
     }
 
     [Fact]
-    public void Load_RoundTrip_PreservesSchemaVersion()
+    public void Load_RoundTrip_PreservesLayerStates()
     {
         var source = new PlotLibrary();
-        source.Plots.Add(new PlotData { Name = "RoundTrip" });
+        var plot = new PlotData { Name = "RoundTrip" };
+        plot.LayerStates[LayerKeys.Plants].Visible = false;
+        plot.LayerStates[LayerKeys.Hardscape].Locked = true;
+        source.Plots.Add(plot);
         string json = JsonSerializer.Serialize(source);
 
         var loader = CreateLoader();
         var lib = loader.Load(json, "unit-test");
 
         Assert.Equal(PlotSchema.Current, lib!.SchemaVersion);
+        Assert.False(lib.Plots[0].LayerStates[LayerKeys.Plants].Visible);
+        Assert.True(lib.Plots[0].LayerStates[LayerKeys.Hardscape].Locked);
+    }
+
+    [Fact]
+    public void Load_Version1Document_PopulatesDefaultLayerStates()
+    {
+        var doc = new JsonObject
+        {
+            ["SchemaVersion"] = 1,
+            ["Plots"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["Id"] = Guid.NewGuid(),
+                    ["Name"] = "Legacy Garden",
+                    ["WidthFt"] = 40.0,
+                    ["HeightFt"] = 30.0,
+                },
+            },
+        };
+
+        var loader = CreateLoader();
+        var lib = loader.Load(doc.ToJsonString(), "unit-test");
+
+        Assert.NotNull(lib);
+        Assert.Equal(PlotSchema.Current, lib!.SchemaVersion);
+        Assert.Equal(8, lib.Plots[0].LayerStates.Count);
+        Assert.True(lib.Plots[0].LayerStates[LayerKeys.Measurement].Visible);
+        Assert.False(lib.Plots[0].LayerStates[LayerKeys.Measurement].Locked);
+    }
+
+    [Fact]
+    public void Load_Version2Document_PopulatesDefaultLayerStates_AndPreservesTakeoff()
+    {
+        var plotId = Guid.NewGuid();
+        var doc = new JsonObject
+        {
+            ["SchemaVersion"] = 2,
+            ["Plots"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["Id"] = plotId,
+                    ["Name"] = "Version Two Garden",
+                    ["WidthFt"] = 40.0,
+                    ["HeightFt"] = 30.0,
+                    ["Takeoff"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["Id"] = 7,
+                            ["CatalogSource"] = 0,
+                            ["CatalogCode"] = "Tomato",
+                            ["Quantity"] = 3,
+                        },
+                    },
+                    ["TakeoffIds"] = new JsonObject
+                    {
+                        ["Next"] = 8,
+                    },
+                },
+            },
+        };
+
+        var loader = CreateLoader();
+        var lib = loader.Load(doc.ToJsonString(), "unit-test");
+
+        Assert.NotNull(lib);
+        Assert.Equal(PlotSchema.Current, lib!.SchemaVersion);
+        Assert.Equal(8, lib.Plots[0].LayerStates.Count);
+        Assert.True(lib.Plots[0].LayerStates[LayerKeys.Measurement].Visible);
+        Assert.False(lib.Plots[0].LayerStates[LayerKeys.Measurement].Locked);
+        Assert.Single(lib.Plots[0].Takeoff);
+        Assert.Equal(7, lib.Plots[0].Takeoff[0].Id);
+        Assert.Equal(8, lib.Plots[0].TakeoffIds.Next);
     }
 
     [Fact]

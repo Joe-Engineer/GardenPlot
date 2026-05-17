@@ -380,6 +380,131 @@
     overflow: hidden;
 }
 
+.layers-dock {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 210px;
+    width: 210px;
+    min-width: 210px;
+    background: #fafaf5;
+    border: 1px solid #d8d3c2;
+    border-radius: 4px;
+    height: calc(100vh - 225px);
+    min-height: 200px;
+    max-height: calc(100vh - 225px);
+    overflow: hidden;
+}
+
+.layers-dock-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    padding: 0.45rem 0.55rem;
+    border: 0;
+    border-bottom: 1px solid #d8d3c2;
+    background: #eef3e6;
+    color: #2f5a3a;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.layers-dock-toggle svg {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.15s ease-in-out;
+}
+
+.layers-dock-toggle svg.expanded {
+    transform: rotate(180deg);
+}
+
+.layers-dock-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.45rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.layer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid #d8d3c2;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.layer-row-main {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.layer-name {
+    font-size: 0.82rem;
+    line-height: 1.15;
+    color: #2a2a2a;
+}
+
+.layer-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    background: #eef3e6;
+    color: #2f5a3a;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.layer-row-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.layer-toggle-btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid #c8c2ad;
+    border-radius: 4px;
+    background: #fff;
+    color: #2f5a3a;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.layer-toggle-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.layer-toggle-btn:hover {
+    background: #d8e4c8;
+    border-color: #6b8b3a;
+}
+
+.layer-toggle-btn.inactive {
+    color: #8b6d3a;
+}
+
+.layer-toggle-btn.locked {
+    color: #9f3a2f;
+    background: #fff3f3;
+    border-color: #d9b4b4;
+}
+
 .palette-header {
     flex: 0 0 auto;
     padding: 0.5rem;
@@ -558,9 +683,12 @@
         flex-direction: column;
     }
 
-    .plot-palette {
+    .plot-palette,
+    .layers-dock {
         width: 100%;
+        min-width: 0;
         height: 260px;
+        max-height: 260px;
     }
 
     .plot-viewport-frame {

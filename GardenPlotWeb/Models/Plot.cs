@@ -67,6 +67,7 @@ public class PlotData
     /// <summary>Whether to show the on-canvas scale bar display.</summary>
     public bool ShowScaleDisplay { get; set; }
 
+    public Dictionary<string, LayerState> LayerStates { get; set; } = LayerResolver.CreateDefaultStates();
     public List<Shape> Shapes { get; set; } = new();
     public List<DropGroup> DropGroups { get; set; } = new();
     public Dictionary<string, double> KitRotations { get; set; } = new();
@@ -85,6 +86,13 @@ public class PlotData
 
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime ModifiedUtc { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class LayerState
+{
+    public bool Visible { get; set; } = true;
+
+    public bool Locked { get; set; }
 }
 
 public class PlotLibrary

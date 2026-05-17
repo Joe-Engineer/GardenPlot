@@ -34,6 +34,18 @@ public enum PaletteKind
     Edging,
 }
 
+public static class LayerKeys
+{
+    public const string GroundCover = "ground-cover";
+    public const string Hardscape = "hardscape";
+    public const string Plants = "plants";
+    public const string Irrigation = "irrigation";
+    public const string Lighting = "lighting";
+    public const string FocalPoints = "focal-points";
+    public const string Measurement = "measurement";
+    public const string Notes = "notes";
+}
+
 /// <summary>User-facing palette categories shown in the combobox.</summary>
 public enum PaletteCategory
 {
