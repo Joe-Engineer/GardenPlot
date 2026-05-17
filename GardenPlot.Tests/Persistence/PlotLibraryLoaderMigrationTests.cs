@@ -48,6 +48,7 @@ public class PlotLibraryLoaderMigrationTests
         Assert.Single(loaded.Plots);
 
         var plot = loaded.Plots[0];
+        Assert.Equal(BackgroundFit.Fit, plot.BackgroundFit);
         Assert.Equal(2, plot.Takeoff.Count);
         Assert.All(plot.Takeoff, t => Assert.NotNull(t.ShapeId));
         Assert.All(plot.Takeoff, t => Assert.Equal(CatalogSource.Base, t.CatalogSource));
@@ -71,7 +72,8 @@ public class PlotLibraryLoaderMigrationTests
         var loaded = CreateLoader().Load(JsonSerializer.Serialize(v1), "unit-test");
 
         Assert.NotNull(loaded);
-        Assert.Empty(loaded!.Plots[0].Takeoff);
+        Assert.Equal(BackgroundFit.Fit, loaded!.Plots[0].BackgroundFit);
+        Assert.Empty(loaded.Plots[0].Takeoff);
         Assert.Equal(1, loaded.Plots[0].TakeoffIds.Next);
         Assert.Equal(25, loaded.Plots[0].DefaultMarkupPercent);
     }
@@ -106,13 +108,14 @@ public class PlotLibraryLoaderMigrationTests
 
         Assert.NotNull(loaded);
         var plot = loaded!.Plots[0];
+        Assert.Equal(BackgroundFit.Fit, plot.BackgroundFit);
         Assert.Single(plot.Takeoff);
         Assert.Equal(42, plot.Takeoff[0].Id);
         Assert.Equal(43, plot.TakeoffIds.Next);
     }
 
     [Fact]
-    public void LoadV2_AddsCostingDefaults_WhenFieldsAreMissing()
+    public void LoadV2_AddsCostingDefaults_AndBackgroundFit_WhenFieldsAreMissing()
     {
         var v2 = new
         {
@@ -154,12 +157,50 @@ public class PlotLibraryLoaderMigrationTests
         Assert.True(loaded.Ui.ShowLineTotalColumn);
         Assert.True(loaded.Ui.ShowInternalView);
         Assert.Equal(75m, loaded.Ui.DefaultLaborRatePerHour);
+        Assert.Equal(BackgroundFit.Fit, loaded.Plots[0].BackgroundFit);
         Assert.Single(loaded.Plots[0].Takeoff);
         Assert.Equal(7, loaded.Plots[0].Takeoff[0].Id);
         Assert.Equal(15, loaded.Plots[0].Takeoff[0].WastePercentOverride);
         Assert.Null(loaded.Plots[0].Takeoff[0].MarkupPercentOverride);
         Assert.Equal(8, loaded.Plots[0].TakeoffIds.Next);
         Assert.Equal(25, loaded.Plots[0].DefaultMarkupPercent);
+    }
+
+    [Fact]
+    public void LoadV3_AddsBackgroundFit_WhenFieldIsMissing()
+    {
+        var v3 = new
+        {
+            SchemaVersion = 3,
+            Plots = new[]
+            {
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Triangulated Garden",
+                    DropGroups = new[]
+                    {
+                        new
+                        {
+                            Id = Guid.NewGuid(),
+                            Pattern = DropPattern.Array,
+                            ItemCount = 6,
+                            Rows = 2,
+                            CenterSpacingXFt = 3.0,
+                            Triangulated = true,
+                        },
+                    },
+                },
+            },
+        };
+
+        var loaded = CreateLoader().Load(JsonSerializer.Serialize(v3), "unit-test");
+
+        Assert.NotNull(loaded);
+        Assert.Equal(PlotSchema.Current, loaded!.SchemaVersion);
+        var plot = loaded.Plots[0];
+        Assert.Equal(BackgroundFit.Fit, plot.BackgroundFit);
+        Assert.True(Assert.Single(plot.DropGroups).Triangulated);
     }
 
     [Fact]

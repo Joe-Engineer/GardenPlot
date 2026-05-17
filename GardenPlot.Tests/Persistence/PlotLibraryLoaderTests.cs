@@ -55,6 +55,40 @@ public class PlotLibraryLoaderTests
         Assert.Equal(PlotSchema.Current, lib!.SchemaVersion);
         Assert.Single(lib.Plots);
         Assert.Equal("Legacy Garden", lib.Plots[0].Name);
+        Assert.Equal(BackgroundFit.Fit, lib.Plots[0].BackgroundFit);
+    }
+
+    [Fact]
+    public void Load_Version2Document_DefaultsBackgroundFitToFit()
+    {
+        string legacyJson = JsonSerializer.Serialize(new
+        {
+            SchemaVersion = 2,
+            Plots = new[]
+            {
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Migrated Garden",
+                    WidthFt = 40.0,
+                    HeightFt = 30.0,
+                    Takeoff = new[]
+                    {
+                        new { Id = 7, CatalogSource = 0, CatalogCode = "Tomato", Quantity = 1 },
+                    },
+                    TakeoffIds = new { Next = 8 },
+                },
+            },
+        });
+
+        var loader = CreateLoader();
+        var lib = loader.Load(legacyJson, "unit-test");
+
+        Assert.NotNull(lib);
+        Assert.Equal(PlotSchema.Current, lib!.SchemaVersion);
+        Assert.Equal(BackgroundFit.Fit, lib.Plots[0].BackgroundFit);
+        Assert.Single(lib.Plots[0].Takeoff);
+        Assert.Equal(8, lib.Plots[0].TakeoffIds.Next);
     }
 
     [Fact]
@@ -105,7 +139,7 @@ public class PlotLibraryLoaderTests
     public void Load_DocumentAtCurrentVersion_PassesThrough()
     {
         var source = new PlotLibrary();
-        source.Plots.Add(new PlotData { Name = "A" });
+        source.Plots.Add(new PlotData { Name = "A", BackgroundFit = BackgroundFit.Stretch });
         string json = JsonSerializer.Serialize(source);
 
         var loader = CreateLoader();
@@ -115,6 +149,7 @@ public class PlotLibraryLoaderTests
         Assert.Equal(PlotSchema.Current, lib!.SchemaVersion);
         Assert.Single(lib.Plots);
         Assert.Equal("A", lib.Plots[0].Name);
+        Assert.Equal(BackgroundFit.Stretch, lib.Plots[0].BackgroundFit);
     }
 
     [Fact]

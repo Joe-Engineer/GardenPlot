@@ -575,17 +575,53 @@ else
                     }
                 </defs>
 
+                @{ 
+                    var backgroundFit = EffectivePlotBackgroundFit(currentPlot);
+                    var backgroundRenderInfo = GetPlotBackgroundRenderInfo(currentPlot);
+                }
                 <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="#f3efe3" />
                 @if (!string.IsNullOrWhiteSpace(currentPlot.BackgroundImageFileName))
                 {
-                    <image href="@PlotImageUrl(currentPlot.BackgroundImageFileName!)"
-                           x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)"
-                           preserveAspectRatio="none"
-                           opacity="@F(EffectivePlotBackgroundOpacity(currentPlot))" />
+                    if (backgroundRenderInfo is not null)
+                    {
+                        <image href="@PlotImageUrl(currentPlot.BackgroundImageFileName!)"
+                               x="@F(backgroundRenderInfo.X)" y="@F(backgroundRenderInfo.Y)"
+                               width="@F(backgroundRenderInfo.Width)" height="@F(backgroundRenderInfo.Height)"
+                               preserveAspectRatio="none"
+                               opacity="@F(EffectivePlotBackgroundOpacity(currentPlot))" />
+                    }
+                    else
+                    {
+                        <image href="@PlotImageUrl(currentPlot.BackgroundImageFileName!)"
+                               x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)"
+                               preserveAspectRatio="@PlotBackgroundPreserveAspectRatio(currentPlot)"
+                               opacity="@F(EffectivePlotBackgroundOpacity(currentPlot))" />
+                    }
                 }
                 @if (currentPlot.ShowGrid)
                 {
                     <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="url(#ftgrid)" />
+                }
+                @if (backgroundFit == BackgroundFit.Letterbox && backgroundRenderInfo is not null)
+                {
+                    var rightBarWidth = Math.Max(0, PlotWidthFt - backgroundRenderInfo.X - backgroundRenderInfo.Width);
+                    var bottomBarHeight = Math.Max(0, PlotHeightFt - backgroundRenderInfo.Y - backgroundRenderInfo.Height);
+                    if (backgroundRenderInfo.X > 0)
+                    {
+                        <rect x="0" y="0" width="@F(backgroundRenderInfo.X)" height="@F(PlotHeightFt)" fill="#f3efe3" />
+                    }
+                    if (rightBarWidth > 0)
+                    {
+                        <rect x="@F(backgroundRenderInfo.X + backgroundRenderInfo.Width)" y="0" width="@F(rightBarWidth)" height="@F(PlotHeightFt)" fill="#f3efe3" />
+                    }
+                    if (backgroundRenderInfo.Y > 0)
+                    {
+                        <rect x="@F(backgroundRenderInfo.X)" y="0" width="@F(backgroundRenderInfo.Width)" height="@F(backgroundRenderInfo.Y)" fill="#f3efe3" />
+                    }
+                    if (bottomBarHeight > 0)
+                    {
+                        <rect x="@F(backgroundRenderInfo.X)" y="@F(backgroundRenderInfo.Y + backgroundRenderInfo.Height)" width="@F(backgroundRenderInfo.Width)" height="@F(bottomBarHeight)" fill="#f3efe3" />
+                    }
                 }
                 <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="none"
                       stroke="#7a6a4a" stroke-width="0.05" />
@@ -2250,17 +2286,25 @@ else
                         }
                         @if (!string.IsNullOrWhiteSpace(newPlotBackgroundImageFileName))
                         {
-                            <div class="row g-2 mt-2">
-                                <div class="col">
+                            <div class="row g-2 mt-2 align-items-end">
+                                <div class="col-sm-7">
                                     <label class="form-label x-small">Background opacity</label>
                                     <input type="range" min="0" max="1" step="0.05" class="form-range"
                                            @bind="newPlotBackgroundOpacity" />
                                     <div class="x-small text-muted">@F(newPlotBackgroundOpacity * 100)%</div>
                                 </div>
+                                <div class="col-sm-5">
+                                    <label class="form-label x-small">Background fit</label>
+                                    <InputSelect class="form-select form-select-sm" @bind-Value="newPlotBackgroundFit">
+                                        <option value="@BackgroundFit.Fit">Fit</option>
+                                        <option value="@BackgroundFit.Letterbox">Letterbox</option>
+                                        <option value="@BackgroundFit.Stretch">Stretch</option>
+                                    </InputSelect>
+                                </div>
                             </div>
                             <div class="d-flex align-items-center gap-2 mt-2">
                                 <button class="btn btn-sm btn-outline-secondary" @onclick="ClearPlotBackgroundImage">Remove image</button>
-                                <span class="x-small text-muted">Use the Scale button to calibrate directly on the main canvas.</span>
+                                <span class="x-small text-muted">Use the Scale button to calibrate directly on the main canvas. Fit preserves aspect ratio; Stretch distorts to fill.</span>
                             </div>
                             <img class="plot-calibration-image mt-2"
                                  src="@PlotImageUrl(newPlotBackgroundImageFileName!)"

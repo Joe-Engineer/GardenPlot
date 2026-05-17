@@ -628,12 +628,12 @@ public sealed class ProjectDossierService
         return shape.Kind switch
         {
             ShapeKind.BedKit => "#e2725b",
+            ShapeKind.Edge => "#6d655e",
             ShapeKind.Rectangle => "#9fcf9f",
             ShapeKind.Oval => "#9fcf9f",
             ShapeKind.CircleRuler => "#9fcf9f",
             ShapeKind.RectRuler => "#9fcf9f",
             ShapeKind.FreeDraw => "#9fcf9f",
-            ShapeKind.Edge => "#9fcf9f",
             ShapeKind.Ruler => "#9fcf9f",
             ShapeKind.Tree => "#9fcf9f",
             ShapeKind.Bush => "#9fcf9f",

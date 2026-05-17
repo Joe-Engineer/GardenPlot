@@ -25,7 +25,7 @@ namespace GardenPlotWeb.Services.Persistence;
 ///   <item>Bump <see cref="PlotSchema.Current"/>.</item>
 ///   <item>Add a new <c>LoadFromVersion&lt;newCurrent&gt;</c> method that does the direct typed deserialize.</item>
 ///   <item>Update the previous <c>LoadFromVersion&lt;N-1&gt;</c> method so it reads the old shape (e.g. via a
-///   private DTO) and returns a current-shaped <see cref="PlotLibrary"/>.</item>
+///   private DTO) and returns a current-shaped <see cref="PlotLibrary"/> with any new defaults applied.</item>
 ///   <item>Wire the new version into the switch in <see cref="Load(string?, string, JsonSerializerOptions?)"/>.</item>
 /// </list>
 /// <para>
@@ -111,6 +111,7 @@ public sealed class PlotLibraryLoader
                 1 => LoadFromVersion1(root, options),
                 2 => LoadFromVersion2(root, options),
                 3 => LoadFromVersion3(root, options),
+                4 => LoadFromVersion4(root, options),
 
                 // Future versions: add a 'N => LoadFromVersionN(root, options),' line here when
                 // PlotSchema.Current is bumped. The previous version's method is then updated to
@@ -119,7 +120,7 @@ public sealed class PlotLibraryLoader
                     // Forward-from-future: the document was written by a newer build than this one.
                     // Best effort: try to deserialize directly as current; the user's newer fields
                     // will be tolerated (PlotLibrary uses default opts) and dropped on next save.
-                    LoadFromVersion3(root, options),
+                    LoadFromVersion4(root, options),
                 _ => throw new InvalidOperationException(
                     $"No loader registered for plot library schema v{fromVersion}."),
             };
@@ -177,10 +178,11 @@ public sealed class PlotLibraryLoader
 
     /// <summary>
     /// Loader for schema v1. v1 documents predate the per-plot <c>Takeoff</c> list,
-    /// <c>TakeoffIds</c> sequence, library-level <c>CustomCatalogItems</c>, and costing defaults.
-    /// We deserialize as the current shape (forward-compatible — extra absent fields are tolerated
-    /// by <c>JsonSerializer</c>) and then synthesize one <see cref="TakeoffItem"/> per existing
-    /// <see cref="Shape"/> so the new Item view lights up without data loss.
+    /// <c>TakeoffIds</c> sequence, library-level <c>CustomCatalogItems</c>, costing defaults,
+    /// legacy triangulation migration, and <see cref="BackgroundFit"/>. We deserialize as the
+    /// current shape (forward-compatible — extra absent fields are tolerated by
+    /// <c>JsonSerializer</c>), synthesize one <see cref="TakeoffItem"/> per existing
+    /// <see cref="Shape"/>, then apply the later schema upgrades in-memory.
     /// </summary>
     private static PlotLibrary? LoadFromVersion1(JsonObject root, JsonSerializerOptions? options)
     {
@@ -195,25 +197,37 @@ public sealed class PlotLibraryLoader
             BackfillTakeoffItemsForLegacyPlot(plot);
         }
 
-        return UpgradeLegacyTriangulation(library);
+        return BackfillBackgroundFit(UpgradeLegacyTriangulation(library));
     }
 
     /// <summary>
-    /// Loader for schema v2. v2 documents already have takeoff items, but predate costing fields
-    /// and may still carry the legacy <c>StaggerHalf</c> drop-group flag. Direct typed
-    /// deserialization is sufficient because the v3 members carry safe model defaults (markup 25%,
-    /// labor rate 75, internal view on, line total on, and default rotation for shapes/drop groups
-    /// when absent), then legacy triangulation is projected onto <see cref="DropGroup.Triangulated"/>
-    /// so the next save writes schema v3.
+    /// Loader for schema v2. v2 documents already have takeoff items, but predate the costing
+    /// fields, the <c>StaggerHalf</c> to <see cref="DropGroup.Triangulated"/> rename, and the
+    /// <see cref="PlotData.BackgroundFit"/> field. Direct typed deserialization is sufficient
+    /// because the newer members carry safe model defaults (markup 25%, labor rate 75, internal
+    /// view on, line total on, default rotation for shapes/drop groups, and <c>Fit</c> for
+    /// background image rendering); we then project legacy triangulation onto
+    /// <see cref="DropGroup.Triangulated"/> and stamp a valid background-fit value before the
+    /// document is rewritten as the current schema.
     /// </summary>
     private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
     {
         PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
-        return library is null ? null : UpgradeLegacyTriangulation(library);
+        return library is null ? null : BackfillBackgroundFit(UpgradeLegacyTriangulation(library));
     }
 
-    /// <summary>Loader for schema v3 — the current shape. Direct typed deserialization.</summary>
+    /// <summary>
+    /// Loader for schema v3. v3 documents already use <see cref="DropGroup.Triangulated"/>, but
+    /// still predate <see cref="BackgroundFit"/>.
+    /// </summary>
     private static PlotLibrary? LoadFromVersion3(JsonObject root, JsonSerializerOptions? options)
+    {
+        PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
+        return library is null ? null : BackfillBackgroundFit(library);
+    }
+
+    /// <summary>Loader for schema v4 — the current shape. Direct typed deserialization.</summary>
+    private static PlotLibrary? LoadFromVersion4(JsonObject root, JsonSerializerOptions? options)
     {
         return root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
     }
@@ -229,6 +243,19 @@ public sealed class PlotLibraryLoader
                     group.Triangulated = true;
                     group.StaggerHalf = false;
                 }
+            }
+        }
+
+        return library;
+    }
+
+    private static PlotLibrary BackfillBackgroundFit(PlotLibrary library)
+    {
+        foreach (PlotData plot in library.Plots)
+        {
+            if (!Enum.IsDefined(plot.BackgroundFit))
+            {
+                plot.BackgroundFit = BackgroundFit.Fit;
             }
         }
 

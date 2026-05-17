@@ -26,6 +26,7 @@ public sealed class ModelDefaultsTests
         Assert.Equal(120, p.WidthFt);
         Assert.Equal(120, p.HeightFt);
         Assert.True(p.ShowGrid);
+        Assert.Equal(BackgroundFit.Fit, p.BackgroundFit);
         Assert.InRange(p.BackgroundImageOpacity, 0, 1);
         Assert.True(p.GridLineWidth > 0);
         Assert.Empty(p.Shapes);

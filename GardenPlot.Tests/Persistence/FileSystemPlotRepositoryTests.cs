@@ -89,6 +89,31 @@ public sealed class FileSystemPlotRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveLibrary_ThenLoadLibrary_RoundTripsBackgroundFit()
+    {
+        var lib = new PlotLibrary();
+        foreach (BackgroundFit fit in Enum.GetValues<BackgroundFit>())
+        {
+            lib.Plots.Add(new PlotData
+            {
+                Name = fit.ToString(),
+                BackgroundImageFileName = $"{fit}.png",
+                BackgroundFit = fit,
+            });
+        }
+
+        await repo.SaveLibraryAsync(lib);
+        var loaded = await repo.LoadLibraryAsync();
+
+        Assert.NotNull(loaded);
+        foreach (BackgroundFit fit in Enum.GetValues<BackgroundFit>())
+        {
+            PlotData plot = Assert.Single(loaded!.Plots, p => p.Name == fit.ToString());
+            Assert.Equal(fit, plot.BackgroundFit);
+        }
+    }
+
+    [Fact]
     public async Task SaveLibrary_PrunesOrphanPlotFiles()
     {
         var first = new PlotLibrary();
