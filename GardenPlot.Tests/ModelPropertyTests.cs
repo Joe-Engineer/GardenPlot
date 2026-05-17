@@ -78,7 +78,7 @@ public sealed class ModelPropertyTests
             Rows = 3,
             CenterSpacingXFt = 2.0,
             CenterSpacingYFt = 1.5,
-            StaggerHalf = true,
+            Triangulated = true,
             Rotation = 30,
             AnchorCenterX = 10,
             AnchorCenterY = 20,
@@ -89,7 +89,7 @@ public sealed class ModelPropertyTests
         Assert.Equal(3, g.Rows);
         Assert.Equal(2.0, g.CenterSpacingXFt);
         Assert.Equal(1.5, g.CenterSpacingYFt);
-        Assert.True(g.StaggerHalf);
+        Assert.True(g.Triangulated);
         Assert.Equal(30, g.Rotation);
         Assert.Equal(10, g.AnchorCenterX);
         Assert.Equal(20, g.AnchorCenterY);

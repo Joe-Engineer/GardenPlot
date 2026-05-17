@@ -1548,7 +1548,7 @@ public partial class GardenPlot
     private int arrayDropRows = 1;
     private double arrayCenterSpacingXFt;
     private double arrayCenterSpacingYFt;
-    private bool arrayStaggerHalf;
+    private bool arrayTriangulated;
     private bool arrayRotationAutoShift;
     private bool showRotationShiftHint;
     private string rotationShiftHintText = string.Empty;
@@ -4041,15 +4041,16 @@ public partial class GardenPlot
             var rows = Math.Clamp(arrayDropRows, 1, count);
             var cols = (int)Math.Ceiling(count / (double)rows);
             spacingX = arrayCenterSpacingXFt > 0 ? arrayCenterSpacingXFt : item.WidthFt;
-            spacingY = arrayCenterSpacingYFt > 0 ? arrayCenterSpacingYFt : item.HeightFt;
+            var storedSpacingY = Math.Clamp(arrayCenterSpacingYFt, 0, 200);
+            spacingY = DropGroupGeometry.ResolveArrayRowSpacing(spacingX, storedSpacingY, arrayTriangulated, item.HeightFt);
             group = new DropGroup
             {
                 Pattern = DropPattern.Array,
                 ItemCount = count,
                 Rows = rows,
                 CenterSpacingXFt = spacingX,
-                CenterSpacingYFt = spacingY,
-                StaggerHalf = arrayStaggerHalf,
+                CenterSpacingYFt = storedSpacingY,
+                Triangulated = arrayTriangulated,
                 Rotation = stampOrientation,
                 AnchorCenterX = centerX,
                 AnchorCenterY = centerY,
@@ -4063,7 +4064,7 @@ public partial class GardenPlot
             {
                 var row = i / cols;
                 var col = i % cols;
-                var localX = (col * spacingX) + ((arrayStaggerHalf && (row % 2 == 1)) ? spacingX * 0.5 : 0);
+                var localX = (col * spacingX) + ((arrayTriangulated && (row % 2 == 1)) ? spacingX * 0.5 : 0);
                 var localY = row * spacingY;
                 var px = centerX + (localX * cos) - (localY * sin);
                 var py = centerY + (localX * sin) + (localY * cos);
@@ -5484,6 +5485,9 @@ public partial class GardenPlot
         await Task.CompletedTask;
     }
 
+    private static double ResolveArrayRowSpacing(double spacingX, double spacingY, bool triangulated, double defaultSpacingY)
+        => DropGroupGeometry.ResolveArrayRowSpacing(spacingX, spacingY, triangulated, defaultSpacingY);
+
     private async Task OnGroupCenterSpacingChanged(ChangeEventArgs e, bool horizontal)
     {
         var group = GetCurrentSelectedDropGroup();
@@ -5497,7 +5501,9 @@ public partial class GardenPlot
             return;
         }
 
-        spacing = Math.Clamp(spacing, 0.1, 200);
+        spacing = horizontal || group.Pattern == DropPattern.Line
+            ? Math.Clamp(spacing, 0.1, 200)
+            : Math.Clamp(spacing, 0, 200);
         if (horizontal || group.Pattern == DropPattern.Line)
         {
             group.CenterSpacingXFt = spacing;
@@ -5595,7 +5601,7 @@ public partial class GardenPlot
         await ReflowDropGroup(group);
     }
 
-    private async Task OnGroupStaggerChanged(ChangeEventArgs e)
+    private async Task OnGroupTriangulatedChanged(ChangeEventArgs e)
     {
         var group = GetCurrentSelectedDropGroup();
         if (group is null || group.Pattern != DropPattern.Array)
@@ -5603,9 +5609,9 @@ public partial class GardenPlot
             return;
         }
 
-        if (bool.TryParse(e.Value?.ToString(), out var stagger))
+        if (bool.TryParse(e.Value?.ToString(), out var triangulated))
         {
-            group.StaggerHalf = stagger;
+            group.Triangulated = triangulated;
             await ReflowDropGroup(group);
         }
     }
@@ -5672,7 +5678,8 @@ public partial class GardenPlot
         {
             group.Rows = Math.Clamp(group.Rows, 1, members.Count);
             group.CenterSpacingXFt = Math.Clamp(group.CenterSpacingXFt <= 0 ? members[0].W : group.CenterSpacingXFt, 0.1, 200);
-            group.CenterSpacingYFt = Math.Clamp(group.CenterSpacingYFt <= 0 ? members[0].H : group.CenterSpacingYFt, 0.1, 200);
+            group.CenterSpacingYFt = Math.Clamp(group.CenterSpacingYFt, 0, 200);
+            var spacingY = DropGroupGeometry.ResolveArrayRowSpacing(group.CenterSpacingXFt, group.CenterSpacingYFt, group.Triangulated, members[0].H);
 
             var cols = (int)Math.Ceiling(members.Count / (double)group.Rows);
             for (var i = 0; i < members.Count; i++)
@@ -5682,8 +5689,8 @@ public partial class GardenPlot
                 shape.GroupIndex = i;
                 var row = i / cols;
                 var col = i % cols;
-                var localX = (col * group.CenterSpacingXFt) + ((group.StaggerHalf && (row % 2 == 1)) ? group.CenterSpacingXFt * 0.5 : 0);
-                var localY = row * group.CenterSpacingYFt;
+                var localX = (col * group.CenterSpacingXFt) + ((group.Triangulated && (row % 2 == 1)) ? group.CenterSpacingXFt * 0.5 : 0);
+                var localY = row * spacingY;
                 var cx = group.AnchorCenterX + (localX * cos) - (localY * sin);
                 var cy = group.AnchorCenterY + (localX * sin) + (localY * cos);
                 shape.X = cx - (shape.W / 2);

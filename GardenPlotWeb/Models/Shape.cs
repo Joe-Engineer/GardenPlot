@@ -2,6 +2,8 @@
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
+using System.Text.Json.Serialization;
+
 namespace GardenPlotWeb.Models;
 
 public class Shape
@@ -68,7 +70,12 @@ public class DropGroup
     public int Rows { get; set; } = 1;
     public double CenterSpacingXFt { get; set; }
     public double CenterSpacingYFt { get; set; }
+    public bool Triangulated { get; set; }
+
+    // Legacy JSON field kept only so schema v2 payloads can migrate onto Triangulated during load.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool StaggerHalf { get; set; }
+
     public double Rotation { get; set; }
     public double AnchorCenterX { get; set; }
     public double AnchorCenterY { get; set; }

@@ -161,4 +161,31 @@ public class PlotLibraryLoaderMigrationTests
         Assert.Equal(8, loaded.Plots[0].TakeoffIds.Next);
         Assert.Equal(25, loaded.Plots[0].DefaultMarkupPercent);
     }
+
+    [Fact]
+    public void LoadCurrentVersion_PassesThrough_PreservingTakeoffItems()
+    {
+        var src = new PlotLibrary();
+        var plot = new PlotData { Name = "Test" };
+        plot.Takeoff.Add(new TakeoffItem
+        {
+            Id = 7,
+            CatalogSource = CatalogSource.Base,
+            CatalogCode = "Tomato",
+            Quantity = 3,
+            WastePercentOverride = 15,
+        });
+        plot.TakeoffIds.Next = 8;
+        src.Plots.Add(plot);
+
+        var json = JsonSerializer.Serialize(src);
+        var loaded = CreateLoader().Load(json, "unit-test");
+
+        Assert.NotNull(loaded);
+        Assert.Equal(PlotSchema.Current, loaded!.SchemaVersion);
+        Assert.Single(loaded.Plots[0].Takeoff);
+        Assert.Equal(7, loaded.Plots[0].Takeoff[0].Id);
+        Assert.Equal(15, loaded.Plots[0].Takeoff[0].WastePercentOverride);
+        Assert.Equal(8, loaded.Plots[0].TakeoffIds.Next);
+    }
 }

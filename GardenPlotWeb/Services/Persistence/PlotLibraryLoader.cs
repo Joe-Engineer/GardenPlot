@@ -195,29 +195,49 @@ public sealed class PlotLibraryLoader
             BackfillTakeoffItemsForLegacyPlot(plot);
         }
 
-        return library;
+        return UpgradeLegacyTriangulation(library);
     }
 
     /// <summary>
-    /// Loader for schema v2. v2 documents already have takeoff items, but predate costing fields.
-    /// Direct typed deserialization is sufficient because the new v3 members carry safe model
-    /// defaults (markup 25%, labor rate 75, internal view on, line total on).
+    /// Loader for schema v2. v2 documents already have takeoff items, but predate costing fields
+    /// and may still carry the legacy <c>StaggerHalf</c> drop-group flag. Direct typed
+    /// deserialization is sufficient because the new v3 members carry safe model defaults
+    /// (markup 25%, labor rate 75, internal view on, line total on), then legacy triangulation is
+    /// projected onto <see cref="DropGroup.Triangulated"/> so the next save writes schema v3.
     /// </summary>
     private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
     {
-        return root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
+        PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
+        return library is null ? null : UpgradeLegacyTriangulation(library);
     }
 
     /// <summary>Loader for schema v3 — the current shape. Direct typed deserialization.</summary>
     private static PlotLibrary? LoadFromVersion3(JsonObject root, JsonSerializerOptions? options)
     {
-        return root.Deserialize<PlotLibrary>(options ?? JsonSerializerOptions.Default);
+        return root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
+    }
+
+    private static PlotLibrary UpgradeLegacyTriangulation(PlotLibrary library)
+    {
+        foreach (PlotData plot in library.Plots)
+        {
+            foreach (DropGroup group in plot.DropGroups)
+            {
+                if (group.StaggerHalf)
+                {
+                    group.Triangulated = true;
+                    group.StaggerHalf = false;
+                }
+            }
+        }
+
+        return library;
     }
 
     /// <summary>
     /// Mints a <see cref="TakeoffItem"/> for every <see cref="Shape"/> in <paramref name="plot"/>
-    /// that doesn't already have a corresponding takeoff entry. Used by the v1 -> v3 migration
-    /// path. <see cref="TakeoffSequence.Next"/> is initialised to <c>max(synthesized Id) + 1</c>.
+    /// that doesn't already have a corresponding takeoff entry. Used by the v1 -> current
+    /// migration path. <see cref="TakeoffSequence.Next"/> is initialised to <c>max(synthesized Id) + 1</c>.
     /// </summary>
     private static void BackfillTakeoffItemsForLegacyPlot(PlotData plot)
     {
