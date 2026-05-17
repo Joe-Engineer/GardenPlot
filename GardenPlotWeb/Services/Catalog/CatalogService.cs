@@ -104,6 +104,7 @@ public sealed class CatalogService : ICatalogService
                 "Grasses" => ("Ground Cover", "ft²", LaborType.Planting, 0.0),
                 "GroundCoverSurfaceCovers" => ("Ground Cover", "ft²", LaborType.Planting, 0.0),
                 "GroundCoverMaterials" => ("Material", "yd³", LaborType.Mulching, 0.5),
+                "FocalPoints" => ("Focal Point", "ea", LaborType.Hardscape, 0.5),
                 _ => (field.Name, "ea", LaborType.Other, 0.0),
             };
             AddRange(items, arr, kind, unit, labor, hours);

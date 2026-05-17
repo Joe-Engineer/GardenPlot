@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using GardenPlotWeb.Models;
+using GardenPlotWeb.Services.Catalog;
 
 namespace GardenPlot.Tests;
 
@@ -51,5 +52,47 @@ public sealed class PaletteCatalogTests
     {
         var values = Enum.GetValues<PaletteCategory>();
         Assert.Equal(values.Length, values.Distinct().Count());
+    }
+
+    [Fact]
+    public void FocalPoints_AreSeededAndProjectedWithExpectedDefaults()
+    {
+        string[] expectedCodes =
+        [
+            "Sculpture",
+            "Buddha",
+            "Garden Bench",
+            "Birdbath",
+            "Urn / Planter",
+            "Sundial",
+            "Astrolabe",
+            "Gazing Ball",
+            "Path Light (low-voltage)",
+            "Lantern (solar)",
+            "Trellis",
+            "Obelisk",
+            "Arbour",
+            "Wall-mounted Sconce",
+        ];
+
+        Assert.Equal(14, PaletteCatalog.FocalPoints.Length);
+        Assert.Equal(expectedCodes, PaletteCatalog.FocalPoints.Select(item => item.Code).ToArray());
+        Assert.All(PaletteCatalog.FocalPoints, item =>
+        {
+            Assert.Equal(PaletteKind.FocalPoint, item.Kind);
+            Assert.Equal(PaletteCategory.FocalPoint, PaletteCatalog.CategoryFor(item));
+            Assert.StartsWith("focal-point-", item.Trait, StringComparison.OrdinalIgnoreCase);
+        });
+
+        var catalog = new CatalogService();
+        foreach (string code in expectedCodes)
+        {
+            CatalogItem? item = catalog.GetBase(code);
+            Assert.NotNull(item);
+            Assert.Equal("Focal Point", item!.Kind);
+            Assert.Equal("ea", item.Unit);
+            Assert.Equal(LaborType.Hardscape, item.LaborType);
+            Assert.Equal(0.5, item.LaborHoursPerUnit);
+        }
     }
 }

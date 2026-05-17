@@ -336,10 +336,7 @@ else
                             <option value="@cat">@CategoryLabel(cat)</option>
                         }
                     </select>
-                    @if (currentCategory != PaletteCategory.GroundCoverMaterials
-                        && currentCategory != PaletteCategory.GroundCoverSurface
-                        && currentCategory != PaletteCategory.CustomTiles
-                        && currentCategory != PaletteCategory.BedKits)
+                    @if (CategorySupportsClimateFilter(currentCategory))
                     {
                         <div class="palette-filter-row">
                             <select class="form-select form-select-sm palette-region-select"
@@ -358,7 +355,7 @@ else
                             </label>
                         </div>
                     }
-                    @if (currentCategory == PaletteCategory.CustomTiles)
+                    @if (currentCategory == PaletteCategory.CustomTiles || currentCategory == PaletteCategory.FocalPoint)
                     {
                         <button class="btn btn-sm btn-outline-primary palette-add-btn" @onclick="ShowAddCustomTileDialog">+ Add Item</button>
                     }
@@ -370,11 +367,12 @@ else
                         var detail = item.Kind switch
                         {
                             PaletteKind.BedKit => $"{item.WidthFt}'×{item.HeightFt}' · {item.Pieces} pcs",
-                            PaletteKind.Plant  => $"spacing {FormatPlantSpacing(item.WidthFt)} · {item.Sunlight} · {item.Water} water",
+                            PaletteKind.Plant => $"spacing {FormatPlantSpacing(item.WidthFt)} · {item.Sunlight} · {item.Water} water",
+                            PaletteKind.FocalPoint => $"single drop · {FocalPointTraitLabel(item.Trait)}",
                             PaletteKind.CustomTile => $"{item.StampShapeKind ?? ShapeKind.Rectangle} · {item.WidthFt}'×{item.HeightFt}'",
                             PaletteKind.GroundCover => item.DefaultDepthIn is double dd ? $"area · {item.Trait} · {dd:0.#}\" default" : $"area · {item.Trait}",
                             PaletteKind.GroundCoverSurface => $"surface · {item.Trait}",
-                            _                  => $"{item.WidthFt}' Ø · {item.Trait}",
+                            _ => $"{item.WidthFt}' Ø · {item.Trait}",
                         };
                         <button class="palette-item @(isActive ? "active" : "")"
                                 @onclick="() => SelectItem(item)" title="@item.Code — @detail">
@@ -402,6 +400,9 @@ else
                                             case PaletteKind.Plant:
                                                 @((MarkupString)PlantRendering.SpacingRingsSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, "good"))
                                                 @((MarkupString)PlantRendering.PlantSpriteSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, item.Trait))
+                                                break;
+                                            case PaletteKind.FocalPoint:
+                                                @((MarkupString)PlantRendering.PlantSpriteSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, EffectivePaletteTrait(item)))
                                                 break;
                                             case PaletteKind.CustomTile:
                                                 if (item.StampShapeKind == ShapeKind.Oval)
@@ -437,12 +438,12 @@ else
                         </button>
                     }
                 </div>
-                @if (currentCategory == PaletteCategory.CustomTiles)
+                @if (currentCategory == PaletteCategory.CustomTiles || currentCategory == PaletteCategory.FocalPoint)
                 {
                     <div class="palette-footer">
                         <button class="btn btn-sm btn-outline-secondary w-100"
                                 @onclick="ShowEditSelectedCustomTileDialog"
-                                disabled="@(selectedItem?.Kind != PaletteKind.CustomTile)">Edit Item</button>
+                                disabled="@(!CanEditSelectedCustomPaletteItem)">Edit Item</button>
                     </div>
                 }
             </aside>
@@ -519,7 +520,7 @@ else
 
                 @{
                     // Plant spacing overlay (under shapes): one set of rings per plant, color-coded by overlap.
-                    var plantList = currentPlot.Shapes.Where(z => z.Kind == ShapeKind.Plant).ToList();
+                    var plantList = currentPlot.Shapes.Where(z => z.Kind == ShapeKind.Plant && !IsFocalPointTrait(z.Trait)).ToList();
                 }
                 @if (plantList.Count > 0)
                 {
@@ -818,7 +819,10 @@ else
                                         @((MarkupString)PlantRendering.BushSvg(s.X, s.Y, s.W, s.H, s.Trait, s.Label))
                                         break;
                                     case ShapeKind.Plant:
-                                        @((MarkupString)PlantRendering.SpacingRingsSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, "good"))
+                                        @if (!IsFocalPointTrait(s.Trait))
+                                        {
+                                            @((MarkupString)PlantRendering.SpacingRingsSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, "good"))
+                                        }
                                         @((MarkupString)PlantRendering.PlantSpriteSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, s.Trait))
                                         break;
                                 }
@@ -850,7 +854,10 @@ else
                                         @((MarkupString)PlantRendering.BushSvg(s.X, s.Y, s.W, s.H, s.Trait, s.Label))
                                         break;
                                     case ShapeKind.Plant:
-                                        @((MarkupString)PlantRendering.SpacingRingsSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, "good"))
+                                        @if (!IsFocalPointTrait(s.Trait))
+                                        {
+                                            @((MarkupString)PlantRendering.SpacingRingsSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, "good"))
+                                        }
                                         @((MarkupString)PlantRendering.PlantSpriteSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, s.Trait))
                                         break;
                                 }
@@ -1732,7 +1739,7 @@ else
                 }
             }
 
-            @if (isSingle && single!.Kind == ShapeKind.Plant)
+            @if (isSingle && single!.Kind == ShapeKind.Plant && !IsFocalPointTrait(single!.Trait))
             {
                 var rules = CompanionRules.ForCode(single.Label ?? "");
                 var nearby = isPreview ? new List<(Shape other, double distFt)>() : NearbyPlants(single, currentPlot.Shapes);
@@ -1918,7 +1925,7 @@ else
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">@(IsEditingCustomTile ? "Edit Custom Tile" : "Add Custom Tile")</h5>
+                    <h5 class="modal-title">@CustomPaletteDialogTitle</h5>
                     <button type="button" class="btn-close" @onclick="CancelAddCustomTile"></button>
                 </div>
                 <div class="modal-body">
@@ -1926,64 +1933,79 @@ else
                         <label class="form-label small">Name</label>
                         <input class="form-control form-control-sm" @bind="newCustomTileName" />
                     </div>
-                    <div class="row g-2 mb-2">
-                        <div class="col">
-                            <label class="form-label small">Shape</label>
-                            <select class="form-select form-select-sm" @bind="newCustomTileShape">
-                                <option value="Rectangle">Rectangle</option>
-                                <option value="Oval">Oval</option>
+                    @if (IsCustomFocalPointDialog)
+                    {
+                        <div class="mb-2">
+                            <label class="form-label small">Icon style</label>
+                            <select class="form-select form-select-sm" @bind="newCustomFocalPointTrait">
+                                @foreach (var option in FocalPointTraitOptions)
+                                {
+                                    <option value="@option.Value">@option.Label</option>
+                                }
                             </select>
                         </div>
-                        <div class="col">
-                            <label class="form-label small">Line color</label>
-                            <input type="color" class="form-control form-control-sm form-control-color custom-color" @bind="newCustomTileStrokeColor" />
+                        <div class="x-small text-muted">Custom focal points place as single-drop tagged icons and inherit Focal Point takeoff defaults.</div>
+                    }
+                    else
+                    {
+                        <div class="row g-2 mb-2">
+                            <div class="col">
+                                <label class="form-label small">Shape</label>
+                                <select class="form-select form-select-sm" @bind="newCustomTileShape">
+                                    <option value="Rectangle">Rectangle</option>
+                                    <option value="Oval">Oval</option>
+                                </select>
+                            </div>
+                            <div class="col">
+                                <label class="form-label small">Line color</label>
+                                <input type="color" class="form-control form-control-sm form-control-color custom-color" @bind="newCustomTileStrokeColor" />
+                            </div>
+                            <div class="col">
+                                <label class="form-label small">Fill color</label>
+                                <input type="color" class="form-control form-control-sm form-control-color custom-color" @bind="newCustomTileFillColor" />
+                            </div>
                         </div>
-                        <div class="col">
-                            <label class="form-label small">Fill color</label>
-                            <input type="color" class="form-control form-control-sm form-control-color custom-color" @bind="newCustomTileFillColor" />
+                        <div class="row g-2 mb-2">
+                            <div class="col">
+                                <label class="form-label small">Width (ft)</label>
+                                <input type="number" min="0.1" max="200" step="0.1" class="form-control form-control-sm" @bind="newCustomTileWidthFt" />
+                            </div>
+                            <div class="col">
+                                <label class="form-label small">Height (ft)</label>
+                                <input type="number" min="0.1" max="200" step="0.1" class="form-control form-control-sm" @bind="newCustomTileHeightFt" />
+                            </div>
                         </div>
-                    </div>
-                    <div class="row g-2 mb-2">
-                        <div class="col">
-                            <label class="form-label small">Width (ft)</label>
-                            <input type="number" min="0.1" max="200" step="0.1" class="form-control form-control-sm" @bind="newCustomTileWidthFt" />
+                        <div class="mb-2">
+                            <label class="form-label small">Palette tile image (for button)</label>
+                            <InputFile OnChange="OnCustomTilePreviewImageSelected" accept="image/*" class="form-control form-control-sm" />
+                            @if (!string.IsNullOrWhiteSpace(newCustomTilePreviewImageWarning))
+                            {
+                                <div class="x-small text-warning mt-1">@newCustomTilePreviewImageWarning</div>
+                            }
                         </div>
-                        <div class="col">
-                            <label class="form-label small">Height (ft)</label>
-                            <input type="number" min="0.1" max="200" step="0.1" class="form-control form-control-sm" @bind="newCustomTileHeightFt" />
+                        <label class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" @bind="newCustomTileUseButtonImageForBackground" />
+                            <span class="form-check-label small">Use button image for tile background</span>
+                        </label>
+                        <div class="mb-2">
+                            <label class="form-label small">Tile background image (for drawn shape)</label>
+                            <InputFile OnChange="OnCustomTileBackgroundImageSelected" accept="image/*" class="form-control form-control-sm" disabled="@newCustomTileUseButtonImageForBackground" />
+                            @if (newCustomTileUseButtonImageForBackground)
+                            {
+                                <div class="x-small text-muted mt-1">The drawn tile will reuse the button image.</div>
+                            }
+                            else if (!string.IsNullOrWhiteSpace(newCustomTileBackgroundImageWarning))
+                            {
+                                <div class="x-small text-warning mt-1">@newCustomTileBackgroundImageWarning</div>
+                            }
                         </div>
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label small">Palette tile image (for button)</label>
-                        <InputFile OnChange="OnCustomTilePreviewImageSelected" accept="image/*" class="form-control form-control-sm" />
-                        @if (!string.IsNullOrWhiteSpace(newCustomTilePreviewImageWarning))
-                        {
-                            <div class="x-small text-warning mt-1">@newCustomTilePreviewImageWarning</div>
-                        }
-                    </div>
-                    <label class="form-check mb-2">
-                        <input class="form-check-input" type="checkbox" @bind="newCustomTileUseButtonImageForBackground" />
-                        <span class="form-check-label small">Use button image for tile background</span>
-                    </label>
-                    <div class="mb-2">
-                        <label class="form-label small">Tile background image (for drawn shape)</label>
-                        <InputFile OnChange="OnCustomTileBackgroundImageSelected" accept="image/*" class="form-control form-control-sm" disabled="@newCustomTileUseButtonImageForBackground" />
-                        @if (newCustomTileUseButtonImageForBackground)
-                        {
-                            <div class="x-small text-muted mt-1">The drawn tile will reuse the button image.</div>
-                        }
-                        else if (!string.IsNullOrWhiteSpace(newCustomTileBackgroundImageWarning))
-                        {
-                            <div class="x-small text-warning mt-1">@newCustomTileBackgroundImageWarning</div>
-                        }
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label small">Citation URL</label>
-                        <input type="url" class="form-control form-control-sm" @bind="newCustomTileCitationUrl" placeholder="https://..." />
-                        <div class="x-small text-muted mt-1">Leave blank to auto-link Wikipedia when possible.</div>
-                    </div>
-                    <div class="x-small text-muted">Large image files can impact rendering performance while panning/zooming.</div>
+                        <div class="mb-2">
+                            <label class="form-label small">Citation URL</label>
+                            <input type="url" class="form-control form-control-sm" @bind="newCustomTileCitationUrl" placeholder="https://..." />
+                            <div class="x-small text-muted mt-1">Leave blank to auto-link Wikipedia when possible.</div>
+                        </div>
+                        <div class="x-small text-muted">Large image files can impact rendering performance while panning/zooming.</div>
+                    }
                     @if (!string.IsNullOrWhiteSpace(addCustomTileError))
                     {
                         <div class="small text-danger mt-2">@addCustomTileError</div>

@@ -21,7 +21,10 @@ public sealed class ModelPropertyTests
         {
             Id = id,
             Kind = ShapeKind.Oval,
-            X = 1, Y = 2, W = 3, H = 4,
+            X = 1,
+            Y = 2,
+            W = 3,
+            H = 4,
             Rotation = 45,
             Points = pts,
             Label = "Bed",
@@ -148,7 +151,7 @@ public sealed class ModelPropertyTests
             HeatTolerance: "high",
             FrostSensitive: true,
             ChillHours: 0,
-            LightTolerance: new[] { SunlightLevel.FullSun },
+            LightTolerance: [SunlightLevel.FullSun],
             LightNotes: "6+ hours direct",
             Water: WaterNeed.Medium,
             DroughtTolerant: false,
@@ -174,8 +177,8 @@ public sealed class ModelPropertyTests
             PollinatorValue: "moderate",
             HostPlantInfo: null,
             WildlifeValue: "moderate",
-            NativeRegions: new[] { ClimateRegion.TropicalHumid },
-            GrowRegions: new[] { ClimateRegion.WarmTemperateContinental, ClimateRegion.HumidSubtropical },
+            NativeRegions: [ClimateRegion.TropicalHumid],
+            GrowRegions: [ClimateRegion.WarmTemperateContinental, ClimateRegion.HumidSubtropical],
             Toxicity: new ToxicityInfo(ToCats: ToxicityLevel.Mild, ToDogs: ToxicityLevel.Mild, ToHumans: ToxicityLevel.None, Notes: "green parts mildly toxic"),
             Invasive: false,
             NoxiousStatus: null,
@@ -189,7 +192,7 @@ public sealed class ModelPropertyTests
             DescriptionLicense: "CC-BY-SA",
             ImageLicense: "CC-BY",
             VersionDate: "2025-01-15",
-            Sources: new[] { new SourceProvenance("USDA", Url: "https://plants.usda.gov", RetrievedOn: "2025-01-15", License: "PD", Attribution: "USDA NRCS") });
+            Sources: [new SourceProvenance("USDA", Url: "https://plants.usda.gov", RetrievedOn: "2025-01-15", License: "PD", Attribution: "USDA NRCS")]);
 
         Assert.Equal("Solanum lycopersicum", p.ScientificName);
         Assert.Equal("Tomato", p.CommonNames![0]);
