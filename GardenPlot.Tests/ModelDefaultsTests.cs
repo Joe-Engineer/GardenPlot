@@ -29,6 +29,12 @@ public sealed class ModelDefaultsTests
         Assert.Equal(BackgroundFit.Fit, p.BackgroundFit);
         Assert.InRange(p.BackgroundImageOpacity, 0, 1);
         Assert.True(p.GridLineWidth > 0);
+        Assert.Equal(8, p.LayerStates.Count);
+        Assert.All(p.LayerStates.Values, state =>
+        {
+            Assert.True(state.Visible);
+            Assert.False(state.Locked);
+        });
         Assert.Empty(p.Shapes);
         Assert.Empty(p.DropGroups);
         Assert.Empty(p.PhotoFileNames);

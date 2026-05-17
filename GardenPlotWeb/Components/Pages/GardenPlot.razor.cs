@@ -141,6 +141,7 @@ public partial class GardenPlot
     private ElementReference takeoffPanelRef;
     private ElementReference calibrationPanelRef;
     private bool showTakeoffPanel;
+    private bool showLayersPanel = true;
     private readonly List<Shape> clipboard = new();
     private readonly Stack<PlotUndoSnapshot> undoStack = new();
     private double? pasteAnchorX;
@@ -170,9 +171,116 @@ public partial class GardenPlot
     private Guid? PrimarySelectedId => selectedIds.Count > 0 ? selectedIds[^1] : null;
     private bool HasClipboard => clipboard.Count > 0;
     private bool IsSelected(Guid id) => selectedIds.Contains(id);
-    private void SelectOnly(Guid id) { selectedIds.Clear(); selectedIds.Add(id); }
-    private void ToggleSelection(Guid id) { if (!selectedIds.Remove(id)) selectedIds.Add(id); }
+
+    private void SelectOnly(Guid id)
+    {
+        selectedIds.Clear();
+
+        if (currentPlot?.Shapes.FirstOrDefault(s => s.Id == id) is Shape shape && CanSelectShape(shape))
+        {
+            selectedIds.Add(id);
+        }
+    }
+
+    private void ToggleSelection(Guid id)
+    {
+        if (selectedIds.Remove(id))
+        {
+            return;
+        }
+
+        if (currentPlot?.Shapes.FirstOrDefault(s => s.Id == id) is Shape shape && CanSelectShape(shape))
+        {
+            selectedIds.Add(id);
+        }
+    }
+
     private void ClearSelection() => selectedIds.Clear();
+
+    private LayerState GetLayerState(string layerKey)
+    {
+        if (currentPlot is null)
+        {
+            return new LayerState();
+        }
+
+        return LayerResolver.GetLayerState(currentPlot, layerKey);
+    }
+
+    private string GetShapeLayerKey(Shape shape)
+    {
+        return LayerResolver.GetLayerKey(shape, ResolveLayerCatalogItem(shape));
+    }
+
+    private bool IsShapeVisible(Shape shape)
+    {
+        return currentPlot is not null && LayerResolver.IsVisible(currentPlot, shape, ResolveLayerCatalogItem(shape));
+    }
+
+    private bool CanSelectShape(Shape shape)
+    {
+        return currentPlot is not null && LayerResolver.IsSelectable(currentPlot, shape, ResolveLayerCatalogItem(shape));
+    }
+
+    private int CountShapesOnLayer(string layerKey)
+    {
+        if (currentPlot is null)
+        {
+            return 0;
+        }
+
+        var count = 0;
+        foreach (Shape shape in currentPlot.Shapes)
+        {
+            if (string.Equals(GetShapeLayerKey(shape), layerKey, StringComparison.Ordinal))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private async Task ToggleLayerVisibilityAsync(string layerKey)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        LayerState state = LayerResolver.GetLayerState(currentPlot, layerKey);
+        state.Visible = !state.Visible;
+        DropIneligibleSelection();
+        await SaveAsync();
+    }
+
+    private async Task ToggleLayerLockAsync(string layerKey)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        LayerState state = LayerResolver.GetLayerState(currentPlot, layerKey);
+        state.Locked = !state.Locked;
+        DropIneligibleSelection();
+        await SaveAsync();
+    }
+
+    private void DropIneligibleSelection()
+    {
+        if (currentPlot is null || selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        selectedIds.RemoveAll(id =>
+        {
+            Shape? shape = currentPlot.Shapes.FirstOrDefault(s => s.Id == id);
+            return shape is null || !CanSelectShape(shape);
+        });
+    }
+
     private void ExpandSelectionToWholeGroups()
     {
         if (currentPlot is null || selectedIds.Count == 0)
@@ -203,7 +311,7 @@ public partial class GardenPlot
 
         foreach (var shape in currentPlot.Shapes)
         {
-            if (shape.GroupId is Guid gid && groupIds.Contains(gid) && !selectedSet.Contains(shape.Id))
+            if (shape.GroupId is Guid gid && groupIds.Contains(gid) && !selectedSet.Contains(shape.Id) && CanSelectShape(shape))
             {
                 selectedSet.Add(shape.Id);
                 ordered.Add(shape.Id);
@@ -213,11 +321,18 @@ public partial class GardenPlot
         selectedIds.Clear();
         selectedIds.AddRange(ordered);
     }
+
     private IEnumerable<Shape> SelectedShapes()
-        => currentPlot is null ? Enumerable.Empty<Shape>()
-                               : selectedIds.Select(id => currentPlot.Shapes.FirstOrDefault(s => s.Id == id))
-                                            .Where(s => s is not null)!
-                                            .Cast<Shape>();
+    {
+        if (currentPlot is null)
+        {
+            return Enumerable.Empty<Shape>();
+        }
+
+        return selectedIds.Select(id => currentPlot.Shapes.FirstOrDefault(s => s.Id == id))
+            .Where(s => s is not null && CanSelectShape(s))!
+            .Cast<Shape>();
+    }
 
     // View state
     private double zoom = 1.0;
@@ -2143,6 +2258,7 @@ public partial class GardenPlot
                 if (currentPlot is null)
                 {
                     var startupFallback = new PlotData { Name = "Garden", WidthFt = 120, HeightFt = 120 };
+                    LayerResolver.EnsureLayerStates(startupFallback);
                     library = new PlotLibrary();
                     library.Plots.Add(startupFallback);
                     library.LastPlotId = startupFallback.Id;
@@ -2223,7 +2339,9 @@ public partial class GardenPlot
 
                     if (library.Plots.Count == 0)
                     {
-                        library.Plots.Add(new PlotData { Name = "Garden", WidthFt = 120, HeightFt = 120 });
+                        var defaultPlot = new PlotData { Name = "Garden", WidthFt = 120, HeightFt = 120 };
+                        LayerResolver.EnsureLayerStates(defaultPlot);
+                        library.Plots.Add(defaultPlot);
                         library.LastPlotId = library.Plots[0].Id;
                         createdDefaultPlot = true;
                         InitialLoadDefault.Add(1);
@@ -2555,6 +2673,7 @@ public partial class GardenPlot
             p.PhotoFileNames ??= new List<string>();
             p.Takeoff ??= new List<TakeoffItem>();
             p.TakeoffIds ??= new TakeoffSequence();
+            LayerResolver.EnsureLayerStates(p);
 
             foreach (var shape in p.Shapes)
             {
@@ -3131,6 +3250,7 @@ public partial class GardenPlot
                 GridOpacity = Math.Clamp(newPlotGridOpacity, 0, 1),
                 ShowScaleDisplay = newPlotShowScaleDisplay,
             };
+            LayerResolver.EnsureLayerStates(p);
             library.Plots.Add(p);
             currentPlot = p;
         }
@@ -3724,6 +3844,36 @@ public partial class GardenPlot
         || string.Equals(s.Trait, "grass", StringComparison.OrdinalIgnoreCase)
         || string.Equals(s.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase);
 
+    private PaletteItem? ResolveLayerCatalogItem(Shape shape)
+    {
+        if (!string.IsNullOrWhiteSpace(shape.GroundCoverCode))
+        {
+            PaletteItem? groundCoverItem = shape.IsGroundCoverSurface
+                ? PaletteCatalog.GroundCoverSurfaceCovers.FirstOrDefault(i => string.Equals(i.Code, shape.GroundCoverCode, StringComparison.OrdinalIgnoreCase))
+                : PaletteCatalog.GroundCoverMaterials.FirstOrDefault(i => string.Equals(i.Code, shape.GroundCoverCode, StringComparison.OrdinalIgnoreCase));
+
+            if (groundCoverItem is not null)
+            {
+                return groundCoverItem;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(shape.Label))
+        {
+            return IsTileShape(shape) ? ResolveCustomTileInfoItem(shape, isPreview: false) : null;
+        }
+
+        return shape.Kind switch
+        {
+            ShapeKind.BedKit => PaletteCatalog.BedKits.FirstOrDefault(i => string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase)),
+            ShapeKind.Tree => PaletteCatalog.Trees.FirstOrDefault(i => string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase)),
+            ShapeKind.Bush => PaletteCatalog.Bushes.FirstOrDefault(i => string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase)),
+            ShapeKind.Plant => PaletteCatalog.Plants.FirstOrDefault(i => string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase)),
+            _ when IsTileShape(shape) => ResolveCustomTileInfoItem(shape, isPreview: false),
+            _ => null,
+        };
+    }
+
     private PaletteItem? ResolveCustomTileInfoItem(Shape shape, bool isPreview)
     {
         if (isPreview && selectedItem?.Kind == PaletteKind.CustomTile)
@@ -4162,6 +4312,7 @@ public partial class GardenPlot
         SyncDropGroupsFromCurrentShapes();
         selectedIds.Clear();
         selectedIds.AddRange(ordered.Select(s => s.Id));
+        DropIneligibleSelection();
 
         await SaveAsync();
     }
@@ -4261,6 +4412,7 @@ public partial class GardenPlot
 
         selectedIds.Clear();
         selectedIds.AddRange(pasted.Select(s => s.Id));
+        DropIneligibleSelection();
         await SaveAsync();
     }
 
@@ -4818,6 +4970,7 @@ public partial class GardenPlot
                     currentPlot.DropGroups.Add(placement.Group);
                     selectedIds.Clear();
                     selectedIds.AddRange(placement.Shapes.Select(z => z.Id));
+                    DropIneligibleSelection();
                 }
 
                 _ = SaveAsync();
@@ -5047,6 +5200,11 @@ public partial class GardenPlot
 
                 foreach (var shape in currentPlot.Shapes)
                 {
+                    if (!CanSelectShape(shape))
+                    {
+                        continue;
+                    }
+
                     var aabb = RotatedAABB(shape);
                     if (aabb.maxX < minX || aabb.minX > maxX || aabb.maxY < minY || aabb.minY > maxY)
                     {
@@ -5093,7 +5251,7 @@ public partial class GardenPlot
 
     private void OnShapePointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, Shape s)
     {
-        if (currentTool != Tool.Select) return;
+        if (currentTool != Tool.Select || !CanSelectShape(s)) return;
 
         TryCaptureCanvasPointer(e.PointerId);
 
@@ -5145,7 +5303,7 @@ public partial class GardenPlot
         }
 
         selectedIds.Clear();
-        selectedIds.AddRange(currentPlot.Shapes.Where(s => s.GroupId == groupId).Select(s => s.Id));
+        selectedIds.AddRange(currentPlot.Shapes.Where(s => s.GroupId == groupId && CanSelectShape(s)).Select(s => s.Id));
     }
 
     private Task SelectDropGroupFromPanel(Guid groupId)
@@ -5926,7 +6084,7 @@ public partial class GardenPlot
         }
 
         selectedIds.Clear();
-        selectedIds.AddRange(currentPlot.Shapes.Select(s => s.Id));
+        selectedIds.AddRange(currentPlot.Shapes.Where(CanSelectShape).Select(s => s.Id));
     }
 
     private void RemoveSelectionGroup(string kind, string name)
