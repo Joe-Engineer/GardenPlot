@@ -196,10 +196,10 @@ else
             </div>
             <div class="drop-field">
                 <label class="drop-field-label">Y ft</label>
-                <input type="number" min="0" max="100" step="0.1" class="form-control form-control-sm drop-input" title="Row center spacing (ft), 0 = item default"
+                <input type="number" min="0" max="100" step="0.1" class="form-control form-control-sm drop-input" title="Row center spacing (ft), 0 = item default or √3/2 × X when triangulated"
                        @bind="arrayCenterSpacingYFt" />
             </div>
-            <label class="drop-check small"><input type="checkbox" @bind="arrayStaggerHalf" /> 1/2 stagger</label>
+            <label class="drop-check small" title="Offsets every other row by half an X spacing. With Y ft = 0, rows become equilateral."><input type="checkbox" @bind="arrayTriangulated" /> Triangulated</label>
             <label class="drop-check small"><input type="checkbox" @bind="arrayRotationAutoShift" /> Auto-shift on rotate</label>
             </span>
 
@@ -287,8 +287,8 @@ else
                     <div class="keybind-grid">
                         <label>Stamp spacing left</label><input class="form-control form-control-sm" @bind="kb.StampSpacingLeft" />
                         <label>Stamp spacing right</label><input class="form-control form-control-sm" @bind="kb.StampSpacingRight" />
-                        <label>Stamp spacing up</label><input class="form-control form-control-sm" @bind="kb.StampSpacingUp" />
-                        <label>Stamp spacing down</label><input class="form-control form-control-sm" @bind="kb.StampSpacingDown" />
+                        <label title="Adjusts array row spacing; with Triangulated and Y ft = 0, rows auto-follow √3/2 × X.">Stamp spacing up</label><input class="form-control form-control-sm" @bind="kb.StampSpacingUp" />
+                        <label title="Adjusts array row spacing; with Triangulated and Y ft = 0, rows auto-follow √3/2 × X.">Stamp spacing down</label><input class="form-control form-control-sm" @bind="kb.StampSpacingDown" />
 
                         <label>Undo</label><input class="form-control form-control-sm" @bind="kb.Undo" />
                         <label>Select all</label><input class="form-control form-control-sm" @bind="kb.SelectAll" />
@@ -1542,7 +1542,11 @@ else
     var groupMembers = selectedDropGroup is null ? new List<Shape>() : GroupShapesOrdered(selectedDropGroup.Id);
     var groupCols = selectedDropGroup is null ? 0 : Math.Max(1, (int)Math.Ceiling(groupMembers.Count / (double)Math.Max(1, selectedDropGroup.Rows)));
     var groupCenterSpacingX = selectedDropGroup?.CenterSpacingXFt ?? 0;
-    var groupCenterSpacingY = selectedDropGroup?.CenterSpacingYFt ?? 0;
+    var groupCenterSpacingY = (selectedDropGroup is null || groupMembers.Count == 0)
+        ? 0
+        : selectedDropGroup.Pattern == DropPattern.Array
+            ? ResolveArrayRowSpacing(groupCenterSpacingX, selectedDropGroup.CenterSpacingYFt, selectedDropGroup.Triangulated, groupMembers[0].H)
+            : selectedDropGroup.CenterSpacingYFt;
     var groupGapX = (selectedDropGroup is null || groupMembers.Count == 0) ? 0 : groupCenterSpacingX - groupMembers[0].W;
     var groupGapY = (selectedDropGroup is null || groupMembers.Count == 0) ? 0 : groupCenterSpacingY - groupMembers[0].H;
     var groupLength = selectedDropGroup is null
@@ -1722,13 +1726,13 @@ else
                         <input type="number" min="1" max="@Math.Max(1, groupMembers.Count)" step="1" value="@selectedDropGroup.Rows" @onchange="OnGroupRowsChanged" />
 
                         <label>Center Y (ft)</label>
-                        <input type="number" min="0.1" max="200" step="0.1" value="@F(groupCenterSpacingY)" @onchange="(e) => OnGroupCenterSpacingChanged(e, false)" />
+                        <input type="number" min="0" max="200" step="0.1" value="@F(selectedDropGroup.CenterSpacingYFt)" title="0 = item default or √3/2 × X when triangulated" @onchange="(e) => OnGroupCenterSpacingChanged(e, false)" />
 
                         <label>Gap Y (ft)</label>
                         <input type="number" min="-200" max="200" step="0.1" value="@F(groupGapY)" @onchange="(e) => OnGroupBoundingSpacingChanged(e, false)" />
 
-                        <label>Stagger</label>
-                        <label class="small"><input type="checkbox" checked="@selectedDropGroup.StaggerHalf" @onchange="OnGroupStaggerChanged" /> 1/2 row offset</label>
+                        <label>Triangulated</label>
+                        <label class="small" title="Offsets every other row by half an X spacing. With Center Y = 0, rows become equilateral."><input type="checkbox" checked="@selectedDropGroup.Triangulated" @onchange="OnGroupTriangulatedChanged" /> Triangulated</label>
 
                         <label>Rotate</label>
                         <label class="small"><input type="checkbox" checked="@selectedDropGroup.AutoShiftOnRotate" @onchange="OnGroupRotationAutoShiftChanged" /> Auto-shift into bounds</label>

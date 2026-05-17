@@ -88,7 +88,7 @@ public sealed class PlotJsonRoundTripTests
                     Rows = 3,
                     CenterSpacingXFt = 2.5,
                     CenterSpacingYFt = 1.75,
-                    StaggerHalf = true,
+                    Triangulated = true,
                     Rotation = 30,
                     AnchorCenterX = 18.25,
                     AnchorCenterY = 9.5,

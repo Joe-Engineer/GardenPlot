@@ -59,6 +59,50 @@ public class PlotLibraryLoaderTests
     }
 
     [Fact]
+    public void Load_Version2TriangulatedPayload_MigratesLegacyStaggerHalf()
+    {
+        string legacyJson = JsonSerializer.Serialize(new
+        {
+            SchemaVersion = 2,
+            Plots = new[]
+            {
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Legacy Garden",
+                    WidthFt = 40.0,
+                    HeightFt = 30.0,
+                    DropGroups = new[]
+                    {
+                        new
+                        {
+                            Id = Guid.NewGuid(),
+                            Pattern = DropPattern.Array,
+                            ItemCount = 6,
+                            Rows = 2,
+                            CenterSpacingXFt = 3.0,
+                            CenterSpacingYFt = 2.0,
+                            StaggerHalf = true,
+                        },
+                    },
+                },
+            },
+        });
+
+        var loader = CreateLoader();
+        var lib = loader.Load(legacyJson, "unit-test");
+
+        Assert.NotNull(lib);
+        DropGroup group = Assert.Single(Assert.Single(lib!.Plots).DropGroups);
+        Assert.True(group.Triangulated);
+        Assert.False(group.StaggerHalf);
+        Assert.Equal(PlotSchema.Current, lib.SchemaVersion);
+
+        string savedJson = JsonSerializer.Serialize(lib);
+        Assert.DoesNotContain("StaggerHalf", savedJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_DocumentAtCurrentVersion_PassesThrough()
     {
         var source = new PlotLibrary();
