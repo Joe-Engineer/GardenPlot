@@ -41,6 +41,7 @@ public sealed class ModelDefaultsTests
         });
         Assert.Empty(p.Shapes);
         Assert.Empty(p.DropGroups);
+        Assert.Empty(p.Tasks);
         Assert.Empty(p.PhotoFileNames);
         Assert.Empty(p.Takeoff);
         Assert.Equal(1, p.TakeoffIds.Next);

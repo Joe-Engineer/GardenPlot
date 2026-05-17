@@ -16,6 +16,7 @@ using Xunit;
 
 namespace GardenPlot.Tests.Persistence;
 
+[Collection(global::GardenPlot.Tests.TestCollections.DataRootEnvironment)]
 public sealed class FileSystemPlotRepositoryTests : IDisposable
 {
     private readonly string tempRoot;

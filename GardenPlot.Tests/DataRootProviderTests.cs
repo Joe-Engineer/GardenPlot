@@ -2,6 +2,7 @@
 
 namespace GardenPlot.Tests;
 
+[Collection(TestCollections.DataRootEnvironment)]
 public sealed class DataRootProviderTests
 {
     [Fact]

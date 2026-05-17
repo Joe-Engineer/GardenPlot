@@ -51,7 +51,10 @@
     {
         <button class="btn btn-sm btn-outline-danger" @onclick="DeleteCurrentPlot">Delete Plot</button>
     }
-    <a href="/about" class="ms-auto text-nowrap">Help / About</a>
+    <div class="ms-auto d-flex align-items-center gap-3">
+        <a href="/calendar" class="text-nowrap">Calendar</a>
+        <a href="/about" class="text-nowrap">Help / About</a>
+    </div>
 </div>
 
 @if (currentPlot is not null)
@@ -1816,6 +1819,12 @@ else
     var singleDropGroup = (!isPreview && isSingle && single?.GroupId is Guid singleGroupId)
         ? currentPlot.DropGroups.FirstOrDefault(g => g.Id == singleGroupId)
         : null;
+    IReadOnlyList<GardenTask> singleShapeTasks = !isPreview && isSingle && single is not null && CanBindTasks(single)
+        ? TasksForShape(single.Id)
+        : [];
+    IReadOnlyList<GardenTaskTemplate> singleTaskTemplates = !isPreview && isSingle && single is not null && CanBindTasks(single)
+        ? GardenTaskTemplates.GetTemplatesForShape(single)
+        : [];
     var groupMembers = selectedDropGroup is null ? new List<Shape>() : GroupShapesOrdered(selectedDropGroup.Id);
     var groupCols = selectedDropGroup is null ? 0 : Math.Max(1, (int)Math.Ceiling(groupMembers.Count / (double)Math.Max(1, selectedDropGroup.Rows)));
     var groupCenterSpacingX = selectedDropGroup?.CenterSpacingXFt ?? 0;
@@ -2117,6 +2126,115 @@ else
                                         <span>@candidate.Label</span>
                                     </label>
                                 }
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (!isPreview && isSingle && single is not null && CanBindTasks(single))
+                {
+                    <div class="mt-2 pt-2 border-top">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                            <div class="small fw-semibold">Tasks</div>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => BeginNewTask(single!)">+ Add task</button>
+                        </div>
+
+                        @if (singleShapeTasks.Count == 0)
+                        {
+                            <div class="x-small text-muted mb-2">No tasks for this item yet.</div>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled small mb-2">
+                                @foreach (GardenTask task in singleShapeTasks)
+                                {
+                                    <li class="mb-2 pb-2 border-bottom">
+                                        <div class="d-flex align-items-start justify-content-between gap-2">
+                                            <div>
+                                                <div class="fw-semibold">@task.Title</div>
+                                                <div class="x-small text-muted">
+                                                    @GardenTaskScheduler.GetCadenceLabel(task)
+                                                    @if (task.NextDueUtc is { } nextDueUtc)
+                                                    {
+                                                        <span> · due @FormatTaskDue(nextDueUtc)</span>
+                                                    }
+                                                </div>
+                                                @if (!string.IsNullOrWhiteSpace(task.Notes))
+                                                {
+                                                    <div class="x-small text-muted">@task.Notes</div>
+                                                }
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <button class="btn btn-sm btn-link p-0" @onclick="() => EditTask(task)">Edit</button>
+                                                <button class="btn btn-sm btn-link p-0 text-danger" @onclick="() => DeleteTaskAsync(task.Id)">Delete</button>
+                                            </div>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+
+                        @if (singleTaskTemplates.Count > 0)
+                        {
+                            <div class="x-small text-muted mb-1">Suggested templates</div>
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                @foreach (GardenTaskTemplate template in singleTaskTemplates)
+                                {
+                                    <button class="btn btn-sm btn-outline-success" @onclick="() => UseTaskTemplate(single!, template)">@template.Title</button>
+                                }
+                            </div>
+                        }
+
+                        @if (TaskEditorMatchesShape(single.Id))
+                        {
+                            <div class="border rounded p-2 bg-body-tertiary">
+                                <div class="row g-2">
+                                    <div class="col-12">
+                                        <label class="form-label form-label-sm mb-1">Title</label>
+                                        <input class="form-control form-control-sm" @bind="taskDraftTitle" />
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <label class="form-label form-label-sm mb-1">Cadence</label>
+                                        <InputSelect class="form-select form-select-sm" @bind-Value="taskDraftCadence">
+                                            @foreach (TaskCadence cadence in Enum.GetValues<TaskCadence>())
+                                            {
+                                                <option value="@cadence">@cadence</option>
+                                            }
+                                        </InputSelect>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <label class="form-label form-label-sm mb-1">Next due</label>
+                                        <input type="datetime-local" class="form-control form-control-sm" value="@taskDraftNextDueLocal" @onchange="OnTaskDueChanged" />
+                                    </div>
+                                    @if (taskDraftCadence is TaskCadence.SeasonStart or TaskCadence.SeasonEnd)
+                                    {
+                                        <div class="col-sm-6">
+                                            <label class="form-label form-label-sm mb-1">Season</label>
+                                            <InputSelect class="form-select form-select-sm" @bind-Value="taskDraftSeason">
+                                                @foreach (Season season in Enum.GetValues<Season>())
+                                                {
+                                                    <option value="@season">@season</option>
+                                                }
+                                            </InputSelect>
+                                        </div>
+                                    }
+                                    @if (taskDraftCadence == TaskCadence.Custom)
+                                    {
+                                        <div class="col-sm-6">
+                                            <label class="form-label form-label-sm mb-1">Custom cron</label>
+                                            <input class="form-control form-control-sm" @bind="taskDraftCustomCron" placeholder="0 8 * * 1" />
+                                        </div>
+                                    }
+                                    <div class="col-12">
+                                        <label class="form-label form-label-sm mb-1">Notes</label>
+                                        <textarea class="form-control form-control-sm" rows="2" @bind="taskDraftNotes"></textarea>
+                                        <div class="x-small text-muted mt-1">Leave next due blank to auto-schedule from the cadence.</div>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 mt-2">
+                                    <button class="btn btn-sm btn-primary" @onclick="SaveTaskAsync" disabled="@string.IsNullOrWhiteSpace(taskDraftTitle)">Save task</button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="CancelTaskEdit">Cancel</button>
+                                </div>
                             </div>
                         }
                     </div>

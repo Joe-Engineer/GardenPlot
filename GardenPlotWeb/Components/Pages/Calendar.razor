@@ -1,0 +1,154 @@
+@page "/calendar"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@using GardenPlotWeb.Models
+@using GardenPlotWeb.Services
+@inject IJSRuntime JS
+@inject GardenPlotWeb.Services.Persistence.PlotLibraryLoader PlotLibraryLoader
+@inject ILogger<Calendar> Logger
+@inject NavigationManager Navigation
+
+<PageTitle>Garden Calendar</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+    <h1 class="mb-0 me-2">Garden Calendar</h1>
+    @if (currentPlot is not null)
+    {
+        <select class="form-select form-select-sm w-auto" value="@currentPlot.Id" @onchange="OnPlotChanged">
+            @foreach (PlotData plot in library.Plots)
+            {
+                <option value="@plot.Id">@plot.Name</option>
+            }
+        </select>
+    }
+    <a class="btn btn-sm btn-outline-secondary ms-auto" href="/">Back to plot</a>
+</div>
+
+@if (currentPlot is null)
+{
+    <p><em>Loading…</em></p>
+}
+else
+{
+    IReadOnlyList<CalendarMonthGroup> monthGroups = BuildMonthGroups();
+    IReadOnlyList<GardenTask> undatedTasks = BuildUndatedTasks();
+
+    <div class="text-muted small mb-3">
+        Tasks for <strong>@currentPlot.Name</strong>. Marking a task done appends a completion timestamp and schedules the next due date.
+    </div>
+
+    @if (monthGroups.Count == 0 && undatedTasks.Count == 0)
+    {
+        <div class="alert alert-secondary">No tasks scheduled for this plot yet.</div>
+    }
+    else
+    {
+        @foreach (CalendarMonthGroup monthGroup in monthGroups)
+        {
+            <section class="mb-4">
+                <h2 class="h4 mb-3">@monthGroup.Label</h2>
+                @foreach (CalendarWeekGroup weekGroup in monthGroup.Weeks)
+                {
+                    <div class="card mb-3">
+                        <div class="card-header py-2">
+                            <strong>@FormatWeekRange(weekGroup.WeekStartLocal)</strong>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Task</th>
+                                        <th>Bound shape</th>
+                                        <th>Cadence</th>
+                                        <th>Next due</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (GardenTask task in weekGroup.Tasks)
+                                    {
+                                        Shape? shape = FindShape(task.ShapeId);
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold">@task.Title</div>
+                                                @if (!string.IsNullOrWhiteSpace(task.Notes))
+                                                {
+                                                    <div class="small text-muted">@task.Notes</div>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (shape is not null)
+                                                {
+                                                    <button class="btn btn-sm btn-link p-0" @onclick="() => OpenShape(task.ShapeId)">@DescribeShape(shape)</button>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted small">Unbound</span>
+                                                }
+                                            </td>
+                                            <td>@GardenTaskScheduler.GetCadenceLabel(task)</td>
+                                            <td>@FormatDue(task.NextDueUtc)</td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-success" @onclick="() => MarkTaskDoneAsync(task)">Mark done</button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            </section>
+        }
+
+        @if (undatedTasks.Count > 0)
+        {
+            <section>
+                <h2 class="h4 mb-3">No due date</h2>
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Task</th>
+                                    <th>Bound shape</th>
+                                    <th>Cadence</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (GardenTask task in undatedTasks)
+                                {
+                                    Shape? shape = FindShape(task.ShapeId);
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@task.Title</div>
+                                            @if (!string.IsNullOrWhiteSpace(task.Notes))
+                                            {
+                                                <div class="small text-muted">@task.Notes</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (shape is not null)
+                                            {
+                                                <button class="btn btn-sm btn-link p-0" @onclick="() => OpenShape(task.ShapeId)">@DescribeShape(shape)</button>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">Unbound</span>
+                                            }
+                                        </td>
+                                        <td>@GardenTaskScheduler.GetCadenceLabel(task)</td>
+                                        <td class="text-end">
+                                            <button class="btn btn-sm btn-success" @onclick="() => MarkTaskDoneAsync(task)">Mark done</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        }
+    }
+}

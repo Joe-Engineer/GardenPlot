@@ -70,6 +70,7 @@ public class PlotData
     public Dictionary<string, LayerState> LayerStates { get; set; } = LayerResolver.CreateDefaultStates();
     public List<Shape> Shapes { get; set; } = new();
     public List<DropGroup> DropGroups { get; set; } = new();
+    public List<GardenTask> Tasks { get; set; } = new();
     public Dictionary<string, double> KitRotations { get; set; } = new();
 
     /// <summary>
