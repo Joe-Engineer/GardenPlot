@@ -42,6 +42,8 @@ public sealed class PlotLibraryLoader
     /// <summary>Public meter name so tests and dashboards can subscribe.</summary>
     public const string MeterName = "GardenPlotWeb.Persistence";
 
+    internal static JsonSerializerOptions SerializerOptions => JsonSerializerOptions.Default;
+
     private static readonly Meter Meter = new(MeterName);
     private static readonly Counter<long> LoadCounter =
         Meter.CreateCounter<long>("gardenplot.schema.load");
@@ -66,7 +68,7 @@ public sealed class PlotLibraryLoader
     /// <param name="source">Free-form tag describing where the JSON came from (e.g. <c>indexeddb</c>);
     /// recorded on emitted metrics/logs for triage.</param>
     /// <param name="options">Serializer options used for the typed deserialization. When
-    /// <see langword="null"/>, <see cref="JsonSerializerOptions.Default"/> is used.</param>
+    /// <see langword="null"/>, <see cref="SerializerOptions"/> is used.</param>
     public PlotLibrary? Load(string? json, string source, JsonSerializerOptions? options = null)
     {
         Stopwatch sw = Stopwatch.StartNew();
@@ -180,7 +182,7 @@ public sealed class PlotLibraryLoader
     /// </summary>
     private static PlotLibrary? LoadFromVersion1(JsonObject root, JsonSerializerOptions? options)
     {
-        PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? JsonSerializerOptions.Default);
+        PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
         if (library is null)
         {
             return null;
@@ -197,7 +199,7 @@ public sealed class PlotLibraryLoader
     /// <summary>Loader for schema v2 — the current shape. Direct typed deserialization.</summary>
     private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
     {
-        return root.Deserialize<PlotLibrary>(options ?? JsonSerializerOptions.Default);
+        return root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
     }
 
     /// <summary>

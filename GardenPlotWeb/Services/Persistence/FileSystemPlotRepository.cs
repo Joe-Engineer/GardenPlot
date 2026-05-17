@@ -80,7 +80,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                     return null;
                 }
 
-                PlotStoreIndex? index = JsonSerializer.Deserialize<PlotStoreIndex>(indexJson);
+                PlotStoreIndex? index = JsonSerializer.Deserialize<PlotStoreIndex>(indexJson, PlotLibraryLoader.SerializerOptions);
                 if (index is null)
                 {
                     RecordOp("load-library", "empty", sw);
@@ -115,7 +115,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                         continue;
                     }
 
-                    PlotData? plot = JsonSerializer.Deserialize<PlotData>(plotJson);
+                    PlotData? plot = JsonSerializer.Deserialize<PlotData>(plotJson, PlotLibraryLoader.SerializerOptions);
                     if (plot is not null)
                     {
                         lib.Plots.Add(plot);
@@ -176,7 +176,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                 });
 
                 string plotPath = Path.Combine(PlotsDirectory, fileName);
-                string plotJson = JsonSerializer.Serialize(plot);
+                string plotJson = JsonSerializer.Serialize(plot, PlotLibraryLoader.SerializerOptions);
                 await WriteAtomicTextFileAsync(plotPath, plotJson, ct).ConfigureAwait(false);
             }
 
@@ -199,7 +199,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                 }
             }
 
-            string indexJson = JsonSerializer.Serialize(index);
+            string indexJson = JsonSerializer.Serialize(index, PlotLibraryLoader.SerializerOptions);
             await WriteAtomicTextFileAsync(IndexPath, indexJson, ct).ConfigureAwait(false);
 
             RecordOp("save-library", "saved", sw, library.Plots.Count);
@@ -235,7 +235,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
         try
         {
             string json = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
-            PlotData? plot = string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<PlotData>(json);
+            PlotData? plot = string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<PlotData>(json, PlotLibraryLoader.SerializerOptions);
             RecordOp("load-plot", plot is null ? "empty" : "loaded", sw);
             return plot;
         }
@@ -259,7 +259,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
 
             string fileName = PlotFileName(plot.Id);
             string plotPath = Path.Combine(PlotsDirectory, fileName);
-            string plotJson = JsonSerializer.Serialize(plot);
+            string plotJson = JsonSerializer.Serialize(plot, PlotLibraryLoader.SerializerOptions);
             await WriteAtomicTextFileAsync(plotPath, plotJson, ct).ConfigureAwait(false);
 
             // Update the index entry for this plot in place (or append). Index file is
@@ -283,7 +283,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                 existing.ModifiedUtc = plot.ModifiedUtc;
             }
 
-            string indexJson = JsonSerializer.Serialize(index);
+            string indexJson = JsonSerializer.Serialize(index, PlotLibraryLoader.SerializerOptions);
             await WriteAtomicTextFileAsync(IndexPath, indexJson, ct).ConfigureAwait(false);
 
             RecordOp("save-plot", "saved", sw);
@@ -319,7 +319,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                 int removed = index.Plots.RemoveAll(e => e.Id == id);
                 if (removed > 0)
                 {
-                    string indexJson = JsonSerializer.Serialize(index);
+                    string indexJson = JsonSerializer.Serialize(index, PlotLibraryLoader.SerializerOptions);
                     await WriteAtomicTextFileAsync(IndexPath, indexJson, ct).ConfigureAwait(false);
                 }
             }
@@ -350,7 +350,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
             }
 
             string json = await File.ReadAllTextAsync(IndexPath, ct).ConfigureAwait(false);
-            PlotStoreIndex? index = string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<PlotStoreIndex>(json);
+            PlotStoreIndex? index = string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<PlotStoreIndex>(json, PlotLibraryLoader.SerializerOptions);
             if (index is null)
             {
                 RecordOp("list", "empty", sw);
@@ -384,7 +384,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
             return new PlotStoreIndex();
         }
 
-        return JsonSerializer.Deserialize<PlotStoreIndex>(json) ?? new PlotStoreIndex();
+        return JsonSerializer.Deserialize<PlotStoreIndex>(json, PlotLibraryLoader.SerializerOptions) ?? new PlotStoreIndex();
     }
 
     private static string PlotFileName(Guid id)
