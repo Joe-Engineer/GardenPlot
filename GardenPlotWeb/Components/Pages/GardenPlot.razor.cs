@@ -138,7 +138,7 @@ public partial class GardenPlot
     private ElementReference calibrationPanelRef;
     private bool showTakeoffPanel;
     private readonly List<Shape> clipboard = new();
-    private readonly Stack<List<Shape>> undoStack = new();
+    private readonly Stack<PlotUndoSnapshot> undoStack = new();
     private double? pasteAnchorX;
     private double? pasteAnchorY;
     private bool isPasteMode;
@@ -1215,6 +1215,10 @@ public partial class GardenPlot
     private double arrayCenterSpacingXFt;
     private double arrayCenterSpacingYFt;
     private bool arrayStaggerHalf;
+    private bool arrayRotationAutoShift;
+    private bool showRotationShiftHint;
+    private string rotationShiftHintText = string.Empty;
+    private CancellationTokenSource? rotationShiftHintCts;
 
     // drag state
     private bool isDragging;
@@ -1387,7 +1391,7 @@ public partial class GardenPlot
             return;
         }
 
-        undoStack.Push(currentPlot.Shapes.Select(s => CloneShape(s, assignNewId: false)).ToList());
+        undoStack.Push(PlotUndoSnapshot.Capture(currentPlot));
     }
 
     private async Task UndoLastOperation()
@@ -1397,7 +1401,7 @@ public partial class GardenPlot
             return;
         }
 
-        currentPlot.Shapes = undoStack.Pop();
+        undoStack.Pop().RestoreInto(currentPlot);
         ClearSelection();
         await SaveAsync();
     }
@@ -1995,6 +1999,8 @@ public partial class GardenPlot
         try { if (gestureHandle is not null) await gestureHandle.InvokeVoidAsync("dispose"); } catch { }
         try { if (gestureHandle is not null) await gestureHandle.DisposeAsync(); } catch { }
         try { if (jsModule is not null) await jsModule.DisposeAsync(); } catch { }
+        rotationShiftHintCts?.Cancel();
+        rotationShiftHintCts?.Dispose();
         dotnetRef?.Dispose();
     }
 
@@ -3544,6 +3550,7 @@ public partial class GardenPlot
                 Rotation = stampOrientation,
                 AnchorCenterX = centerX,
                 AnchorCenterY = centerY,
+                AutoShiftOnRotate = arrayRotationAutoShift,
             };
 
             var rad = stampOrientation * Math.PI / 180.0;
@@ -4421,7 +4428,10 @@ public partial class GardenPlot
 
     private async Task HandleWheel(double deltaY, bool shift, bool ctrl, bool alt)
     {
-        if (currentPlot is null) return;
+        if (currentPlot is null)
+        {
+            return;
+        }
 
         // Keep modifier state in sync for ghost preview logic (ActiveDropPattern uses these flags).
         pointerShiftDown = shift;
@@ -4449,16 +4459,19 @@ public partial class GardenPlot
         // Alt rotates line/array orientation; Shift/Ctrl rotate each item about its own center.
         if (currentTool == Tool.Stamp && selectedItem is not null && (alt || shift || ctrl))
         {
-            var delta = dir * (ctrl ? 1.0 : 15.0);
             if (alt)
             {
-                stampOrientation = ((stampOrientation + delta) % 360 + 360) % 360;
+                var orientationDelta = dir * (ctrl ? 1.0 : 15.0);
+                stampOrientation = GardenPlotRotationHelper.NormalizeDegrees(stampOrientation + orientationDelta);
             }
-            else
+            else if (ComputeSelectionRotationDelta(dir, shift, ctrl) is double stampDelta)
             {
-                stampRotation = ((stampRotation + delta) % 360 + 360) % 360;
+                stampRotation = GardenPlotRotationHelper.NormalizeDegrees(stampRotation + stampDelta);
                 currentPlot.KitRotations[selectedItem.Code] = stampRotation;
-                EnsureStampSpacingForItemRotation(selectedItem, dropPattern);
+                if (dropPattern == DropPattern.Array && arrayRotationAutoShift)
+                {
+                    EnsureStampSpacingForItemRotation(selectedItem, dropPattern);
+                }
             }
 
             await SaveAsync();
@@ -4472,32 +4485,85 @@ public partial class GardenPlot
             if (groups.Count > 0)
             {
                 var orientationDelta = dir * (ctrl ? 1.0 : 15.0);
-                _ = RotateSelectedGroupOrientations(orientationDelta);
+                await RotateSelectedGroupOrientations(orientationDelta);
                 return;
             }
         }
 
-        // Rotate selected items: Shift = coarse (15°), Ctrl = fine (1°).
-        if (!shift && !ctrl) return;
-        var selectionDelta = dir * (ctrl ? 1.0 : 15.0);
-        if (selectedIds.Count == 0) return;
-        var rotated = SelectedShapes().ToList();
-        foreach (var s in rotated)
+        // Rotate selected items: Shift = coarse (15°), Ctrl = fine (1°), Shift+Ctrl keeps legacy auto-shift.
+        if (ComputeSelectionRotationDelta(dir, shift, ctrl) is not double selectionDelta || selectedIds.Count == 0)
         {
-            s.Rotation = ((s.Rotation + selectionDelta) % 360 + 360) % 360;
-            var aabb = RotatedAABB(s);
-            double tx = 0, ty = 0;
-            if (aabb.minX < 0) tx = -aabb.minX;
-            else if (aabb.maxX > PlotWidthFt) tx = PlotWidthFt - aabb.maxX;
-            if (aabb.minY < 0) ty = -aabb.minY;
-            else if (aabb.maxY > PlotHeightFt) ty = PlotHeightFt - aabb.maxY;
-            if (tx != 0 || ty != 0) ShiftShape(s, tx, ty);
+            return;
         }
 
-        await ReflowAffectedGroupsForMemberRotation(rotated);
+        await RotateSelectionOrStamp(selectionDelta, autoShiftEnabled: shift && ctrl);
+    }
 
-        SyncDropGroupsFromCurrentShapes();
-        await SaveAsync();
+    private static double? ComputeSelectionRotationDelta(int dir, bool shift, bool ctrl)
+    {
+        if (!shift && !ctrl)
+        {
+            return null;
+        }
+
+        return dir * (ctrl ? 1.0 : 15.0);
+    }
+
+    private static (double centerX, double centerY) ShapeCenter(Shape shape)
+        => (shape.X + (shape.W / 2), shape.Y + (shape.H / 2));
+
+    private async Task ShowRotationShiftHintAsync(double shiftX, double shiftY)
+    {
+        if (Math.Abs(shiftX) < 0.001 && Math.Abs(shiftY) < 0.001)
+        {
+            return;
+        }
+
+        rotationShiftHintCts?.Cancel();
+        rotationShiftHintCts?.Dispose();
+        rotationShiftHintCts = new CancellationTokenSource();
+        var token = rotationShiftHintCts.Token;
+
+        rotationShiftHintText = $"Auto-shift {RotationShiftDirection(shiftX, shiftY)}";
+        showRotationShiftHint = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await Task.Delay(600, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (token.IsCancellationRequested)
+        {
+            return;
+        }
+
+        showRotationShiftHint = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static string RotationShiftDirection(double shiftX, double shiftY)
+    {
+        const double threshold = 0.001;
+        var horizontal = shiftX > threshold ? 1 : shiftX < -threshold ? -1 : 0;
+        var vertical = shiftY > threshold ? 1 : shiftY < -threshold ? -1 : 0;
+
+        return (horizontal, vertical) switch
+        {
+            (-1, -1) => "↖",
+            (0, -1) => "↑",
+            (1, -1) => "↗",
+            (-1, 0) => "←",
+            (1, 0) => "→",
+            (-1, 1) => "↙",
+            (0, 1) => "↓",
+            (1, 1) => "↘",
+            _ => "adjusted",
+        };
     }
 
     private void SyncDropGroupsFromCurrentShapes()
@@ -4562,10 +4628,26 @@ public partial class GardenPlot
             return;
         }
 
+        RecordUndoState();
+        double hintShiftX = 0;
+        double hintShiftY = 0;
+
         foreach (var group in groups)
         {
-            group.Rotation = ((group.Rotation + delta) % 360 + 360) % 360;
-            await ReflowDropGroup(group, save: false);
+            var anchorBeforeX = group.AnchorCenterX;
+            var anchorBeforeY = group.AnchorCenterY;
+            group.Rotation = GardenPlotRotationHelper.NormalizeDegrees(group.Rotation + delta);
+
+            var autoShiftEnabled = group.Pattern == DropPattern.Array && group.AutoShiftOnRotate;
+            await ReflowDropGroup(group, save: false, autoShiftIntoBounds: autoShiftEnabled);
+
+            hintShiftX += group.AnchorCenterX - anchorBeforeX;
+            hintShiftY += group.AnchorCenterY - anchorBeforeY;
+        }
+
+        if (Math.Abs(hintShiftX) >= 0.001 || Math.Abs(hintShiftY) >= 0.001)
+        {
+            _ = ShowRotationShiftHintAsync(hintShiftX, hintShiftY);
         }
 
         await SaveAsync();
@@ -5025,7 +5107,23 @@ public partial class GardenPlot
         }
     }
 
-    private async Task ReflowDropGroup(DropGroup group, bool save = true)
+    private async Task OnGroupRotationAutoShiftChanged(ChangeEventArgs e)
+    {
+        var group = GetCurrentSelectedDropGroup();
+        if (group is null || group.Pattern != DropPattern.Array)
+        {
+            return;
+        }
+
+        if (bool.TryParse(e.Value?.ToString(), out var autoShift))
+        {
+            group.AutoShiftOnRotate = autoShift;
+            arrayRotationAutoShift = autoShift;
+            await SaveAsync();
+        }
+    }
+
+    private async Task ReflowDropGroup(DropGroup group, bool save = true, bool autoShiftIntoBounds = true)
     {
         if (currentPlot is null)
         {
@@ -5090,18 +5188,18 @@ public partial class GardenPlot
             }
         }
 
-        var union = UnionAabb(members);
-        var dx = SafeClamp(0, -union.minX, PlotWidthFt - union.maxX);
-        var dy = SafeClamp(0, -union.minY, PlotHeightFt - union.maxY);
-        if (dx != 0 || dy != 0)
+        var shift = autoShiftIntoBounds
+            ? GardenPlotRotationHelper.ComputeBoundsShift(members, PlotWidthFt, PlotHeightFt)
+            : RotationAutoShiftResult.None;
+        if (shift.Applied)
         {
             foreach (var shape in members)
             {
-                ShiftShape(shape, dx, dy);
+                ShiftShape(shape, shift.ShiftX, shift.ShiftY);
             }
 
-            group.AnchorCenterX += dx;
-            group.AnchorCenterY += dy;
+            group.AnchorCenterX += shift.ShiftX;
+            group.AnchorCenterY += shift.ShiftY;
         }
 
         if (save)
@@ -5110,7 +5208,7 @@ public partial class GardenPlot
         }
     }
 
-    private async Task RotateSelectionOrStamp(double delta)
+    private async Task RotateSelectionOrStamp(double delta, bool autoShiftEnabled = false)
     {
         if (currentPlot is null)
         {
@@ -5119,9 +5217,14 @@ public partial class GardenPlot
 
         if (currentTool == Tool.Stamp && selectedItem is not null)
         {
-            stampRotation = ((stampRotation + delta) % 360 + 360) % 360;
+            stampRotation = GardenPlotRotationHelper.NormalizeDegrees(stampRotation + delta);
             currentPlot.KitRotations[selectedItem.Code] = stampRotation;
             stampOrientation = stampRotation;
+            if (dropPattern == DropPattern.Array && arrayRotationAutoShift)
+            {
+                EnsureStampSpacingForItemRotation(selectedItem, dropPattern);
+            }
+
             await SaveAsync();
             return;
         }
@@ -5132,25 +5235,32 @@ public partial class GardenPlot
         }
 
         var rotated = SelectedShapes().ToList();
-        foreach (var s in rotated)
+        if (rotated.Count == 0)
         {
-            s.Rotation = ((s.Rotation + delta) % 360 + 360) % 360;
-            var aabb = RotatedAABB(s);
-            double tx = 0;
-            double ty = 0;
-            if (aabb.minX < 0) tx = -aabb.minX;
-            else if (aabb.maxX > PlotWidthFt) tx = PlotWidthFt - aabb.maxX;
-            if (aabb.minY < 0) ty = -aabb.minY;
-            else if (aabb.maxY > PlotHeightFt) ty = PlotHeightFt - aabb.maxY;
-            if (tx != 0 || ty != 0)
-            {
-                ShiftShape(s, tx, ty);
-            }
+            return;
         }
 
-        await ReflowAffectedGroupsForMemberRotation(rotated);
+        RecordUndoState();
+        var primaryShapeId = rotated[0].Id;
+        var primaryBefore = ShapeCenter(rotated[0]);
 
-        SyncDropGroupsFromCurrentShapes();
+        foreach (var shape in rotated)
+        {
+            GardenPlotRotationHelper.RotateShape(shape, delta, PlotWidthFt, PlotHeightFt, autoShiftEnabled);
+        }
+
+        if (autoShiftEnabled)
+        {
+            await ReflowAffectedGroupsForMemberRotation(rotated);
+            SyncDropGroupsFromCurrentShapes();
+
+            var primaryAfterShape = currentPlot.Shapes.FirstOrDefault(shape => shape.Id == primaryShapeId);
+            if (primaryAfterShape is not null)
+            {
+                var primaryAfter = ShapeCenter(primaryAfterShape);
+                _ = ShowRotationShiftHintAsync(primaryAfter.centerX - primaryBefore.centerX, primaryAfter.centerY - primaryBefore.centerY);
+            }
+        }
 
         await SaveAsync();
     }
@@ -5177,7 +5287,7 @@ public partial class GardenPlot
             }
 
             EnsureGroupSpacingForRotation(group);
-            await ReflowDropGroup(group, save: false);
+            await ReflowDropGroup(group, save: false, autoShiftIntoBounds: true);
         }
     }
 
@@ -5208,12 +5318,7 @@ public partial class GardenPlot
     }
 
     private static double ProjectedSizeAlongAxis(Shape shape, double axisDeg)
-    {
-        var delta = (shape.Rotation - axisDeg) * Math.PI / 180.0;
-        var c = Math.Abs(Math.Cos(delta));
-        var s = Math.Abs(Math.Sin(delta));
-        return (shape.W * c) + (shape.H * s);
-    }
+        => GardenPlotRotationHelper.ProjectedSizeAlongAxis(shape, axisDeg);
 
     private void EnsureStampSpacingForItemRotation(PaletteItem item, DropPattern pattern)
     {

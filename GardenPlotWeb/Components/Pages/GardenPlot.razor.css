@@ -451,6 +451,41 @@
     position: relative;
 }
 
+.rotation-shift-hint {
+    position: absolute;
+    top: 0.85rem;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.18rem 0.55rem;
+    border: 1px solid #c8d7b1;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #2f5a3a;
+    font-size: 0.78rem;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    pointer-events: none;
+    z-index: 8;
+    animation: rotation-shift-hint-fade 600ms ease-out forwards;
+}
+
+@keyframes rotation-shift-hint-fade {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 4px);
+    }
+
+    15% {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -6px);
+    }
+}
+
 @media (max-width: 1200px) {
 }
 

@@ -200,6 +200,7 @@ else
                        @bind="arrayCenterSpacingYFt" />
             </div>
             <label class="drop-check small"><input type="checkbox" @bind="arrayStaggerHalf" /> 1/2 stagger</label>
+            <label class="drop-check small"><input type="checkbox" @bind="arrayRotationAutoShift" /> Auto-shift on rotate</label>
             </span>
 
             @if (currentTool == Tool.GroundCover)
@@ -858,6 +859,10 @@ else
                     </g>
                 }
                 </svg>
+                @if (showRotationShiftHint)
+                {
+                    <div class="rotation-shift-hint" role="status" aria-live="polite">@rotationShiftHintText</div>
+                }
             </div>
         </div>
             <div class="plot-status-bar" role="status" aria-live="polite">
@@ -1420,7 +1425,7 @@ else
                     <div class="small"><span class="text-muted">Drop pattern:</span> <strong>@previewDropPattern</strong></div>
                     <div class="small"><span class="text-muted">Orientation:</span> <strong>@F(stampOrientation)°</strong></div>
                     <div class="small"><span class="text-muted">Item rotation:</span> <strong>@F(stampRotation)°</strong></div>
-                    <div class="x-small text-muted">Wheel controls: Shift/Ctrl rotate items, Alt rotates line/array orientation.</div>
+                    <div class="x-small text-muted">Wheel controls: Shift/Ctrl rotate items, Alt rotates line/array orientation. Shift+Ctrl or the array auto-shift toggle keeps legacy nudging.</div>
                 }
             }
             else
@@ -1490,6 +1495,9 @@ else
 
                         <label>Stagger</label>
                         <label class="small"><input type="checkbox" checked="@selectedDropGroup.StaggerHalf" @onchange="OnGroupStaggerChanged" /> 1/2 row offset</label>
+
+                        <label>Rotate</label>
+                        <label class="small"><input type="checkbox" checked="@selectedDropGroup.AutoShiftOnRotate" @onchange="OnGroupRotationAutoShiftChanged" /> Auto-shift into bounds</label>
                     }
                 </div>
             }

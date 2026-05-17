@@ -72,5 +72,6 @@ public class DropGroup
     public double Rotation { get; set; }
     public double AnchorCenterX { get; set; }
     public double AnchorCenterY { get; set; }
+    public bool AutoShiftOnRotate { get; set; }
 }
 
