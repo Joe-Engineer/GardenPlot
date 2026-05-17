@@ -296,7 +296,7 @@ public class PlotLibraryLoaderTests
 
         Assert.NotNull(lib);
         Assert.Equal(PlotSchema.Current, lib!.SchemaVersion);
-        Assert.True(lib.Ui.ShowClipHatch);
+        Assert.False(lib.Ui.ShowClipHatch);
         Assert.Empty(lib.Plots[0].Shapes[0].ClippedBy);
     }
 

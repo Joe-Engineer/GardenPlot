@@ -65,8 +65,10 @@ public class UiPreferences
     /// <summary>Last-selected palette category (sticky across sessions).</summary>
     public PaletteCategory? LastPaletteCategory { get; set; }
 
-    /// <summary>Whether to show the clip hatch overlay for clipped areas.</summary>
-    public bool ShowClipHatch { get; set; } = true;
+    /// <summary>Whether to show the clip hatch overlay for clipped areas. Default off — the
+    /// overlay runs polygon-clipping per affected shape on every render, so we leave it as an
+    /// opt-in control (toggleable from the canvas status bar).</summary>
+    public bool ShowClipHatch { get; set; }
 }
 
 public class KeyBindingSettings
