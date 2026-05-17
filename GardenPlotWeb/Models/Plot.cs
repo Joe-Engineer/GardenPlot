@@ -2,6 +2,7 @@
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
+using System.Text.Json.Serialization;
 using GardenPlotWeb.Services.Persistence;
 
 namespace GardenPlotWeb.Models;
@@ -33,6 +34,10 @@ public class PlotData
     public List<string> PhotoFileNames { get; set; } = new();
     public double WidthFt { get; set; } = 120;
     public double HeightFt { get; set; } = 120;
+    public LinearUnit LinearUnit { get; set; } = LinearUnit.Feet;
+
+    [JsonIgnore]
+    public bool HasExplicitLinearUnit { get; set; } = true;
 
     /// <summary>Climate region this plot sits in (drives plant suitability checks).</summary>
     public ClimateRegion? ClimateRegion { get; set; }

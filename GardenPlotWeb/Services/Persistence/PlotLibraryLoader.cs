@@ -206,14 +206,13 @@ public sealed class PlotLibraryLoader
     /// legacy triangulation migration, the v2 grass / ground-cover surface catalog rebind,
     /// <see cref="PlotData.BackgroundFit"/>, per-plot <c>LayerStates</c>, the
     /// <see cref="DropGroup"/> along-path fields, <see cref="Shape.ClippedBy"/> metadata,
-    /// <see cref="PlotData.Tasks"/> collections, and the narrowed material fields. We
-    /// pre-migrate legacy ground-cover fields onto the current material model, deserialize as
-    /// the current shape (forward-compatible — missing fields take safe defaults, extra absent
-    /// fields are tolerated by <c>JsonSerializer</c>), synthesize one <see cref="TakeoffItem"/>
-    /// per existing <see cref="Shape"/>, normalize missing layer state and task collections,
-    /// rebind legacy plant/tile placements onto the surface catalog, then project legacy
-    /// triangulation flags onto <see cref="DropGroup.Triangulated"/> and stamp a valid
-    /// background-fit value.
+    /// <see cref="PlotData.Tasks"/> collections, the narrowed material fields, plot
+    /// <c>LinearUnit</c>, and UI <c>RecentPlotSizes</c>. We pre-migrate legacy ground-cover
+    /// fields onto the current material model, deserialize as the current shape, synthesize one
+    /// <see cref="TakeoffItem"/> per existing <see cref="Shape"/>, normalize missing layer
+    /// state and task collections, rebind legacy plant/tile placements onto the surface catalog,
+    /// then project legacy triangulation flags onto <see cref="DropGroup.Triangulated"/>, stamp
+    /// a valid background-fit value, and finalize unit/recent-size defaults.
     /// </summary>
     private static PlotLibrary? LoadFromVersion1(JsonObject root, JsonSerializerOptions? options)
     {
@@ -234,7 +233,8 @@ public sealed class PlotLibraryLoader
 
         RebindMovedGroundCoverSurfaceShapes(library);
         EnsureTaskCollections(library);
-        return BackfillBackgroundFit(UpgradeLegacyTriangulation(library));
+        library = BackfillBackgroundFit(library);
+        return FinalizeLoadedLibrary(library, root);
     }
 
     /// <summary>
@@ -265,7 +265,8 @@ public sealed class PlotLibraryLoader
         RebindMovedGroundCoverSurfaceShapes(library);
         EnsureLayerStates(library);
         EnsureTaskCollections(library);
-        return BackfillBackgroundFit(UpgradeLegacyTriangulation(library));
+        library = BackfillBackgroundFit(library);
+        return FinalizeLoadedLibrary(library, root);
     }
 
     /// <summary>
@@ -285,12 +286,14 @@ public sealed class PlotLibraryLoader
 
         EnsureLayerStates(library);
         EnsureTaskCollections(library);
-        return BackfillBackgroundFit(library);
+        library = BackfillBackgroundFit(library);
+        return FinalizeLoadedLibrary(library, root);
     }
 
     /// <summary>
     /// Loader for schema v4 — the current shape. Direct typed deserialization onto
-    /// <see cref="PlotLibrary"/> plus normalization of per-plot layer state and task entries.
+    /// <see cref="PlotLibrary"/> plus normalization of per-plot layer state, task entries,
+    /// and unit/recent-size defaults.
     /// </summary>
     private static PlotLibrary? LoadFromVersion4(JsonObject root, JsonSerializerOptions? options)
     {
@@ -302,7 +305,7 @@ public sealed class PlotLibraryLoader
 
         EnsureLayerStates(library);
         EnsureTaskCollections(library);
-        return library;
+        return FinalizeLoadedLibrary(library, root);
     }
 
     private static void EnsureTaskCollections(PlotLibrary? library)
@@ -322,10 +325,36 @@ public sealed class PlotLibraryLoader
         }
     }
 
-    private static PlotLibrary UpgradeLegacyTriangulation(PlotLibrary library)
+    private static PlotLibrary? FinalizeLoadedLibrary(PlotLibrary? library, JsonObject root)
     {
-        foreach (PlotData plot in library.Plots)
+        if (library is null)
         {
+            return null;
+        }
+
+        library.Ui ??= new UiPreferences();
+        library.Ui.RecentPlotSizes ??= new List<(double WidthFt, double HeightFt)>();
+        library.Plots ??= new List<PlotData>();
+        library.CustomPaletteItems ??= new List<PaletteItem>();
+        library.CustomCatalogItems ??= new List<CatalogItem>();
+
+        JsonArray? plotNodes = root["Plots"] as JsonArray;
+        for (int i = 0; i < library.Plots.Count; i++)
+        {
+            PlotData plot = library.Plots[i] ?? new PlotData();
+            bool hasLinearUnit = plotNodes is not null &&
+                i < plotNodes.Count &&
+                plotNodes[i] is JsonObject plotNode &&
+                plotNode.ContainsKey(nameof(PlotData.LinearUnit));
+
+            plot.LinearUnit = hasLinearUnit ? plot.LinearUnit : LinearUnit.Feet;
+            plot.HasExplicitLinearUnit = hasLinearUnit;
+            plot.Shapes ??= new List<Shape>();
+            plot.DropGroups ??= new List<DropGroup>();
+            plot.KitRotations ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            plot.Takeoff ??= new List<TakeoffItem>();
+            plot.TakeoffIds ??= new TakeoffSequence();
+
             foreach (DropGroup group in plot.DropGroups)
             {
                 if (group.StaggerHalf)
@@ -334,6 +363,8 @@ public sealed class PlotLibraryLoader
                     group.StaggerHalf = false;
                 }
             }
+
+            library.Plots[i] = plot;
         }
 
         return library;

@@ -135,6 +135,9 @@ public class PlotLibraryLoaderTests
         Assert.Equal(PlotSchema.Current, lib!.SchemaVersion);
         Assert.Single(lib.Plots);
         Assert.Empty(lib.Plots[0].Tasks);
+        Assert.Equal(LinearUnit.Feet, lib.Plots[0].LinearUnit);
+        Assert.False(lib.Plots[0].HasExplicitLinearUnit);
+        Assert.Empty(lib.Ui.RecentPlotSizes);
     }
 
     [Fact]
@@ -185,7 +188,8 @@ public class PlotLibraryLoaderTests
     public void Load_DocumentAtCurrentVersion_PassesThrough()
     {
         var source = new PlotLibrary();
-        source.Plots.Add(new PlotData { Name = "A", BackgroundFit = BackgroundFit.Stretch });
+        source.Ui.RecentPlotSizes.Add((40, 30));
+        source.Plots.Add(new PlotData { Name = "A", BackgroundFit = BackgroundFit.Stretch, LinearUnit = LinearUnit.Yards });
         string json = JsonSerializer.Serialize(source);
 
         var loader = CreateLoader();
@@ -196,6 +200,9 @@ public class PlotLibraryLoaderTests
         Assert.Single(lib.Plots);
         Assert.Equal("A", lib.Plots[0].Name);
         Assert.Equal(BackgroundFit.Stretch, lib.Plots[0].BackgroundFit);
+        Assert.Equal(LinearUnit.Yards, lib.Plots[0].LinearUnit);
+        Assert.True(lib.Plots[0].HasExplicitLinearUnit);
+        Assert.Equal((40d, 30d), lib.Ui.RecentPlotSizes[0]);
     }
 
     [Fact]
