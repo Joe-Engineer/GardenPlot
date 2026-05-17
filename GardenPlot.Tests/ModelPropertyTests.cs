@@ -1,4 +1,5 @@
-﻿using GardenPlotWeb.Models;
+﻿using System.Collections.Generic;
+using GardenPlotWeb.Models;
 
 namespace GardenPlot.Tests;
 
@@ -82,6 +83,7 @@ public sealed class ModelPropertyTests
             AnchorCenterX = 10,
             AnchorCenterY = 20,
         };
+
         Assert.Equal(DropPattern.Array, g.Pattern);
         Assert.Equal(12, g.ItemCount);
         Assert.Equal(3, g.Rows);
@@ -108,6 +110,16 @@ public sealed class ModelPropertyTests
             CalibrationPanelX = 7,
             CalibrationPanelY = 8,
             TakeoffPanelVisible = true,
+            TakeoffViewMode = TakeoffViewMode.Summary,
+            AutoDeleteTakeoffOnShapeDelete = false,
+            ShowInternalView = false,
+            ShowMaterialCostColumn = true,
+            ShowLaborCostColumn = true,
+            ShowMarkupPercentColumn = true,
+            ShowLineTotalColumn = false,
+            DefaultLaborRatePerHour = 82.5m,
+            FirmName = "Garden Plot Studio",
+            CustomerCutDate = new DateTime(2026, 5, 17),
             Zoom = 1.5,
             ViewCenterXFt = 10,
             ViewCenterYFt = 20,
@@ -126,6 +138,16 @@ public sealed class ModelPropertyTests
         Assert.Equal(7, u.CalibrationPanelX);
         Assert.Equal(8, u.CalibrationPanelY);
         Assert.True(u.TakeoffPanelVisible);
+        Assert.Equal(TakeoffViewMode.Summary, u.TakeoffViewMode);
+        Assert.False(u.AutoDeleteTakeoffOnShapeDelete);
+        Assert.False(u.ShowInternalView);
+        Assert.True(u.ShowMaterialCostColumn);
+        Assert.True(u.ShowLaborCostColumn);
+        Assert.True(u.ShowMarkupPercentColumn);
+        Assert.False(u.ShowLineTotalColumn);
+        Assert.Equal(82.5m, u.DefaultLaborRatePerHour);
+        Assert.Equal("Garden Plot Studio", u.FirmName);
+        Assert.Equal(new DateTime(2026, 5, 17), u.CustomerCutDate);
         Assert.Equal(1.5, u.Zoom);
         Assert.Equal(10, u.ViewCenterXFt);
         Assert.Equal(20, u.ViewCenterYFt);
@@ -134,6 +156,55 @@ public sealed class ModelPropertyTests
         Assert.Equal(SunExposure.FullSun, u.DefaultSun);
         Assert.Equal(ClimateRegion.AridDesert, u.PaletteRegionFilter);
         Assert.True(u.PaletteNativeOnly);
+    }
+
+    [Fact]
+    public void CostingModels_RoundTrip()
+    {
+        var catalog = new CatalogItem
+        {
+            Code = "X",
+            Source = CatalogSource.Custom,
+            PackId = "demo-pack",
+            Kind = "Plant",
+            DisplayName = "Test Plant",
+            Unit = "ea",
+            DefaultDepthIn = 2,
+            DefaultWastePercent = 10,
+            MaterialUnitCost = 14.25m,
+            LaborType = LaborType.Planting,
+            LaborHoursPerUnit = 0.5,
+            LaborRatePerHour = 92m,
+            BagSize = "2 gal",
+            Notes = "demo",
+        };
+        var item = new TakeoffItem
+        {
+            Id = 7,
+            CatalogSource = CatalogSource.Custom,
+            CatalogPackId = "demo-pack",
+            CatalogCode = "X",
+            NameOverride = "Front entry",
+            Quantity = 3,
+            UnitOverride = "pot",
+            DepthInOverride = 4,
+            WastePercentOverride = 12,
+            LaborTypeOverride = LaborType.Cleanup,
+            LaborHoursPerUnitOverride = 0.75,
+            MarkupPercentOverride = 18.5,
+            Notes = "rush",
+            ShapeId = Guid.NewGuid(),
+        };
+        var plot = new PlotData
+        {
+            Name = "Quote",
+            DefaultMarkupPercent = 30,
+        };
+
+        Assert.Equal(14.25m, catalog.MaterialUnitCost);
+        Assert.Equal(92m, catalog.LaborRatePerHour);
+        Assert.Equal(18.5, item.MarkupPercentOverride);
+        Assert.Equal(30, plot.DefaultMarkupPercent);
     }
 
     [Fact]

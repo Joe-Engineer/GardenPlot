@@ -1,4 +1,4 @@
-// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
+﻿// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -317,7 +317,36 @@ public partial class GardenPlot
 
     // ===== Takeoff list =====
 
-    private sealed record TakeoffRow(string Kind, string Name, int Count, string? Quantity = null);
+    private sealed record TakeoffItemRow(
+        int Id,
+        string Kind,
+        string Name,
+        double Quantity,
+        string Unit,
+        double WastePercent,
+        LaborType LaborType,
+        double LaborHours,
+        bool Bound,
+        string? Notes,
+        decimal? MaterialCost,
+        decimal LaborCost,
+        double MarkupPercent,
+        decimal? LineTotal,
+        bool Unbound,
+        bool HasWasteOverride,
+        bool HasLaborTypeOverride,
+        bool HasMarkupOverride);
+
+    private sealed record TakeoffSummaryRow(
+        string Kind,
+        string Name,
+        int Count,
+        double Quantity,
+        string Unit,
+        decimal? MaterialCost,
+        decimal LaborCost,
+        double MarkupPercent,
+        decimal? LineTotal);
 
     /// <summary>
     /// Keeps <see cref="PlotData.Takeoff"/> in lockstep with <see cref="PlotData.Shapes"/>:
@@ -514,48 +543,81 @@ public partial class GardenPlot
         return by.OrderBy(kv => kv.Key).Select(kv => (kv.Key, kv.Value)).ToList();
     }
 
-    private static List<TakeoffRow> BuildTakeoff(IEnumerable<Shape> shapes)
+    private IReadOnlyList<TakeoffItemRow> BuildTakeoffItemRows()
     {
-        var all = shapes.ToList();
+        if (currentPlot is null)
+        {
+            return Array.Empty<TakeoffItemRow>();
+        }
 
-        // Ground-cover shapes get aggregated by (material code, depth, surface flag),
-        // emitting volume (yd³) or area (ft²) instead of a raw count.
-        var groundCovers = all
-            .Where(IsGroundCoverShape)
-            .GroupBy(s => (
-                Code: string.IsNullOrWhiteSpace(s.GroundCoverCode) ? (s.Label ?? "Ground cover") : s.GroundCoverCode!,
-                DepthIn: s.GroundCoverDepthIn,
-                Surface: s.IsGroundCoverSurface))
-            .Select(g =>
+        return currentPlot.Takeoff
+            .OrderBy(t => t.Id)
+            .Select(t =>
             {
-                var totalArea = g.Sum(GroundCoverMath.AreaFt2);
-                string qty;
-                string name = g.Key.Code;
-                if (g.Key.Surface)
-                {
-                    qty = $"{totalArea:0.#} ft²";
-                }
-                else
-                {
-                    var depth = g.Key.DepthIn ?? 0;
-                    var vol = GroundCoverMath.VolumeYd3(totalArea, depth);
-                    qty = $"{vol:0.##} yd³ ({totalArea:0.#} ft² × {depth:0.#}\")";
-                }
-                var kind = g.Key.Surface ? "Ground Cover — Surface" : "Ground Cover";
-                return new TakeoffRow(kind, name, g.Count(), qty);
-            });
-
-        var others = all
-            .Where(s => !IsGroundCoverShape(s))
-            .Where(s => s.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant
-                                or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
-            .GroupBy(s => (Kind: TakeoffKind(s), Name: TakeoffName(s)))
-            .Select(g => new TakeoffRow(g.Key.Kind, g.Key.Name, g.Count()));
-
-        return groundCovers.Concat(others)
-            .OrderBy(r => r.Kind, StringComparer.Ordinal)
-            .ThenBy(r => r.Name, StringComparer.Ordinal)
+                CatalogItem? catalog = CatalogFor(t);
+                return new TakeoffItemRow(
+                    t.Id,
+                    TakeoffMath.Kind(catalog),
+                    TakeoffMath.DisplayName(t, catalog),
+                    t.Quantity,
+                    TakeoffMath.EffectiveUnit(t, catalog),
+                    TakeoffMath.EffectiveWastePercent(t, catalog),
+                    TakeoffMath.EffectiveLaborType(t, catalog),
+                    TakeoffMath.EffectiveLaborHours(t, catalog),
+                    t.ShapeId.HasValue,
+                    t.Notes,
+                    TakeoffMath.EffectiveMaterialCost(t, catalog),
+                    TakeoffMath.EffectiveLaborCost(t, catalog, library.Ui),
+                    TakeoffMath.EffectiveMarkupPercent(t, currentPlot),
+                    TakeoffMath.LineTotal(t, catalog, library.Ui, currentPlot),
+                    catalog is null,
+                    t.WastePercentOverride.HasValue,
+                    t.LaborTypeOverride.HasValue,
+                    t.MarkupPercentOverride.HasValue);
+            })
             .ToList();
+    }
+
+    private static IReadOnlyList<TakeoffSummaryRow> BuildTakeoffSummaryRows(IEnumerable<TakeoffItemRow> itemRows)
+    {
+        return itemRows
+            .GroupBy(
+                row => new
+                {
+                    row.Kind,
+                    row.Name,
+                    row.Unit,
+                    MarkupPercent = Math.Round(row.MarkupPercent, 6),
+                })
+            .Select(group => new TakeoffSummaryRow(
+                group.Key.Kind,
+                group.Key.Name,
+                group.Count(),
+                group.Sum(row => row.Quantity),
+                group.Key.Unit,
+                TakeoffMath.SumCurrency(group.Select(row => row.MaterialCost)),
+                group.Sum(row => row.LaborCost),
+                group.First().MarkupPercent,
+                TakeoffMath.SumCurrency(group.Select(row => row.LineTotal))))
+            .OrderBy(row => row.Kind, StringComparer.Ordinal)
+            .ThenBy(row => row.Name, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static string FormatTakeoffNumber(double value)
+    {
+        return value.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatTakeoffPercent(double value)
+    {
+        return value.ToString("0.#", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatCustomerCutDate(UiPreferences uiPreferences)
+    {
+        ArgumentNullException.ThrowIfNull(uiPreferences);
+        return (uiPreferences.CustomerCutDate?.Date ?? DateTime.Today).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 
     private static bool IsGroundCoverShape(Shape s)
@@ -907,42 +969,106 @@ public partial class GardenPlot
         }
 
         ReconcileTakeoff();
-        var sb = new System.Text.StringBuilder();
+        IReadOnlyList<TakeoffItemRow> itemRows = BuildTakeoffItemRows();
+        IReadOnlyList<TakeoffSummaryRow> summaryRows = BuildTakeoffSummaryRows(itemRows);
+        bool isInternalView = library.Ui.ShowInternalView;
+        StringBuilder sb = new();
+
+        if (!isInternalView)
+        {
+            sb.AppendLine($"Firm,{CsvField(library.Ui.FirmName)}");
+            sb.AppendLine($"Project,{CsvField(currentPlot.Name)}");
+            sb.AppendLine($"Date,{CsvField(FormatCustomerCutDate(library.Ui))}");
+            sb.AppendLine();
+        }
 
         if (library.Ui.TakeoffViewMode == TakeoffViewMode.Item)
         {
-            sb.AppendLine("Id,Kind,Name,Quantity,Unit,WastePercent,LaborType,LaborHours,Bound,Notes");
-            foreach (var t in currentPlot.Takeoff.OrderBy(t => t.Id))
+            if (isInternalView)
             {
-                var c = CatalogFor(t);
-                sb.Append(t.Id.ToString(CultureInfo.InvariantCulture)).Append(',')
-                  .Append(CsvField(TakeoffMath.Kind(c))).Append(',')
-                  .Append(CsvField(TakeoffMath.DisplayName(t, c))).Append(',')
-                  .Append(t.Quantity.ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
-                  .Append(CsvField(TakeoffMath.EffectiveUnit(t, c))).Append(',')
-                  .Append(TakeoffMath.EffectiveWastePercent(t, c).ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
-                  .Append(TakeoffMath.EffectiveLaborType(t, c).ToString()).Append(',')
-                  .Append(TakeoffMath.EffectiveLaborHours(t, c).ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
-                  .Append(t.ShapeId.HasValue ? "yes" : "no").Append(',')
-                  .Append(CsvField(t.Notes ?? string.Empty))
+                sb.AppendLine("Id,Kind,Name,Quantity,Unit,WastePercent,LaborType,LaborHours,MaterialCost,LaborCost,MarkupPercent,LineTotal,Bound,Notes");
+                foreach (TakeoffItemRow row in itemRows)
+                {
+                    sb.Append(row.Id.ToString(CultureInfo.InvariantCulture)).Append(',')
+                      .Append(CsvField(row.Kind)).Append(',')
+                      .Append(CsvField(row.Name)).Append(',')
+                      .Append(FormatTakeoffNumber(row.Quantity)).Append(',')
+                      .Append(CsvField(row.Unit)).Append(',')
+                      .Append(FormatTakeoffPercent(row.WastePercent)).Append(',')
+                      .Append(CsvField(row.LaborType.ToString())).Append(',')
+                      .Append(FormatTakeoffNumber(row.LaborHours)).Append(',')
+                      .Append(CsvField(TakeoffMath.FormatCurrency(row.MaterialCost))).Append(',')
+                      .Append(CsvField(TakeoffMath.FormatCurrency(row.LaborCost))).Append(',')
+                      .Append(FormatTakeoffPercent(row.MarkupPercent)).Append(',')
+                      .Append(CsvField(TakeoffMath.FormatCurrency(row.LineTotal))).Append(',')
+                      .Append(row.Bound ? "yes" : "no").Append(',')
+                      .Append(CsvField(row.Notes ?? string.Empty))
+                      .Append('\n');
+                }
+            }
+            else
+            {
+                sb.AppendLine("Kind,Name,LineTotal");
+                foreach (IGrouping<string, TakeoffItemRow> kindGroup in itemRows.GroupBy(row => row.Kind).OrderBy(group => group.Key, StringComparer.Ordinal))
+                {
+                    foreach (TakeoffItemRow row in kindGroup)
+                    {
+                        sb.Append(CsvField(row.Kind)).Append(',')
+                          .Append(CsvField(row.Name)).Append(',')
+                          .Append(CsvField(TakeoffMath.FormatCurrency(row.LineTotal)))
+                          .Append('\n');
+                    }
+
+                    sb.Append(CsvField(kindGroup.Key)).Append(',')
+                      .Append(CsvField("Subtotal")).Append(',')
+                      .Append(CsvField(TakeoffMath.FormatCurrency(TakeoffMath.SumCurrency(kindGroup.Select(row => row.LineTotal)))))
+                      .Append('\n');
+                }
+            }
+        }
+        else if (isInternalView)
+        {
+            sb.AppendLine("Kind,Name,Count,Quantity,Unit,MaterialCost,LaborCost,MarkupPercent,LineTotal");
+            foreach (TakeoffSummaryRow row in summaryRows)
+            {
+                sb.Append(CsvField(row.Kind)).Append(',')
+                  .Append(CsvField(row.Name)).Append(',')
+                  .Append(row.Count.ToString(CultureInfo.InvariantCulture)).Append(',')
+                  .Append(FormatTakeoffNumber(row.Quantity)).Append(',')
+                  .Append(CsvField(row.Unit)).Append(',')
+                  .Append(CsvField(TakeoffMath.FormatCurrency(row.MaterialCost))).Append(',')
+                  .Append(CsvField(TakeoffMath.FormatCurrency(row.LaborCost))).Append(',')
+                  .Append(FormatTakeoffPercent(row.MarkupPercent)).Append(',')
+                  .Append(CsvField(TakeoffMath.FormatCurrency(row.LineTotal)))
                   .Append('\n');
             }
         }
         else
         {
-            var rows = BuildTakeoff(currentPlot.Shapes);
-            sb.AppendLine("Type,Name,Count,Quantity");
-            foreach (var r in rows)
+            sb.AppendLine("Kind,Name,Count,Quantity,Unit,LineTotal");
+            foreach (IGrouping<string, TakeoffSummaryRow> kindGroup in summaryRows.GroupBy(row => row.Kind).OrderBy(group => group.Key, StringComparer.Ordinal))
             {
-                sb.Append(CsvField(r.Kind)).Append(',')
-                  .Append(CsvField(r.Name)).Append(',')
-                  .Append(r.Count.ToString(CultureInfo.InvariantCulture)).Append(',')
-                  .Append(CsvField(r.Quantity ?? string.Empty))
+                foreach (TakeoffSummaryRow row in kindGroup)
+                {
+                    sb.Append(CsvField(row.Kind)).Append(',')
+                      .Append(CsvField(row.Name)).Append(',')
+                      .Append(row.Count.ToString(CultureInfo.InvariantCulture)).Append(',')
+                      .Append(FormatTakeoffNumber(row.Quantity)).Append(',')
+                      .Append(CsvField(row.Unit)).Append(',')
+                      .Append(CsvField(TakeoffMath.FormatCurrency(row.LineTotal)))
+                      .Append('\n');
+                }
+
+                sb.Append(CsvField(kindGroup.Key)).Append(',')
+                  .Append(CsvField("Subtotal")).Append(',')
+                  .Append(',').Append(',').Append(',')
+                  .Append(CsvField(TakeoffMath.FormatCurrency(TakeoffMath.SumCurrency(kindGroup.Select(row => row.LineTotal)))))
                   .Append('\n');
             }
         }
 
-        var name = $"{Sanitize(currentPlot.Name)}-takeoff.csv";
+        string cutName = isInternalView ? "internal" : "customer";
+        string name = $"{Sanitize(currentPlot.Name)}-takeoff-{cutName}.csv";
         try
         {
             await jsModule.InvokeVoidAsync("downloadText", name, sb.ToString(), "text/csv;charset=utf-8");
@@ -961,6 +1087,89 @@ public partial class GardenPlot
         }
 
         library.Ui.TakeoffViewMode = mode;
+        _ = SaveAsync();
+    }
+
+    private void SetTakeoffCut(bool showInternalView)
+    {
+        if (library.Ui.ShowInternalView == showInternalView)
+        {
+            return;
+        }
+
+        library.Ui.ShowInternalView = showInternalView;
+        _ = SaveAsync();
+    }
+
+    private void OnTakeoffColumnPreferenceChanged(string columnName, ChangeEventArgs e)
+    {
+        bool isVisible = e.Value is bool b && b;
+        switch (columnName)
+        {
+            case nameof(UiPreferences.ShowMaterialCostColumn):
+                library.Ui.ShowMaterialCostColumn = isVisible;
+                break;
+            case nameof(UiPreferences.ShowLaborCostColumn):
+                library.Ui.ShowLaborCostColumn = isVisible;
+                break;
+            case nameof(UiPreferences.ShowMarkupPercentColumn):
+                library.Ui.ShowMarkupPercentColumn = isVisible;
+                break;
+            case nameof(UiPreferences.ShowLineTotalColumn):
+                library.Ui.ShowLineTotalColumn = isVisible;
+                break;
+            default:
+                return;
+        }
+
+        _ = SaveAsync();
+    }
+
+    private void OnDefaultLaborRateChanged(ChangeEventArgs e)
+    {
+        if (!decimal.TryParse(e.Value?.ToString(), NumberStyles.Number, CultureInfo.InvariantCulture, out decimal value))
+        {
+            return;
+        }
+
+        library.Ui.DefaultLaborRatePerHour = value;
+        _ = SaveAsync();
+    }
+
+    private void OnDefaultMarkupPercentChanged(ChangeEventArgs e)
+    {
+        if (currentPlot is null ||
+            !double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
+        {
+            return;
+        }
+
+        currentPlot.DefaultMarkupPercent = value;
+        _ = SaveAsync();
+    }
+
+    private void OnFirmNameChanged(ChangeEventArgs e)
+    {
+        library.Ui.FirmName = e.Value?.ToString() ?? string.Empty;
+        _ = SaveAsync();
+    }
+
+    private void OnCustomerCutDateChanged(ChangeEventArgs e)
+    {
+        string? value = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            library.Ui.CustomerCutDate = null;
+            _ = SaveAsync();
+            return;
+        }
+
+        if (!DateTime.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
+        {
+            return;
+        }
+
+        library.Ui.CustomerCutDate = date;
         _ = SaveAsync();
     }
 
@@ -1152,6 +1361,7 @@ public partial class GardenPlot
             WastePercentOverride = src.WastePercentOverride,
             LaborTypeOverride = src.LaborTypeOverride,
             LaborHoursPerUnitOverride = src.LaborHoursPerUnitOverride,
+            MarkupPercentOverride = src.MarkupPercentOverride,
             Notes = src.Notes,
             ShapeId = null,
         });
@@ -1675,6 +1885,7 @@ public partial class GardenPlot
                             SessionTraceId, loadedFromKey ?? "(none)", loadWasAuthoritative);
                     }
 
+                    Catalog.SetCustomCatalogItems(library.CustomCatalogItems);
                     currentPlot = library.Plots.FirstOrDefault(p => p.Id == library.LastPlotId)
                                   ?? library.Plots[0];
                     library.LastPlotId = currentPlot.Id;
@@ -1982,6 +2193,8 @@ public partial class GardenPlot
             p.Shapes ??= new List<Shape>();
             p.DropGroups ??= new List<DropGroup>();
             p.KitRotations ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            p.Takeoff ??= new List<TakeoffItem>();
+            p.TakeoffIds ??= new TakeoffSequence();
         }
 
         return safe;

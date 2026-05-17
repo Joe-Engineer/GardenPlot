@@ -22,7 +22,6 @@ public class PlotLibraryLoaderMigrationTests
     [Fact]
     public void LoadV1_WithShapes_SynthesizesTakeoffItems_OnePerShape()
     {
-        // v1 document: SchemaVersion=1, a plot with two shapes, no Takeoff/TakeoffIds yet.
         var v1 = new
         {
             SchemaVersion = 1,
@@ -41,11 +40,11 @@ public class PlotLibraryLoaderMigrationTests
             },
         };
 
-        var json = JsonSerializer.Serialize(v1);
-        var loaded = CreateLoader().Load(json, "unit-test");
+        var loaded = CreateLoader().Load(JsonSerializer.Serialize(v1), "unit-test");
 
         Assert.NotNull(loaded);
         Assert.Equal(PlotSchema.Current, loaded!.SchemaVersion);
+        Assert.Equal(75m, loaded.Ui.DefaultLaborRatePerHour);
         Assert.Single(loaded.Plots);
 
         var plot = loaded.Plots[0];
@@ -54,6 +53,7 @@ public class PlotLibraryLoaderMigrationTests
         Assert.All(plot.Takeoff, t => Assert.Equal(CatalogSource.Base, t.CatalogSource));
         Assert.Equal(ExpectedSynthesizedIds, plot.Takeoff.OrderBy(t => t.Id).Select(t => t.Id));
         Assert.Equal(3, plot.TakeoffIds.Next); // max(synthesized Id) + 1
+        Assert.Equal(25, plot.DefaultMarkupPercent);
     }
 
     [Fact]
@@ -73,13 +73,12 @@ public class PlotLibraryLoaderMigrationTests
         Assert.NotNull(loaded);
         Assert.Empty(loaded!.Plots[0].Takeoff);
         Assert.Equal(1, loaded.Plots[0].TakeoffIds.Next);
+        Assert.Equal(25, loaded.Plots[0].DefaultMarkupPercent);
     }
 
     [Fact]
     public void LoadV1_RespectsExistingBoundTakeoff_DoesNotDuplicate()
     {
-        // Edge case: a v1 document somehow already has a Takeoff entry bound to a shape.
-        // The migration must not duplicate it.
         var sharedShapeId = Guid.NewGuid();
         var v1 = new
         {
@@ -113,29 +112,53 @@ public class PlotLibraryLoaderMigrationTests
     }
 
     [Fact]
-    public void LoadV2_PassesThrough_PreservingTakeoffItems()
+    public void LoadV2_AddsCostingDefaults_WhenFieldsAreMissing()
     {
-        var src = new PlotLibrary();
-        var plot = new PlotData { Name = "Test" };
-        plot.Takeoff.Add(new TakeoffItem
+        var v2 = new
         {
-            Id = 7,
-            CatalogSource = CatalogSource.Base,
-            CatalogCode = "Tomato",
-            Quantity = 3,
-            WastePercentOverride = 15,
-        });
-        plot.TakeoffIds.Next = 8;
-        src.Plots.Add(plot);
+            SchemaVersion = 2,
+            Ui = new
+            {
+                TakeoffViewMode = (int)TakeoffViewMode.Summary,
+                AutoDeleteTakeoffOnShapeDelete = false,
+            },
+            Plots = new[]
+            {
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Test",
+                    Takeoff = new[]
+                    {
+                        new
+                        {
+                            Id = 7,
+                            CatalogSource = (int)CatalogSource.Base,
+                            CatalogCode = "Tomato",
+                            Quantity = 3,
+                            WastePercentOverride = 15,
+                        },
+                    },
+                    TakeoffIds = new { Next = 8 },
+                },
+            },
+        };
 
-        var json = JsonSerializer.Serialize(src);
-        var loaded = CreateLoader().Load(json, "unit-test");
+        var loaded = CreateLoader().Load(JsonSerializer.Serialize(v2), "unit-test");
 
         Assert.NotNull(loaded);
         Assert.Equal(PlotSchema.Current, loaded!.SchemaVersion);
+        Assert.False(loaded.Ui.ShowMaterialCostColumn);
+        Assert.False(loaded.Ui.ShowLaborCostColumn);
+        Assert.False(loaded.Ui.ShowMarkupPercentColumn);
+        Assert.True(loaded.Ui.ShowLineTotalColumn);
+        Assert.True(loaded.Ui.ShowInternalView);
+        Assert.Equal(75m, loaded.Ui.DefaultLaborRatePerHour);
         Assert.Single(loaded.Plots[0].Takeoff);
         Assert.Equal(7, loaded.Plots[0].Takeoff[0].Id);
         Assert.Equal(15, loaded.Plots[0].Takeoff[0].WastePercentOverride);
+        Assert.Null(loaded.Plots[0].Takeoff[0].MarkupPercentOverride);
         Assert.Equal(8, loaded.Plots[0].TakeoffIds.Next);
+        Assert.Equal(25, loaded.Plots[0].DefaultMarkupPercent);
     }
 }

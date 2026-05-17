@@ -57,9 +57,13 @@ public sealed class CatalogItem
 
     public double? DefaultWastePercent { get; set; }
 
+    public decimal? MaterialUnitCost { get; set; }
+
     public LaborType LaborType { get; set; } = LaborType.None;
 
     public double LaborHoursPerUnit { get; set; }
+
+    public decimal? LaborRatePerHour { get; set; }
 
     public string? BagSize { get; set; }
 
