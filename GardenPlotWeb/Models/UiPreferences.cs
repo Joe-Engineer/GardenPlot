@@ -64,6 +64,9 @@ public class UiPreferences
 
     /// <summary>Last-selected palette category (sticky across sessions).</summary>
     public PaletteCategory? LastPaletteCategory { get; set; }
+
+    /// <summary>Whether to show the clip hatch overlay for clipped areas.</summary>
+    public bool ShowClipHatch { get; set; } = true;
 }
 
 public class KeyBindingSettings

@@ -170,10 +170,10 @@ public sealed class FileSystemPlotRepositoryTests : IDisposable
 
         await repo.SavePlotAsync(plot);
 
-        var loaded = await repo.LoadPlotAsync(plot.Id);
+        PlotData? loaded = await repo.LoadPlotAsync(plot.Id);
 
         Assert.NotNull(loaded);
-        var edge = Assert.Single(loaded!.Shapes);
+        Shape edge = Assert.Single(loaded!.Shapes);
         Assert.Equal(ShapeKind.Edge, edge.Kind);
         Assert.True(edge.CloseEdge);
         Assert.Equal(4, edge.Points.Count);
@@ -183,6 +183,41 @@ public sealed class FileSystemPlotRepositoryTests : IDisposable
         Assert.Equal("Steel Edging (6\")", edge.Takeoff!.CatalogCode);
         Assert.Equal("lf", edge.Takeoff.Unit);
         Assert.Equal(24.56, edge.Takeoff.QuantityOverride);
+    }
+
+    [Fact]
+    public async Task SavePlot_ThenLoadPlot_PreservesClippedBy()
+    {
+        Guid clipperId = Guid.NewGuid();
+        var plot = new PlotData
+        {
+            Name = "Clipped",
+            Shapes =
+            [
+                new Shape
+                {
+                    Kind = ShapeKind.Rectangle,
+                    W = 10,
+                    H = 10,
+                    ClippedBy = [clipperId],
+                },
+                new Shape
+                {
+                    Id = clipperId,
+                    Kind = ShapeKind.Rectangle,
+                    X = 2,
+                    Y = 2,
+                    W = 2,
+                    H = 2,
+                },
+            ],
+        };
+        await repo.SavePlotAsync(plot);
+
+        PlotData? loaded = await repo.LoadPlotAsync(plot.Id);
+
+        Assert.NotNull(loaded);
+        Assert.Equal([clipperId], loaded!.Shapes[0].ClippedBy);
     }
 
     [Fact]

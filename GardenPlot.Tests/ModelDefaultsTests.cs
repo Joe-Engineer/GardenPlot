@@ -15,6 +15,8 @@ public sealed class ModelDefaultsTests
         Assert.Empty(a.Points);
         Assert.NotNull(a.Readings);
         Assert.Empty(a.Readings);
+        Assert.NotNull(a.ClippedBy);
+        Assert.Empty(a.ClippedBy);
     }
 
     [Fact]
@@ -63,6 +65,7 @@ public sealed class ModelDefaultsTests
         Assert.Equal("Ctrl+Z", u.KeyBindings.Undo);
         Assert.Equal("Ctrl+A", u.KeyBindings.SelectAll);
         Assert.Equal("Escape", u.KeyBindings.Escape);
+        Assert.True(u.ShowClipHatch);
     }
 
     [Fact]

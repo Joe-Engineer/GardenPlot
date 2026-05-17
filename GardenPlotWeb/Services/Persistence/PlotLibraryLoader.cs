@@ -1,4 +1,4 @@
-﻿// <copyright file="PlotLibraryLoader.cs" company="Garden Plot">
+// <copyright file="PlotLibraryLoader.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -204,17 +204,18 @@ public sealed class PlotLibraryLoader
     /// Loader for schema v1. v1 documents predate the per-plot <c>Takeoff</c> list,
     /// <c>TakeoffIds</c> sequence, library-level <c>CustomCatalogItems</c>, costing defaults,
     /// legacy triangulation migration, the v2 grass / ground-cover surface catalog rebind,
-    /// <see cref="PlotData.BackgroundFit"/>, per-plot <c>LayerStates</c>, and the
-    /// <see cref="DropGroup"/> along-path fields. We deserialize as the current shape
-    /// (forward-compatible — missing along-path fields take safe defaults, extra absent fields
-    /// are tolerated by <c>JsonSerializer</c>), synthesize one <see cref="TakeoffItem"/> per
-    /// existing <see cref="Shape"/>, normalize missing layer state, rebind legacy plant/tile
-    /// placements onto the surface catalog, then project legacy triangulation flags onto
-    /// <see cref="DropGroup.Triangulated"/> and stamp a valid background-fit value.
+    /// <see cref="PlotData.BackgroundFit"/>, per-plot <c>LayerStates</c>, the
+    /// <see cref="DropGroup"/> along-path fields, and <see cref="Shape.ClippedBy"/> metadata.
+    /// We deserialize as the current shape (forward-compatible — missing fields take safe
+    /// defaults, extra absent fields are tolerated by <c>JsonSerializer</c>), synthesize one
+    /// <see cref="TakeoffItem"/> per existing <see cref="Shape"/>, normalize missing layer state,
+    /// rebind legacy plant/tile placements onto the surface catalog, then project legacy
+    /// triangulation flags onto <see cref="DropGroup.Triangulated"/> and stamp a valid
+    /// background-fit value.
     /// </summary>
     private static PlotLibrary? LoadFromVersion1(JsonObject root, JsonSerializerOptions? options)
     {
-        PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
+        PlotLibrary? library = NormalizeLoadedLibrary(root.Deserialize<PlotLibrary>(options ?? SerializerOptions));
         if (library is null)
         {
             return null;
@@ -234,13 +235,13 @@ public sealed class PlotLibraryLoader
     /// <summary>
     /// Loader for schema v2. v2 documents already have takeoff items, but may still contain
     /// legacy plant/custom-tile placements for area-based grasses or ground covers, predate the
-    /// costing fields, soil-marker reading lists, the <c>StaggerHalf</c> to
+    /// costing fields, soil-marker reading lists, clipping metadata, the <c>StaggerHalf</c> to
     /// <see cref="DropGroup.Triangulated"/> rename, the <see cref="PlotData.BackgroundFit"/>
     /// field, and per-plot <c>LayerStates</c>. Direct typed deserialization is sufficient because
     /// the newer members carry safe model defaults (markup 25%, labor rate 75, internal view on,
-    /// line total on, default rotation for shapes/drop groups, empty soil-reading lists, and
-    /// <c>Fit</c> for background image rendering); we then rebind moved surface palette items,
-    /// normalize missing layer state, project legacy triangulation, and stamp a valid
+    /// line total on, default rotation for shapes/drop groups, empty soil-reading + clip lists,
+    /// and <c>Fit</c> for background image rendering); we then rebind moved surface palette
+    /// items, normalize missing layer state, project legacy triangulation, and stamp a valid
     /// background-fit value before the document is rewritten as the current schema.
     /// </summary>
     private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
@@ -482,5 +483,33 @@ public sealed class PlotLibraryLoader
         }
 
         return PlotSchema.LegacyVersion;
+    }
+
+    private static PlotLibrary? NormalizeLoadedLibrary(PlotLibrary? library)
+    {
+        if (library is null)
+        {
+            return null;
+        }
+
+        library.Plots ??= new List<PlotData>();
+        library.Ui ??= new UiPreferences();
+        library.CustomPaletteItems ??= new List<PaletteItem>();
+        library.CustomCatalogItems ??= new List<CatalogItem>();
+        foreach (PlotData plot in library.Plots)
+        {
+            plot.Shapes ??= new List<Shape>();
+            plot.DropGroups ??= new List<DropGroup>();
+            plot.KitRotations ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            plot.Takeoff ??= new List<TakeoffItem>();
+            plot.TakeoffIds ??= new TakeoffSequence();
+            foreach (Shape shape in plot.Shapes)
+            {
+                shape.Points ??= new List<Point>();
+                shape.ClippedBy ??= new List<Guid>();
+            }
+        }
+
+        return library;
     }
 }

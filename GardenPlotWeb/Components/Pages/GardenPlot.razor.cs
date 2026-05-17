@@ -468,6 +468,9 @@ public partial class GardenPlot
         double MarkupPercent,
         decimal? LineTotal);
 
+    private sealed record TakeoffRow(string Kind, string Name, int Count, string? Quantity = null);
+    private sealed record ClipCandidateInfo(Guid Id, int PlotNumber, string Label, bool Selected);
+
     /// <summary>
     /// Keeps <see cref="PlotData.Takeoff"/> in lockstep with <see cref="PlotData.Shapes"/>:
     /// mints a <see cref="TakeoffItem"/> for any new shape lacking one, and reconciles orphan
@@ -723,6 +726,43 @@ public partial class GardenPlot
             .ToList();
     }
 
+    private static IReadOnlyList<TakeoffRow> BuildTakeoff(IEnumerable<Shape> shapes)
+    {
+        List<Shape> all = shapes.ToList();
+        Dictionary<Guid, Shape> allById = all.ToDictionary(shape => shape.Id);
+
+        var groundCovers = all
+            .Where(IsGroundCoverShape)
+            .GroupBy(shape => new
+            {
+                Code = string.IsNullOrWhiteSpace(shape.GroundCoverCode) ? TakeoffName(shape) : shape.GroundCoverCode!,
+                Surface = shape.IsGroundCoverSurface,
+                DepthIn = shape.GroundCoverDepthIn,
+            })
+            .Select(group =>
+            {
+                double totalArea = group.Sum(shape => TakeoffMath.EffectiveAreaFt2(shape, allById));
+                double depthIn = group.Key.DepthIn ?? 0;
+                string quantity = group.Key.Surface
+                    ? $"{totalArea:0.#} ft²"
+                    : $"{GroundCoverMath.VolumeYd3(totalArea, depthIn):0.##} yd³ ({totalArea:0.#} ft² × {depthIn:0.#}\")";
+                string kind = group.Key.Surface ? "Ground Cover — Surface" : "Ground Cover";
+                return new TakeoffRow(kind, group.Key.Code, group.Count(), quantity);
+            });
+
+        var others = all
+            .Where(shape => !IsGroundCoverShape(shape))
+            .Where(shape => shape.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant
+                                or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
+            .GroupBy(shape => (Kind: TakeoffKind(shape), Name: TakeoffName(shape)))
+            .Select(group => new TakeoffRow(group.Key.Kind, group.Key.Name, group.Count()));
+
+        return groundCovers.Concat(others)
+            .OrderBy(row => row.Kind, StringComparer.Ordinal)
+            .ThenBy(row => row.Name, StringComparer.Ordinal)
+            .ToList();
+    }
+
     private static string FormatTakeoffNumber(double value)
     {
         return value.ToString("0.##", CultureInfo.InvariantCulture);
@@ -790,6 +830,8 @@ public partial class GardenPlot
         return string.Equals(s.Trait, "ground-cover", StringComparison.OrdinalIgnoreCase)
             || !string.IsNullOrWhiteSpace(s.GroundCoverCode);
     }
+
+    private static bool CanShapeBeClipped(Shape shape) => GroundCoverMath.IsAreaShape(shape);
 
     private static readonly string[] GroundCoverTextureKeys =
     [
@@ -2679,6 +2721,7 @@ public partial class GardenPlot
             foreach (var shape in p.Shapes)
             {
                 shape.Points ??= new List<Point>();
+                shape.ClippedBy ??= new List<Guid>();
                 if (shape.Kind == ShapeKind.Edge)
                 {
                     TakeoffMath.Reconcile(shape);
@@ -4388,6 +4431,7 @@ public partial class GardenPlot
         RecordUndoState();
         var ids = selectedIds.ToHashSet();
         currentPlot.Shapes.RemoveAll(s => ids.Contains(s.Id));
+        RemoveClipReferences(currentPlot.Shapes, ids);
         CleanupOrphanDropGroups();
         ClearSelection();
         await SaveAsync();
@@ -4480,6 +4524,7 @@ public partial class GardenPlot
             H = source.H,
             Rotation = source.Rotation,
             Points = source.Points.Select(p => new Point(p.X, p.Y)).ToList(),
+            ClippedBy = assignNewId ? new List<Guid>() : source.ClippedBy.Distinct().ToList(),
             Label = source.Label,
             Trait = source.Trait,
             Stroke = source.Stroke,
@@ -4544,6 +4589,14 @@ public partial class GardenPlot
         currentPlot.DropGroups.RemoveAll(g => !used.Contains(g.Id));
     }
 
+    private static void RemoveClipReferences(IEnumerable<Shape> shapes, IReadOnlySet<Guid> removedIds)
+    {
+        foreach (Shape shape in shapes)
+        {
+            shape.ClippedBy.RemoveAll(removedIds.Contains);
+        }
+    }
+
     private static (double minX, double minY, double maxX, double maxY) UnionAabb(IReadOnlyList<Shape> shapes)
     {
         var first = RotatedAABB(shapes[0]);
@@ -4585,6 +4638,92 @@ public partial class GardenPlot
 
     private bool CanUngroupSelection
         => GardenPlotGroupingOperations.CanUngroupSelection(SelectedShapes());
+
+    private bool CanToggleClipSelection => TryGetClipSelectionPair(out _, out _);
+
+    private string ClipToolbarLabel
+    {
+        get
+        {
+            if (!TryGetClipSelectionPair(out Shape clippee, out Shape clipper))
+            {
+                return "Clip A by B";
+            }
+
+            string verb = clippee.ClippedBy.Contains(clipper.Id) ? "Unclip" : "Clip";
+            return $"{verb} {TakeoffName(clippee)} by {TakeoffName(clipper)}";
+        }
+    }
+
+    private async Task ToggleSelectedClipRelationship()
+    {
+        if (!TryGetClipSelectionPair(out Shape clippee, out Shape clipper))
+        {
+            return;
+        }
+
+        bool shouldClip = !clippee.ClippedBy.Contains(clipper.Id);
+        await SetShapeClipStateAsync(clippee, clipper.Id, shouldClip);
+    }
+
+    private bool TryGetClipSelectionPair(out Shape clippee, out Shape clipper)
+    {
+        clippee = null!;
+        clipper = null!;
+        if (currentPlot is null || selectedIds.Count != 2)
+        {
+            return false;
+        }
+
+        Dictionary<Guid, Shape> byId = currentPlot.Shapes.ToDictionary(s => s.Id);
+        if (!byId.TryGetValue(selectedIds[0], out Shape? clippeeCandidate) || !byId.TryGetValue(selectedIds[1], out Shape? clipperCandidate))
+        {
+            return false;
+        }
+
+        clippee = clippeeCandidate;
+        clipper = clipperCandidate;
+        return clippee.Id != clipper.Id && CanShapeBeClipped(clippee) && CanShapeBeClipped(clipper);
+    }
+
+    private async Task SetShapeClipStateAsync(Shape clippee, Guid clipperId, bool isClipped)
+    {
+        if (currentPlot is null || clippee.Id == clipperId)
+        {
+            return;
+        }
+
+        clippee.ClippedBy ??= new List<Guid>();
+        bool exists = clippee.ClippedBy.Contains(clipperId);
+        if (exists == isClipped)
+        {
+            return;
+        }
+
+        bool clipperExists = currentPlot.Shapes.Any(s => s.Id == clipperId && CanShapeBeClipped(s));
+        if (!clipperExists)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        if (isClipped)
+        {
+            clippee.ClippedBy.Add(clipperId);
+            clippee.ClippedBy = clippee.ClippedBy.Distinct().ToList();
+        }
+        else
+        {
+            clippee.ClippedBy.RemoveAll(id => id == clipperId);
+        }
+
+        await SaveAsync();
+    }
+
+    private async Task OnClipCandidateChanged(Shape clippee, Guid clipperId, ChangeEventArgs e)
+    {
+        await SetShapeClipStateAsync(clippee, clipperId, e.Value is bool selected && selected);
+    }
 
     private bool IsMultiDropActive(bool shift, bool ctrl, bool alt)
     {
@@ -7596,6 +7735,12 @@ public partial class GardenPlot
         await SaveAsync();
     }
 
+    private async Task OnClipHatchPreferenceChanged(ChangeEventArgs e)
+    {
+        library.Ui.ShowClipHatch = e.Value is bool enabled && enabled;
+        await SaveAsync();
+    }
+
     private async Task HideTakeoffPanel()
     {
         showTakeoffPanel = false;
@@ -7628,6 +7773,52 @@ public partial class GardenPlot
     }
 
     // ===== Selection info panel content =====
+
+    private List<ClipCandidateInfo> ClipCandidatesFor(Shape clippee)
+    {
+        if (currentPlot is null)
+        {
+            return new List<ClipCandidateInfo>();
+        }
+
+        return currentPlot.Shapes
+            .Select((shape, index) => new { shape, plotNumber = index + 1 })
+            .Where(x => x.shape.Id != clippee.Id && CanShapeBeClipped(x.shape))
+            .Select(x => new ClipCandidateInfo(
+                x.shape.Id,
+                x.plotNumber,
+                $"#{x.plotNumber} {PanelTitleFor(x.shape)}",
+                clippee.ClippedBy.Contains(x.shape.Id)))
+            .OrderBy(x => x.PlotNumber)
+            .ToList();
+    }
+
+    private string ClipAreaSummary(Shape shape)
+    {
+        if (currentPlot is null)
+        {
+            return "Net 0.0 ft² (gross 0.0 − 0.0 clipped)";
+        }
+
+        Dictionary<Guid, Shape> allById = currentPlot.Shapes.ToDictionary(s => s.Id);
+        double gross = TakeoffMath.GrossAreaFt2(shape);
+        double net = TakeoffMath.EffectiveAreaFt2(shape, allById);
+        double clipped = Math.Max(0, gross - net);
+        return $"Net {net:0.0} ft² (gross {gross:0.0} − {clipped:0.0} clipped)";
+    }
+
+    private double NetAreaFt2(Shape shape)
+    {
+        if (currentPlot is null)
+        {
+            return 0;
+        }
+
+        Dictionary<Guid, Shape> allById = currentPlot.Shapes.ToDictionary(s => s.Id);
+        return TakeoffMath.EffectiveAreaFt2(shape, allById);
+    }
+
+    private double GrossAreaFt2(Shape shape) => TakeoffMath.GrossAreaFt2(shape);
 
     private static string PanelTitleFor(Shape s)
     {
@@ -8068,7 +8259,7 @@ public partial class GardenPlot
         var inches = ft * 12.0;
         return $"{inches:0}\"";
     }
-    private static string PointsString(List<Point> pts)
+    private static string PointsString(IReadOnlyList<Point> pts)
         => string.Join(' ', pts.Select(p => $"{F(p.X)},{F(p.Y)}"));
 }
 
