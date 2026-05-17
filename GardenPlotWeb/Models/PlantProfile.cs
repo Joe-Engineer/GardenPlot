@@ -6,6 +6,8 @@ namespace GardenPlotWeb.Models;
 
 public sealed record HardinessRange(int MinZone, int MaxZone);
 
+public sealed record NumericRange(double? Min = null, double? Max = null);
+
 public sealed record ToxicityInfo(
     ToxicityLevel ToCats = ToxicityLevel.None,
     ToxicityLevel ToDogs = ToxicityLevel.None,
@@ -49,6 +51,7 @@ public sealed record PlantProfile(
     string? SoilTexture = null,
     string? SoilDrainage = null,
     string? SoilPh = null,
+    NumericRange? SoilPhRange = null,
     string? SoilFertility = null,
 
     // Size

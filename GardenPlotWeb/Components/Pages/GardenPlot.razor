@@ -449,6 +449,7 @@ else
                             PaletteKind.BedKit => $"{item.WidthFt}'×{item.HeightFt}' · {item.Pieces} pcs",
                             PaletteKind.Plant => $"spacing {FormatPlantSpacing(item.WidthFt)} · {item.Sunlight} · {item.Water} water",
                             PaletteKind.FocalPoint => $"single drop · {FocalPointTraitLabel(item.Trait)}",
+                            PaletteKind.SoilMarker => $"pin · {item.WidthFt:0.#}'×{item.HeightFt:0.#}'",
                             PaletteKind.CustomTile => $"{item.StampShapeKind ?? ShapeKind.Rectangle} · {item.WidthFt}'×{item.HeightFt}'",
                             PaletteKind.GroundCover => item.DefaultDepthIn is double dd ? $"area · {item.Trait} · {dd:0.#}\" default" : $"area · {item.Trait}",
                             PaletteKind.GroundCoverSurface => $"surface · {item.Trait}",
@@ -486,6 +487,9 @@ else
                                                 break;
                                             case PaletteKind.FocalPoint:
                                                 @((MarkupString)PlantRendering.PlantSpriteSvg(item.WidthFt / 2, item.HeightFt / 2, item.WidthFt, EffectivePaletteTrait(item)))
+                                                break;
+                                            case PaletteKind.SoilMarker:
+                                                @((MarkupString)PlantRendering.SoilMarkerSvg(0, 0, item.WidthFt, item.HeightFt, item.Code, item.FillColor, item.StrokeColor))
                                                 break;
                                             case PaletteKind.CustomTile:
                                                 if (item.StampShapeKind == ShapeKind.Oval)
@@ -881,6 +885,9 @@ else
                             case ShapeKind.Plant:
                                 @((MarkupString)PlantRendering.PlantSpriteSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, s.Trait))
                                 break;
+                            case ShapeKind.SoilMarker:
+                                @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, EffectiveFill(s), EffectiveStroke(s)))
+                                break;
                         }
                         @if (IsSelected(s.Id))
                         {
@@ -1043,6 +1050,9 @@ else
                                         }
                                         @((MarkupString)PlantRendering.PlantSpriteSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, s.Trait))
                                         break;
+                                    case ShapeKind.SoilMarker:
+                                        @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, EffectiveFill(s), EffectiveStroke(s)))
+                                        break;
                                 }
                             </g>
                         }
@@ -1077,6 +1087,9 @@ else
                                             @((MarkupString)PlantRendering.SpacingRingsSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, "good"))
                                         }
                                         @((MarkupString)PlantRendering.PlantSpriteSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, s.Trait))
+                                        break;
+                                    case ShapeKind.SoilMarker:
+                                        @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, EffectiveFill(s), EffectiveStroke(s)))
                                         break;
                                 }
                             </g>
@@ -1932,6 +1945,119 @@ else
                     </div>
                 }
 
+                @if (!isPreview && single!.Kind == ShapeKind.SoilMarker)
+                {
+                    var orderedReadings = SoilMarkerAnalysis.ReadingsNewestFirst(single!.Readings);
+                    <div class="soil-marker-panel mt-2 pt-2 border-top">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                            <div class="small fw-semibold">Soil readings</div>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => AddSoilReading(single!)">Add reading</button>
+                        </div>
+                        @if (orderedReadings.Count == 0)
+                        {
+                            <div class="x-small text-muted">No readings yet. Add one to start tracking pH, EC, and nutrients.</div>
+                        }
+                        else
+                        {
+                            @if (HasSoilSparkline(orderedReadings, r => r.PhValue) || HasSoilSparkline(orderedReadings, r => r.SalinityEcDsm))
+                            {
+                                <div class="soil-sparkline-row">
+                                    @if (HasSoilSparkline(orderedReadings, r => r.PhValue))
+                                    {
+                                        <div class="soil-sparkline-item">
+                                            <span class="x-small text-muted">pH</span>
+                                            @((MarkupString)PlantRendering.SparklineSvg(orderedReadings, r => r.PhValue, "#7a4f1d"))
+                                        </div>
+                                    }
+                                    @if (HasSoilSparkline(orderedReadings, r => r.SalinityEcDsm))
+                                    {
+                                        <div class="soil-sparkline-item">
+                                            <span class="x-small text-muted">EC</span>
+                                            @((MarkupString)PlantRendering.SparklineSvg(orderedReadings, r => r.SalinityEcDsm, "#2f88c0"))
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            <div class="soil-reading-list">
+                                @foreach (var reading in orderedReadings)
+                                {
+                                    <div class="soil-reading-card" @key="reading">
+                                        <div class="soil-reading-grid">
+                                            <label>
+                                                <span>Date</span>
+                                                <input type="date" class="form-control form-control-sm"
+                                                       value="@SoilDateValue(reading.TakenOnUtc)"
+                                                       @onchange="@(e => OnSoilReadingDateChanged(single!, reading, e))" />
+                                            </label>
+                                            <label>
+                                                <span>pH</span>
+                                                <input type="number" min="0" max="14" step="0.1" class="form-control form-control-sm"
+                                                       value="@SoilNumberValue(reading.PhValue)"
+                                                       @onchange="@(e => OnSoilReadingNumberChanged(single!, reading, nameof(SoilReading.PhValue), e))" />
+                                            </label>
+                                            <label>
+                                                <span>EC</span>
+                                                <input type="number" min="0" step="0.1" class="form-control form-control-sm"
+                                                       value="@SoilNumberValue(reading.SalinityEcDsm)"
+                                                       @onchange="@(e => OnSoilReadingNumberChanged(single!, reading, nameof(SoilReading.SalinityEcDsm), e))" />
+                                            </label>
+                                            <label>
+                                                <span>OM %</span>
+                                                <input type="number" min="0" step="0.1" class="form-control form-control-sm"
+                                                       value="@SoilNumberValue(reading.OrganicMatterPct)"
+                                                       @onchange="@(e => OnSoilReadingNumberChanged(single!, reading, nameof(SoilReading.OrganicMatterPct), e))" />
+                                            </label>
+                                            <label>
+                                                <span>N ppm</span>
+                                                <input type="number" min="0" step="0.1" class="form-control form-control-sm"
+                                                       value="@SoilNumberValue(reading.NitrogenPpm)"
+                                                       @onchange="@(e => OnSoilReadingNumberChanged(single!, reading, nameof(SoilReading.NitrogenPpm), e))" />
+                                            </label>
+                                            <label>
+                                                <span>P ppm</span>
+                                                <input type="number" min="0" step="0.1" class="form-control form-control-sm"
+                                                       value="@SoilNumberValue(reading.PhosphorusPpm)"
+                                                       @onchange="@(e => OnSoilReadingNumberChanged(single!, reading, nameof(SoilReading.PhosphorusPpm), e))" />
+                                            </label>
+                                            <label>
+                                                <span>K ppm</span>
+                                                <input type="number" min="0" step="0.1" class="form-control form-control-sm"
+                                                       value="@SoilNumberValue(reading.PotassiumPpm)"
+                                                       @onchange="@(e => OnSoilReadingNumberChanged(single!, reading, nameof(SoilReading.PotassiumPpm), e))" />
+                                            </label>
+                                            <label>
+                                                <span>Lab</span>
+                                                <input type="text" class="form-control form-control-sm"
+                                                       value="@(reading.LabSource ?? string.Empty)"
+                                                       @onchange="@(e => OnSoilReadingTextChanged(single!, reading, nameof(SoilReading.LabSource), e))" />
+                                            </label>
+                                        </div>
+                                        <div class="soil-reading-grid soil-reading-grid-notes mt-2">
+                                            <label>
+                                                <span>Drainage</span>
+                                                <input type="text" class="form-control form-control-sm"
+                                                       value="@(reading.DrainageNotes ?? string.Empty)"
+                                                       @onchange="@(e => OnSoilReadingTextChanged(single!, reading, nameof(SoilReading.DrainageNotes), e))" />
+                                            </label>
+                                            <label>
+                                                <span>Notes</span>
+                                                <input type="text" class="form-control form-control-sm"
+                                                       value="@(reading.GeneralNotes ?? string.Empty)"
+                                                       @onchange="@(e => OnSoilReadingTextChanged(single!, reading, nameof(SoilReading.GeneralNotes), e))" />
+                                            </label>
+                                        </div>
+                                        <div class="soil-reading-actions">
+                                            <span class="x-small text-muted">Latest-first order</span>
+                                            <button class="btn btn-link btn-sm p-0 text-danger" @onclick="() => DeleteSoilReading(single!, reading)">Delete</button>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
                 @if (isPreview && previewDropPattern != DropPattern.One)
                 {
                     <div class="small"><span class="text-muted">Drop pattern:</span> <strong>@previewDropPattern</strong></div>
@@ -2089,7 +2215,7 @@ else
             {
                 <hr class="my-2" />
                 <div class="x-small text-muted">
-                    Color customization is not available for trees, bushes, or plants.
+                    Appearance customization is not available for this item.
                 </div>
             }
 
@@ -2207,6 +2333,47 @@ else
                         </div>
                     }
                 </div>
+            }
+
+            @if (isSingle && !isPreview && IsPlantLikeShape(single!))
+            {
+                var soilMatch = SoilMarkerAnalysis.FindNearestMarker(single!, currentPlot.Shapes, ProfileForShape(single!, isPreview));
+                <hr class="my-2" />
+                <div class="fw-bold small mb-1">Soil alignment</div>
+                @if (soilMatch is null)
+                {
+                    <div class="x-small text-muted">No soil marker within @F(SoilMarkerAnalysis.DefaultAlignmentRadiusFt) ft.</div>
+                }
+                else
+                {
+                    <div class="small"><span class="text-muted">Nearest marker:</span> <strong>@SoilMarkerName(soilMatch.Marker)</strong> <span class="text-muted">— @F(soilMatch.DistanceFt) ft</span></div>
+                    @if (soilMatch.LatestReading is { } recentReading)
+                    {
+                        <div class="soil-reading-inline mt-1 x-small">
+                            <span><strong>@recentReading.TakenOnUtc:yyyy-MM-dd</strong></span>
+                            @if (recentReading.PhValue is double phValue)
+                            {
+                                <span>pH <strong>@phValue.ToString("0.##", CultureInfo.InvariantCulture)</strong></span>
+                            }
+                            @if (recentReading.SalinityEcDsm is double ecValue)
+                            {
+                                <span>EC <strong>@ecValue.ToString("0.##", CultureInfo.InvariantCulture)</strong> dS/m</span>
+                            }
+                            @if (recentReading.OrganicMatterPct is double organicMatter)
+                            {
+                                <span>OM <strong>@organicMatter.ToString("0.##", CultureInfo.InvariantCulture)</strong>%</span>
+                            }
+                        </div>
+                        @if (soilMatch.IsPhMismatch)
+                        {
+                            <div class="soil-warning x-small mt-1">Latest pH @recentReading.PhValue?.ToString("0.##", CultureInfo.InvariantCulture) is outside the preferred range @FormatSoilPhRange(soilMatch.PreferredPhRange).</div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="x-small text-muted mt-1">Nearest marker has no readings yet.</div>
+                    }
+                }
             }
 
             @if (isSingle && (single!.Kind == ShapeKind.Tree || single.Kind == ShapeKind.Bush || IsTileShape(single)))

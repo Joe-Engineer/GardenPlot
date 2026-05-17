@@ -99,6 +99,7 @@ public static class LayerResolver
             ShapeKind.Rectangle => LayerKeys.Hardscape,
             ShapeKind.Oval => LayerKeys.Hardscape,
             ShapeKind.FreeDraw => LayerKeys.Hardscape,
+            ShapeKind.SoilMarker => LayerKeys.Measurement,
             _ => LayerKeys.Notes,
         };
     }
@@ -131,6 +132,7 @@ public static class LayerResolver
             PaletteKind.GroundCover => LayerKeys.GroundCover,
             PaletteKind.GroundCoverSurface => LayerKeys.GroundCover,
             PaletteKind.FocalPoint => LayerKeys.FocalPoints,
+            PaletteKind.SoilMarker => LayerKeys.Measurement,
             PaletteKind.CustomTile => ResolveCustomTileLayer(item),
             _ => null,
         };

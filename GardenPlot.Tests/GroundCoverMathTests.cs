@@ -30,6 +30,7 @@ public sealed class GroundCoverMathTests
     [InlineData(ShapeKind.Tree)]
     [InlineData(ShapeKind.Bush)]
     [InlineData(ShapeKind.Plant)]
+    [InlineData(ShapeKind.SoilMarker)]
     public void AreaFt2_NonAreaKinds_ReturnsZero(ShapeKind kind)
     {
         var s = new Shape { Kind = kind, W = 10, H = 10 };

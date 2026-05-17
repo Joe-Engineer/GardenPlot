@@ -140,6 +140,82 @@ public static class PlantRendering
         return sb.ToString();
     }
 
+    public static string SoilMarkerSvg(double x, double y, double w, double h, string? label = null, string? fill = null, string? stroke = null)
+    {
+        double cx = x + (w / 2);
+        double headRadius = Math.Max(0.16, Math.Min(w * 0.32, h * 0.22));
+        double headCy = y + headRadius + (h * 0.10);
+        double tipY = y + h;
+        string markerFill = fill ?? "#d49b52";
+        string markerStroke = stroke ?? "#6b4b2a";
+        string markerLabel = SoilMarkerLabel(label);
+        double fontSize = Math.Max(0.16, headRadius * 0.85);
+        StringBuilder sb = new(320);
+
+        _ = sb.Append("<path d=\"M").Append(F(cx)).Append(' ').Append(F(tipY))
+            .Append(" L").Append(F(cx - (headRadius * 0.75))).Append(' ').Append(F(headCy + (headRadius * 0.55)))
+            .Append(" A").Append(F(headRadius)).Append(' ').Append(F(headRadius)).Append(" 0 1 1 ")
+            .Append(F(cx + (headRadius * 0.75))).Append(' ').Append(F(headCy + (headRadius * 0.55)))
+            .Append(" Z\" fill=\"").Append(markerFill)
+            .Append("\" stroke=\"").Append(markerStroke)
+            .Append("\" stroke-width=\"").Append(F(Math.Max(0.04, headRadius * 0.2))).Append("\" />");
+        _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(headCy))
+            .Append("\" r=\"").Append(F(headRadius * 0.66)).Append("\" fill=\"#fff7ec\" opacity=\"0.55\" />");
+        _ = sb.Append("<text x=\"").Append(F(cx)).Append("\" y=\"").Append(F(headCy + (fontSize * 0.35)))
+            .Append("\" text-anchor=\"middle\" font-size=\"").Append(F(fontSize))
+            .Append("\" fill=\"").Append(markerStroke)
+            .Append("\" style=\"font-family:sans-serif;font-weight:700;pointer-events:none;\">")
+            .Append(WebUtility.HtmlEncode(markerLabel)).Append("</text>");
+
+        return sb.ToString();
+    }
+
+    public static string SparklineSvg(IEnumerable<SoilReading> readings, Func<SoilReading, double?> selector, string stroke, double width = 42, double height = 14)
+    {
+        ArgumentNullException.ThrowIfNull(readings);
+        ArgumentNullException.ThrowIfNull(selector);
+
+        var points = readings
+            .OrderBy(r => r.TakenOnUtc)
+            .Select(r => new { r.TakenOnUtc, Value = selector(r) })
+            .Where(r => r.Value is not null)
+            .ToList();
+
+        if (points.Count < 2)
+        {
+            return string.Empty;
+        }
+
+        double min = points.Min(p => p.Value!.Value);
+        double max = points.Max(p => p.Value!.Value);
+        double horizontalInset = 1.0;
+        double verticalInset = 1.0;
+        double drawableWidth = Math.Max(1, width - (horizontalInset * 2));
+        double drawableHeight = Math.Max(1, height - (verticalInset * 2));
+        double range = max - min;
+        StringBuilder line = new(points.Count * 16);
+
+        for (int i = 0; i < points.Count; i++)
+        {
+            double value = points[i].Value!.Value;
+            double xPoint = horizontalInset + ((i * drawableWidth) / Math.Max(1, points.Count - 1));
+            double normalized = range <= double.Epsilon ? 0.5 : (value - min) / range;
+            double yPoint = verticalInset + ((1.0 - normalized) * drawableHeight);
+            if (i > 0)
+            {
+                _ = line.Append(' ');
+            }
+
+            _ = line.Append(F(xPoint)).Append(',').Append(F(yPoint));
+        }
+
+        return string.Concat(
+            "<svg width=\"", F(width), "\" height=\"", F(height), "\" viewBox=\"0 0 ", F(width), ' ', F(height), "\" role=\"img\" aria-hidden=\"true\">",
+            "<line x1=\"1\" y1=\"", F(height - 1), "\" x2=\"", F(width - 1), "\" y2=\"", F(height - 1), "\" stroke=\"#d8d3c2\" stroke-width=\"0.8\" />",
+            "<polyline fill=\"none\" stroke=\"", stroke, "\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" points=\"", line, "\" />",
+            "</svg>");
+    }
+
     /// <summary>
     /// Concentric spacing rings for a planted item, color-coded by overlap status:
     /// "good" = green, "partial" = yellow, "crowded" = red.
@@ -214,6 +290,24 @@ public static class PlantRendering
         }
 
         return sb.ToString();
+    }
+
+    private static string SoilMarkerLabel(string? label)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return "S";
+        }
+
+        string[] tokens = label.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (tokens.Length >= 2)
+        {
+            return string.Concat(tokens[0][0], tokens[1][0]).ToUpperInvariant();
+        }
+
+        return label.Trim().Length <= 2
+            ? label.Trim().ToUpperInvariant()
+            : label.Trim()[..2].ToUpperInvariant();
     }
 
     private static (string fill, string stroke) CanopyColors(string trait)

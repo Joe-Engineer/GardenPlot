@@ -234,13 +234,14 @@ public sealed class PlotLibraryLoader
     /// <summary>
     /// Loader for schema v2. v2 documents already have takeoff items, but may still contain
     /// legacy plant/custom-tile placements for area-based grasses or ground covers, predate the
-    /// costing fields, the <c>StaggerHalf</c> to <see cref="DropGroup.Triangulated"/> rename,
-    /// the <see cref="PlotData.BackgroundFit"/> field, and per-plot <c>LayerStates</c>. Direct
-    /// typed deserialization is sufficient because the newer members carry safe model defaults
-    /// (markup 25%, labor rate 75, internal view on, line total on, default rotation for
-    /// shapes/drop groups, and <c>Fit</c> for background image rendering); we then rebind moved
-    /// surface palette items, normalize missing layer state, project legacy triangulation, and
-    /// stamp a valid background-fit value before the document is rewritten as the current schema.
+    /// costing fields, soil-marker reading lists, the <c>StaggerHalf</c> to
+    /// <see cref="DropGroup.Triangulated"/> rename, the <see cref="PlotData.BackgroundFit"/>
+    /// field, and per-plot <c>LayerStates</c>. Direct typed deserialization is sufficient because
+    /// the newer members carry safe model defaults (markup 25%, labor rate 75, internal view on,
+    /// line total on, default rotation for shapes/drop groups, empty soil-reading lists, and
+    /// <c>Fit</c> for background image rendering); we then rebind moved surface palette items,
+    /// normalize missing layer state, project legacy triangulation, and stamp a valid
+    /// background-fit value before the document is rewritten as the current schema.
     /// </summary>
     private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
     {
@@ -414,6 +415,11 @@ public sealed class PlotLibraryLoader
             plot.PhotoFileNames ??= [];
             plot.Takeoff ??= [];
             plot.TakeoffIds ??= new TakeoffSequence();
+
+            foreach (Shape shape in plot.Shapes)
+            {
+                shape.Readings ??= [];
+            }
         }
 
         return library;

@@ -139,6 +139,11 @@ public static class PaletteCatalog
         new("Wall-mounted Sconce", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-sconce"),
     ];
 
+    public static readonly PaletteItem[] SoilMarkers =
+    [
+        new("Soil Marker", PaletteKind.SoilMarker, 1.2, 1.6, "soil-marker", StrokeColor: "#6b4b2a", FillColor: "#d49b52"),
+    ];
+
     public static IReadOnlyList<PaletteItem> For(PaletteKind kind)
     {
         return kind switch
@@ -148,6 +153,7 @@ public static class PaletteCatalog
             PaletteKind.Bush => Bushes,
             PaletteKind.Plant => Plants,
             PaletteKind.FocalPoint => FocalPoints,
+            PaletteKind.SoilMarker => SoilMarkers,
             PaletteKind.CustomTile => [],
             PaletteKind.GroundCover => GroundCoverMaterials,
             PaletteKind.GroundCoverSurface => GroundCoverSurfaceCovers,
@@ -463,6 +469,7 @@ public static class PaletteCatalog
             PaletteCategory.Edging => Edging,
             PaletteCategory.Bulbs => [.. Plants.Where(p => string.Equals(p.Trait, "bulb", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.GroundCoverPlants => [.. GroundCoverSurfaceCovers.Where(IsGroundCoverPlantSurfaceItem)],
+            PaletteCategory.SoilMarkers => SoilMarkers,
             PaletteCategory.GrassesTurf => [.. Grasses.Where(g => g.Kind == PaletteKind.GroundCoverSurface)],
             PaletteCategory.GrassesOrnamental => [.. Grasses.Where(g => string.Equals(g.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(IsOrnamentalGrassSurfaceItem))],
             PaletteCategory.Succulents => [.. Plants.Where(p => string.Equals(p.Trait, "succulent", StringComparison.OrdinalIgnoreCase))],
@@ -510,6 +517,7 @@ public static class PaletteCatalog
                 _ => PaletteCategory.Vegetables,
             },
             PaletteKind.FocalPoint => PaletteCategory.FocalPoint,
+            PaletteKind.SoilMarker => PaletteCategory.SoilMarkers,
             PaletteKind.CustomTile => item.Trait?.ToLowerInvariant() switch
             {
                 "grass-ornamental" => PaletteCategory.GrassesOrnamental,
@@ -558,5 +566,4 @@ public static class PaletteCatalog
             && OrnamentalGrassSurfaceCodes.Contains(item.Code);
     }
 }
-
 

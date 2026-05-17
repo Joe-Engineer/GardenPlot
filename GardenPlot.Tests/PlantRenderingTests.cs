@@ -89,4 +89,26 @@ public sealed class PlantRenderingTests
         Assert.DoesNotContain("<dangerous>", svg);
         Assert.Contains("&lt;dangerous&gt;", svg);
     }
+
+    [Fact]
+    public void SoilMarkerSvg_ProducesPinMarkup()
+    {
+        string svg = PlantRendering.SoilMarkerSvg(0, 0, 1.2, 1.6, "Soil Marker");
+        Assert.Contains("<path", svg);
+        Assert.Contains("SM", svg);
+    }
+
+    [Fact]
+    public void SparklineSvg_RendersPolyline_WhenTwoValuesExist()
+    {
+        List<SoilReading> readings =
+        [
+            new() { TakenOnUtc = DateTime.SpecifyKind(new DateTime(2026, 5, 1), DateTimeKind.Utc), PhValue = 6.2 },
+            new() { TakenOnUtc = DateTime.SpecifyKind(new DateTime(2026, 5, 15), DateTimeKind.Utc), PhValue = 6.5 },
+        ];
+
+        string svg = PlantRendering.SparklineSvg(readings, r => r.PhValue, "#7a4f1d");
+        Assert.Contains("<svg", svg);
+        Assert.Contains("<polyline", svg);
+    }
 }

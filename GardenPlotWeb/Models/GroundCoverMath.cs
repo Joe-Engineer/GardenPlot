@@ -26,6 +26,7 @@ public static class GroundCoverMath
             ShapeKind.Tree => 0,
             ShapeKind.Bush => 0,
             ShapeKind.Plant => 0,
+            ShapeKind.SoilMarker => 0,
             _ => 0,
         };
     }
