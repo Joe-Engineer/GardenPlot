@@ -143,6 +143,21 @@
     white-space: nowrap;
 }
 
+.rotation-editor-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.rotation-input {
+    max-width: 96px;
+    text-align: right;
+}
+
+.rotation-presets {
+    flex-wrap: wrap;
+}
+
 .zoom-btn {
     width: 30px;
     height: 30px;

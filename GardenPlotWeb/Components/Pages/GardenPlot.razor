@@ -215,6 +215,29 @@ else
                 <input type="number" min="0" max="100" step="0.1" class="form-control form-control-sm drop-input" title="Row center spacing (ft), 0 = item default or √3/2 × X when triangulated"
                        @bind="arrayCenterSpacingYFt" />
             </div>
+            @if (currentTool == Tool.Select && GetCurrentSelectedDropGroup() is { Pattern: DropPattern.Array } selectedArrayDropGroup)
+            {
+                <div class="drop-field">
+                    <label class="drop-field-label">Rot °</label>
+                    <input type="number"
+                           min="0"
+                           max="360"
+                           step="1"
+                           class="form-control form-control-sm drop-input rotation-input"
+                           title="Array orientation in degrees"
+                           value="@GetSelectedGroupRotationInputValue(selectedArrayDropGroup)"
+                           @oninput="OnSelectedGroupRotationInput"
+                           @onchange="OnSelectedGroupRotationChanged"
+                           @onkeydown="OnSelectedGroupRotationKeyDown" />
+                </div>
+                <div class="btn-group btn-group-sm rotation-presets" role="group" aria-label="Set array rotation">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedGroupRotationAsync(0)">0°</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedGroupRotationAsync(45)">45°</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedGroupRotationAsync(90)">90°</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedGroupRotationAsync(180)">180°</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedGroupRotationAsync(270)">270°</button>
+                </div>
+            }
             <label class="drop-check small" title="Offsets every other row by half an X spacing. With Y ft = 0, rows become equilateral."><input type="checkbox" @bind="arrayTriangulated" /> Triangulated</label>
             <label class="drop-check small"><input type="checkbox" @bind="arrayRotationAutoShift" /> Auto-shift on rotate</label>
             </span>
@@ -1692,6 +1715,32 @@ else
                 @if (!isPreview && drafting is not null && drafting.Kind == ShapeKind.Ruler && single!.Id == drafting.Id)
                 {
                     <div class="x-small text-muted mt-1">Click to finish · Ctrl+click to add a vertex</div>
+                }
+
+                @if (!isPreview)
+                {
+                    <div class="rotation-editor mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Rotation</div>
+                        <div class="rotation-editor-row">
+                            <input type="number"
+                                   min="0"
+                                   max="360"
+                                   step="1"
+                                   class="form-control form-control-sm rotation-input"
+                                   value="@GetSelectedRotationInputValue(single!)"
+                                   @oninput="OnSelectedRotationInput"
+                                   @onchange="OnSelectedRotationChanged"
+                                   @onkeydown="OnSelectedRotationKeyDown" />
+                            <span class="small text-muted">deg</span>
+                        </div>
+                        <div class="btn-group btn-group-sm rotation-presets" role="group" aria-label="Set shape rotation">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedShapeRotationAsync(0)">0°</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedShapeRotationAsync(45)">45°</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedShapeRotationAsync(90)">90°</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedShapeRotationAsync(180)">180°</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedShapeRotationAsync(270)">270°</button>
+                        </div>
+                    </div>
                 }
 
                 @if (!isPreview && single!.Kind == ShapeKind.Edge)
