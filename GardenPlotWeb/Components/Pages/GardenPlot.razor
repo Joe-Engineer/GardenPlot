@@ -1801,16 +1801,38 @@ else
                             <option value="Rectangle">Rectangle (flat)</option>
                         </select>
                     </div>
-                    <div class="row g-2">
-                        <div class="col">
+                    <div class="row g-2 plot-dimension-row">
+                        <div class="col plot-dimension-col">
                             <label class="form-label small">Width (ft)</label>
                             <input type="number" min="1" max="500" step="0.5" class="form-control form-control-sm"
-                                   @bind="newPlotWidth" />
+                                   value="@F(newPlotWidth)" @onchange="OnNewPlotWidthChanged" />
                         </div>
-                        <div class="col">
+                        <div class="col-auto plot-dimension-lock-col">
+                            <button type="button"
+                                    class="aspect-lock-toggle @(aspectLocked ? "locked" : string.Empty)"
+                                    @onclick="ToggleAspectLock"
+                                    aria-label="Lock aspect ratio"
+                                    aria-pressed="@aspectLocked"
+                                    title="Lock aspect ratio">
+                                @if (aspectLocked)
+                                {
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path fill="currentColor" d="M14.41 4.76C15.96 3.21 18.49 3.21 20.04 4.76C21.59 6.32 21.59 8.84 20.04 10.4L17.76 12.68C16.21 14.23 13.68 14.23 12.12 12.68L11.56 12.12L13.26 10.42L13.83 10.98C14.44 11.6 15.44 11.6 16.06 10.98L18.34 8.7C18.96 8.08 18.96 7.08 18.34 6.46C17.72 5.84 16.72 5.84 16.1 6.46L13.82 8.74L12.12 7.04ZM11.88 11.32L12.44 11.88L10.74 13.58L10.17 13.02C9.56 12.4 8.56 12.4 7.94 13.02L5.66 15.3C5.04 15.92 5.04 16.92 5.66 17.54C6.28 18.16 7.28 18.16 7.9 17.54L10.18 15.26L11.88 16.96L9.59 19.24C8.04 20.79 5.51 20.79 3.96 19.24C2.41 17.68 2.41 15.16 3.96 13.6L6.24 11.32C7.79 9.77 10.32 9.77 11.88 11.32ZM8.54 11.88L11.88 8.54L15.46 12.12L12.12 15.46Z" />
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M10.6 13.4C9.43 12.23 9.43 10.34 10.6 9.17L13.17 6.6C14.34 5.43 16.23 5.43 17.4 6.6C18.57 7.77 18.57 9.66 17.4 10.83L15.9 12.33" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                        <path d="M13.4 10.6C14.57 11.77 14.57 13.66 13.4 14.83L10.83 17.4C9.66 18.57 7.77 18.57 6.6 17.4C5.43 16.23 5.43 14.34 6.6 13.17L8.1 11.67" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                }
+                            </button>
+                        </div>
+                        <div class="col plot-dimension-col">
                             <label class="form-label small">Height (ft)</label>
                             <input type="number" min="1" max="500" step="0.5" class="form-control form-control-sm"
-                                   @bind="newPlotHeight" />
+                                   value="@F(newPlotHeight)" @onchange="OnNewPlotHeightChanged" />
                         </div>
                     </div>
 
