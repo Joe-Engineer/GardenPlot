@@ -37,6 +37,9 @@ public sealed class ModelPropertyTests
             GroupId = groupId,
             GroupIndex = 2,
             TileBackgroundImageFileName = "tile.png",
+            MaterialCode = "Pea Gravel",
+            DepthIn = 3.5,
+            WastePercent = 7.5,
             GroundCoverCode = "Mulch",
             GroundCoverDepthIn = 3,
             IsGroundCoverSurface = true,
@@ -61,6 +64,9 @@ public sealed class ModelPropertyTests
         Assert.Equal(groupId, s.GroupId);
         Assert.Equal(2, s.GroupIndex);
         Assert.Equal("tile.png", s.TileBackgroundImageFileName);
+        Assert.Equal("Pea Gravel", s.MaterialCode);
+        Assert.Equal(3.5, s.DepthIn);
+        Assert.Equal(7.5, s.WastePercent);
         Assert.Equal("Mulch", s.GroundCoverCode);
         Assert.Equal(3, s.GroundCoverDepthIn);
         Assert.True(s.IsGroundCoverSurface);

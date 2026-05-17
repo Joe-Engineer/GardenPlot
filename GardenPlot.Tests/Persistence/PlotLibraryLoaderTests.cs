@@ -665,6 +665,118 @@ public class PlotLibraryLoaderTests
     }
 
     [Fact]
+    public void Load_Version1_MigratesLegacyGroundCoverFieldsToMaterialFields()
+    {
+        var doc = new JsonObject
+        {
+            ["SchemaVersion"] = 1,
+            ["Plots"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["Name"] = "Legacy",
+                    ["Shapes"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["GroundCoverCode"] = "Pea Gravel",
+                            ["GroundCoverDepthIn"] = 2.5,
+                            ["IsGroundCoverSurface"] = false,
+                        },
+                    },
+                },
+            },
+        };
+
+        var loader = CreateLoader();
+        var lib = loader.Load(doc.ToJsonString(), "unit-test");
+
+        Assert.NotNull(lib);
+        Shape shape = Assert.Single(Assert.Single(lib!.Plots).Shapes);
+        Assert.Equal("Pea Gravel", shape.MaterialCode);
+        Assert.Equal(2.5, shape.DepthIn);
+        Assert.Equal("Pea Gravel", shape.GroundCoverCode);
+        Assert.Equal(2.5, shape.GroundCoverDepthIn);
+        Assert.False(shape.IsGroundCoverSurface);
+    }
+
+    [Fact]
+    public void Load_Version2_MigratesLegacyGroundCoverFieldsToMaterialFields()
+    {
+        var doc = new JsonObject
+        {
+            ["SchemaVersion"] = 2,
+            ["Plots"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["Name"] = "LegacyV2",
+                    ["Takeoff"] = new JsonArray(),
+                    ["TakeoffIds"] = new JsonObject { ["Next"] = 1 },
+                    ["Shapes"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["GroundCoverCode"] = "White Clover",
+                            ["GroundCoverDepthIn"] = 1.5,
+                            ["IsGroundCoverSurface"] = true,
+                        },
+                    },
+                },
+            },
+        };
+
+        var loader = CreateLoader();
+        var lib = loader.Load(doc.ToJsonString(), "unit-test");
+
+        Assert.NotNull(lib);
+        Assert.Equal(PlotSchema.Current, lib!.SchemaVersion);
+        Shape shape = Assert.Single(Assert.Single(lib.Plots).Shapes);
+        Assert.Equal("White Clover", shape.MaterialCode);
+        Assert.Equal(1.5, shape.DepthIn);
+        Assert.Equal("White Clover", shape.GroundCoverCode);
+        Assert.Equal(1.5, shape.GroundCoverDepthIn);
+        Assert.True(shape.IsGroundCoverSurface);
+    }
+
+    [Fact]
+    public void Load_RoundTrip_PreservesLegacyAndNewMaterialFields()
+    {
+        var source = new PlotLibrary();
+        source.Plots.Add(
+            new PlotData
+            {
+                Name = "Materials",
+                Shapes =
+                {
+                    new Shape
+                    {
+                        Kind = ShapeKind.Rectangle,
+                        MaterialCode = "Pea Gravel",
+                        DepthIn = 4,
+                        WastePercent = 7.5,
+                        GroundCoverCode = "Pea Gravel",
+                        GroundCoverDepthIn = 4,
+                        IsGroundCoverSurface = false,
+                    },
+                },
+            });
+
+        var loader = CreateLoader();
+        PlotLibrary loaded = Assert.IsType<PlotLibrary>(loader.Load(JsonSerializer.Serialize(source), "unit-test"));
+        string roundTripJson = JsonSerializer.Serialize(loaded);
+        using JsonDocument doc = JsonDocument.Parse(roundTripJson);
+        JsonElement shape = doc.RootElement.GetProperty("Plots")[0].GetProperty("Shapes")[0];
+
+        Assert.Equal("Pea Gravel", shape.GetProperty("MaterialCode").GetString());
+        Assert.Equal(4, shape.GetProperty("DepthIn").GetDouble());
+        Assert.Equal(7.5, shape.GetProperty("WastePercent").GetDouble());
+        Assert.Equal("Pea Gravel", shape.GetProperty("GroundCoverCode").GetString());
+        Assert.Equal(4, shape.GetProperty("GroundCoverDepthIn").GetDouble());
+        Assert.False(shape.GetProperty("IsGroundCoverSurface").GetBoolean());
+    }
+
+    [Fact]
     public void Load_EmitsLoadMetric_OnHappyPath()
     {
         var observed = new List<(string Name, long Value, IReadOnlyDictionary<string, object?> Tags)>();

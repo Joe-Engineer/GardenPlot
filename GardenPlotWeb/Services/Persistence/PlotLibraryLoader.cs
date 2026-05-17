@@ -205,16 +205,20 @@ public sealed class PlotLibraryLoader
     /// <c>TakeoffIds</c> sequence, library-level <c>CustomCatalogItems</c>, costing defaults,
     /// legacy triangulation migration, the v2 grass / ground-cover surface catalog rebind,
     /// <see cref="PlotData.BackgroundFit"/>, per-plot <c>LayerStates</c>, the
-    /// <see cref="DropGroup"/> along-path fields, <see cref="Shape.ClippedBy"/> metadata, and
-    /// <see cref="PlotData.Tasks"/> collections. We deserialize as the current shape
-    /// (forward-compatible — missing fields take safe defaults, extra absent fields are tolerated
-    /// by <c>JsonSerializer</c>), synthesize one <see cref="TakeoffItem"/> per existing
-    /// <see cref="Shape"/>, normalize missing layer state and task collections, rebind legacy
-    /// plant/tile placements onto the surface catalog, then project legacy triangulation flags
-    /// onto <see cref="DropGroup.Triangulated"/> and stamp a valid background-fit value.
+    /// <see cref="DropGroup"/> along-path fields, <see cref="Shape.ClippedBy"/> metadata,
+    /// <see cref="PlotData.Tasks"/> collections, and the narrowed material fields. We
+    /// pre-migrate legacy ground-cover fields onto the current material model, deserialize as
+    /// the current shape (forward-compatible — missing fields take safe defaults, extra absent
+    /// fields are tolerated by <c>JsonSerializer</c>), synthesize one <see cref="TakeoffItem"/>
+    /// per existing <see cref="Shape"/>, normalize missing layer state and task collections,
+    /// rebind legacy plant/tile placements onto the surface catalog, then project legacy
+    /// triangulation flags onto <see cref="DropGroup.Triangulated"/> and stamp a valid
+    /// background-fit value.
     /// </summary>
     private static PlotLibrary? LoadFromVersion1(JsonObject root, JsonSerializerOptions? options)
     {
+        MigrateLegacyMaterialFields(root);
+
         PlotLibrary? library = NormalizeLoadedLibrary(root.Deserialize<PlotLibrary>(options ?? SerializerOptions));
         if (library is null)
         {
@@ -237,8 +241,9 @@ public sealed class PlotLibraryLoader
     /// Loader for schema v2. v2 documents already have takeoff items, but may still contain
     /// legacy plant/custom-tile placements for area-based grasses or ground covers, predate the
     /// costing fields, soil-marker reading lists, clipping metadata, task collections, the
-    /// <c>StaggerHalf</c> to <see cref="DropGroup.Triangulated"/> rename, the
-    /// <see cref="PlotData.BackgroundFit"/> field, and per-plot <c>LayerStates</c>. Direct typed
+    /// narrowed material fields, the <c>StaggerHalf</c> to <see cref="DropGroup.Triangulated"/>
+    /// rename, the <see cref="PlotData.BackgroundFit"/> field, and per-plot <c>LayerStates</c>.
+    /// We pre-migrate legacy ground-cover fields onto the current material model; direct typed
     /// deserialization is sufficient because the newer members carry safe model defaults
     /// (markup 25%, labor rate 75, internal view on, line total on, default rotation for
     /// shapes/drop groups, empty soil-reading + clip lists, empty task collections, and
@@ -248,6 +253,8 @@ public sealed class PlotLibraryLoader
     /// </summary>
     private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
     {
+        MigrateLegacyMaterialFields(root);
+
         PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
         if (library is null)
         {
@@ -263,10 +270,13 @@ public sealed class PlotLibraryLoader
 
     /// <summary>
     /// Loader for schema v3. v3 documents already use <see cref="DropGroup.Triangulated"/>, but
-    /// still predate <see cref="PlotData.BackgroundFit"/> and per-plot <c>LayerStates</c>.
+    /// still predate <see cref="PlotData.BackgroundFit"/>, per-plot <c>LayerStates</c>, and the
+    /// narrowed material fields.
     /// </summary>
     private static PlotLibrary? LoadFromVersion3(JsonObject root, JsonSerializerOptions? options)
     {
+        MigrateLegacyMaterialFields(root);
+
         PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
         if (library is null)
         {
@@ -352,6 +362,44 @@ public sealed class PlotLibraryLoader
         foreach (PlotData plot in library.Plots)
         {
             LayerResolver.EnsureLayerStates(plot);
+        }
+    }
+
+    private static void MigrateLegacyMaterialFields(JsonObject root)
+    {
+        if (root["Plots"] is not JsonArray plots)
+        {
+            return;
+        }
+
+        foreach (JsonNode? plotNode in plots)
+        {
+            if (plotNode is not JsonObject plotObject || plotObject["Shapes"] is not JsonArray shapes)
+            {
+                continue;
+            }
+
+            foreach (JsonNode? shapeNode in shapes)
+            {
+                if (shapeNode is not JsonObject shapeObject)
+                {
+                    continue;
+                }
+
+                string? materialCode = shapeObject["MaterialCode"]?.GetValue<string>();
+                string? legacyCode = shapeObject["GroundCoverCode"]?.GetValue<string>();
+                if (string.IsNullOrWhiteSpace(materialCode) && !string.IsNullOrWhiteSpace(legacyCode))
+                {
+                    shapeObject["MaterialCode"] = legacyCode;
+                }
+
+                if (shapeObject["DepthIn"] is null &&
+                    shapeObject.TryGetPropertyValue("GroundCoverDepthIn", out JsonNode? legacyDepthNode) &&
+                    legacyDepthNode is not null)
+                {
+                    shapeObject["DepthIn"] = legacyDepthNode.DeepClone();
+                }
+            }
         }
     }
 

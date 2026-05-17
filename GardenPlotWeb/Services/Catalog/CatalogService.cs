@@ -92,9 +92,9 @@ public sealed class CatalogService : ICatalogService
                 continue;
             }
 
-            if (field.Name is "BedKits" or "Trees" or "Bushes")
+            if (field.Name is "BedKits" or "Trees" or "Bushes" or "MaterialItems")
             {
-                continue; // already added above with calibrated labor defaults
+                continue; // already added above with calibrated labor defaults or is a synthetic aggregate
             }
 
             PaletteItem[] arr = (PaletteItem[])field.GetValue(null)!;

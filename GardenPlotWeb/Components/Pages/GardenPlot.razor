@@ -1939,18 +1939,42 @@ else
 
                 @if (!isPreview && IsGroundCoverShape(single!))
                 {
+                    var materialItem = MaterialItemFor(single!);
+                    var materialCode = MaterialCodeFor(single!);
+                    var materialSoldBy = MaterialSoldByFor(single!, materialItem);
+                    var materialArea = GroundCoverMath.AreaFt2(single!);
+                    var materialDepth = GroundCoverMath.ResolveDepthIn(single!, materialItem);
+                    var materialWaste = GroundCoverMath.ResolveWastePercent(single!, materialItem);
+                    var materialVolume = GroundCoverMath.QuantityWithWaste(GroundCoverMath.VolumeYd3(materialArea, materialDepth), materialWaste);
                     <div class="ground-cover-info mt-2 pt-2 border-top">
-                        <div class="small fw-semibold mb-1">Ground cover</div>
+                        <div class="small fw-semibold mb-1">Material</div>
                         <div class="small mb-1 d-flex align-items-center gap-2">
-                            <span class="text-muted">Material:</span>
-                            <strong>@(string.IsNullOrWhiteSpace(single!.GroundCoverCode) ? (single!.Label ?? "(unnamed)") : single!.GroundCoverCode)</strong>
+                            <span class="text-muted">Selected:</span>
+                            <strong>@MaterialDisplayName(single!)</strong>
                             <span class="gc-swatch"
                                   style="@($"background:{single!.Fill ?? "#8a8276"};border-color:{single!.Stroke ?? "#3f3a30"};")"
                                   title="@(string.IsNullOrWhiteSpace(single!.TextureKey) ? "color" : single!.TextureKey)"></span>
-                            @if (single!.IsGroundCoverSurface)
+                            @if (materialSoldBy == MaterialSoldBy.Area)
                             {
                                 <span class="badge text-bg-secondary">surface</span>
                             }
+                        </div>
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="small text-muted mb-0">Material:</label>
+                            <select class="form-select form-select-sm"
+                                    value="@materialCode"
+                                    @onchange="@(e => OnMaterialChanged(single!, e.Value?.ToString()))">
+                                <option value="">(select material)</option>
+                                @foreach (var group in MaterialPickerGroups)
+                                {
+                                    <optgroup label="@MaterialCategoryLabel(group.Category)">
+                                        @foreach (var item in group.Items)
+                                        {
+                                            <option value="@item.Code">@item.Code</option>
+                                        }
+                                    </optgroup>
+                                }
+                            </select>
                         </div>
                         <div class="small mb-1">
                             <span class="text-muted">Area:</span>
@@ -1961,16 +1985,25 @@ else
                                 <strong>@($"{GroundCoverMath.VolumeYd3(NetAreaFt2(single!), d):0.##} yd³")</strong>
                             }
                         </div>
-                        @if (!single!.IsGroundCoverSurface)
+                        @if (materialSoldBy == MaterialSoldBy.Volume)
                         {
                             <div class="d-flex align-items-center gap-1 mb-1">
                                 <label class="small text-muted mb-0">Depth (in):</label>
                                 <input type="number" min="0" step="0.1"
                                        class="form-control form-control-sm gc-depth-input"
-                                       value="@(single!.GroundCoverDepthIn ?? 0)"
+                                       value="@NumberValue(single!.DepthIn)"
+                                       placeholder="@NumberPlaceholder(materialItem?.DefaultDepthIn ?? 0)"
                                        @oninput="@(e => OnGroundCoverDepthChanged(single!, e.Value?.ToString()))" />
                             </div>
                         }
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <label class="small text-muted mb-0">Waste (%):</label>
+                            <input type="number" min="0" step="0.1"
+                                   class="form-control form-control-sm gc-depth-input"
+                                   value="@NumberValue(single!.WastePercent)"
+                                   placeholder="@NumberPlaceholder(materialItem?.DefaultWastePercent ?? 0)"
+                                   @oninput="@(e => OnGroundCoverWasteChanged(single!, e.Value?.ToString()))" />
+                        </div>
                         <div class="d-flex align-items-center gap-1 mb-1">
                             <label class="small text-muted mb-0">Texture:</label>
                             <select class="form-select form-select-sm"

@@ -51,13 +51,22 @@ public class Shape
     /// <summary>Optional bound takeoff item for length-based materials such as edging.</summary>
     public TakeoffItem? Takeoff { get; set; }
 
-    /// <summary>Ground-cover palette item code (e.g. "Pea Gravel"). Empty for non-ground-cover shapes.</summary>
+    /// <summary>Optional material catalog code override (for example, "Pea Gravel").</summary>
+    public string? MaterialCode { get; set; }
+
+    /// <summary>Optional material depth override in inches.</summary>
+    public double? DepthIn { get; set; }
+
+    /// <summary>Optional material waste override as a percentage.</summary>
+    public double? WastePercent { get; set; }
+
+    /// <summary>Legacy ground-cover palette item code kept for one schema-version overlap.</summary>
     public string? GroundCoverCode { get; set; }
 
-    /// <summary>Ground-cover depth in inches. Null for surface (no-depth) covers.</summary>
+    /// <summary>Legacy ground-cover depth in inches kept for one schema-version overlap.</summary>
     public double? GroundCoverDepthIn { get; set; }
 
-    /// <summary>True when this shape is a surface ground cover (sold by area, no depth).</summary>
+    /// <summary>Legacy surface-cover flag kept for one schema-version overlap.</summary>
     public bool IsGroundCoverSurface { get; set; }
 
     /// <summary>Procedural texture key (e.g. "gravel-fine"). Resolved client-side by the texture registry.</summary>

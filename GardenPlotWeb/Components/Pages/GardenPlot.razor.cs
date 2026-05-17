@@ -664,6 +664,16 @@ public partial class GardenPlot
         return by.OrderBy(kv => kv.Key).Select(kv => (kv.Key, kv.Value)).ToList();
     }
 
+    private sealed record MaterialPickerGroup(MaterialCategory Category, IReadOnlyList<PaletteItem> Items);
+
+    private static readonly IReadOnlyList<MaterialPickerGroup> MaterialPickerGroups =
+        PaletteCatalog.MaterialItems
+            .Where(item => item.MaterialCategory is MaterialCategory)
+            .GroupBy(item => item.MaterialCategory!.Value)
+            .OrderBy(group => MaterialCategoryLabel(group.Key), StringComparer.Ordinal)
+            .Select(group => new MaterialPickerGroup(group.Key, group.OrderBy(item => item.Code, StringComparer.Ordinal).ToArray()))
+            .ToArray();
+
     private IReadOnlyList<TakeoffItemRow> BuildTakeoffItemRows()
     {
         if (currentPlot is null)
@@ -828,10 +838,30 @@ public partial class GardenPlot
     private static bool IsGroundCoverShape(Shape s)
     {
         return string.Equals(s.Trait, "ground-cover", StringComparison.OrdinalIgnoreCase)
-            || !string.IsNullOrWhiteSpace(s.GroundCoverCode);
+            || !string.IsNullOrWhiteSpace(GroundCoverMath.MaterialCode(s));
     }
 
     private static bool CanShapeBeClipped(Shape shape) => GroundCoverMath.IsAreaShape(shape);
+
+    private static PaletteItem? MaterialItemFor(Shape s) => PaletteCatalog.FindMaterial(GroundCoverMath.MaterialCode(s));
+
+    private static string MaterialCodeFor(Shape s) => GroundCoverMath.MaterialCode(s) ?? string.Empty;
+
+    private static string MaterialDisplayName(Shape s) => string.IsNullOrWhiteSpace(GroundCoverMath.MaterialCode(s)) ? (s.Label ?? "(unnamed)") : GroundCoverMath.MaterialCode(s)!;
+
+    private static MaterialSoldBy MaterialSoldByFor(Shape s, PaletteItem? item = null) => GroundCoverMath.ResolveSoldBy(s, item);
+
+    private static bool MaterialUsesDepth(Shape s, PaletteItem? item = null) => MaterialSoldByFor(s, item) == MaterialSoldBy.Volume;
+
+    private static string NumberValue(double? value) => value?.ToString("0.###", CultureInfo.InvariantCulture) ?? string.Empty;
+
+    private static string NumberPlaceholder(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+
+    private static string MaterialCategoryLabel(MaterialCategory category) => category switch
+    {
+        MaterialCategory.GroundCover => "Ground cover",
+        _ => category.ToString(),
+    };
 
     private static readonly string[] GroundCoverTextureKeys =
     [
@@ -1002,12 +1032,62 @@ public partial class GardenPlot
         "</pattern>",
     ];
 
+    private void OnMaterialChanged(Shape s, string? value)
+    {
+        RecordUndoState();
+
+        PaletteItem? item = PaletteCatalog.FindMaterial(value);
+        if (item is null)
+        {
+            s.MaterialCode = null;
+            s.DepthIn = null;
+            s.WastePercent = null;
+            s.GroundCoverCode = null;
+            s.GroundCoverDepthIn = null;
+            s.IsGroundCoverSurface = false;
+            _ = SaveAsync();
+            return;
+        }
+
+        ApplyMaterialCatalogDefaults(s, item, clearOverrides: true);
+        _ = SaveAsync();
+    }
+
     private void OnGroundCoverDepthChanged(Shape s, string? value)
     {
+        PaletteItem? item = MaterialItemFor(s);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            RecordUndoState();
+            s.DepthIn = null;
+            s.GroundCoverDepthIn = MaterialUsesDepth(s, item) ? item?.DefaultDepthIn : null;
+            _ = SaveAsync();
+            return;
+        }
+
         if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double depth) && depth >= 0)
         {
             RecordUndoState();
+            s.DepthIn = depth;
             s.GroundCoverDepthIn = depth;
+            _ = SaveAsync();
+        }
+    }
+
+    private void OnGroundCoverWasteChanged(Shape s, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            RecordUndoState();
+            s.WastePercent = null;
+            _ = SaveAsync();
+            return;
+        }
+
+        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double waste) && waste >= 0)
+        {
+            RecordUndoState();
+            s.WastePercent = waste;
             _ = SaveAsync();
         }
     }
@@ -1076,6 +1156,7 @@ public partial class GardenPlot
         {
             return;
         }
+
         RecordUndoState();
         s.TextureImageId = null;
         _ = SaveAsync();
@@ -1083,35 +1164,33 @@ public partial class GardenPlot
 
     private void ResetGroundCoverToPaletteDefaults(Shape s)
     {
-        if (string.IsNullOrWhiteSpace(s.GroundCoverCode))
-        {
-            return;
-        }
-
-        PaletteItem? item = null;
-        if (!s.IsGroundCoverSurface)
-        {
-            item = PaletteCatalog.GroundCoverMaterials.FirstOrDefault(p => string.Equals(p.Code, s.GroundCoverCode, StringComparison.OrdinalIgnoreCase));
-        }
-        if (item is null)
-        {
-            item = PaletteCatalog.GroundCoverSurfaceCovers.FirstOrDefault(p => string.Equals(p.Code, s.GroundCoverCode, StringComparison.OrdinalIgnoreCase));
-        }
+        PaletteItem? item = MaterialItemFor(s);
         if (item is null)
         {
             return;
         }
 
         RecordUndoState();
+        ApplyMaterialCatalogDefaults(s, item, clearOverrides: true);
+        _ = SaveAsync();
+    }
+
+    private static void ApplyMaterialCatalogDefaults(Shape s, PaletteItem item, bool clearOverrides)
+    {
+        s.MaterialCode = item.Code;
+        s.GroundCoverCode = item.Code;
+        s.IsGroundCoverSurface = item.MaterialSoldBy == MaterialSoldBy.Area;
         s.TextureKey = item.TextureKey;
         s.TextureImageId = null;
         s.Fill = item.FillColor;
         s.Stroke = item.StrokeColor;
-        if (!s.IsGroundCoverSurface && item.DefaultDepthIn is double dd)
+        s.GroundCoverDepthIn = item.MaterialSoldBy == MaterialSoldBy.Volume ? item.DefaultDepthIn : null;
+
+        if (clearOverrides)
         {
-            s.GroundCoverDepthIn = dd;
+            s.DepthIn = null;
+            s.WastePercent = null;
         }
-        _ = SaveAsync();
     }
 
     private static double EdgeStrokeWidthFt(Shape shape)
@@ -1196,6 +1275,11 @@ public partial class GardenPlot
 
     private static string TakeoffKind(Shape s)
     {
+        if (IsGroundCoverShape(s))
+        {
+            return MaterialSoldByFor(s) == MaterialSoldBy.Area ? "Ground Cover — Surface" : "Ground Cover";
+        }
+
         if ((s.Kind == ShapeKind.Rectangle || s.Kind == ShapeKind.Oval)
             && string.Equals(s.Trait, "custom-tile", StringComparison.OrdinalIgnoreCase))
         {
@@ -1234,6 +1318,11 @@ public partial class GardenPlot
 
     private static string TakeoffName(Shape s)
     {
+        if (IsGroundCoverShape(s))
+        {
+            return MaterialDisplayName(s);
+        }
+
         if (!string.IsNullOrEmpty(s.Label))
         {
             return s.Label!;
@@ -5270,6 +5359,8 @@ public partial class GardenPlot
                     var surfaceTrait = isSurface && !string.IsNullOrWhiteSpace(gcItem.Trait)
                         ? gcItem.Trait
                         : "ground-cover";
+                    var depthOverride = isSurface || depth == gcItem.DefaultDepthIn ? null : depth;
+                    var legacyDepth = isSurface ? (double?)null : (depth ?? gcItem.DefaultDepthIn);
                     if (groundCoverSubMode == GroundCoverSubMode.Polygon)
                     {
                         // Click-by-vertex polygon. First click: start the shape with an
@@ -5284,8 +5375,10 @@ public partial class GardenPlot
                                 Label = gcItem.Code,
                                 Stroke = gcItem.StrokeColor,
                                 Fill = gcItem.FillColor,
+                                MaterialCode = gcItem.Code,
+                                DepthIn = depthOverride,
                                 GroundCoverCode = gcItem.Code,
-                                GroundCoverDepthIn = depth,
+                                GroundCoverDepthIn = legacyDepth,
                                 IsGroundCoverSurface = isSurface,
                                 TextureKey = gcItem.TextureKey,
                             };
@@ -5310,8 +5403,10 @@ public partial class GardenPlot
                             Label = gcItem.Code,
                             Stroke = gcItem.StrokeColor,
                             Fill = gcItem.FillColor,
+                            MaterialCode = gcItem.Code,
+                            DepthIn = depthOverride,
                             GroundCoverCode = gcItem.Code,
-                            GroundCoverDepthIn = depth,
+                            GroundCoverDepthIn = legacyDepth,
                             IsGroundCoverSurface = isSurface,
                             TextureKey = gcItem.TextureKey,
                         };
@@ -5330,8 +5425,10 @@ public partial class GardenPlot
                             Label = gcItem.Code,
                             Stroke = gcItem.StrokeColor,
                             Fill = gcItem.FillColor,
+                            MaterialCode = gcItem.Code,
+                            DepthIn = depthOverride,
                             GroundCoverCode = gcItem.Code,
-                            GroundCoverDepthIn = depth,
+                            GroundCoverDepthIn = legacyDepth,
                             IsGroundCoverSurface = isSurface,
                             TextureKey = gcItem.TextureKey,
                         };
@@ -8080,8 +8177,8 @@ public partial class GardenPlot
     {
         if (IsGroundCoverShape(s))
         {
-            var name = !string.IsNullOrWhiteSpace(s.GroundCoverCode) ? s.GroundCoverCode : (s.Label ?? "(unnamed)");
-            return s.IsGroundCoverSurface ? $"Ground Cover — Surface · {name}" : $"Ground Cover · {name}";
+            var name = MaterialDisplayName(s);
+            return MaterialSoldByFor(s) == MaterialSoldBy.Area ? $"Ground Cover — Surface · {name}" : $"Ground Cover · {name}";
         }
 
         if ((s.Kind == ShapeKind.Rectangle || s.Kind == ShapeKind.Oval)

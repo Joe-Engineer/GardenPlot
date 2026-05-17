@@ -335,6 +335,35 @@ public static class PaletteCatalog
         new("Pampas Grass",        PaletteKind.CustomTile, 6,   6,   "grass-ornamental", StampShapeKind: ShapeKind.Oval,      FillColor: "#c8b777", StrokeColor: "#7a5b2a"),
     ];
 
+    private static PaletteItem VolumeMaterial(string code, string trait, string fillColor, string strokeColor, double defaultDepthIn, string textureKey, MaterialCategory materialCategory) =>
+        new(
+            code,
+            PaletteKind.GroundCover,
+            1,
+            1,
+            trait,
+            StampShapeKind: ShapeKind.Rectangle,
+            FillColor: fillColor,
+            StrokeColor: strokeColor,
+            DefaultDepthIn: defaultDepthIn,
+            TextureKey: textureKey,
+            MaterialCategory: materialCategory,
+            MaterialSoldBy: MaterialSoldBy.Volume);
+
+    private static PaletteItem AreaMaterial(string code, string trait, string fillColor, string strokeColor, string textureKey, MaterialCategory materialCategory) =>
+        new(
+            code,
+            PaletteKind.GroundCoverSurface,
+            1,
+            1,
+            trait,
+            StampShapeKind: ShapeKind.Rectangle,
+            FillColor: fillColor,
+            StrokeColor: strokeColor,
+            TextureKey: textureKey,
+            MaterialCategory: materialCategory,
+            MaterialSoldBy: MaterialSoldBy.Area);
+
     /// <summary>
     /// Volumetric ground cover materials (soils, gravels, rocks, mulches, bark, etc.).
     /// Each carries a default depth (inches) and a procedural texture key for rendering.
@@ -343,38 +372,38 @@ public static class PaletteCatalog
     public static readonly PaletteItem[] GroundCoverMaterials =
     [
         // Soils & amendments
-        new("Topsoil",              PaletteKind.GroundCover, 1, 1, "soil",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#4a3a2a", StrokeColor: "#2a1f15", DefaultDepthIn: 4,  TextureKey: "soil-stipple"),
-        new("Garden Mix",           PaletteKind.GroundCover, 1, 1, "soil",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#574030", StrokeColor: "#2a1f15", DefaultDepthIn: 6,  TextureKey: "soil-stipple"),
-        new("Compost",              PaletteKind.GroundCover, 1, 1, "soil",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#3a2a1c", StrokeColor: "#1f1810", DefaultDepthIn: 2,  TextureKey: "compost"),
-        new("Peat Moss",            PaletteKind.GroundCover, 1, 1, "soil",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#3d2e22", StrokeColor: "#1f1810", DefaultDepthIn: 2,  TextureKey: "compost"),
-        new("Sand (Coarse)",        PaletteKind.GroundCover, 1, 1, "sand",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#d6c79a", StrokeColor: "#8a7a4a", DefaultDepthIn: 2,  TextureKey: "sand"),
-        new("Sand (Mason)",         PaletteKind.GroundCover, 1, 1, "sand",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#e0d2a8", StrokeColor: "#8a7a4a", DefaultDepthIn: 1,  TextureKey: "sand"),
+        VolumeMaterial("Topsoil", "soil", "#4a3a2a", "#2a1f15", 4, "soil-stipple", MaterialCategory.Soil),
+        VolumeMaterial("Garden Mix", "soil", "#574030", "#2a1f15", 6, "soil-stipple", MaterialCategory.Soil),
+        VolumeMaterial("Compost", "soil", "#3a2a1c", "#1f1810", 2, "compost", MaterialCategory.Compost),
+        VolumeMaterial("Peat Moss", "soil", "#3d2e22", "#1f1810", 2, "compost", MaterialCategory.Amendment),
+        VolumeMaterial("Sand (Coarse)", "sand", "#d6c79a", "#8a7a4a", 2, "sand", MaterialCategory.Sand),
+        VolumeMaterial("Sand (Mason)", "sand", "#e0d2a8", "#8a7a4a", 1, "sand", MaterialCategory.Sand),
 
         // Gravels
-        new("Pea Gravel",           PaletteKind.GroundCover, 1, 1, "gravel", StampShapeKind: ShapeKind.Rectangle, FillColor: "#b5a98a", StrokeColor: "#6a5e42", DefaultDepthIn: 2,  TextureKey: "gravel-fine"),
-        new("Crushed Granite",      PaletteKind.GroundCover, 1, 1, "gravel", StampShapeKind: ShapeKind.Rectangle, FillColor: "#a89c8a", StrokeColor: "#5e5444", DefaultDepthIn: 2,  TextureKey: "gravel-fine"),
-        new("Crushed Limestone",    PaletteKind.GroundCover, 1, 1, "gravel", StampShapeKind: ShapeKind.Rectangle, FillColor: "#c8c0ad", StrokeColor: "#6e6650", DefaultDepthIn: 3,  TextureKey: "gravel-coarse"),
-        new("3/4\" Gravel",         PaletteKind.GroundCover, 1, 1, "gravel", StampShapeKind: ShapeKind.Rectangle, FillColor: "#9a907c", StrokeColor: "#574e3c", DefaultDepthIn: 3,  TextureKey: "gravel-coarse"),
-        new("Drainage Rock (#57)",  PaletteKind.GroundCover, 1, 1, "gravel", StampShapeKind: ShapeKind.Rectangle, FillColor: "#8e8472", StrokeColor: "#4e4636", DefaultDepthIn: 4,  TextureKey: "gravel-coarse"),
-        new("Road Base",            PaletteKind.GroundCover, 1, 1, "gravel", StampShapeKind: ShapeKind.Rectangle, FillColor: "#8c8170", StrokeColor: "#4a4232", DefaultDepthIn: 4,  TextureKey: "gravel-fine"),
+        VolumeMaterial("Pea Gravel", "gravel", "#b5a98a", "#6a5e42", 2, "gravel-fine", MaterialCategory.Gravel),
+        VolumeMaterial("Crushed Granite", "gravel", "#a89c8a", "#5e5444", 2, "gravel-fine", MaterialCategory.Gravel),
+        VolumeMaterial("Crushed Limestone", "gravel", "#c8c0ad", "#6e6650", 3, "gravel-coarse", MaterialCategory.Gravel),
+        VolumeMaterial("3/4\" Gravel", "gravel", "#9a907c", "#574e3c", 3, "gravel-coarse", MaterialCategory.Gravel),
+        VolumeMaterial("Drainage Rock (#57)", "gravel", "#8e8472", "#4e4636", 4, "gravel-coarse", MaterialCategory.Gravel),
+        VolumeMaterial("Road Base", "gravel", "#8c8170", "#4a4232", 4, "gravel-fine", MaterialCategory.Gravel),
 
         // Decorative rock
-        new("River Rock",           PaletteKind.GroundCover, 1, 1, "rock",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#8a8276", StrokeColor: "#3f3a30", DefaultDepthIn: 3,  TextureKey: "river-rock"),
-        new("Lava Rock (Red)",      PaletteKind.GroundCover, 1, 1, "rock",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#7a3a2c", StrokeColor: "#3f1f18", DefaultDepthIn: 3,  TextureKey: "lava-rock"),
-        new("Lava Rock (Black)",    PaletteKind.GroundCover, 1, 1, "rock",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#2e2a28", StrokeColor: "#0f0d0c", DefaultDepthIn: 3,  TextureKey: "lava-rock"),
-        new("Decorative Rock",      PaletteKind.GroundCover, 1, 1, "rock",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#9d9486", StrokeColor: "#4a4438", DefaultDepthIn: 3,  TextureKey: "decorative-rock"),
-        new("Cobblestone",          PaletteKind.GroundCover, 1, 1, "rock",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#7e7468", StrokeColor: "#3a342c", DefaultDepthIn: 4,  TextureKey: "decorative-rock"),
+        VolumeMaterial("River Rock", "rock", "#8a8276", "#3f3a30", 3, "river-rock", MaterialCategory.Stone),
+        VolumeMaterial("Lava Rock (Red)", "rock", "#7a3a2c", "#3f1f18", 3, "lava-rock", MaterialCategory.Stone),
+        VolumeMaterial("Lava Rock (Black)", "rock", "#2e2a28", "#0f0d0c", 3, "lava-rock", MaterialCategory.Stone),
+        VolumeMaterial("Decorative Rock", "rock", "#9d9486", "#4a4438", 3, "decorative-rock", MaterialCategory.Stone),
+        VolumeMaterial("Cobblestone", "rock", "#7e7468", "#3a342c", 4, "decorative-rock", MaterialCategory.Stone),
 
         // Mulches & bark
-        new("Hardwood Mulch",       PaletteKind.GroundCover, 1, 1, "mulch",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#5a3a26", StrokeColor: "#2a1c10", DefaultDepthIn: 3,  TextureKey: "mulch-fine"),
-        new("Cedar Mulch",          PaletteKind.GroundCover, 1, 1, "mulch",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#7a4a2c", StrokeColor: "#3a2415", DefaultDepthIn: 3,  TextureKey: "mulch-fine"),
-        new("Cypress Mulch",        PaletteKind.GroundCover, 1, 1, "mulch",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#8a6a44", StrokeColor: "#3a2a18", DefaultDepthIn: 3,  TextureKey: "mulch-fine"),
-        new("Pine Bark (Fine)",     PaletteKind.GroundCover, 1, 1, "bark",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#6a4a30", StrokeColor: "#2f2014", DefaultDepthIn: 2,  TextureKey: "bark-chips"),
-        new("Pine Bark (Large)",    PaletteKind.GroundCover, 1, 1, "bark",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#5a3a24", StrokeColor: "#2a1c10", DefaultDepthIn: 3,  TextureKey: "bark-chips"),
-        new("Wood Chips",           PaletteKind.GroundCover, 1, 1, "mulch",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#947050", StrokeColor: "#42301f", DefaultDepthIn: 3,  TextureKey: "mulch-coarse"),
-        new("Arborist Chips",       PaletteKind.GroundCover, 1, 1, "mulch",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#8a6444", StrokeColor: "#3a2a18", DefaultDepthIn: 4,  TextureKey: "mulch-coarse"),
-        new("Rubber Mulch",         PaletteKind.GroundCover, 1, 1, "mulch",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#3a2620", StrokeColor: "#1f140f", DefaultDepthIn: 3,  TextureKey: "mulch-fine"),
-        new("Straw",                PaletteKind.GroundCover, 1, 1, "mulch",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#c9b97a", StrokeColor: "#6e6038", DefaultDepthIn: 2,  TextureKey: "cross-hatch"),
+        VolumeMaterial("Hardwood Mulch", "mulch", "#5a3a26", "#2a1c10", 3, "mulch-fine", MaterialCategory.Mulch),
+        VolumeMaterial("Cedar Mulch", "mulch", "#7a4a2c", "#3a2415", 3, "mulch-fine", MaterialCategory.Mulch),
+        VolumeMaterial("Cypress Mulch", "mulch", "#8a6a44", "#3a2a18", 3, "mulch-fine", MaterialCategory.Mulch),
+        VolumeMaterial("Pine Bark (Fine)", "bark", "#6a4a30", "#2f2014", 2, "bark-chips", MaterialCategory.Mulch),
+        VolumeMaterial("Pine Bark (Large)", "bark", "#5a3a24", "#2a1c10", 3, "bark-chips", MaterialCategory.Mulch),
+        VolumeMaterial("Wood Chips", "mulch", "#947050", "#42301f", 3, "mulch-coarse", MaterialCategory.Mulch),
+        VolumeMaterial("Arborist Chips", "mulch", "#8a6444", "#3a2a18", 4, "mulch-coarse", MaterialCategory.Mulch),
+        VolumeMaterial("Rubber Mulch", "mulch", "#3a2620", "#1f140f", 3, "mulch-fine", MaterialCategory.Mulch),
+        VolumeMaterial("Straw", "mulch", "#c9b97a", "#6e6038", 2, "cross-hatch", MaterialCategory.Mulch),
     ];
 
     /// <summary>
@@ -382,14 +411,14 @@ public static class PaletteCatalog
     /// </summary>
     public static readonly PaletteItem[] GroundCoverSurfaceCovers =
     [
-        new("Kentucky Bluegrass Seed",  PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#6a9a4f", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
-        new("Tall Fescue Seed",         PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#7aa657", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
-        new("Fine Fescue Seed (Shade)", PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#6e8a5a", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
-        new("Perennial Ryegrass Seed", PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#7fa852", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
-        new("Bermuda Seed",             PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#94b34d", StrokeColor: "#5e7a25", TextureKey: "grass-blades"),
-        new("Zoysia Seed",              PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#7c9b40", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
-        new("Buffalo Grass Seed",       PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#8aa56e", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
-        new("Drought-Tolerant Mix",     PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#94a86a", StrokeColor: "#5a7028", TextureKey: "grass-blades"),
+        AreaMaterial("Kentucky Bluegrass Seed", "seed-grass", "#6a9a4f", "#3f6a2d", "grass-blades", MaterialCategory.Sod),
+        AreaMaterial("Tall Fescue Seed", "seed-grass", "#7aa657", "#3f6a2d", "grass-blades", MaterialCategory.Sod),
+        AreaMaterial("Fine Fescue Seed (Shade)", "seed-grass", "#6e8a5a", "#3f6a2d", "grass-blades", MaterialCategory.Sod),
+        AreaMaterial("Perennial Ryegrass Seed", "seed-grass", "#7fa852", "#3f6a2d", "grass-blades", MaterialCategory.Sod),
+        AreaMaterial("Bermuda Seed", "seed-grass", "#94b34d", "#5e7a25", "grass-blades", MaterialCategory.Sod),
+        AreaMaterial("Zoysia Seed", "seed-grass", "#7c9b40", "#3f6a2d", "grass-blades", MaterialCategory.Sod),
+        AreaMaterial("Buffalo Grass Seed", "seed-grass", "#8aa56e", "#3f6a2d", "grass-blades", MaterialCategory.Sod),
+        AreaMaterial("Drought-Tolerant Mix", "seed-grass", "#94a86a", "#5a7028", "grass-blades", MaterialCategory.Sod),
 
         // Grass-like ornamental drifts and living ground-cover plants are placed by area.
         new("Blue Fescue",              PaletteKind.GroundCoverSurface, 1.5, 1.5, "grass",        0, "full",    "low",    365, FillColor: "#7896a0", StrokeColor: "#4b6570", TextureKey: "grass-blades"),
@@ -418,15 +447,15 @@ public static class PaletteCatalog
         new("Corsican Mint",            PaletteKind.GroundCoverSurface, 0.5, 0.5, "ground-cover", 0, "partial", "medium", 365, FillColor: "#6c955f", StrokeColor: "#3d5d34", TextureKey: "clover"),
         new("Irish Moss",               PaletteKind.GroundCoverSurface, 0.5, 0.5, "ground-cover", 0, "partial", "medium", 365, FillColor: "#7aa35b", StrokeColor: "#466433", TextureKey: "clover"),
 
-        new("White Clover",             PaletteKind.GroundCoverSurface, 1, 1, "seed-clover",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#6e8c4a", StrokeColor: "#3f5a25", TextureKey: "clover"),
-        new("Micro Clover",             PaletteKind.GroundCoverSurface, 1, 1, "seed-clover",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#79994f", StrokeColor: "#3f5a25", TextureKey: "clover"),
-        new("Crimson Clover",           PaletteKind.GroundCoverSurface, 1, 1, "seed-clover",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#8a4a48", StrokeColor: "#4a2422", TextureKey: "clover"),
-        new("Dutch Clover",             PaletteKind.GroundCoverSurface, 1, 1, "seed-clover",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#6c8848", StrokeColor: "#3f5a25", TextureKey: "clover"),
+        AreaMaterial("White Clover", "seed-clover", "#6e8c4a", "#3f5a25", "clover", MaterialCategory.GroundCover),
+        AreaMaterial("Micro Clover", "seed-clover", "#79994f", "#3f5a25", "clover", MaterialCategory.GroundCover),
+        AreaMaterial("Crimson Clover", "seed-clover", "#8a4a48", "#4a2422", "clover", MaterialCategory.GroundCover),
+        AreaMaterial("Dutch Clover", "seed-clover", "#6c8848", "#3f5a25", "clover", MaterialCategory.GroundCover),
 
-        new("Wildflower Mix",           PaletteKind.GroundCoverSurface, 1, 1, "seed-flower",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#b07a98", StrokeColor: "#6a4458", TextureKey: "wildflower"),
-        new("Pollinator Mix",           PaletteKind.GroundCoverSurface, 1, 1, "seed-flower",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#c89858", StrokeColor: "#6a522a", TextureKey: "wildflower"),
-        new("Native Shortgrass Mix",    PaletteKind.GroundCoverSurface, 1, 1, "seed-native",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#9aa05a", StrokeColor: "#5a5e30", TextureKey: "grass-blades"),
-        new("Eco-Lawn Mix",             PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#84a35a", StrokeColor: "#4a6a2a", TextureKey: "grass-blades"),
+        AreaMaterial("Wildflower Mix", "seed-flower", "#b07a98", "#6a4458", "wildflower", MaterialCategory.GroundCover),
+        AreaMaterial("Pollinator Mix", "seed-flower", "#c89858", "#6a522a", "wildflower", MaterialCategory.GroundCover),
+        AreaMaterial("Native Shortgrass Mix", "seed-native", "#9aa05a", "#5a5e30", "grass-blades", MaterialCategory.Sod),
+        AreaMaterial("Eco-Lawn Mix", "seed-grass", "#84a35a", "#4a6a2a", "grass-blades", MaterialCategory.Sod),
     ];
 
     /// <summary>Linear edging materials sold by length and rendered as edge polylines.</summary>
@@ -441,6 +470,18 @@ public static class PaletteCatalog
         new("Concrete Curb", PaletteKind.Edging, 4, 1, "edging", StrokeColor: "#9c9b96"),
         new("Paver Soldier Course", PaletteKind.Edging, 4, 1, "edging", StrokeColor: "#7d5b47"),
     ];
+
+    public static readonly PaletteItem[] MaterialItems = [.. GroundCoverMaterials, .. GroundCoverSurfaceCovers];
+
+    public static PaletteItem? FindMaterial(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return null;
+        }
+
+        return MaterialItems.FirstOrDefault(item => string.Equals(item.Code, code, StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>Filters items by user-facing palette category (combobox option).</summary>
     public static IReadOnlyList<PaletteItem> For(PaletteCategory category)

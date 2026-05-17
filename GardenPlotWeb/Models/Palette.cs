@@ -90,6 +90,27 @@ public enum DropPattern
     AlongPath,
 }
 
+public enum MaterialCategory
+{
+    Mulch,
+    Soil,
+    Compost,
+    Gravel,
+    Sand,
+    Stone,
+    Sod,
+    GroundCover,
+    Amendment,
+    Other,
+}
+
+public enum MaterialSoldBy
+{
+    Volume,
+    Area,
+    Each,
+}
+
 /// <summary>
 /// Generalized palette item.
 /// - For bed kits, <c>Pieces</c> is meaningful and metadata is empty.
@@ -116,8 +137,11 @@ public record PaletteItem(
     string? CitationUrl = null,
     PlantProfile? Profile = null,
     double? DefaultDepthIn = null,
+    double? DefaultWastePercent = null,
     string? TextureKey = null,
-    string? TextureImageId = null);
+    string? TextureImageId = null,
+    MaterialCategory? MaterialCategory = null,
+    MaterialSoldBy? MaterialSoldBy = null);
 
 /// <summary>Legacy alias kept for compatibility with existing references.</summary>
 public record BedKit(string Code, double WidthFt, double HeightFt, int Pieces);
