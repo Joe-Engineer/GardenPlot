@@ -66,6 +66,13 @@ public class Shape
     public string? TextureImageId { get; set; }
 }
 
+public enum AlongPathAnchor
+{
+    Start,
+    Center,
+    End,
+}
+
 public class DropGroup
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -84,5 +91,10 @@ public class DropGroup
     public double AnchorCenterX { get; set; }
     public double AnchorCenterY { get; set; }
     public bool AutoShiftOnRotate { get; set; }
+    public Guid? SourcePathShapeId { get; set; }
+    public double? SpacingFtOverride { get; set; }
+    public double? OffsetIn { get; set; }
+    public AlongPathAnchor Anchor { get; set; } = AlongPathAnchor.Start;
+    public bool AlignToTangent { get; set; } = true;
 }
 

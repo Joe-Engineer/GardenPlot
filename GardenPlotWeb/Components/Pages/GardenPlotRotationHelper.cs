@@ -271,6 +271,11 @@ public sealed class PlotUndoSnapshot
             AnchorCenterX = source.AnchorCenterX,
             AnchorCenterY = source.AnchorCenterY,
             AutoShiftOnRotate = source.AutoShiftOnRotate,
+            SourcePathShapeId = source.SourcePathShapeId,
+            SpacingFtOverride = source.SpacingFtOverride,
+            OffsetIn = source.OffsetIn,
+            Anchor = source.Anchor,
+            AlignToTangent = source.AlignToTangent,
         };
     }
 }

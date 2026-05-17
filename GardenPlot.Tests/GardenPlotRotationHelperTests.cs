@@ -54,7 +54,7 @@ public sealed class GardenPlotRotationHelperTests
                 new DropGroup
                 {
                     Id = Guid.NewGuid(),
-                    Pattern = DropPattern.Array,
+                    Pattern = DropPattern.AlongPath,
                     ItemCount = 1,
                     Rows = 1,
                     CenterSpacingXFt = 2,
@@ -63,6 +63,11 @@ public sealed class GardenPlotRotationHelperTests
                     AnchorCenterX = 9,
                     AnchorCenterY = 5,
                     AutoShiftOnRotate = true,
+                    SourcePathShapeId = Guid.NewGuid(),
+                    SpacingFtOverride = 3.5,
+                    OffsetIn = 12,
+                    Anchor = AlongPathAnchor.Center,
+                    AlignToTangent = false,
                 },
             ],
         };
@@ -89,5 +94,10 @@ public sealed class GardenPlotRotationHelperTests
         Assert.Equal(9, restoredGroup.AnchorCenterX);
         Assert.Equal(0, restoredGroup.Rotation);
         Assert.True(restoredGroup.AutoShiftOnRotate);
+        Assert.NotNull(restoredGroup.SourcePathShapeId);
+        Assert.Equal(3.5, restoredGroup.SpacingFtOverride);
+        Assert.Equal(12, restoredGroup.OffsetIn);
+        Assert.Equal(AlongPathAnchor.Center, restoredGroup.Anchor);
+        Assert.False(restoredGroup.AlignToTangent);
     }
 }

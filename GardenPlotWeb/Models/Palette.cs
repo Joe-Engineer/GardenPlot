@@ -84,6 +84,7 @@ public enum DropPattern
     One,
     Line,
     Array,
+    AlongPath,
 }
 
 /// <summary>
