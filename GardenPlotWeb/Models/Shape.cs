@@ -17,6 +17,7 @@ public class Shape
     public double Rotation { get; set; }
     public List<Point> Points { get; set; } = new();
     public bool CloseEdge { get; set; }
+    public List<Guid> ClippedBy { get; set; } = new();
     public string? Label { get; set; }
 
     /// <summary>

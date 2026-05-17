@@ -2,7 +2,10 @@
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
+using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Reflection;
 using GardenPlotWeb.Models;
 using Xunit;
 
@@ -252,5 +255,158 @@ public sealed class TakeoffMathTests
             Assert.True((item.DefaultWastePercent ?? 0) > 0);
             Assert.NotNull(item.DefaultThicknessIn);
         });
+    }
+
+    [Fact]
+    public void EffectiveAreaFt2_NoOverlap_ReturnsGrossArea()
+    {
+        Shape clippee = Rectangle(0, 0, 10, 10, clipperIds: [Guid.NewGuid()]);
+        Shape clipper = Rectangle(20, 20, 2, 2, id: clippee.ClippedBy[0]);
+
+        double area = TakeoffMath.EffectiveAreaFt2(clippee, ToDictionary(clippee, clipper));
+
+        Assert.Equal(100, area, 6);
+    }
+
+    [Fact]
+    public void EffectiveAreaFt2_FullContainment_SubtractsContainedArea()
+    {
+        Shape clipper = Rectangle(2, 3, 4, 5);
+        Shape clippee = Rectangle(0, 0, 10, 10, clipperIds: [clipper.Id]);
+
+        double area = TakeoffMath.EffectiveAreaFt2(clippee, ToDictionary(clippee, clipper));
+
+        Assert.Equal(80, area, 6);
+    }
+
+    [Fact]
+    public void EffectiveAreaFt2_PartialOverlap_SubtractsOverlapArea()
+    {
+        Shape clipper = Rectangle(8, 0, 5, 5);
+        Shape clippee = Rectangle(0, 0, 10, 10, clipperIds: [clipper.Id]);
+
+        double area = TakeoffMath.EffectiveAreaFt2(clippee, ToDictionary(clippee, clipper));
+
+        Assert.Equal(90, area, 6);
+    }
+
+    [Fact]
+    public void EffectiveAreaFt2_MultipleClippers_SubtractsCombinedArea()
+    {
+        Shape clipperA = Rectangle(0, 0, 2, 2);
+        Shape clipperB = Rectangle(7, 7, 3, 2);
+        Shape clippee = Rectangle(0, 0, 10, 10, clipperIds: [clipperA.Id, clipperB.Id]);
+
+        double area = TakeoffMath.EffectiveAreaFt2(clippee, ToDictionary(clippee, clipperA, clipperB));
+
+        Assert.Equal(90, area, 6);
+    }
+
+    [Fact]
+    public void EffectiveAreaFt2_ClipperOverlap_UsesUnionSemantics()
+    {
+        Shape clipperA = Rectangle(0, 0, 6, 6);
+        Shape clipperB = Rectangle(4, 0, 6, 6);
+        Shape clippee = Rectangle(0, 0, 10, 10, clipperIds: [clipperA.Id, clipperB.Id]);
+
+        double area = TakeoffMath.EffectiveAreaFt2(clippee, ToDictionary(clippee, clipperA, clipperB));
+
+        Assert.Equal(40, area, 6);
+    }
+
+    [Fact]
+    public void EffectiveAreaFt2_NonConvexClipper_UsesTriangulatedIntersection()
+    {
+        Shape clipper = new()
+        {
+            Kind = ShapeKind.FreeDraw,
+            Points =
+            [
+                new Point(0, 0),
+                new Point(4, 0),
+                new Point(4, 2),
+                new Point(2, 2),
+                new Point(2, 4),
+                new Point(0, 4),
+            ],
+        };
+        Shape clippee = Rectangle(0, 0, 6, 6, clipperIds: [clipper.Id]);
+
+        double area = TakeoffMath.EffectiveAreaFt2(clippee, ToDictionary(clippee, clipper));
+
+        Assert.Equal(24, area, 6);
+    }
+
+    [Fact]
+    public void BuildTakeoff_UsesNetAreaForGroundCoverQuantity()
+    {
+        Shape clipper = Rectangle(0, 0, 2, 5);
+        Shape clippee = Rectangle(0, 0, 10, 10, clipperIds: [clipper.Id]);
+        clippee.Trait = "ground-cover";
+        clippee.GroundCoverCode = "Grass";
+        clippee.IsGroundCoverSurface = true;
+
+        List<object> rows = BuildTakeoffRows([clippee, clipper]);
+        object row = Assert.Single(rows, r => (string?)GetProperty(r, "Kind") == "Ground Cover — Surface");
+
+        Assert.Equal("90 ft²", GetProperty(row, "Quantity"));
+    }
+
+    [Fact]
+    public void EffectiveAreaFt2_PerfSmoke_HandlesFiftyRelationshipsUnderFiveMilliseconds()
+    {
+        Shape clippee = Rectangle(0, 0, 100, 100);
+        List<Shape> shapes = [clippee];
+        for (int row = 0; row < 5; row++)
+        {
+            for (int col = 0; col < 10; col++)
+            {
+                Shape clipper = Rectangle(col * 5, row * 5, 2, 2);
+                shapes.Add(clipper);
+                clippee.ClippedBy.Add(clipper.Id);
+            }
+        }
+
+        Dictionary<Guid, Shape> byId = ToDictionary(shapes.ToArray());
+        _ = TakeoffMath.EffectiveAreaFt2(clippee, byId);
+
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        double area = TakeoffMath.EffectiveAreaFt2(clippee, byId);
+        stopwatch.Stop();
+
+        Assert.Equal(9800, area, 6);
+        Assert.True(stopwatch.Elapsed.TotalMilliseconds < 5, $"Expected < 5 ms, got {stopwatch.Elapsed.TotalMilliseconds:0.###} ms.");
+    }
+
+    private static Shape Rectangle(double x, double y, double w, double h, Guid? id = null, IReadOnlyList<Guid>? clipperIds = null)
+    {
+        return new Shape
+        {
+            Id = id ?? Guid.NewGuid(),
+            Kind = ShapeKind.Rectangle,
+            X = x,
+            Y = y,
+            W = w,
+            H = h,
+            ClippedBy = clipperIds?.ToList() ?? new List<Guid>(),
+        };
+    }
+
+    private static Dictionary<Guid, Shape> ToDictionary(params Shape[] shapes)
+    {
+        return shapes.ToDictionary(shape => shape.Id);
+    }
+
+    private static List<object> BuildTakeoffRows(IEnumerable<Shape> shapes)
+    {
+        MethodInfo method = typeof(global::GardenPlotWeb.Components.Pages.GardenPlot)
+            .GetMethod("BuildTakeoff", BindingFlags.NonPublic | BindingFlags.Static)!;
+        IEnumerable rows = (IEnumerable)method.Invoke(null, [shapes])!;
+        return rows.Cast<object>().ToList();
+    }
+
+    private static object? GetProperty(object instance, string propertyName)
+    {
+        return instance.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public)!.GetValue(instance);
     }
 }

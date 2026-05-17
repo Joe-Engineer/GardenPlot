@@ -769,6 +769,18 @@
     text-decoration: none;
 }
 
+.clip-hatch-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    color: #35523c;
+}
+
+.clip-hatch-toggle input {
+    margin: 0;
+}
+
 .floating-panel.default-ruler-pos {
     top: 40px;
     right: 40px;
@@ -1086,6 +1098,11 @@
 
 /* ===== Selection panel: multi-select list + color controls ===== */
 
+.clip-action-btn {
+    margin-left: 0.35rem;
+    white-space: nowrap;
+}
+
 .selection-list {
     list-style: none;
     padding-left: 0;
@@ -1351,7 +1368,10 @@
 .ground-cover-info { font-size: 0.85rem; }
 .ground-cover-info .gc-depth-input { width: 5rem; }
 .ground-cover-info select.form-select-sm { max-width: 11rem; }
-
+.clip-info { font-size: 0.85rem; }
+.clip-candidate-list { display: flex; flex-direction: column; gap: 0.3rem; max-height: 10rem; overflow-y: auto; }
+.clip-candidate-row { display: flex; align-items: center; gap: 0.45rem; color: #344437; }
+.clip-hatch-layer { opacity: 0.95; }
 
 .gc-swatch { display: inline-block; width: 1.1rem; height: 1.1rem; border: 1px solid #888; border-radius: 3px; background-clip: padding-box; vertical-align: middle; }
 .gc-swatch.gc-swatch-sm { width: 0.85rem; height: 0.85rem; }

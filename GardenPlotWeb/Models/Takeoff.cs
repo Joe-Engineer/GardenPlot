@@ -78,13 +78,16 @@ public sealed class TakeoffSequence
 }
 
 /// <summary>
-/// Override-then-catalog resolution helpers for a <see cref="TakeoffItem"/>. Each helper returns
-/// the per-instance override when set, otherwise falls back to the matching field on the bound
-/// <see cref="CatalogItem"/>. When the catalog item is missing (unresolved link), reasonable
-/// defaults are returned and the caller can mark the item <c>Unbound</c> in the UI.
+/// Override-then-catalog resolution helpers for a <see cref="TakeoffItem"/> plus net-area helpers
+/// for clipped shapes.
 /// </summary>
 public static class TakeoffMath
 {
+    private readonly record struct AxisAlignedRect(double MinX, double MinY, double MaxX, double MaxY)
+    {
+        public double Area => Math.Max(0, MaxX - MinX) * Math.Max(0, MaxY - MinY);
+    }
+
     public static string DisplayName(TakeoffItem item, CatalogItem? catalog)
     {
         if (!string.IsNullOrWhiteSpace(item.NameOverride))
@@ -216,6 +219,72 @@ public static class TakeoffMath
             : "—";
     }
 
+    /// <summary>Returns the unclipped area for the supplied shape.</summary>
+    public static double GrossAreaFt2(Shape shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        return GroundCoverMath.AreaFt2(shape);
+    }
+
+    /// <summary>Returns the area that remains after subtracting the union of all clippers.</summary>
+    public static double EffectiveAreaFt2(Shape shape, IReadOnlyDictionary<Guid, Shape> allShapesById)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        ArgumentNullException.ThrowIfNull(allShapesById);
+
+        double grossArea = GrossAreaFt2(shape);
+        if (grossArea <= 0)
+        {
+            return 0;
+        }
+
+        if (TryComputeFastRectangleClipArea(shape, allShapesById, out double fastClippedArea))
+        {
+            return Math.Max(0, grossArea - Math.Min(grossArea, fastClippedArea));
+        }
+
+        double clippedArea = Math.Min(grossArea, PolygonClipping.Area(ClipOverlapUnion(shape, allShapesById)));
+        return Math.Max(0, grossArea - clippedArea);
+    }
+
+    /// <summary>Returns the unioned overlap polygons for the shape's active clippers.</summary>
+    public static IReadOnlyList<IReadOnlyList<Point>> ClipOverlapUnion(Shape shape, IReadOnlyDictionary<Guid, Shape> allShapesById)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        ArgumentNullException.ThrowIfNull(allShapesById);
+
+        List<Point> subjectPolygon = GroundCoverMath.ToPolygon(shape);
+        if (subjectPolygon.Count < 3 || shape.ClippedBy.Count == 0)
+        {
+            return Array.Empty<IReadOnlyList<Point>>();
+        }
+
+        HashSet<Guid> seen = new();
+        List<IReadOnlyList<Point>> overlaps = new();
+        foreach (Guid clipperId in shape.ClippedBy)
+        {
+            if (!seen.Add(clipperId) || clipperId == shape.Id)
+            {
+                continue;
+            }
+
+            if (!allShapesById.TryGetValue(clipperId, out Shape? clipper) || !GroundCoverMath.IsAreaShape(clipper))
+            {
+                continue;
+            }
+
+            List<Point> clipperPolygon = GroundCoverMath.ToPolygon(clipper);
+            if (clipperPolygon.Count < 3)
+            {
+                continue;
+            }
+
+            overlaps.AddRange(PolygonClipping.IntersectGeneral(subjectPolygon, clipperPolygon));
+        }
+
+        return overlaps.Count == 0 ? Array.Empty<IReadOnlyList<Point>>() : PolygonClipping.Union(overlaps);
+    }
+
     public static double EffectiveLengthFt(Shape shape)
     {
         ArgumentNullException.ThrowIfNull(shape);
@@ -226,7 +295,7 @@ public static class TakeoffMath
         }
 
         double total = 0;
-        for (var i = 1; i < shape.Points.Count; i++)
+        for (int i = 1; i < shape.Points.Count; i++)
         {
             total += Distance(shape.Points[i - 1], shape.Points[i]);
         }
@@ -298,13 +367,134 @@ public static class TakeoffMath
             : RoundLengthFt(EffectiveLengthFt(shape));
     }
 
+    private static bool TryComputeFastRectangleClipArea(Shape shape, IReadOnlyDictionary<Guid, Shape> allShapesById, out double clippedArea)
+    {
+        clippedArea = 0;
+        if (!TryGetAxisAlignedRectangle(shape, out AxisAlignedRect subject))
+        {
+            return false;
+        }
+
+        HashSet<Guid> seen = new();
+        List<AxisAlignedRect> overlaps = new();
+        foreach (Guid clipperId in shape.ClippedBy)
+        {
+            if (!seen.Add(clipperId) || clipperId == shape.Id)
+            {
+                continue;
+            }
+
+            if (!allShapesById.TryGetValue(clipperId, out Shape? clipper) || !GroundCoverMath.IsAreaShape(clipper))
+            {
+                continue;
+            }
+
+            if (!TryGetAxisAlignedRectangle(clipper, out AxisAlignedRect clipperRect))
+            {
+                return false;
+            }
+
+            AxisAlignedRect overlap = Intersect(subject, clipperRect);
+            if (overlap.Area > 0)
+            {
+                overlaps.Add(overlap);
+            }
+        }
+
+        clippedArea = UnionArea(overlaps);
+        return true;
+    }
+
+    private static bool TryGetAxisAlignedRectangle(Shape shape, out AxisAlignedRect rect)
+    {
+        rect = default;
+        if (Math.Abs(shape.Rotation) > PolygonClipping.Epsilon || shape.Kind is not (ShapeKind.Rectangle or ShapeKind.BedKit))
+        {
+            return false;
+        }
+
+        double minX = Math.Min(shape.X, shape.X + shape.W);
+        double maxX = Math.Max(shape.X, shape.X + shape.W);
+        double minY = Math.Min(shape.Y, shape.Y + shape.H);
+        double maxY = Math.Max(shape.Y, shape.Y + shape.H);
+        rect = new AxisAlignedRect(minX, minY, maxX, maxY);
+        return rect.Area > 0;
+    }
+
+    private static AxisAlignedRect Intersect(AxisAlignedRect left, AxisAlignedRect right)
+    {
+        return new AxisAlignedRect(
+            Math.Max(left.MinX, right.MinX),
+            Math.Max(left.MinY, right.MinY),
+            Math.Min(left.MaxX, right.MaxX),
+            Math.Min(left.MaxY, right.MaxY));
+    }
+
+    private static double UnionArea(IReadOnlyList<AxisAlignedRect> rectangles)
+    {
+        if (rectangles.Count == 0)
+        {
+            return 0;
+        }
+
+        List<double> xValues = rectangles
+            .SelectMany(r => new[] { r.MinX, r.MaxX })
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+        double total = 0;
+        for (int i = 0; i < xValues.Count - 1; i++)
+        {
+            double x1 = xValues[i];
+            double x2 = xValues[i + 1];
+            double width = x2 - x1;
+            if (width <= 0)
+            {
+                continue;
+            }
+
+            List<(double Start, double End)> intervals = rectangles
+                .Where(r => r.MinX < x2 && r.MaxX > x1)
+                .Select(r => (r.MinY, r.MaxY))
+                .OrderBy(r => r.MinY)
+                .ToList();
+            if (intervals.Count == 0)
+            {
+                continue;
+            }
+
+            double coveredY = 0;
+            double currentStart = intervals[0].Start;
+            double currentEnd = intervals[0].End;
+            for (int j = 1; j < intervals.Count; j++)
+            {
+                (double nextStart, double nextEnd) = intervals[j];
+                if (nextStart <= currentEnd)
+                {
+                    currentEnd = Math.Max(currentEnd, nextEnd);
+                }
+                else
+                {
+                    coveredY += currentEnd - currentStart;
+                    currentStart = nextStart;
+                    currentEnd = nextEnd;
+                }
+            }
+
+            coveredY += currentEnd - currentStart;
+            total += width * coveredY;
+        }
+
+        return total;
+    }
+
     private static double RoundLengthFt(double lengthFt)
         => Math.Round(lengthFt, 2, MidpointRounding.AwayFromZero);
 
     private static double Distance(Point a, Point b)
     {
-        var dx = a.X - b.X;
-        var dy = a.Y - b.Y;
+        double dx = a.X - b.X;
+        double dy = a.Y - b.Y;
         return Math.Sqrt((dx * dx) + (dy * dy));
     }
 }

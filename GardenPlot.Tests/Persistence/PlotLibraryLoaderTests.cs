@@ -238,6 +238,76 @@ public class PlotLibraryLoaderTests
     }
 
     [Fact]
+    public void Load_LegacyDocument_DefaultsClipFields()
+    {
+        string legacyJson = JsonSerializer.Serialize(new
+        {
+            Plots = new[]
+            {
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Legacy Garden",
+                    Shapes = new[]
+                    {
+                        new { Id = Guid.NewGuid(), Kind = ShapeKind.Rectangle, X = 0.0, Y = 0.0, W = 10.0, H = 10.0 },
+                    },
+                },
+            },
+            Ui = new { },
+        });
+
+        var loader = CreateLoader();
+        PlotLibrary? lib = loader.Load(legacyJson, "unit-test");
+
+        Assert.NotNull(lib);
+        Assert.Equal(PlotSchema.Current, lib!.SchemaVersion);
+        Assert.True(lib.Ui.ShowClipHatch);
+        Assert.Empty(lib.Plots[0].Shapes[0].ClippedBy);
+    }
+
+    [Fact]
+    public void Load_CurrentDocument_PreservesClippedBy()
+    {
+        Guid clipperId = Guid.NewGuid();
+        var source = new PlotLibrary
+        {
+            Ui = new UiPreferences { ShowClipHatch = false },
+        };
+        source.Plots.Add(new PlotData
+        {
+            Name = "A",
+            Shapes =
+            [
+                new Shape
+                {
+                    Kind = ShapeKind.Rectangle,
+                    W = 10,
+                    H = 10,
+                    ClippedBy = [clipperId],
+                },
+                new Shape
+                {
+                    Id = clipperId,
+                    Kind = ShapeKind.Rectangle,
+                    X = 2,
+                    Y = 2,
+                    W = 2,
+                    H = 2,
+                },
+            ],
+        });
+        string json = JsonSerializer.Serialize(source);
+
+        var loader = CreateLoader();
+        PlotLibrary? lib = loader.Load(json, "unit-test");
+
+        Assert.NotNull(lib);
+        Assert.Equal([clipperId], lib!.Plots[0].Shapes[0].ClippedBy);
+        Assert.False(lib.Ui.ShowClipHatch);
+    }
+
+    [Fact]
     public void Load_RoundTrip_PreservesLayerStates()
     {
         var source = new PlotLibrary();

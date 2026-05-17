@@ -164,6 +164,12 @@ else
                 <button class="btn btn-sm btn-outline-secondary" @onclick="PlaceSelectedItemAlongPath" disabled="@(!CanPlaceAlongPath)" title="Place selected stamp item along the selected path">
                     Along path
                 </button>
+                <button class="btn btn-sm btn-outline-secondary clip-action-btn"
+                        @onclick="ToggleSelectedClipRelationship"
+                        disabled="@(!CanToggleClipSelection)"
+                        title="First-selected area is clippee; second-selected area is clipper.">
+                    @ClipToolbarLabel
+                </button>
             </div>
 
             <div class="align-toolbar align-toolbar-inline" role="toolbar" aria-label="Position controls">
@@ -642,6 +648,11 @@ else
                     {
                         @((MarkupString)tex)
                     }
+
+                    <pattern id="clip-hatch" width="0.5" height="0.5" patternUnits="userSpaceOnUse" patternTransform="rotate(25)">
+                        <rect width="0.5" height="0.5" fill="rgba(255,255,255,0.12)" />
+                        <path d="M0 0 L0 0.5" stroke="#264d32" stroke-width="0.08" opacity="0.28" />
+                    </pattern>
                 </defs>
 
                 @{ 
@@ -715,6 +726,12 @@ else
 
                     // Plant spacing overlay (under shapes): one set of rings per plant, color-coded by overlap.
                     var plantList = visibleShapes.Where(z => z.Kind == ShapeKind.Plant && !IsFocalPointTrait(z.Trait)).ToList();
+                    var allShapesById = currentPlot.Shapes.ToDictionary(z => z.Id);
+                    var clipHatches = library.Ui.ShowClipHatch
+                        ? currentPlot.Shapes
+                            .Where(CanShapeBeClipped)
+                            .ToDictionary(z => z.Id, z => TakeoffMath.ClipOverlapUnion(z, allShapesById))
+                        : new Dictionary<Guid, IReadOnlyList<IReadOnlyList<Point>>>();
                 }
                 @if (plantList.Count > 0)
                 {
@@ -895,6 +912,22 @@ else
                                   width="@F(sb.w + 0.1)" height="@F(sb.h + 0.1)"
                                   fill="none" stroke="#0d6efd" stroke-width="0.05"
                                   stroke-dasharray="0.15,0.1" pointer-events="none" />
+                        }
+                    </g>
+                }
+
+                @if (library.Ui.ShowClipHatch)
+                {
+                    <g class="clip-hatch-layer" pointer-events="none">
+                        @foreach (var clippedShape in currentPlot.Shapes)
+                        {
+                            if (clipHatches.TryGetValue(clippedShape.Id, out var polygons))
+                            {
+                                foreach (var polygon in polygons)
+                                {
+                                    <polygon points="@PointsString(polygon)" fill="url(#clip-hatch)" />
+                                }
+                            }
                         }
                     </g>
                 }
@@ -1107,7 +1140,11 @@ else
                 <span class="status-item status-pos"><strong>X:</strong> @(lastCanvasX is double statusX ? F(statusX) : "--")</span>
                 <span class="status-item status-pos"><strong>Y:</strong> @(lastCanvasY is double statusY ? F(statusY) : "--")</span>
                 <span class="status-item"><strong>Action:</strong> @CurrentMouseActionLabel()</span>
-                <span class="status-item ms-auto">
+                <span class="status-item ms-auto d-inline-flex align-items-center gap-3">
+                    <label class="clip-hatch-toggle">
+                        <input type="checkbox" checked="@library.Ui.ShowClipHatch" @onchange="OnClipHatchPreferenceChanged" />
+                        Clip hatch
+                    </label>
                     <button class="btn btn-sm btn-link p-0 takeoff-toggle-btn"
                             @onclick="ToggleTakeoffPanel">
                         @(showTakeoffPanel ? "Hide Takeoff" : "Show Takeoff")
@@ -1897,11 +1934,11 @@ else
                         </div>
                         <div class="small mb-1">
                             <span class="text-muted">Area:</span>
-                            <strong>@($"{GroundCoverMath.AreaFt2(single!):0.#} ft²")</strong>
+                            <strong>@ClipAreaSummary(single!)</strong>
                             @if (!single!.IsGroundCoverSurface && single!.GroundCoverDepthIn is double d && d > 0)
                             {
                                 <span class="text-muted ms-2">Volume:</span>
-                                <strong>@($"{GroundCoverMath.VolumeYd3(GroundCoverMath.AreaFt2(single!), d):0.##} yd³")</strong>
+                                <strong>@($"{GroundCoverMath.VolumeYd3(NetAreaFt2(single!), d):0.##} yd³")</strong>
                             }
                         </div>
                         @if (!single!.IsGroundCoverSurface)
@@ -2052,6 +2089,33 @@ else
                                             <button class="btn btn-link btn-sm p-0 text-danger" @onclick="() => DeleteSoilReading(single!, reading)">Delete</button>
                                         </div>
                                     </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (!isPreview && CanShapeBeClipped(single!))
+                {
+                    var clipCandidates = ClipCandidatesFor(single!);
+                    <div class="clip-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Clipped by</div>
+                        <div class="small mb-2"><strong>@ClipAreaSummary(single!)</strong></div>
+                        @if (clipCandidates.Count == 0)
+                        {
+                            <div class="x-small text-muted">No other area shapes are available on this plot.</div>
+                        }
+                        else
+                        {
+                            <div class="clip-candidate-list">
+                                @foreach (var candidate in clipCandidates)
+                                {
+                                    <label class="clip-candidate-row">
+                                        <input type="checkbox"
+                                               checked="@candidate.Selected"
+                                               @onchange="@(e => OnClipCandidateChanged(single!, candidate.Id, e))" />
+                                        <span>@candidate.Label</span>
+                                    </label>
                                 }
                             </div>
                         }
