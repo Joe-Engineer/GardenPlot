@@ -450,6 +450,22 @@ public sealed class ProjectDossierService
                     }
                 }
                 break;
+            case ShapeKind.Edge:
+                if (shape.Points.Count > 0)
+                {
+                    string points = string.Join(' ', shape.Points.Select(point => $"{F(point.X)},{F(point.Y)}"));
+                    string element = shape.CloseEdge && shape.Points.Count > 1 ? "polygon" : "polyline";
+                    _ = sb.Append('<')
+                        .Append(element)
+                        .Append(" points=\"")
+                        .Append(points)
+                        .Append("\" fill=\"none\" stroke=\"")
+                        .Append(stroke)
+                        .Append("\" stroke-width=\"")
+                        .Append(F(EdgeStrokeWidthFt(shape)))
+                        .Append("\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />");
+                }
+                break;
             case ShapeKind.BedKit:
                 _ = sb.Append("<rect x=\"")
                     .Append(F(shape.X))
@@ -541,6 +557,14 @@ public sealed class ProjectDossierService
             .Append("\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />");
     }
 
+    private static double EdgeStrokeWidthFt(Shape shape)
+    {
+        double thicknessIn = shape.Takeoff?.DefaultThicknessIn
+            ?? GardenPlotWeb.Models.Catalog.Find(shape.Takeoff?.CatalogCode ?? shape.Label)?.DefaultThicknessIn
+            ?? 0.125;
+        return Math.Max(0.01, thicknessIn / 12.0);
+    }
+
     private static void AppendCenteredLabel(StringBuilder sb, string? label, double x, double y, double size, string fill = "#264a26")
     {
         if (string.IsNullOrWhiteSpace(label) || size <= 0)
@@ -563,7 +587,7 @@ public sealed class ProjectDossierService
 
     private static (double x, double y, double w, double h) GetBounds(Shape shape)
     {
-        if ((shape.Kind == ShapeKind.FreeDraw || shape.Kind == ShapeKind.Ruler) && shape.Points.Count > 0)
+        if ((shape.Kind == ShapeKind.FreeDraw || shape.Kind == ShapeKind.Edge || shape.Kind == ShapeKind.Ruler) && shape.Points.Count > 0)
         {
             double minX = shape.Points.Min(point => point.X);
             double minY = shape.Points.Min(point => point.Y);
@@ -586,6 +610,7 @@ public sealed class ProjectDossierService
             ShapeKind.Rectangle => "#2f5a3a",
             ShapeKind.Oval => "#2f5a3a",
             ShapeKind.FreeDraw => IsGroundCoverShape(shape) ? (shape.IsGroundCoverSurface ? "#3f6a2d" : "#3f3a30") : "#3a3a3a",
+            ShapeKind.Edge => "#6d655e",
             ShapeKind.Ruler => "#c81e1e",
             ShapeKind.CircleRuler => "#2f5a3a",
             ShapeKind.RectRuler => "#2f5a3a",
@@ -608,6 +633,7 @@ public sealed class ProjectDossierService
             ShapeKind.CircleRuler => "#9fcf9f",
             ShapeKind.RectRuler => "#9fcf9f",
             ShapeKind.FreeDraw => "#9fcf9f",
+            ShapeKind.Edge => "#9fcf9f",
             ShapeKind.Ruler => "#9fcf9f",
             ShapeKind.Tree => "#9fcf9f",
             ShapeKind.Bush => "#9fcf9f",
@@ -621,6 +647,7 @@ public sealed class ProjectDossierService
         return shape.Kind switch
         {
             ShapeKind.FreeDraw when !IsGroundCoverShape(shape) => 0,
+            ShapeKind.Edge => 0,
             ShapeKind.Ruler => 0,
             ShapeKind.Rectangle => 0.6,
             ShapeKind.Oval => 0.6,
