@@ -14,6 +14,8 @@ namespace GardenPlot.Tests.Persistence;
 
 public class PlotLibraryLoaderMigrationTests
 {
+    private static readonly int[] ExpectedSynthesizedIds = [1, 2];
+
     private static PlotLibraryLoader CreateLoader()
         => new(NullLogger<PlotLibraryLoader>.Instance);
 
@@ -50,7 +52,7 @@ public class PlotLibraryLoaderMigrationTests
         Assert.Equal(2, plot.Takeoff.Count);
         Assert.All(plot.Takeoff, t => Assert.NotNull(t.ShapeId));
         Assert.All(plot.Takeoff, t => Assert.Equal(CatalogSource.Base, t.CatalogSource));
-        Assert.Equal(new[] { 1, 2 }, plot.Takeoff.OrderBy(t => t.Id).Select(t => t.Id));
+        Assert.Equal(ExpectedSynthesizedIds, plot.Takeoff.OrderBy(t => t.Id).Select(t => t.Id));
         Assert.Equal(3, plot.TakeoffIds.Next); // max(synthesized Id) + 1
     }
 
