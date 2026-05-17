@@ -514,6 +514,11 @@
     border-color: #2f5a3a;
 }
 
+.floating-panel.scale-panel .panel-header,
+.floating-panel.scale-panel .panel-header:active {
+    cursor: move;
+}
+
 .floating-panel.takeoff-floating {
     width: 320px;
     max-height: 60vh;

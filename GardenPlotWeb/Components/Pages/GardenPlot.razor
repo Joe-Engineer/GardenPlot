@@ -922,10 +922,18 @@ else
 
 @if (showCanvasScalePanel && currentPlot is not null)
 {
-    <div class="floating-panel scale-panel anchored-scale-pos">
-        <div class="panel-header">
+    var positioned = library.Ui.CalibrationPanelX is double && library.Ui.CalibrationPanelY is double;
+
+    <div class="floating-panel scale-panel @(positioned ? string.Empty : "anchored-scale-pos")"
+         @ref="calibrationPanelRef"
+         style="@(positioned ? $"left:{library.Ui.CalibrationPanelX!.Value}px;top:{library.Ui.CalibrationPanelY!.Value}px;" : string.Empty)"
+         @onpointermove="OnPanelDragMove"
+         @onpointerup="OnPanelDragEnd"
+         @onpointercancel="OnPanelDragEnd">
+        <div class="panel-header"
+             @onpointerdown="StartCalibrationPanelDrag">
             <span class="panel-title">Scale calibration</span>
-            <button type="button" class="btn-close btn-close-sm" @onclick="CloseCanvasScaleCalibration"></button>
+            <button type="button" class="btn-close btn-close-sm" @onclick="CloseCanvasScaleCalibration" @onpointerdown:stopPropagation="true"></button>
         </div>
         <div class="panel-body">
             @if (canvasScaleStartXFt is null)
