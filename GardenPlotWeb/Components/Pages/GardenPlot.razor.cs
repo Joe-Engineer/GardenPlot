@@ -472,7 +472,14 @@ public partial class GardenPlot
     {
         zoom = Math.Clamp(newZoom, MinZoom, MaxZoom);
         zoomInputText = $"{zoom * 100:0}%";
-        library.Ui.Zoom = zoom;
+        if (currentPlot is not null)
+        {
+            CurrentPlotUi.Zoom = zoom;
+        }
+        else
+        {
+            library.Ui.Zoom = zoom;
+        }
 
         if (persist)
         {
@@ -2749,7 +2756,7 @@ public partial class GardenPlot
                     currentPlot = library.Plots.FirstOrDefault(p => p.Id == library.LastPlotId)
                                   ?? library.Plots[0];
                     library.LastPlotId = currentPlot.Id;
-                    SetZoom(library.Ui.Zoom ?? 1.0, persist: false);
+                    SetZoom(currentPlot.Ui.Zoom ?? library.Ui.Zoom ?? 1.0, persist: false);
                     showTakeoffPanel = library.Ui.TakeoffPanelVisible ?? false;
                     currentCategory = library.Ui.LastPaletteCategory ?? DefaultPaletteCategory;
                     RefreshCustomCatalogItems();
@@ -2796,7 +2803,7 @@ public partial class GardenPlot
                                     library.LastPlotId = currentPlot.Id;
                                 }
 
-                                SetZoom(library.Ui.Zoom ?? 1.0, persist: false);
+                                SetZoom(currentPlot?.Ui.Zoom ?? library.Ui.Zoom ?? 1.0, persist: false);
                                 restoreViewportPending = true;
                                 StateHasChanged();
                             }
@@ -3115,6 +3122,7 @@ public partial class GardenPlot
 
         foreach (var p in safe.Plots)
         {
+            p.Ui ??= new UiPreferences();
             p.Shapes ??= new List<Shape>();
             p.DropGroups ??= new List<DropGroup>();
             p.Tasks ??= new List<GardenTask>();
@@ -3295,7 +3303,14 @@ public partial class GardenPlot
             }
         }
 
-        await CaptureViewportStateAsync();
+        if (suppressViewportCaptureOnce)
+        {
+            suppressViewportCaptureOnce = false;
+        }
+        else
+        {
+            await CaptureViewportStateAsync();
+        }
 
         try
         {
@@ -3466,9 +3481,9 @@ public partial class GardenPlot
         try
         {
             var center = await jsModule.InvokeAsync<JsonElement>("getViewCenterFt", wrapRef, canvasRef, PxPerFt, zoom);
-            library.Ui.ViewCenterXFt = center.GetProperty("x").GetDouble();
-            library.Ui.ViewCenterYFt = center.GetProperty("y").GetDouble();
-            library.Ui.Zoom = zoom;
+            CurrentPlotUi.ViewCenterXFt = Math.Clamp(center.GetProperty("x").GetDouble() - ViewportOffsetXFt, 0, currentPlot.WidthFt);
+            CurrentPlotUi.ViewCenterYFt = Math.Clamp(center.GetProperty("y").GetDouble() - ViewportOffsetYFt, 0, currentPlot.HeightFt);
+            CurrentPlotUi.Zoom = zoom;
         }
         catch
         {
@@ -3483,15 +3498,15 @@ public partial class GardenPlot
             return;
         }
 
-        if (library.Ui.ViewCenterXFt is not double x || library.Ui.ViewCenterYFt is not double y)
+        if (CurrentPlotUi.ViewCenterXFt is not double x || CurrentPlotUi.ViewCenterYFt is not double y)
         {
             return;
         }
 
         try
         {
-            var tx = Math.Clamp(x, 0, currentPlot.WidthFt);
-            var ty = Math.Clamp(y, 0, currentPlot.HeightFt);
+            var tx = Math.Clamp(x, 0, currentPlot.WidthFt) + ViewportOffsetXFt;
+            var ty = Math.Clamp(y, 0, currentPlot.HeightFt) + ViewportOffsetYFt;
             await jsModule.InvokeVoidAsync("setViewCenterFt", wrapRef, canvasRef, PxPerFt, zoom, tx, ty);
         }
         catch
@@ -3504,13 +3519,21 @@ public partial class GardenPlot
     {
         if (Guid.TryParse(e.Value?.ToString(), out var id))
         {
+            await CaptureViewportStateAsync();
             currentPlot = library.Plots.FirstOrDefault(p => p.Id == id);
+            if (currentPlot is null)
+            {
+                return;
+            }
+
             undoStack.Clear();
             ClearSelection();
             CancelTaskEdit();
             selectedItem = null;
             currentTool = Tool.Select;
             ghostX = ghostY = null;
+            SetZoom(currentPlot.Ui.Zoom ?? library.Ui.Zoom ?? 1.0, persist: false);
+            suppressViewportCaptureOnce = true;
             restoreViewportPending = true;
             await SaveAsync();
         }
@@ -3526,9 +3549,9 @@ public partial class GardenPlot
         isPasteMode = false;
         pasteHoverX = pasteHoverY = null;
         SetZoom(1.0, persist: false);
-        library.Ui.Zoom = 1.0;
-        library.Ui.ViewCenterXFt = null;
-        library.Ui.ViewCenterYFt = null;
+        CurrentPlotUi.Zoom = 1.0;
+        CurrentPlotUi.ViewCenterXFt = null;
+        CurrentPlotUi.ViewCenterYFt = null;
         library.Ui.RulerPanelX = null;
         library.Ui.RulerPanelY = null;
         library.Ui.InfoPanelX = null;
@@ -5659,6 +5682,11 @@ public partial class GardenPlot
             return;
         }
 
+        if (IsConceptMode)
+        {
+            return;
+        }
+
         var (x, y) = ToFt(e);
         x = Math.Clamp(x, 0, PlotWidthFt);
         y = Math.Clamp(y, 0, PlotHeightFt);
@@ -5967,6 +5995,11 @@ public partial class GardenPlot
             canvasScaleCurrentYFt = y;
         }
 
+        if (IsConceptMode)
+        {
+            return;
+        }
+
         if (currentTool == Tool.Select && isPasteMode)
         {
             pasteHoverX = x;
@@ -6096,6 +6129,11 @@ public partial class GardenPlot
             return;
         }
 
+        if (IsConceptMode)
+        {
+            return;
+        }
+
         if (isDragging)
         {
             isDragging = false;
@@ -6190,6 +6228,7 @@ public partial class GardenPlot
 
     private void OnShapePointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, Shape s)
     {
+        if (IsConceptMode) return;
         if (currentTool != Tool.Select || !CanSelectShape(s))
         {
             if (!CanReceiveShapePointer(s)) return;
@@ -6439,7 +6478,7 @@ public partial class GardenPlot
             return;
         }
 
-        if (!CanReceiveShapePointer(s) || currentPlot is null)
+        if (IsConceptMode || !CanReceiveShapePointer(s) || currentPlot is null)
         {
             return;
         }
@@ -6554,6 +6593,11 @@ public partial class GardenPlot
                 ZoomIn();
             }
 
+            return;
+        }
+
+        if (IsConceptMode)
+        {
             return;
         }
 
@@ -6802,7 +6846,7 @@ public partial class GardenPlot
     /// </summary>
     private void OnCanvasDoubleClick(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
     {
-        if (drafting is null || currentPlot is null)
+        if (IsConceptMode || drafting is null || currentPlot is null)
         {
             return;
         }
@@ -6908,6 +6952,28 @@ public partial class GardenPlot
     private async Task OnKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
     {
         var kb = KeyBindings;
+
+        if (IsConceptMode)
+        {
+            if (IsBindingMatch(e, kb.ZoomIn))
+            {
+                ZoomIn();
+            }
+            else if (IsBindingMatch(e, kb.ZoomOut))
+            {
+                ZoomOut();
+            }
+            else if (IsBindingMatch(e, kb.ZoomReset))
+            {
+                ZoomReset();
+            }
+            else if (IsBindingMatch(e, kb.PanLeft) || IsBindingMatch(e, kb.PanRight) || IsBindingMatch(e, kb.PanUp) || IsBindingMatch(e, kb.PanDown))
+            {
+                await PanByKeybindingAsync(e, kb);
+            }
+
+            return;
+        }
 
         if (currentTool == Tool.Stamp && selectedItem is not null && (dropPattern == DropPattern.Line || dropPattern == DropPattern.Array))
         {
@@ -7929,7 +7995,15 @@ public partial class GardenPlot
         return s.Fill ?? DefaultFill(s);
     }
 
-    private static double EffectiveFillOpacity(Shape s) => s.FillOpacity ?? DefaultFillOpacity(s);
+    private double EffectiveFillOpacity(Shape s)
+    {
+        if (IsConceptMode && IsGroundCoverShape(s) && (!string.IsNullOrWhiteSpace(s.TextureKey) || !string.IsNullOrWhiteSpace(s.TextureImageId)))
+        {
+            return 1.0;
+        }
+
+        return s.FillOpacity ?? DefaultFillOpacity(s);
+    }
 
     private static double EffectiveFontScale(Shape s)
     {
@@ -8218,11 +8292,6 @@ public partial class GardenPlot
     private static string SoilMarkerName(Shape marker)
     {
         return string.IsNullOrWhiteSpace(marker.Label) ? "Soil Marker" : marker.Label;
-    }
-
-    private static bool IsPlantLikeShape(Shape shape)
-    {
-        return shape.Kind is ShapeKind.Plant or ShapeKind.Tree or ShapeKind.Bush;
     }
 
     private static bool TryParseNullableDouble(string? value, out double? parsed)

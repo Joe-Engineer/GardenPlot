@@ -25,6 +25,43 @@ public static class PlantRendering
             && trait.StartsWith("focal-point", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>SVG filter used to soften Concept-mode plant shadows.</summary>
+    public static string ConceptShadowFilterDef()
+    {
+        return "<filter id=\"concept-shadow\" x=\"-30%\" y=\"-30%\" width=\"170%\" height=\"170%\">"
+            + "<feGaussianBlur in=\"SourceAlpha\" stdDeviation=\"0.18\" result=\"blur\" />"
+            + "<feOffset in=\"blur\" dx=\"0.12\" dy=\"0.16\" result=\"offset\" />"
+            + "<feComponentTransfer in=\"offset\" result=\"shadow\">"
+            + "<feFuncA type=\"linear\" slope=\"0.35\" />"
+            + "</feComponentTransfer>"
+            + "<feMerge><feMergeNode in=\"shadow\" /><feMergeNode in=\"SourceGraphic\" /></feMerge>"
+            + "</filter>";
+    }
+
+    /// <summary>Faint mature-spread halo for Concept mode.</summary>
+    public static string MatureSpreadHaloSvg(double cx, double cy, double diameter, string trait)
+    {
+        if (diameter <= 0)
+        {
+            return string.Empty;
+        }
+
+        (string fill, string stroke) = HaloColors(trait);
+        double r = diameter / 2;
+        return "<circle class=\"concept-plant-halo\" cx=\"" + F(cx) + "\" cy=\"" + F(cy) + "\" r=\"" + F(r)
+            + "\" fill=\"" + fill + "\" fill-opacity=\"0.12\" stroke=\"" + stroke + "\" stroke-width=\""
+            + F(Math.Max(0.03, r * 0.04)) + "\" stroke-opacity=\"0.3\" />";
+    }
+
+    /// <summary>Swatch colors for tree canopies.</summary>
+    public static (string fill, string stroke) TreePalette(string trait) => CanopyColors(trait);
+
+    /// <summary>Swatch colors for bush canopies.</summary>
+    public static (string fill, string stroke) BushPalette(string trait) => BushColors(trait);
+
+    /// <summary>Swatch colors for herbaceous plants.</summary>
+    public static (string fill, string stroke) PlantPalette(string trait) => PlantSpriteColors(trait);
+
     /// <summary>Stylized tree: filled canopy circle with optional fruit/nut/flower indicators.</summary>
     public static string TreeSvg(double x, double y, double w, double h, string trait, string? label = null)
     {
@@ -78,13 +115,7 @@ public static class PlantRendering
         }
 
         StringBuilder sb = new(256);
-        string stemColor = trait switch { "flower" => "#4a8a3a", "herb" => "#3a6a2a", _ => "#3a6a3a" };
-        string leafColor = trait switch
-        {
-            "flower" => "#7ec46b",
-            "herb" => "#5a9a4a",
-            _ => "#6ea158",
-        };
+        (string leafColor, string stemColor) = PlantSpriteColors(trait);
 
         double glyph = Math.Clamp(diameter * 0.45, 0.35, 1.0);
         double lr = glyph * 0.45;
@@ -332,6 +363,29 @@ public static class PlantRendering
             "foliage" => ("#a7b27d", "#56683a"),
             "fruit" => ("#7aa760", "#2f5a3a"),
             _ => ("#6e9a55", "#2f5a3a"),
+        };
+    }
+
+    private static (string fill, string stroke) PlantSpriteColors(string trait)
+    {
+        return trait switch
+        {
+            "flower" => ("#7ec46b", "#4a8a3a"),
+            "herb" => ("#5a9a4a", "#3a6a2a"),
+            _ => ("#6ea158", "#3a6a3a"),
+        };
+    }
+
+    private static (string fill, string stroke) HaloColors(string trait)
+    {
+        return trait switch
+        {
+            "flower" => ("#d7b6c8", "#8a4e7e"),
+            "fruit" => ("#cfe3c4", "#4a6b31"),
+            "nut" => ("#d7d2b6", "#6f6a48"),
+            "evergreen" => ("#c7dbc7", "#2f5a3a"),
+            "foliage" => ("#ddd2b8", "#7a6242"),
+            _ => ("#cfe0be", "#4f6f31"),
         };
     }
 

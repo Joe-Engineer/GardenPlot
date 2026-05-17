@@ -40,6 +40,8 @@ public sealed class ModelDefaultsTests
             Assert.True(state.Visible);
             Assert.False(state.Locked);
         });
+        Assert.NotNull(p.Ui);
+        Assert.Equal(ViewMode.Design, p.Ui.LastViewMode);
         Assert.Empty(p.Shapes);
         Assert.Empty(p.DropGroups);
         Assert.Empty(p.Tasks);

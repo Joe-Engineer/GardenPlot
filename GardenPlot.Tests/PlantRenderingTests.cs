@@ -111,4 +111,21 @@ public sealed class PlantRenderingTests
         Assert.Contains("<svg", svg);
         Assert.Contains("<polyline", svg);
     }
+
+    [Fact]
+    public void MatureSpreadHaloSvg_RendersConceptHalo()
+    {
+        string svg = PlantRendering.MatureSpreadHaloSvg(4, 5, 6, "flower");
+        Assert.Contains("concept-plant-halo", svg);
+        Assert.Contains("r=\"3\"", svg);
+    }
+
+    [Fact]
+    public void ConceptShadowFilterDef_RendersReusableFilter()
+    {
+        string svg = PlantRendering.ConceptShadowFilterDef();
+        Assert.Contains("concept-shadow", svg);
+        Assert.Contains("feGaussianBlur", svg);
+        Assert.Contains("feOffset", svg);
+    }
 }
