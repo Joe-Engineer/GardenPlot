@@ -21,7 +21,7 @@ namespace GardenPlotWeb.Services.Persistence;
 public static class PlotSchema
 {
     /// <summary>Current schema version written by this build.</summary>
-    public const int Current = 1;
+    public const int Current = 2;
 
     /// <summary>Version assumed when a document is loaded without an explicit version field.</summary>
     public const int LegacyVersion = 1;

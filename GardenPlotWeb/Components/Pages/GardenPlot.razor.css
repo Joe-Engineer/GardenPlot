@@ -1024,3 +1024,10 @@
 
 .gc-depth-toolbar { width: 4.5rem; }
 
+
+/* Takeoff row selection + context menu */
+.takeoff-table tbody tr:hover { background-color: rgba(90, 138, 74, 0.08); }
+.takeoff-table tbody tr.takeoff-row-selected { background-color: rgba(90, 138, 74, 0.22) !important; box-shadow: inset 3px 0 0 #5a8a4a; }
+.takeoff-ctx-backdrop { position: fixed; inset: 0; z-index: 1080; }
+.takeoff-ctx-menu { position: fixed; z-index: 1090; min-width: 10rem; }
+

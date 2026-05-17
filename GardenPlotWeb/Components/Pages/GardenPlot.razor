@@ -18,6 +18,7 @@
 @inject IPlantProfileService PlantProfiles
 @inject GardenPlotWeb.Services.Persistence.PlotLibraryLoader PlotLibraryLoader
 @inject GardenPlotWeb.Services.Persistence.IPlotRepository PlotRepository
+@inject GardenPlotWeb.Services.Catalog.ICatalogService Catalog
 @inject ILogger<GardenPlot> Logger
 
 <PageTitle>Garden Plot</PageTitle>
@@ -970,8 +971,11 @@ else
 
 @if (currentPlot is not null)
 {
+    ReconcileTakeoff();
     var takeoff = BuildTakeoff(currentPlot.Shapes);
     var totalCount = takeoff.Sum(t => t.Count);
+    var viewMode = library.Ui.TakeoffViewMode;
+    var labor = LaborRollup();
 
     @if (showTakeoffPanel)
     {
@@ -986,52 +990,262 @@ else
                  @onpointerdown="StartTakeoffPanelDrag">
                 <span class="panel-title">
                     Takeoff list
-                    <span class="text-muted small ms-2">@takeoff.Count distinct · @totalCount placed</span>
+                    <span class="text-muted small ms-2">
+                        @if (viewMode == GardenPlotWeb.Models.TakeoffViewMode.Item)
+                        {
+                            <span>@currentPlot.Takeoff.Count item@(currentPlot.Takeoff.Count == 1 ? "" : "s")</span>
+                        }
+                        else
+                        {
+                            <span>@takeoff.Count distinct &middot; @totalCount placed</span>
+                        }
+                    </span>
                 </span>
                 <span class="d-flex align-items-center gap-1">
-                    <button type="button" class="btn-close btn-close-sm" title="Hide Takeoff" aria-label="Hide Takeoff"
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Takeoff view mode"
+                         @onpointerdown:stopPropagation="true">
+                        <button type="button"
+                                class="btn @(viewMode == GardenPlotWeb.Models.TakeoffViewMode.Item ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick="() => SetTakeoffViewMode(GardenPlotWeb.Models.TakeoffViewMode.Item)">Item</button>
+                        <button type="button"
+                                class="btn @(viewMode == GardenPlotWeb.Models.TakeoffViewMode.Summary ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick="() => SetTakeoffViewMode(GardenPlotWeb.Models.TakeoffViewMode.Summary)">Summary</button>
+                    </div>
+                    <button type="button" class="btn-close btn-close-sm ms-2" title="Hide Takeoff" aria-label="Hide Takeoff"
                             @onclick="HideTakeoffPanel"
                             @onpointerdown:stopPropagation="true"></button>
                 </span>
             </div>
             <div class="panel-body takeoff-floating-body">
-                @if (takeoff.Count == 0)
+                @if (currentPlot.Takeoff.Count == 0)
                 {
                     <div class="x-small text-muted">Nothing placed yet.</div>
                 }
                 else
                 {
-                    <div class="d-flex justify-content-end mb-1">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <button class="btn btn-sm btn-outline-success"
+                                @onclick="AddVirtualTakeoffItem"
+                                title="Add a takeoff line that is not yet drawn">
+                            + Add item
+                        </button>
                         <button class="btn btn-sm btn-outline-secondary" @onclick="ExportTakeoffCsv" title="Download as CSV">
                             Download CSV
                         </button>
                     </div>
-                    <table class="table table-sm takeoff-table mb-0">
-                        <thead>
-                            <tr>
-                                <th>Type</th>
-                                <th>Name</th>
-                                <th class="text-end">Count</th>
-                                <th class="text-end">Quantity</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var row in takeoff)
-                            {
+
+                    @if (viewMode == GardenPlotWeb.Models.TakeoffViewMode.Item)
+                    {
+                        <table class="table table-sm takeoff-table mb-0">
+                            <thead>
                                 <tr>
-                                    <td>@row.Kind</td>
-                                    <td>@row.Name</td>
-                                    <td class="text-end">@row.Count</td>
-                                    <td class="text-end">@(row.Quantity ?? "")</td>
+                                    <th class="text-end">#</th>
+                                    <th>Kind</th>
+                                    <th>Name</th>
+                                    <th class="text-end">Qty</th>
+                                    <th>Unit</th>
+                                    <th class="text-end">Waste %</th>
+                                    <th>Labor</th>
+                                    <th class="text-end">Hours</th>
+                                    <th title="Bound to a canvas shape?">Bound</th>
                                 </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var t in currentPlot.Takeoff.OrderBy(t => t.Id))
+                                {
+                                    var c = CatalogFor(t);
+                                    var unbound = c is null;
+                                    var rowSelected = IsTakeoffRowSelected(t);
+                                    <tr class="@(unbound ? "table-warning" : "") @(rowSelected ? "takeoff-row-selected" : "")"
+                                        @onclick="(e) => OnTakeoffRowClick(t, e)"
+                                        @oncontextmenu="(e) => OnTakeoffRowContextMenu(t, e)"
+                                        @oncontextmenu:preventDefault="true"
+                                        style="cursor: pointer;">
+                                        <td class="text-end text-muted">@t.Id</td>
+                                        <td>@(GardenPlotWeb.Models.TakeoffMath.Kind(c))</td>
+                                        <td>
+                                            @GardenPlotWeb.Models.TakeoffMath.DisplayName(t, c)
+                                            @if (unbound)
+                                            {
+                                                <span class="badge text-bg-warning ms-1" title="Catalog item not found">unbound</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">@t.Quantity.ToString("0.##")</td>
+                                        <td>@GardenPlotWeb.Models.TakeoffMath.EffectiveUnit(t, c)</td>
+                                        <td class="text-end">
+                                            @GardenPlotWeb.Models.TakeoffMath.EffectiveWastePercent(t, c).ToString("0.#")
+                                            @if (t.WastePercentOverride.HasValue)
+                                            {
+                                                <span class="text-primary" title="Override">*</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @GardenPlotWeb.Models.TakeoffMath.EffectiveLaborType(t, c)
+                                            @if (t.LaborTypeOverride.HasValue)
+                                            {
+                                                <span class="text-primary" title="Override">*</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            @GardenPlotWeb.Models.TakeoffMath.EffectiveLaborHours(t, c).ToString("0.##")
+                                        </td>
+                                        <td class="text-center" title="@(t.ShapeId.HasValue ? "Bound to canvas shape" : "Virtual item (not on canvas)")">
+                                            @(t.ShapeId.HasValue ? "✓" : "—")
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            @if (labor.Count > 0)
+                            {
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="6" class="text-end text-muted small">Total labor hours</td>
+                                        <td colspan="3">
+                                            @foreach (var (Type, Hours) in labor)
+                                            {
+                                                <span class="badge text-bg-light text-dark me-1">@Type: @Hours.ToString("0.##") h</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                </tfoot>
                             }
-                        </tbody>
-                    </table>
-                }
-            </div>
-        </div>
-    }
-}
+                        </table>
+                    }
+                    else
+                    {
+                        <table class="table table-sm takeoff-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Name</th>
+                                    <th class="text-end">Count</th>
+                                    <th class="text-end">Quantity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in takeoff)
+                                {
+                                    <tr>
+                                        <td>@row.Kind</td>
+                                        <td>@row.Name</td>
+                                        <td class="text-end">@row.Count</td>
+                                        <td class="text-end">@(row.Quantity ?? "")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            @if (labor.Count > 0)
+                            {
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="2" class="text-end text-muted small">Total labor hours</td>
+                                        <td colspan="2">
+                                            @foreach (var (Type, Hours) in labor)
+                                            {
+                                                <span class="badge text-bg-light text-dark me-1">@Type: @Hours.ToString("0.##") h</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                                                 </tfoot>
+                                                            }
+                                                        </table>
+                                                    }
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                }
+
+                                @if (showTakeoffContextMenu && takeoffContextMenuItemId is int ctxId && currentPlot is not null)
+                                {
+                                    <div class="takeoff-ctx-backdrop" @onclick="CloseTakeoffContextMenu"
+                                         @oncontextmenu="CloseTakeoffContextMenu" @oncontextmenu:preventDefault="true"></div>
+                                    <div class="dropdown-menu show takeoff-ctx-menu"
+                                         style="@($"left:{takeoffContextMenuX}px;top:{takeoffContextMenuY}px;")"
+                                         @onclick:stopPropagation="true">
+                                        <button class="dropdown-item" type="button" @onclick="() => BeginEditTakeoffItem(ctxId)">
+                                            <span class="me-2">✎</span> Edit
+                                        </button>
+                                        <button class="dropdown-item" type="button" @onclick="() => DuplicateTakeoffItem(ctxId)">
+                                            <span class="me-2">⎘</span> Duplicate
+                                        </button>
+                                        <div class="dropdown-divider"></div>
+                                        <button class="dropdown-item text-danger" type="button" @onclick="() => DeleteTakeoffItem(ctxId)">
+                                            <span class="me-2">🗑</span> Delete
+                                        </button>
+                                    </div>
+                                }
+
+                                @if (EditingTakeoff is { } editing && currentPlot is not null)
+                                {
+                                    var editCatalog = CatalogFor(editing);
+                                    <div class="modal-backdrop fade show"></div>
+                                    <div class="modal d-block" tabindex="-1" role="dialog">
+                                        <div class="modal-dialog modal-sm" role="document">
+                                            <div class="modal-content">
+                                                <div class="modal-header py-2">
+                                                    <h6 class="modal-title">Edit takeoff item #@editing.Id</h6>
+                                                    <button type="button" class="btn-close" @onclick="CloseEditTakeoffItem"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="mb-2">
+                                                        <label class="form-label small mb-0">Name</label>
+                                                        <input class="form-control form-control-sm"
+                                                               value="@(editing.NameOverride ?? GardenPlotWeb.Models.TakeoffMath.DisplayName(editing, editCatalog))"
+                                                               @oninput="(e) => editing.NameOverride = (string?)e.Value" />
+                                                    </div>
+                                                    <div class="row g-2 mb-2">
+                                                        <div class="col">
+                                                            <label class="form-label small mb-0">Quantity</label>
+                                                            <input type="number" step="0.01" class="form-control form-control-sm"
+                                                                   @bind="editing.Quantity" />
+                                                        </div>
+                                                        <div class="col">
+                                                            <label class="form-label small mb-0">Unit</label>
+                                                            <input class="form-control form-control-sm"
+                                                                   value="@GardenPlotWeb.Models.TakeoffMath.EffectiveUnit(editing, editCatalog)"
+                                                                   @oninput="(e) => editing.UnitOverride = string.IsNullOrWhiteSpace((string?)e.Value) ? null : (string?)e.Value" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="row g-2 mb-2">
+                                                        <div class="col">
+                                                            <label class="form-label small mb-0">Waste %</label>
+                                                            <input type="number" step="0.5" class="form-control form-control-sm"
+                                                                   value="@GardenPlotWeb.Models.TakeoffMath.EffectiveWastePercent(editing, editCatalog)"
+                                                                   @oninput="(e) => editing.WastePercentOverride = double.TryParse((string?)e.Value, out var v) ? v : null" />
+                                                        </div>
+                                                        <div class="col">
+                                                            <label class="form-label small mb-0">Hours / unit</label>
+                                                            <input type="number" step="0.05" class="form-control form-control-sm"
+                                                                   value="@GardenPlotWeb.Models.TakeoffMath.EffectiveLaborHoursPerUnit(editing, editCatalog)"
+                                                                   @oninput="(e) => editing.LaborHoursPerUnitOverride = double.TryParse((string?)e.Value, out var v) ? v : null" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="mb-2">
+                                                        <label class="form-label small mb-0">Labor type</label>
+                                                        <select class="form-select form-select-sm"
+                                                                value="@GardenPlotWeb.Models.TakeoffMath.EffectiveLaborType(editing, editCatalog)"
+                                                                @onchange="(e) => editing.LaborTypeOverride = Enum.TryParse<GardenPlotWeb.Models.LaborType>((string?)e.Value, out var lt) ? lt : null">
+                                                            @foreach (var lt in Enum.GetValues<GardenPlotWeb.Models.LaborType>())
+                                                            {
+                                                                <option value="@lt">@lt</option>
+                                                            }
+                                                        </select>
+                                                    </div>
+                                                    <div class="mb-1">
+                                                        <label class="form-label small mb-0">Notes</label>
+                                                        <textarea class="form-control form-control-sm" rows="2"
+                                                                  value="@(editing.Notes ?? "")"
+                                                                  @oninput="(e) => editing.Notes = (string?)e.Value"></textarea>
+                                                    </div>
+                                                    <div class="form-text x-small">Bound: @(editing.ShapeId.HasValue ? "shape on canvas" : "virtual (no shape)")</div>
+                                                </div>
+                                                <div class="modal-footer py-2">
+                                                    <button class="btn btn-sm btn-primary" @onclick="CloseEditTakeoffItem">Done</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
 
 @{
     var infoRuler = drafting is not null && IsRulerShape(drafting)
