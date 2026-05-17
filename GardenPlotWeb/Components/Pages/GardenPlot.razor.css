@@ -274,6 +274,55 @@
     cursor: crosshair;
 }
 
+.plot-dimension-row {
+    align-items: flex-end;
+}
+
+.plot-dimension-col {
+    min-width: 0;
+}
+
+.plot-dimension-lock-col {
+    display: flex;
+    align-items: flex-end;
+}
+
+.aspect-lock-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #c8c2ad;
+    border-radius: 4px;
+    background: #fff;
+    color: #6c757d;
+}
+
+.aspect-lock-toggle svg {
+    width: 16px;
+    height: 16px;
+}
+
+.aspect-lock-toggle:hover {
+    background: #eef3e6;
+    border-color: #6b8b3a;
+    color: #2f5a3a;
+}
+
+.aspect-lock-toggle:focus-visible {
+    outline: 2px solid rgba(47, 90, 58, 0.3);
+    outline-offset: 1px;
+}
+
+.aspect-lock-toggle.locked {
+    background: #2f5a3a;
+    border-color: #2f5a3a;
+    color: #fff;
+    box-shadow: 0 0 0 2px rgba(47, 90, 58, 0.15);
+}
+
 .plot-viewport-frame {
     position: relative;
     display: flex;

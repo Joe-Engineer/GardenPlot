@@ -1252,6 +1252,8 @@ public partial class GardenPlot
     private string newPlotShape = "Rectangle";
     private double newPlotWidth = 60;
     private double newPlotHeight = 8;
+    private bool aspectLocked;
+    private double? aspectRatio;
     private string? newPlotBackgroundImageFileName;
     private double newPlotBackgroundOpacity = 0.92;
     private bool newPlotShowGrid = true;
@@ -2269,6 +2271,95 @@ public partial class GardenPlot
         await SaveAsync();
     }
 
+    private static double ClampPlotDimension(double value) => Math.Clamp(value, 1, 500);
+
+    private static bool TryParsePlotDimension(ChangeEventArgs e, out double value)
+    {
+        if (!double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+        {
+            value = 0;
+            return false;
+        }
+
+        value = ClampPlotDimension(parsed);
+        return true;
+    }
+
+    private void ResetAspectLock()
+    {
+        aspectLocked = false;
+        aspectRatio = null;
+    }
+
+    private bool CaptureAspectRatio()
+    {
+        newPlotWidth = ClampPlotDimension(newPlotWidth);
+        newPlotHeight = ClampPlotDimension(newPlotHeight);
+        aspectRatio = newPlotHeight / newPlotWidth;
+        return aspectRatio > 0;
+    }
+
+    private void ToggleAspectLock()
+    {
+        if (aspectLocked)
+        {
+            ResetAspectLock();
+            return;
+        }
+
+        aspectLocked = CaptureAspectRatio();
+        if (!aspectLocked)
+        {
+            aspectRatio = null;
+        }
+    }
+
+    private bool TryGetAspectRatio(out double ratio)
+    {
+        ratio = 0;
+        if (!aspectLocked)
+        {
+            return false;
+        }
+
+        if (aspectRatio is not > 0 && !CaptureAspectRatio())
+        {
+            ResetAspectLock();
+            return false;
+        }
+
+        ratio = aspectRatio.GetValueOrDefault();
+        return ratio > 0;
+    }
+
+    private void OnNewPlotWidthChanged(ChangeEventArgs e)
+    {
+        if (!TryParsePlotDimension(e, out var width))
+        {
+            return;
+        }
+
+        newPlotWidth = width;
+        if (TryGetAspectRatio(out var ratio))
+        {
+            newPlotHeight = ClampPlotDimension(width * ratio);
+        }
+    }
+
+    private void OnNewPlotHeightChanged(ChangeEventArgs e)
+    {
+        if (!TryParsePlotDimension(e, out var height))
+        {
+            return;
+        }
+
+        newPlotHeight = height;
+        if (TryGetAspectRatio(out var ratio))
+        {
+            newPlotWidth = ClampPlotDimension(height / ratio);
+        }
+    }
+
     private void ShowNewPlotDialog()
     {
         isEditingPlotSettings = false;
@@ -2276,6 +2367,7 @@ public partial class GardenPlot
         newPlotShape = "Rectangle";
         newPlotWidth = 60;
         newPlotHeight = 8;
+        ResetAspectLock();
         newPlotBackgroundImageFileName = null;
         newPlotBackgroundOpacity = 0.92;
         newPlotShowGrid = true;
@@ -2301,6 +2393,7 @@ public partial class GardenPlot
         newPlotShape = "Rectangle";
         newPlotWidth = currentPlot.WidthFt;
         newPlotHeight = currentPlot.HeightFt;
+        ResetAspectLock();
         newPlotBackgroundImageFileName = currentPlot.BackgroundImageFileName;
         newPlotBackgroundOpacity = EffectivePlotBackgroundOpacity(currentPlot);
         newPlotShowGrid = currentPlot.ShowGrid;
@@ -2317,14 +2410,15 @@ public partial class GardenPlot
     private void CancelNewPlot()
     {
         showNewPlotDialog = false;
+        ResetAspectLock();
         newPlotError = null;
         newPlotBackgroundImageWarning = null;
     }
 
     private async Task SavePlotSettingsAsync()
     {
-        var w = Math.Clamp(newPlotWidth, 1, 500);
-        var h = Math.Clamp(newPlotHeight, 1, 500);
+        var w = ClampPlotDimension(newPlotWidth);
+        var h = ClampPlotDimension(newPlotHeight);
 
         if (!isEditingPlotSettings)
         {
@@ -2367,6 +2461,7 @@ public partial class GardenPlot
         selectedItem = null;
         currentTool = Tool.Select;
         showNewPlotDialog = false;
+        ResetAspectLock();
         await SaveAsync();
     }
 

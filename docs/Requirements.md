@@ -48,6 +48,7 @@ GardenPlot.slnx
 - **Multiple plots**, persisted as a single JSON blob under `localStorage` key `gardenplot.library.v1`.
 - A **plot selector** (dropdown) above the canvas lists every saved plot as `Name (W ft × H ft)`.
 - **+ New Plot** opens a modal accepting Name, Shape (currently *Rectangle (flat)* — extension point), Width (ft), Height (ft). Width / Height clamped to 1–500 ft.
+- Plot create/edit dialogs include a transient **Lock aspect ratio** chain toggle between Width and Height. It is **off by default**, captures the current ratio when enabled, keeps that ratio while editing, and resets to unlocked each time the dialog opens.
 - **Delete Plot** (visible only when ≥ 2 plots exist) removes the current plot and falls back to the first.
 - The last-active plot ID is remembered (`PlotLibrary.LastPlotId`) and auto-restored on page load.
 - A default 60 × 8 ft *"My Garden"* plot is created on first visit if no library exists.
