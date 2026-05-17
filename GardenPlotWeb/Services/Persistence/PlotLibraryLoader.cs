@@ -49,6 +49,30 @@ public sealed class PlotLibraryLoader
         Meter.CreateCounter<long>("gardenplot.schema.load");
     private static readonly Histogram<double> LoadDurationMs =
         Meter.CreateHistogram<double>("gardenplot.schema.load.duration.ms");
+    private static readonly HashSet<string> MovedGroundCoverSurfaceCodes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Blue Fescue",
+        "Mondo (Ornamental)",
+        "Creeping Thyme",
+        "Creeping Phlox",
+        "Sweet Woodruff",
+        "Vinca (Periwinkle)",
+        "Pachysandra",
+        "Ajuga (Bugleweed)",
+        "Lamb's Ear",
+        "Lily of the Valley",
+        "Mondo Grass (Dwarf)",
+        "Wild Ginger",
+        "Bunchberry",
+        "Wild Strawberry",
+        "Bearberry (Kinnikinnick)",
+        "Sedum (Stonecrop)",
+        "Sedum (Creeping)",
+        "Stonecrop (Groundcover)",
+        "Mazus",
+        "Corsican Mint",
+        "Irish Moss",
+    };
 
     private readonly ILogger<PlotLibraryLoader> logger;
 
@@ -179,10 +203,12 @@ public sealed class PlotLibraryLoader
     /// <summary>
     /// Loader for schema v1. v1 documents predate the per-plot <c>Takeoff</c> list,
     /// <c>TakeoffIds</c> sequence, library-level <c>CustomCatalogItems</c>, costing defaults,
-    /// legacy triangulation migration, and <see cref="BackgroundFit"/>. We deserialize as the
-    /// current shape (forward-compatible — extra absent fields are tolerated by
-    /// <c>JsonSerializer</c>), synthesize one <see cref="TakeoffItem"/> per existing
-    /// <see cref="Shape"/>, then apply the later schema upgrades in-memory.
+    /// legacy triangulation migration, the v2 grass / ground-cover surface catalog rebind, and
+    /// <see cref="PlotData.BackgroundFit"/>. We deserialize as the current shape
+    /// (forward-compatible — extra absent fields are tolerated by <c>JsonSerializer</c>),
+    /// synthesize one <see cref="TakeoffItem"/> per existing <see cref="Shape"/>, rebind legacy
+    /// plant/tile placements onto the surface catalog, then project legacy triangulation flags
+    /// onto <see cref="DropGroup.Triangulated"/> and stamp a valid background-fit value.
     /// </summary>
     private static PlotLibrary? LoadFromVersion1(JsonObject root, JsonSerializerOptions? options)
     {
@@ -192,28 +218,38 @@ public sealed class PlotLibraryLoader
             return null;
         }
 
+        library = NormalizeLibrary(library);
         foreach (PlotData plot in library.Plots)
         {
             BackfillTakeoffItemsForLegacyPlot(plot);
         }
 
+        RebindMovedGroundCoverSurfaceShapes(library);
         return BackfillBackgroundFit(UpgradeLegacyTriangulation(library));
     }
 
     /// <summary>
-    /// Loader for schema v2. v2 documents already have takeoff items, but predate the costing
-    /// fields, the <c>StaggerHalf</c> to <see cref="DropGroup.Triangulated"/> rename, and the
-    /// <see cref="PlotData.BackgroundFit"/> field. Direct typed deserialization is sufficient
-    /// because the newer members carry safe model defaults (markup 25%, labor rate 75, internal
-    /// view on, line total on, default rotation for shapes/drop groups, and <c>Fit</c> for
-    /// background image rendering); we then project legacy triangulation onto
-    /// <see cref="DropGroup.Triangulated"/> and stamp a valid background-fit value before the
-    /// document is rewritten as the current schema.
+    /// Loader for schema v2. v2 documents already have takeoff items, but may still contain
+    /// legacy plant/custom-tile placements for area-based grasses or ground covers, predate the
+    /// costing fields, the <c>StaggerHalf</c> to <see cref="DropGroup.Triangulated"/> rename,
+    /// and the <see cref="PlotData.BackgroundFit"/> field. Direct typed deserialization is
+    /// sufficient because the newer members carry safe model defaults (markup 25%, labor rate
+    /// 75, internal view on, line total on, default rotation for shapes/drop groups, and
+    /// <c>Fit</c> for background image rendering); we then rebind moved surface palette items,
+    /// project legacy triangulation, and stamp a valid background-fit value before the document
+    /// is rewritten as the current schema.
     /// </summary>
     private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
     {
         PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
-        return library is null ? null : BackfillBackgroundFit(UpgradeLegacyTriangulation(library));
+        if (library is null)
+        {
+            return null;
+        }
+
+        library = NormalizeLibrary(library);
+        RebindMovedGroundCoverSurfaceShapes(library);
+        return BackfillBackgroundFit(UpgradeLegacyTriangulation(library));
     }
 
     /// <summary>
@@ -348,6 +384,53 @@ public sealed class PlotLibraryLoader
         }
 
         return library;
+    }
+
+    private static void RebindMovedGroundCoverSurfaceShapes(PlotLibrary library)
+    {
+        foreach (PlotData plot in library.Plots)
+        {
+            foreach (Shape shape in plot.Shapes)
+            {
+                RebindMovedGroundCoverSurfaceShape(shape);
+            }
+        }
+    }
+
+    private static void RebindMovedGroundCoverSurfaceShape(Shape shape)
+    {
+        string? code = string.IsNullOrWhiteSpace(shape.GroundCoverCode) ? shape.Label : shape.GroundCoverCode;
+        if (string.IsNullOrWhiteSpace(code) || !MovedGroundCoverSurfaceCodes.Contains(code))
+        {
+            return;
+        }
+
+        PaletteItem? item = PaletteCatalog.GroundCoverSurfaceCovers.FirstOrDefault(p =>
+            string.Equals(p.Code, code, StringComparison.OrdinalIgnoreCase));
+        if (item is null)
+        {
+            return;
+        }
+
+        if (shape.Kind == ShapeKind.Plant)
+        {
+            shape.Kind = ShapeKind.Oval;
+        }
+        else if (shape.Kind is not ShapeKind.Rectangle and not ShapeKind.Oval and not ShapeKind.FreeDraw)
+        {
+            shape.Kind = ShapeKind.Rectangle;
+        }
+
+        shape.Label = item.Code;
+        shape.Trait = item.Trait;
+        shape.Fill = item.FillColor;
+        shape.Stroke = item.StrokeColor;
+        shape.GroundCoverCode = item.Code;
+        shape.GroundCoverDepthIn = null;
+        shape.IsGroundCoverSurface = true;
+        shape.TextureKey = item.TextureKey;
+        shape.TextureImageId = null;
+        shape.TileBackgroundImageFileName = null;
     }
 
     private static int ReadVersion(JsonObject root)

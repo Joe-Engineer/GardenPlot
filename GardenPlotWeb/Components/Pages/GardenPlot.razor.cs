@@ -3737,7 +3737,10 @@ public partial class GardenPlot
         }
 
         return library.CustomPaletteItems.FirstOrDefault(i => string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase))
-            ?? PaletteCatalog.Grasses.FirstOrDefault(i => string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase));
+            ?? PaletteCatalog.Grasses.FirstOrDefault(i => string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase))
+            ?? PaletteCatalog.GroundCoverSurfaceCovers.FirstOrDefault(i =>
+                string.Equals(i.Code, shape.Label, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(i.Trait, "grass", StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task EnsureCitationSummaryForCustomTile(PaletteItem item)
@@ -4697,6 +4700,9 @@ public partial class GardenPlot
                     var depth = isSurface
                         ? (double?)null
                         : (currentGroundCoverDepthIn ?? gcItem.DefaultDepthIn ?? 3.0);
+                    var surfaceTrait = isSurface && !string.IsNullOrWhiteSpace(gcItem.Trait)
+                        ? gcItem.Trait
+                        : "ground-cover";
                     if (groundCoverSubMode == GroundCoverSubMode.Polygon)
                     {
                         // Click-by-vertex polygon. First click: start the shape with an
@@ -4707,7 +4713,7 @@ public partial class GardenPlot
                             drafting = new Shape
                             {
                                 Kind = ShapeKind.FreeDraw,
-                                Trait = "ground-cover",
+                                Trait = surfaceTrait,
                                 Label = gcItem.Code,
                                 Stroke = gcItem.StrokeColor,
                                 Fill = gcItem.FillColor,
@@ -4733,7 +4739,7 @@ public partial class GardenPlot
                         drafting = new Shape
                         {
                             Kind = ShapeKind.FreeDraw,
-                            Trait = "ground-cover",
+                            Trait = surfaceTrait,
                             Label = gcItem.Code,
                             Stroke = gcItem.StrokeColor,
                             Fill = gcItem.FillColor,
@@ -4753,7 +4759,7 @@ public partial class GardenPlot
                             Y = y,
                             W = 0,
                             H = 0,
-                            Trait = "ground-cover",
+                            Trait = surfaceTrait,
                             Label = gcItem.Code,
                             Stroke = gcItem.StrokeColor,
                             Fill = gcItem.FillColor,
