@@ -1,4 +1,4 @@
-﻿// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
+// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -149,6 +149,18 @@ public partial class GardenPlot
     private double shapeContextMenuX;
     private double shapeContextMenuY;
     private bool isDisposingOrDisposed;
+
+    // === Takeoff row selection / context menu / inline edit ===
+    private readonly HashSet<int> selectedTakeoffIds = new();
+    private bool showTakeoffContextMenu;
+    private double takeoffContextMenuX;
+    private double takeoffContextMenuY;
+    private int? takeoffContextMenuItemId;
+    private int? editingTakeoffId;
+    private TakeoffItem? EditingTakeoff =>
+        editingTakeoffId is int id && currentPlot is not null
+            ? currentPlot.Takeoff.FirstOrDefault(t => t.Id == id)
+            : null;
 
     private Guid? PrimarySelectedId => selectedIds.Count > 0 ? selectedIds[^1] : null;
     private bool HasClipboard => clipboard.Count > 0;
@@ -907,6 +919,178 @@ public partial class GardenPlot
             ShapeId = null,
         });
         currentPlot.TakeoffIds.Next = nextId + 1;
+        _ = SaveAsync();
+    }
+
+    // === Takeoff row selection / context menu / inline edit ===
+
+    /// <summary>True when the given takeoff item's row should render highlighted in the panel.</summary>
+    private bool IsTakeoffRowSelected(TakeoffItem t)
+    {
+        if (selectedTakeoffIds.Contains(t.Id))
+        {
+            return true;
+        }
+
+        return t.ShapeId is Guid g && selectedIds.Contains(g);
+    }
+
+    /// <summary>
+    /// Click handler for a takeoff row. Selects the row (multi-select with Ctrl/Shift) and, when
+    /// the row is bound to a shape, syncs the canvas selection so the user sees the same item
+    /// highlighted in both places.
+    /// </summary>
+    private void OnTakeoffRowClick(TakeoffItem t, MouseEventArgs e)
+    {
+        showTakeoffContextMenu = false;
+        bool additive = e.CtrlKey || e.ShiftKey || e.MetaKey;
+
+        if (t.ShapeId is Guid shapeId)
+        {
+            if (additive)
+            {
+                ToggleSelection(shapeId);
+                if (selectedIds.Contains(shapeId))
+                {
+                    _ = selectedTakeoffIds.Add(t.Id);
+                }
+                else
+                {
+                    _ = selectedTakeoffIds.Remove(t.Id);
+                }
+            }
+            else
+            {
+                selectedTakeoffIds.Clear();
+                SelectOnly(shapeId);
+                _ = selectedTakeoffIds.Add(t.Id);
+            }
+        }
+        else
+        {
+            // Virtual item: drive panel-only selection, clear canvas selection unless additive.
+            if (!additive)
+            {
+                ClearSelection();
+                selectedTakeoffIds.Clear();
+            }
+
+            if (!selectedTakeoffIds.Add(t.Id))
+            {
+                _ = selectedTakeoffIds.Remove(t.Id);
+            }
+        }
+    }
+
+    /// <summary>Right-click on a row opens the context menu pinned to it.</summary>
+    private void OnTakeoffRowContextMenu(TakeoffItem t, MouseEventArgs e)
+    {
+        // Make sure the row is selected before showing actions.
+        if (!IsTakeoffRowSelected(t))
+        {
+            OnTakeoffRowClick(t, e);
+        }
+
+        takeoffContextMenuItemId = t.Id;
+        takeoffContextMenuX = e.ClientX;
+        takeoffContextMenuY = e.ClientY;
+        showTakeoffContextMenu = true;
+        showShapeContextMenu = false;
+    }
+
+    private void CloseTakeoffContextMenu()
+    {
+        showTakeoffContextMenu = false;
+        takeoffContextMenuItemId = null;
+    }
+
+    /// <summary>Deletes a takeoff item. If bound to a shape, the shape is removed too.</summary>
+    private void DeleteTakeoffItem(int takeoffId)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        TakeoffItem? t = currentPlot.Takeoff.FirstOrDefault(x => x.Id == takeoffId);
+        if (t is null)
+        {
+            return;
+        }
+
+        RecordUndoState();
+
+        if (t.ShapeId is Guid sid)
+        {
+            _ = currentPlot.Shapes.RemoveAll(s => s.Id == sid);
+            _ = selectedIds.Remove(sid);
+        }
+
+        _ = currentPlot.Takeoff.Remove(t);
+        _ = selectedTakeoffIds.Remove(takeoffId);
+        CloseTakeoffContextMenu();
+        _ = SaveAsync();
+    }
+
+    /// <summary>
+    /// Duplicates a takeoff item as a new *virtual* row with a fresh monotonic Id. The shape is
+    /// not cloned (geometry is per-shape; duplicating into a free virtual line preserves intent
+    /// without dropping an unsolicited copy onto the canvas).
+    /// </summary>
+    private void DuplicateTakeoffItem(int takeoffId)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        TakeoffItem? src = currentPlot.Takeoff.FirstOrDefault(x => x.Id == takeoffId);
+        if (src is null)
+        {
+            return;
+        }
+
+        RecordUndoState();
+
+        int nextId = currentPlot.TakeoffIds.Next;
+        foreach (TakeoffItem t in currentPlot.Takeoff)
+        {
+            if (t.Id >= nextId)
+            {
+                nextId = t.Id + 1;
+            }
+        }
+
+        currentPlot.Takeoff.Add(new TakeoffItem
+        {
+            Id = nextId,
+            CatalogSource = src.CatalogSource,
+            CatalogPackId = src.CatalogPackId,
+            CatalogCode = src.CatalogCode,
+            NameOverride = src.NameOverride,
+            Quantity = src.Quantity,
+            UnitOverride = src.UnitOverride,
+            DepthInOverride = src.DepthInOverride,
+            WastePercentOverride = src.WastePercentOverride,
+            LaborTypeOverride = src.LaborTypeOverride,
+            LaborHoursPerUnitOverride = src.LaborHoursPerUnitOverride,
+            Notes = src.Notes,
+            ShapeId = null,
+        });
+        currentPlot.TakeoffIds.Next = nextId + 1;
+        CloseTakeoffContextMenu();
+        _ = SaveAsync();
+    }
+
+    private void BeginEditTakeoffItem(int takeoffId)
+    {
+        editingTakeoffId = takeoffId;
+        CloseTakeoffContextMenu();
+    }
+
+    private void CloseEditTakeoffItem()
+    {
+        editingTakeoffId = null;
         _ = SaveAsync();
     }
 
