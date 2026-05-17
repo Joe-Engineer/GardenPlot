@@ -173,6 +173,9 @@ else
                         title="First-selected area is clippee; second-selected area is clipper.">
                     @ClipToolbarLabel
                 </button>
+                <button class="btn btn-sm btn-outline-success ms-2" @onclick="FillSelectedAreaWithPlantsAsync" disabled="@(!CanFillSelectedArea)">
+                    Fill with plants
+                </button>
             </div>
 
             <div class="align-toolbar align-toolbar-inline" role="toolbar" aria-label="Position controls">
@@ -767,7 +770,7 @@ else
                     var scy = sb.y + sb.h / 2;
                     <g class="shape @(IsSelected(s.Id) ? "selected" : "")"
                        transform="rotate(@F(s.Rotation) @F(scx) @F(scy))"
-                       pointer-events="@(currentTool == Tool.Select && CanSelectShape(s) ? "auto" : "none")"
+                       pointer-events="@(currentTool == Tool.Select && CanSelectShape(s) && CanReceiveShapePointer(s) ? "auto" : "none")"
                        @onpointerdown="(e) => OnShapePointerDown(e, s)"
                        @onpointerdown:stopPropagation="true"
                        @oncontextmenu="(e) => OnShapeContextMenu(e, s)"
@@ -1209,6 +1212,10 @@ else
     {
         <div class="shape-context-menu" style="left:@F(shapeContextMenuX)px;top:@F(shapeContextMenuY)px;"
              @onpointerdown:stopPropagation="true">
+            @if (CanFillSelectedArea)
+            {
+                <button type="button" @onclick="FillSelectedAreaWithPlantsFromMenu">Fill with plants</button>
+            }
             <button type="button" @onclick="BringSelectionToFrontFromMenu">Bring to Front</button>
             <button type="button" @onclick="SendSelectionToBackFromMenu">Send to Back</button>
         </div>
@@ -1611,7 +1618,9 @@ else
                                 {
                                     @foreach (var row in summaryRows)
                                     {
-                                        <tr>
+                                        <tr class="@(IsTakeoffSummaryRowSelected(row) ? "table-active" : string.Empty)"
+                                            @onclick="() => SelectTakeoffSummaryRow(row)"
+                                            style="cursor:@(row.ShapeId.HasValue || row.ParentShapeId.HasValue ? "pointer" : "default");">
                                             <td>@row.Kind</td>
                                             <td>@row.Name</td>
                                             <td class="text-end">@row.Count</td>
@@ -1642,7 +1651,9 @@ else
                                     {
                                         @foreach (var row in kindGroup)
                                         {
-                                            <tr>
+                                            <tr class="@(IsTakeoffSummaryRowSelected(row) ? "table-active" : string.Empty)"
+                                                @onclick="() => SelectTakeoffSummaryRow(row)"
+                                                style="cursor:@(row.ShapeId.HasValue || row.ParentShapeId.HasValue ? "pointer" : "default");">
                                                 <td>@row.Kind</td>
                                                 <td>@row.Name</td>
                                                 <td class="text-end">@row.Count</td>

@@ -170,7 +170,12 @@ public partial class GardenPlot
 
     private Guid? PrimarySelectedId => selectedIds.Count > 0 ? selectedIds[^1] : null;
     private bool HasClipboard => clipboard.Count > 0;
+    private bool HasSelectedPlantPaletteItem => selectedItem?.Kind == PaletteKind.Plant;
+    private bool CanFillSelectedArea => HasSelectedPlantPaletteItem && GetSelectedFillAreaShape() is not null;
     private bool IsSelected(Guid id) => selectedIds.Contains(id);
+
+    private bool CanReceiveShapePointer(Shape shape)
+        => currentTool == Tool.Select || (HasSelectedPlantPaletteItem && IsFillableAreaShape(shape));
 
     private void SelectOnly(Guid id)
     {
@@ -192,6 +197,30 @@ public partial class GardenPlot
         if (currentPlot?.Shapes.FirstOrDefault(s => s.Id == id) is Shape shape && CanSelectShape(shape))
         {
             selectedIds.Add(id);
+        }
+    }
+
+    private void SelectFilledAreaRegion(Guid clickedId)
+    {
+        selectedIds.Clear();
+        selectedIds.AddRange(OrderedFilledAreaRegionSelection(clickedId));
+    }
+
+    private void ToggleFilledAreaRegion(Guid clickedId)
+    {
+        var linkedIds = OrderedFilledAreaRegionSelection(clickedId);
+        if (linkedIds.All(IsSelected))
+        {
+            selectedIds.RemoveAll(linkedIds.Contains);
+            return;
+        }
+
+        foreach (var id in linkedIds)
+        {
+            if (!selectedIds.Contains(id))
+            {
+                selectedIds.Add(id);
+            }
         }
     }
 
@@ -321,6 +350,103 @@ public partial class GardenPlot
         selectedIds.Clear();
         selectedIds.AddRange(ordered);
     }
+
+    private void ExpandSelectionToFilledAreas()
+    {
+        if (currentPlot is null || selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        var ordered = new List<Guid>(selectedIds);
+        var selectedSet = selectedIds.ToHashSet();
+        foreach (var id in selectedIds.ToList())
+        {
+            foreach (var linkedId in GetFilledAreaRegionIds(id))
+            {
+                if (selectedSet.Add(linkedId))
+                {
+                    ordered.Add(linkedId);
+                }
+            }
+        }
+
+        selectedIds.Clear();
+        selectedIds.AddRange(ordered);
+    }
+
+    private List<Guid> OrderedFilledAreaRegionSelection(Guid clickedId)
+    {
+        var regionIds = GetFilledAreaRegionIds(clickedId);
+        if (regionIds.Count == 0)
+        {
+            return new List<Guid> { clickedId };
+        }
+
+        regionIds.Remove(clickedId);
+        regionIds.Add(clickedId);
+        return regionIds;
+    }
+
+    private List<Guid> GetFilledAreaRegionIds(Guid shapeId)
+    {
+        if (currentPlot is null)
+        {
+            return new List<Guid>();
+        }
+
+        var shape = currentPlot.Shapes.FirstOrDefault(s => s.Id == shapeId);
+        if (shape is null)
+        {
+            return new List<Guid>();
+        }
+
+        Guid? areaId = IsFillableAreaShape(shape)
+            ? shape.Id
+            : shape.FilledAreaShapeId;
+        if (areaId is not Guid linkedAreaId)
+        {
+            return new List<Guid>();
+        }
+
+        return currentPlot.Shapes
+            .Where(s => s.Id == linkedAreaId || s.FilledAreaShapeId == linkedAreaId)
+            .Select(s => s.Id)
+            .Distinct()
+            .ToList();
+    }
+
+    private Shape? GetSelectedFillAreaShape()
+    {
+        if (currentPlot is null || selectedIds.Count == 0)
+        {
+            return null;
+        }
+
+        if (PrimarySelectedId is Guid primaryId)
+        {
+            var primary = currentPlot.Shapes.FirstOrDefault(s => s.Id == primaryId);
+            if (primary is not null)
+            {
+                if (IsFillableAreaShape(primary))
+                {
+                    return primary;
+                }
+
+                if (primary.FilledAreaShapeId is Guid parentAreaId)
+                {
+                    return currentPlot.Shapes.FirstOrDefault(s => s.Id == parentAreaId);
+                }
+            }
+        }
+
+        return SelectedShapes().FirstOrDefault(IsFillableAreaShape);
+    }
+
+    private List<Shape> GetFilledAreaChildren(Guid areaId)
+        => currentPlot is null
+            ? new List<Shape>()
+            : currentPlot.Shapes.Where(s => s.FilledAreaShapeId == areaId).ToList();
 
     private IEnumerable<Shape> SelectedShapes()
     {
@@ -455,9 +581,11 @@ public partial class GardenPlot
         bool Unbound,
         bool HasWasteOverride,
         bool HasLaborTypeOverride,
-        bool HasMarkupOverride);
+        bool HasMarkupOverride,
+        Guid? ShapeId,
+        Guid? ParentShapeId);
 
-    private sealed record TakeoffSummaryRow(
+    private sealed record TakeoffAggregateRow(
         string Kind,
         string Name,
         int Count,
@@ -466,7 +594,9 @@ public partial class GardenPlot
         decimal? MaterialCost,
         decimal LaborCost,
         double MarkupPercent,
-        decimal? LineTotal);
+        decimal? LineTotal,
+        Guid? ShapeId = null,
+        Guid? ParentShapeId = null);
 
     private sealed record TakeoffRow(string Kind, string Name, int Count, string? Quantity = null);
     private sealed record ClipCandidateInfo(Guid Id, int PlotNumber, string Label, bool Selected);
@@ -681,11 +811,17 @@ public partial class GardenPlot
             return Array.Empty<TakeoffItemRow>();
         }
 
+        Dictionary<Guid, Shape> shapesById = currentPlot.Shapes.ToDictionary(shape => shape.Id);
+
         return currentPlot.Takeoff
             .OrderBy(t => t.Id)
             .Select(t =>
             {
                 CatalogItem? catalog = CatalogFor(t);
+                Shape? boundShape = t.ShapeId is Guid shapeId && shapesById.TryGetValue(shapeId, out Shape? resolvedShape)
+                    ? resolvedShape
+                    : null;
+
                 return new TakeoffItemRow(
                     t.Id,
                     TakeoffMath.Kind(catalog),
@@ -705,12 +841,112 @@ public partial class GardenPlot
                     catalog is null,
                     t.WastePercentOverride.HasValue,
                     t.LaborTypeOverride.HasValue,
-                    t.MarkupPercentOverride.HasValue);
+                    t.MarkupPercentOverride.HasValue,
+                    t.ShapeId,
+                    boundShape?.FilledAreaShapeId);
             })
             .ToList();
     }
 
-    private static IReadOnlyList<TakeoffSummaryRow> BuildTakeoffSummaryRows(IEnumerable<TakeoffItemRow> itemRows)
+    private static List<TakeoffSummaryRow> BuildTakeoff(IEnumerable<Shape> shapes)
+    {
+        var all = shapes.ToList();
+        var allById = all.ToDictionary(s => s.Id);
+        var filledAreaIds = all
+            .Where(IsFilledAreaPlant)
+            .Select(s => s.FilledAreaShapeId!.Value)
+            .Distinct()
+            .ToHashSet();
+
+        var filledAreaRows = all
+            .Where(s => filledAreaIds.Contains(s.Id) && IsFillableAreaShape(s))
+            .SelectMany(area =>
+            {
+                var plants = all
+                    .Where(s => s.FilledAreaShapeId == area.Id && s.Kind == ShapeKind.Plant)
+                    .OrderBy(s => s.Label, StringComparer.Ordinal)
+                    .ThenBy(s => s.Id)
+                    .ToList();
+                if (plants.Count == 0)
+                {
+                    return Array.Empty<TakeoffSummaryRow>();
+                }
+
+                var plantName = plants[0].Label ?? "Plant";
+                return new[]
+                {
+                    new TakeoffSummaryRow(
+                        Kind: "Filled Area",
+                        Name: FilledAreaTakeoffName(area, plantName),
+                        Count: 1,
+                        Quantity: $"{TakeoffMath.EffectiveAreaFt2(area, allById):0.#} ft²",
+                        ShapeId: area.Id,
+                        ParentShapeId: area.Id),
+                    new TakeoffSummaryRow(
+                        Kind: "Plant",
+                        Name: plantName,
+                        Count: plants.Count,
+                        ShapeId: plants[0].Id,
+                        ParentShapeId: area.Id),
+                };
+            });
+
+        var groundCovers = all
+            .Where(s => IsGroundCoverShape(s) && !filledAreaIds.Contains(s.Id))
+            .GroupBy(s => (
+                Code: string.IsNullOrWhiteSpace(s.GroundCoverCode) ? (s.Label ?? "Ground cover") : s.GroundCoverCode!,
+                DepthIn: s.GroundCoverDepthIn,
+                Surface: s.IsGroundCoverSurface))
+            .Select(g =>
+            {
+                var totalArea = g.Sum(shape => TakeoffMath.EffectiveAreaFt2(shape, allById));
+                string qty;
+                string name = g.Key.Code;
+                if (g.Key.Surface)
+                {
+                    qty = $"{totalArea:0.#} ft²";
+                }
+                else
+                {
+                    var depth = g.Key.DepthIn ?? 0;
+                    var vol = GroundCoverMath.VolumeYd3(totalArea, depth);
+                    qty = $"{vol:0.##} yd³ ({totalArea:0.#} ft² × {depth:0.#}\")";
+                }
+
+                var kind = g.Key.Surface ? "Ground Cover — Surface" : "Ground Cover";
+                return new TakeoffSummaryRow(kind, name, g.Count(), qty);
+            });
+
+        var others = all
+            .Where(s => !IsGroundCoverShape(s) && !IsFilledAreaPlant(s) && !filledAreaIds.Contains(s.Id))
+            .Where(s => s.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant
+                                or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
+            .GroupBy(s => (Kind: TakeoffKind(s), Name: TakeoffName(s)))
+            .Select(g => new TakeoffSummaryRow(g.Key.Kind, g.Key.Name, g.Count()));
+
+        return filledAreaRows.Concat(groundCovers).Concat(others)
+            .OrderBy(r => r.Kind, StringComparer.Ordinal)
+            .ThenBy(r => r.Name, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static Guid? DistinctSingleOrNull(IEnumerable<Guid?> ids)
+    {
+        Guid? result = null;
+        foreach (Guid candidate in ids.Where(id => id.HasValue).Select(id => id!.Value).Distinct())
+        {
+            if (result.HasValue)
+            {
+                return null;
+            }
+
+            result = candidate;
+        }
+
+        return result;
+    }
+
+    private static IReadOnlyList<TakeoffAggregateRow> BuildTakeoffSummaryRows(IEnumerable<TakeoffItemRow> itemRows)
     {
         return itemRows
             .GroupBy(
@@ -721,53 +957,24 @@ public partial class GardenPlot
                     row.Unit,
                     MarkupPercent = Math.Round(row.MarkupPercent, 6),
                 })
-            .Select(group => new TakeoffSummaryRow(
-                group.Key.Kind,
-                group.Key.Name,
-                group.Count(),
-                group.Sum(row => row.Quantity),
-                group.Key.Unit,
-                TakeoffMath.SumCurrency(group.Select(row => row.MaterialCost)),
-                group.Sum(row => row.LaborCost),
-                group.First().MarkupPercent,
-                TakeoffMath.SumCurrency(group.Select(row => row.LineTotal))))
-            .OrderBy(row => row.Kind, StringComparer.Ordinal)
-            .ThenBy(row => row.Name, StringComparer.Ordinal)
-            .ToList();
-    }
-
-    private static IReadOnlyList<TakeoffRow> BuildTakeoff(IEnumerable<Shape> shapes)
-    {
-        List<Shape> all = shapes.ToList();
-        Dictionary<Guid, Shape> allById = all.ToDictionary(shape => shape.Id);
-
-        var groundCovers = all
-            .Where(IsGroundCoverShape)
-            .GroupBy(shape => new
-            {
-                Code = string.IsNullOrWhiteSpace(shape.GroundCoverCode) ? TakeoffName(shape) : shape.GroundCoverCode!,
-                Surface = shape.IsGroundCoverSurface,
-                DepthIn = shape.GroundCoverDepthIn,
-            })
             .Select(group =>
             {
-                double totalArea = group.Sum(shape => TakeoffMath.EffectiveAreaFt2(shape, allById));
-                double depthIn = group.Key.DepthIn ?? 0;
-                string quantity = group.Key.Surface
-                    ? $"{totalArea:0.#} ft²"
-                    : $"{GroundCoverMath.VolumeYd3(totalArea, depthIn):0.##} yd³ ({totalArea:0.#} ft² × {depthIn:0.#}\")";
-                string kind = group.Key.Surface ? "Ground Cover — Surface" : "Ground Cover";
-                return new TakeoffRow(kind, group.Key.Code, group.Count(), quantity);
-            });
+                Guid? parentShapeId = DistinctSingleOrNull(group.Select(row => row.ParentShapeId));
+                Guid? shapeId = parentShapeId.HasValue ? null : DistinctSingleOrNull(group.Select(row => row.ShapeId));
 
-        var others = all
-            .Where(shape => !IsGroundCoverShape(shape))
-            .Where(shape => shape.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant
-                                or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
-            .GroupBy(shape => (Kind: TakeoffKind(shape), Name: TakeoffName(shape)))
-            .Select(group => new TakeoffRow(group.Key.Kind, group.Key.Name, group.Count()));
-
-        return groundCovers.Concat(others)
+                return new TakeoffAggregateRow(
+                    group.Key.Kind,
+                    group.Key.Name,
+                    group.Count(),
+                    group.Sum(row => row.Quantity),
+                    group.Key.Unit,
+                    TakeoffMath.SumCurrency(group.Select(row => row.MaterialCost)),
+                    group.Sum(row => row.LaborCost),
+                    group.First().MarkupPercent,
+                    TakeoffMath.SumCurrency(group.Select(row => row.LineTotal)),
+                    shapeId,
+                    parentShapeId);
+            })
             .OrderBy(row => row.Kind, StringComparer.Ordinal)
             .ThenBy(row => row.Name, StringComparer.Ordinal)
             .ToList();
@@ -862,6 +1069,41 @@ public partial class GardenPlot
         MaterialCategory.GroundCover => "Ground cover",
         _ => category.ToString(),
     };
+
+    private static bool IsFillableAreaShape(Shape s)
+        => s.Kind is ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw
+            && !IsTileShape(s)
+            && !IsRulerShape(s);
+
+    private static bool IsFilledAreaPlant(Shape s)
+        => s.Kind == ShapeKind.Plant && s.FilledAreaShapeId is not null;
+
+    private static string FilledAreaTakeoffName(Shape area, string plantName)
+        => $"{TakeoffName(area)} · {plantName}";
+
+    private void SelectTakeoffSummaryRow(TakeoffAggregateRow row)
+    {
+        if (row.ParentShapeId is Guid parentAreaId)
+        {
+            SelectFilledAreaRegion(parentAreaId);
+            return;
+        }
+
+        if (row.ShapeId is Guid shapeId)
+        {
+            SelectOnly(shapeId);
+        }
+    }
+
+    private bool IsTakeoffSummaryRowSelected(TakeoffAggregateRow row)
+    {
+        if (row.ParentShapeId is Guid parentAreaId)
+        {
+            return GetFilledAreaRegionIds(parentAreaId).Any(IsSelected);
+        }
+
+        return row.ShapeId is Guid shapeId && IsSelected(shapeId);
+    }
 
     private static readonly string[] GroundCoverTextureKeys =
     [
@@ -1351,7 +1593,7 @@ public partial class GardenPlot
 
         ReconcileTakeoff();
         IReadOnlyList<TakeoffItemRow> itemRows = BuildTakeoffItemRows();
-        IReadOnlyList<TakeoffSummaryRow> summaryRows = BuildTakeoffSummaryRows(itemRows);
+        IReadOnlyList<TakeoffAggregateRow> summaryRows = BuildTakeoffSummaryRows(itemRows);
         bool isInternalView = library.Ui.ShowInternalView;
         StringBuilder sb = new();
 
@@ -1411,7 +1653,7 @@ public partial class GardenPlot
         else if (isInternalView)
         {
             sb.AppendLine("Kind,Name,Count,Quantity,Unit,MaterialCost,LaborCost,MarkupPercent,LineTotal");
-            foreach (TakeoffSummaryRow row in summaryRows)
+            foreach (TakeoffAggregateRow row in summaryRows)
             {
                 sb.Append(CsvField(row.Kind)).Append(',')
                   .Append(CsvField(row.Name)).Append(',')
@@ -1428,9 +1670,9 @@ public partial class GardenPlot
         else
         {
             sb.AppendLine("Kind,Name,Count,Quantity,Unit,LineTotal");
-            foreach (IGrouping<string, TakeoffSummaryRow> kindGroup in summaryRows.GroupBy(row => row.Kind).OrderBy(group => group.Key, StringComparer.Ordinal))
+            foreach (IGrouping<string, TakeoffAggregateRow> kindGroup in summaryRows.GroupBy(row => row.Kind).OrderBy(group => group.Key, StringComparer.Ordinal))
             {
-                foreach (TakeoffSummaryRow row in kindGroup)
+                foreach (TakeoffAggregateRow row in kindGroup)
                 {
                     sb.Append(CsvField(row.Kind)).Append(',')
                       .Append(CsvField(row.Name)).Append(',')
@@ -3636,11 +3878,21 @@ public partial class GardenPlot
 
         var known = Math.Clamp(canvasScaleKnownDistanceValue, 0.1, 1_000_000) * UnitToFeetFactor(canvasScaleKnownDistanceUnit);
         var factor = known / measured;
+        var filledAreaIds = currentPlot.Shapes
+            .Where(s => s.FilledAreaShapeId is Guid)
+            .Select(s => s.FilledAreaShapeId!.Value)
+            .Distinct()
+            .ToList();
 
         RecordUndoState();
         ScalePlotGeometry(currentPlot, factor);
         currentPlot.WidthFt = Math.Clamp(currentPlot.WidthFt * factor, 1, 500);
         currentPlot.HeightFt = Math.Clamp(currentPlot.HeightFt * factor, 1, 500);
+        if (filledAreaIds.Count > 0)
+        {
+            await RefillScaledFilledAreasAsync(filledAreaIds);
+        }
+
         canvasScaleError = null;
         canvasScaleStatus = $"Applied {F(factor)}× scale. Plot size is now {F(currentPlot.WidthFt)}' × {F(currentPlot.HeightFt)}'.";
         showCanvasScalePanel = false;
@@ -4461,7 +4713,9 @@ public partial class GardenPlot
 
     private void SelectItem(PaletteItem item)
     {
-        var preserveSelection = IsStampablePaletteItem(item) && GetSelectedAlongPathSourceShape() is not null;
+        var preserveSelection =
+            (IsStampablePaletteItem(item) && GetSelectedAlongPathSourceShape() is not null)
+            || (item.Kind == PaletteKind.Plant && GetSelectedFillAreaShape() is not null);
         if (!preserveSelection)
         {
             ClearSelection();
@@ -4600,6 +4854,7 @@ public partial class GardenPlot
     private async Task DeleteSelected()
     {
         if (currentPlot is null || selectedIds.Count == 0) return;
+        ExpandSelectionToFilledAreas();
         RecordUndoState();
         var ids = selectedIds.ToHashSet();
         currentPlot.Shapes.RemoveAll(s => ids.Contains(s.Id));
@@ -4613,6 +4868,7 @@ public partial class GardenPlot
 
     private void CopySelected()
     {
+        ExpandSelectionToFilledAreas();
         clipboard.Clear();
         foreach (var s in SelectedShapes())
         {
@@ -4673,6 +4929,24 @@ public partial class GardenPlot
     private List<Shape> BuildClipboardShapesAt(double targetX, double targetY, bool assignNewIds)
     {
         var shapes = clipboard.Select(s => CloneShape(s, assignNewId: assignNewIds)).ToList();
+        if (assignNewIds)
+        {
+            var areaIdMap = clipboard
+                .Zip(shapes, (source, clone) => new { source, clone })
+                .Where(pair => IsFillableAreaShape(pair.source))
+                .ToDictionary(pair => pair.source.Id, pair => pair.clone.Id);
+
+            foreach (var pair in clipboard.Zip(shapes, (source, clone) => new { source, clone }))
+            {
+                if (pair.source.FilledAreaShapeId is Guid oldAreaId)
+                {
+                    pair.clone.FilledAreaShapeId = areaIdMap.TryGetValue(oldAreaId, out var newAreaId)
+                        ? newAreaId
+                        : null;
+                }
+            }
+        }
+
         var groupAabb = UnionAabb(shapes);
         var dx = targetX - groupAabb.minX;
         var dy = targetY - groupAabb.minY;
@@ -4700,6 +4974,7 @@ public partial class GardenPlot
             Points = source.Points.Select(p => new Point(p.X, p.Y)).ToList(),
             ClippedBy = assignNewId ? new List<Guid>() : source.ClippedBy.Distinct().ToList(),
             Label = source.Label,
+            FilledAreaShapeId = source.FilledAreaShapeId,
             Trait = source.Trait,
             Stroke = source.Stroke,
             Fill = source.Fill,
@@ -4979,6 +5254,7 @@ public partial class GardenPlot
             H = item.HeightFt,
             Rotation = rotation,
             Label = item.Code,
+            FilledAreaShapeId = null,
             Trait = EffectivePaletteTrait(item),
             Stroke = item.StrokeColor,
             Fill = item.FillColor,
@@ -5198,6 +5474,148 @@ public partial class GardenPlot
         }
 
         return new StampPlacement { Shapes = shapes, Group = group };
+    }
+
+    private async Task FillSelectedAreaWithPlantsAsync()
+    {
+        if (currentPlot is null || selectedItem is not { Kind: PaletteKind.Plant } plantItem)
+        {
+            return;
+        }
+
+        var area = GetSelectedFillAreaShape();
+        if (area is null)
+        {
+            return;
+        }
+
+        await FillAreaWithPlantAsync(area, plantItem, confirmReplacement: true, recordUndoState: true);
+    }
+
+    private async Task FillSelectedAreaWithPlantsFromMenu()
+    {
+        await FillSelectedAreaWithPlantsAsync();
+        HideShapeContextMenu();
+    }
+
+    private async Task<bool> FillAreaWithPlantAsync(Shape area, PaletteItem item, bool confirmReplacement, bool recordUndoState)
+    {
+        if (currentPlot is null)
+        {
+            return false;
+        }
+
+        var polygon = GroundCoverMath.AreaPolygon(area);
+        if (polygon.Count < 3)
+        {
+            return false;
+        }
+
+        var existingPlants = GetFilledAreaChildren(area.Id)
+            .Where(s => s.Kind == ShapeKind.Plant)
+            .ToList();
+        if (confirmReplacement && !await ConfirmFillReplacementAsync(existingPlants.Count))
+        {
+            return false;
+        }
+
+        var samplePoints = TriangulatedFill.SampleInside(polygon, item.WidthFt);
+        if (existingPlants.Count == 0 && samplePoints.Count == 0)
+        {
+            return false;
+        }
+
+        if (recordUndoState)
+        {
+            RecordUndoState();
+        }
+
+        var rotation = existingPlants.Count > 0 ? existingPlants[0].Rotation : stampRotation;
+        currentPlot.Shapes.RemoveAll(s => s.FilledAreaShapeId == area.Id);
+        foreach (var point in samplePoints)
+        {
+            var plant = BuildStampShapeAt(item, point.X, point.Y, rotation, null, null);
+            plant.FilledAreaShapeId = area.Id;
+            currentPlot.Shapes.Add(plant);
+        }
+
+        SelectFilledAreaRegion(area.Id);
+        await SaveAsync();
+        return true;
+    }
+
+    private async Task<bool> ConfirmFillReplacementAsync(int existingCount)
+    {
+        if (existingCount <= 0)
+        {
+            return true;
+        }
+
+        return await ConfirmAsync(BuildFillReplacementPrompt(existingCount));
+    }
+
+    private static string BuildFillReplacementPrompt(int existingCount)
+        => $"Re-run fill? Existing {existingCount} plants will be replaced.";
+
+    private async Task<bool> ConfirmAsync(string message)
+    {
+        if (jsModule is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            return await jsModule.InvokeAsync<bool>("confirmAction", message);
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private PaletteItem? TryResolveFilledAreaPlant(Shape area)
+    {
+        var child = GetFilledAreaChildren(area.Id).FirstOrDefault(s => s.Kind == ShapeKind.Plant);
+        return string.IsNullOrWhiteSpace(child?.Label)
+            ? null
+            : PaletteCatalog.Plants.FirstOrDefault(p => string.Equals(p.Code, child.Label, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task RefillScaledFilledAreasAsync(IEnumerable<Guid> areaIds)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        var areas = areaIds
+            .Distinct()
+            .Select(id => currentPlot.Shapes.FirstOrDefault(s => s.Id == id))
+            .Where(s => s is not null && IsFillableAreaShape(s))
+            .Cast<Shape>()
+            .ToList();
+        if (areas.Count == 0)
+        {
+            return;
+        }
+
+        var existingPlantCount = areas.Sum(area => GetFilledAreaChildren(area.Id).Count(s => s.Kind == ShapeKind.Plant));
+        if (!await ConfirmFillReplacementAsync(existingPlantCount))
+        {
+            return;
+        }
+
+        foreach (var area in areas)
+        {
+            var plantItem = TryResolveFilledAreaPlant(area);
+            if (plantItem is null)
+            {
+                continue;
+            }
+
+            await FillAreaWithPlantAsync(area, plantItem, confirmReplacement: false, recordUndoState: false);
+        }
     }
 
     private void OnPointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
@@ -5772,7 +6190,10 @@ public partial class GardenPlot
 
     private void OnShapePointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, Shape s)
     {
-        if (currentTool != Tool.Select || !CanSelectShape(s)) return;
+        if (currentTool != Tool.Select || !CanSelectShape(s))
+        {
+            if (!CanReceiveShapePointer(s)) return;
+        }
 
         TryCaptureCanvasPointer(e.PointerId);
 
@@ -5786,17 +6207,27 @@ public partial class GardenPlot
 
         if (e.ShiftKey)
         {
-            // Shift-click toggles membership in the selection set; doesn't start a drag.
-            ToggleSelection(s.Id);
+            if (GetFilledAreaRegionIds(s.Id).Count > 0)
+            {
+                ToggleFilledAreaRegion(s.Id);
+            }
+            else
+            {
+                ToggleSelection(s.Id);
+            }
+
             return;
         }
 
-        if (s.GroupId is Guid groupId && currentPlot?.DropGroups.Any(g => g.Id == groupId) == true)
+        if (GetFilledAreaRegionIds(s.Id).Count > 0)
+        {
+            SelectFilledAreaRegion(s.Id);
+        }
+        else if (s.GroupId is Guid groupId && currentPlot?.DropGroups.Any(g => g.Id == groupId) == true)
         {
             SelectDropGroup(groupId);
         }
-
-        if (!IsSelected(s.Id))
+        else if (!IsSelected(s.Id))
         {
             SelectOnly(s.Id);
         }
@@ -6008,14 +6439,21 @@ public partial class GardenPlot
             return;
         }
 
-        if (currentTool != Tool.Select || currentPlot is null)
+        if (!CanReceiveShapePointer(s) || currentPlot is null)
         {
             return;
         }
 
         if (!IsSelected(s.Id))
         {
-            SelectOnly(s.Id);
+            if (GetFilledAreaRegionIds(s.Id).Count > 0)
+            {
+                SelectFilledAreaRegion(s.Id);
+            }
+            else
+            {
+                SelectOnly(s.Id);
+            }
         }
 
         shapeContextMenuX = e.ClientX;
@@ -6027,6 +6465,7 @@ public partial class GardenPlot
     {
         if (currentPlot is null || selectedIds.Count == 0) return;
         ExpandSelectionToWholeGroups();
+        ExpandSelectionToFilledAreas();
         isDragging = true;
         dragStartX = ftX;
         dragStartY = ftY;

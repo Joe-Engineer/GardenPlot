@@ -20,6 +20,9 @@ public class Shape
     public List<Guid> ClippedBy { get; set; } = new();
     public string? Label { get; set; }
 
+    /// <summary>Optional parent area id when this shape belongs to a filled planting area.</summary>
+    public Guid? FilledAreaShapeId { get; set; }
+
     /// <summary>
     /// Free-form trait tag for Tree/Bush rendering: "fruit", "nut", "flower", "shade", "evergreen", "foliage".
     /// Empty for other shape kinds.

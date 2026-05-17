@@ -285,6 +285,10 @@ export function downloadText(filename, text, mime) {
     URL.revokeObjectURL(url);
 }
 
+export function confirmAction(message) {
+    return window.confirm(message || 'Are you sure?');
+}
+
 const gpDbName = 'gardenplot-db';
 const gpStore = 'kv';
 let gpDbPromise = null;

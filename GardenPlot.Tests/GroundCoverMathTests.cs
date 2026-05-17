@@ -156,4 +156,66 @@ public sealed class GroundCoverMathTests
 
         Assert.Equal(99, quantity, 6);
     }
+
+    [Fact]
+    public void TriangulatedFill_SquarePolygon_ReturnsExpectedGrid()
+    {
+        var polygon = new List<Point>
+        {
+            new(0, 0),
+            new(4, 0),
+            new(4, 4),
+            new(0, 4),
+        };
+
+        var samples = TriangulatedFill.SampleInside(polygon, 2.0);
+
+        Assert.Equal(8, samples.Count);
+        AssertPoint(samples[0], 0, 0);
+        AssertPoint(samples[1], 2, 0);
+        AssertPoint(samples[2], 4, 0);
+        AssertPoint(samples[3], 1, Math.Sqrt(3));
+        AssertPoint(samples[4], 3, Math.Sqrt(3));
+        AssertPoint(samples[5], 0, 2 * Math.Sqrt(3));
+        AssertPoint(samples[6], 2, 2 * Math.Sqrt(3));
+        AssertPoint(samples[7], 4, 2 * Math.Sqrt(3));
+    }
+
+    [Fact]
+    public void TriangulatedFill_LPolygon_SkipsSamplesOutsideCutout()
+    {
+        var polygon = new List<Point>
+        {
+            new(0, 0),
+            new(4, 0),
+            new(4, 2),
+            new(2, 2),
+            new(2, 4),
+            new(0, 4),
+        };
+
+        var samples = TriangulatedFill.SampleInside(polygon, 2.0);
+
+        Assert.Equal(7, samples.Count);
+        Assert.All(samples, point => Assert.True(GroundCoverMath.PointInPolygon(polygon, point)));
+        Assert.DoesNotContain(samples, point => Math.Abs(point.X - 4) < 0.000001 && point.Y > 2.1);
+    }
+
+    [Fact]
+    public void TriangulatedFill_RoundedOval_KeepsAllSamplesInside()
+    {
+        var area = new Shape { Kind = ShapeKind.Oval, X = 0, Y = 0, W = 6, H = 4 };
+        var polygon = GroundCoverMath.AreaPolygon(area);
+
+        var samples = TriangulatedFill.SampleInside(polygon, 1.5);
+
+        Assert.NotEmpty(samples);
+        Assert.All(samples, point => Assert.True(GroundCoverMath.PointInPolygon(polygon, point)));
+    }
+
+    private static void AssertPoint(Point actual, double expectedX, double expectedY)
+    {
+        Assert.Equal(expectedX, actual.X, 6);
+        Assert.Equal(expectedY, actual.Y, 6);
+    }
 }

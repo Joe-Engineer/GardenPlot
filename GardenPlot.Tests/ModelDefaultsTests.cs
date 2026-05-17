@@ -11,6 +11,7 @@ public sealed class ModelDefaultsTests
         var b = new Shape();
         Assert.NotEqual(a.Id, b.Id);
         Assert.Equal(string.Empty, a.Trait);
+        Assert.Null(a.FilledAreaShapeId);
         Assert.NotNull(a.Points);
         Assert.Empty(a.Points);
         Assert.NotNull(a.Readings);
@@ -77,5 +78,13 @@ public sealed class ModelDefaultsTests
         var c = new Point(1.5, 2.6);
         Assert.Equal(a, b);
         Assert.NotEqual(a, c);
+    }
+
+    [Fact]
+    public void TakeoffSummaryRow_DefaultLinks_AreNull()
+    {
+        var row = new TakeoffSummaryRow("Plant", "Basil", 12);
+        Assert.Null(row.ShapeId);
+        Assert.Null(row.ParentShapeId);
     }
 }
