@@ -121,6 +121,24 @@ public static class PaletteCatalog
         new("Hosta (Large)",         PaletteKind.Bush, 4, 4, "foliage"),
     ];
 
+    public static readonly PaletteItem[] FocalPoints =
+    [
+        new("Sculpture", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-sculpture"),
+        new("Buddha", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-buddha"),
+        new("Garden Bench", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-bench"),
+        new("Birdbath", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-birdbath"),
+        new("Urn / Planter", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-planter"),
+        new("Sundial", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-sundial"),
+        new("Astrolabe", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-astrolabe"),
+        new("Gazing Ball", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-gazing-ball"),
+        new("Path Light (low-voltage)", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-path-light"),
+        new("Lantern (solar)", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-lantern"),
+        new("Trellis", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-trellis"),
+        new("Obelisk", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-obelisk"),
+        new("Arbour", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-arbour"),
+        new("Wall-mounted Sconce", PaletteKind.FocalPoint, 1.5, 1.5, "focal-point-sconce"),
+    ];
+
     public static IReadOnlyList<PaletteItem> For(PaletteKind kind)
     {
         return kind switch
@@ -129,6 +147,7 @@ public static class PaletteCatalog
             PaletteKind.Tree => Trees,
             PaletteKind.Bush => Bushes,
             PaletteKind.Plant => Plants,
+            PaletteKind.FocalPoint => FocalPoints,
             PaletteKind.CustomTile => [],
             PaletteKind.GroundCover => GroundCoverMaterials,
             PaletteKind.GroundCoverSurface => GroundCoverSurfaceCovers,
@@ -419,6 +438,7 @@ public static class PaletteCatalog
             PaletteCategory.HerbsMedicinal => [.. Plants.Where(p => string.Equals(p.Trait, "herb-medicinal", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.FlowersAnnual => [.. Plants.Where(p => string.Equals(p.Trait, "flower", StringComparison.OrdinalIgnoreCase) || string.Equals(p.Trait, "flower-annual", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.FlowersPerennial => [.. Plants.Where(p => string.Equals(p.Trait, "flower-perennial", StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.FocalPoint => FocalPoints,
             PaletteCategory.GroundCoverMaterials => GroundCoverMaterials,
             PaletteCategory.GroundCoverSurface => GroundCoverSurfaceCovers,
             PaletteCategory.Bulbs => [.. Plants.Where(p => string.Equals(p.Trait, "bulb", StringComparison.OrdinalIgnoreCase))],
@@ -469,6 +489,7 @@ public static class PaletteCatalog
                 "vine-ornamental" => PaletteCategory.VinesOrnamental,
                 _ => PaletteCategory.Vegetables,
             },
+            PaletteKind.FocalPoint => PaletteCategory.FocalPoint,
             PaletteKind.CustomTile => item.Trait?.ToLowerInvariant() switch
             {
                 "grass-ornamental" => PaletteCategory.GrassesOrnamental,
@@ -487,34 +508,4 @@ public static class PaletteCatalog
     }
 }
 
-/// <summary>User-facing palette categories shown in the combobox.</summary>
-public enum PaletteCategory
-{
-    BedKits,
-    TreesFruit,
-    TreesNut,
-    TreesOrnamentalFlowering,
-    TreesShade,
-    TreesEvergreen,
-    ShrubsBerry,
-    ShrubsFlowering,
-    ShrubsEvergreen,
-    VinesEdible,
-    VinesOrnamental,
-    Vegetables,
-    HerbsCulinary,
-    HerbsMedicinal,
-    FlowersAnnual,
-    FlowersPerennial,
-    Bulbs,
-    GroundCoverPlants,
-    GroundCoverMaterials,
-    GroundCoverSurface,
-    GrassesTurf,
-    GrassesOrnamental,
-    Succulents,
-    PollinatorNatives,
-    CoverCrops,
-    CustomTiles,
-}
 

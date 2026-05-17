@@ -19,6 +19,12 @@ public static class PlantRendering
         return v.ToString("0.###", CultureInfo.InvariantCulture);
     }
 
+    public static bool IsFocalPointTrait(string trait)
+    {
+        return !string.IsNullOrWhiteSpace(trait)
+            && trait.StartsWith("focal-point", StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Stylized tree: filled canopy circle with optional fruit/nut/flower indicators.</summary>
     public static string TreeSvg(double x, double y, double w, double h, string trait, string? label = null)
     {
@@ -66,6 +72,11 @@ public static class PlantRendering
     /// </summary>
     public static string PlantSpriteSvg(double cx, double cy, double diameter, string trait)
     {
+        if (IsFocalPointTrait(trait))
+        {
+            return FocalPointSpriteSvg(cx, cy, diameter, trait);
+        }
+
         StringBuilder sb = new(256);
         string stemColor = trait switch { "flower" => "#4a8a3a", "herb" => "#3a6a2a", _ => "#3a6a3a" };
         string leafColor = trait switch
@@ -99,6 +110,33 @@ public static class PlantRendering
                 .Append("\" r=\"").Append(F(glyph * 0.10)).Append("\" fill=\"#f7d35e\" />");
         }
 
+        return sb.ToString();
+    }
+
+    private static string FocalPointSpriteSvg(double cx, double cy, double diameter, string trait)
+    {
+        StringBuilder sb = new(384);
+        double glyph = Math.Clamp(diameter * 0.50, 0.45, 1.05);
+        double badgeR = glyph * 0.78;
+        double tagW = glyph * 0.75;
+        double tagH = glyph * 0.30;
+        double badgeTop = cy - badgeR;
+        double badgeBottom = cy + badgeR;
+        double badgeLeft = cx - badgeR;
+        double badgeRight = cx + badgeR;
+
+        _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
+            .Append("\" r=\"").Append(F(badgeR)).Append("\" fill=\"#f6efe0\" stroke=\"#7a5a32\" stroke-width=\"")
+            .Append(F(glyph * 0.10)).Append("\" />");
+        _ = sb.Append("<path d=\"M")
+            .Append(F(cx - (tagW / 2))).Append(' ').Append(F(badgeTop - (tagH * 0.35)))
+            .Append(" L").Append(F(cx + (tagW / 2))).Append(' ').Append(F(badgeTop - (tagH * 0.35)))
+            .Append(" L").Append(F(cx + (tagW * 0.35))).Append(' ').Append(F(badgeTop + tagH))
+            .Append(" L").Append(F(cx - (tagW * 0.35))).Append(' ').Append(F(badgeTop + tagH))
+            .Append(" Z\" fill=\"#d38b3d\" stroke=\"#8b5a20\" stroke-width=\"")
+            .Append(F(glyph * 0.06)).Append("\" />");
+
+        AppendFocalPointGlyph(sb, cx, cy, glyph, trait, badgeLeft, badgeRight, badgeTop, badgeBottom);
         return sb.ToString();
     }
 
@@ -278,6 +316,149 @@ public static class PlantRendering
 
         _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
             .Append("\" r=\"").Append(F(r * 0.32)).Append("\" fill=\"").Append(profile.Center).Append("\" />");
+    }
+
+    private static void AppendFocalPointGlyph(StringBuilder sb, double cx, double cy, double glyph, string trait, double left, double right, double top, double bottom)
+    {
+        string focalPoint = NormalizeFocalPointTrait(trait);
+        switch (focalPoint)
+        {
+            case "buddha":
+                _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy - (glyph * 0.12)))
+                    .Append("\" r=\"").Append(F(glyph * 0.20)).Append("\" fill=\"#7a5a32\" />");
+                _ = sb.Append("<path d=\"M").Append(F(cx - (glyph * 0.28))).Append(' ').Append(F(cy + (glyph * 0.30)))
+                    .Append(" Q ").Append(F(cx)).Append(' ').Append(F(cy - (glyph * 0.02))).Append(' ')
+                    .Append(F(cx + (glyph * 0.28))).Append(' ').Append(F(cy + (glyph * 0.30)))
+                    .Append("\" fill=\"none\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.16)).Append("\" stroke-linecap=\"round\" />");
+                break;
+            case "bench":
+                _ = sb.Append("<rect x=\"").Append(F(cx - (glyph * 0.34))).Append("\" y=\"").Append(F(cy - (glyph * 0.02)))
+                    .Append("\" width=\"").Append(F(glyph * 0.68)).Append("\" height=\"").Append(F(glyph * 0.12))
+                    .Append("\" rx=\"").Append(F(glyph * 0.04)).Append("\" fill=\"#7a5a32\" />");
+                _ = sb.Append("<line x1=\"").Append(F(cx - (glyph * 0.26))).Append("\" y1=\"").Append(F(cy + (glyph * 0.12)))
+                    .Append("\" x2=\"").Append(F(cx - (glyph * 0.18))).Append("\" y2=\"").Append(F(cy + (glyph * 0.32)))
+                    .Append("\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                _ = sb.Append("<line x1=\"").Append(F(cx + (glyph * 0.26))).Append("\" y1=\"").Append(F(cy + (glyph * 0.12)))
+                    .Append("\" x2=\"").Append(F(cx + (glyph * 0.18))).Append("\" y2=\"").Append(F(cy + (glyph * 0.32)))
+                    .Append("\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                _ = sb.Append("<line x1=\"").Append(F(cx - (glyph * 0.30))).Append("\" y1=\"").Append(F(cy - (glyph * 0.16)))
+                    .Append("\" x2=\"").Append(F(cx + (glyph * 0.30))).Append("\" y2=\"").Append(F(cy - (glyph * 0.16)))
+                    .Append("\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                break;
+            case "birdbath":
+                _ = sb.Append("<path d=\"M").Append(F(cx - (glyph * 0.34))).Append(' ').Append(F(cy - (glyph * 0.10)))
+                    .Append(" Q ").Append(F(cx)).Append(' ').Append(F(cy + (glyph * 0.06))).Append(' ')
+                    .Append(F(cx + (glyph * 0.34))).Append(' ').Append(F(cy - (glyph * 0.10)))
+                    .Append("\" fill=\"none\" stroke=\"#5f7ea1\" stroke-width=\"").Append(F(glyph * 0.12)).Append("\" stroke-linecap=\"round\" />");
+                _ = sb.Append("<line x1=\"").Append(F(cx)).Append("\" y1=\"").Append(F(cy - (glyph * 0.02)))
+                    .Append("\" x2=\"").Append(F(cx)).Append("\" y2=\"").Append(F(cy + (glyph * 0.28)))
+                    .Append("\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                _ = sb.Append("<line x1=\"").Append(F(cx - (glyph * 0.16))).Append("\" y1=\"").Append(F(cy + (glyph * 0.34)))
+                    .Append("\" x2=\"").Append(F(cx + (glyph * 0.16))).Append("\" y2=\"").Append(F(cy + (glyph * 0.34)))
+                    .Append("\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                break;
+            case "planter":
+                _ = sb.Append("<path d=\"M").Append(F(cx - (glyph * 0.22))).Append(' ').Append(F(cy - (glyph * 0.18)))
+                    .Append(" L").Append(F(cx + (glyph * 0.22))).Append(' ').Append(F(cy - (glyph * 0.18)))
+                    .Append(" L").Append(F(cx + (glyph * 0.30))).Append(' ').Append(F(cy + (glyph * 0.18)))
+                    .Append(" L").Append(F(cx - (glyph * 0.30))).Append(' ').Append(F(cy + (glyph * 0.18)))
+                    .Append(" Z\" fill=\"#b68555\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                _ = sb.Append("<ellipse cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy - (glyph * 0.18)))
+                    .Append("\" rx=\"").Append(F(glyph * 0.22)).Append("\" ry=\"").Append(F(glyph * 0.06))
+                    .Append("\" fill=\"#d8b187\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.06)).Append("\" />");
+                break;
+            case "sundial":
+                _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy + (glyph * 0.06)))
+                    .Append("\" r=\"").Append(F(glyph * 0.28)).Append("\" fill=\"none\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                _ = sb.Append("<line x1=\"").Append(F(cx)).Append("\" y1=\"").Append(F(cy + (glyph * 0.06)))
+                    .Append("\" x2=\"").Append(F(cx + (glyph * 0.18))).Append("\" y2=\"").Append(F(cy - (glyph * 0.26)))
+                    .Append("\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                break;
+            case "astrolabe":
+                _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
+                    .Append("\" r=\"").Append(F(glyph * 0.30)).Append("\" fill=\"none\" stroke=\"#5f7ea1\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy))
+                    .Append("\" r=\"").Append(F(glyph * 0.14)).Append("\" fill=\"none\" stroke=\"#5f7ea1\" stroke-width=\"").Append(F(glyph * 0.06)).Append("\" />");
+                _ = sb.Append("<line x1=\"").Append(F(cx - (glyph * 0.34))).Append("\" y1=\"").Append(F(cy))
+                    .Append("\" x2=\"").Append(F(cx + (glyph * 0.34))).Append("\" y2=\"").Append(F(cy))
+                    .Append("\" stroke=\"#5f7ea1\" stroke-width=\"").Append(F(glyph * 0.06)).Append("\" />");
+                break;
+            case "gazing-ball":
+                _ = sb.Append("<circle cx=\"").Append(F(cx)).Append("\" cy=\"").Append(F(cy - (glyph * 0.08)))
+                    .Append("\" r=\"").Append(F(glyph * 0.24)).Append("\" fill=\"#9fc7d7\" stroke=\"#5f7ea1\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                _ = sb.Append("<line x1=\"").Append(F(cx)).Append("\" y1=\"").Append(F(cy + (glyph * 0.18)))
+                    .Append("\" x2=\"").Append(F(cx)).Append("\" y2=\"").Append(F(cy + (glyph * 0.36)))
+                    .Append("\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                break;
+            case "path-light":
+            case "lantern":
+            case "sconce":
+                _ = sb.Append("<rect x=\"").Append(F(cx - (glyph * 0.12))).Append("\" y=\"").Append(F(cy - (glyph * 0.24)))
+                    .Append("\" width=\"").Append(F(glyph * 0.24)).Append("\" height=\"").Append(F(glyph * 0.28))
+                    .Append("\" rx=\"").Append(F(glyph * 0.04)).Append("\" fill=\"#f6d46b\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                if (focalPoint == "sconce")
+                {
+                    _ = sb.Append("<line x1=\"").Append(F(left + (glyph * 0.18))).Append("\" y1=\"").Append(F(cy - (glyph * 0.02)))
+                        .Append("\" x2=\"").Append(F(cx - (glyph * 0.12))).Append("\" y2=\"").Append(F(cy - (glyph * 0.02)))
+                        .Append("\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.07)).Append("\" />");
+                }
+                else
+                {
+                    _ = sb.Append("<line x1=\"").Append(F(cx)).Append("\" y1=\"").Append(F(cy + (glyph * 0.04)))
+                        .Append("\" x2=\"").Append(F(cx)).Append("\" y2=\"").Append(F(bottom - (glyph * 0.10)))
+                        .Append("\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                }
+                break;
+            case "trellis":
+            case "obelisk":
+            case "arbour":
+                _ = sb.Append("<path d=\"M").Append(F(cx - (glyph * 0.30))).Append(' ').Append(F(bottom - (glyph * 0.10)))
+                    .Append(" L").Append(F(cx - (glyph * 0.18))).Append(' ').Append(F(top + (glyph * 0.28)))
+                    .Append(" L").Append(F(cx + (glyph * 0.18))).Append(' ').Append(F(top + (glyph * 0.28)))
+                    .Append(" L").Append(F(cx + (glyph * 0.30))).Append(' ').Append(F(bottom - (glyph * 0.10)))
+                    .Append("\" fill=\"none\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                if (focalPoint == "arbour")
+                {
+                    _ = sb.Append("<path d=\"M").Append(F(cx - (glyph * 0.24))).Append(' ').Append(F(top + (glyph * 0.30)))
+                        .Append(" Q ").Append(F(cx)).Append(' ').Append(F(top + (glyph * 0.02))).Append(' ')
+                        .Append(F(cx + (glyph * 0.24))).Append(' ').Append(F(top + (glyph * 0.30)))
+                        .Append("\" fill=\"none\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.08)).Append("\" />");
+                }
+                else
+                {
+                    _ = sb.Append("<line x1=\"").Append(F(cx - (glyph * 0.22))).Append("\" y1=\"").Append(F(cy))
+                        .Append("\" x2=\"").Append(F(cx + (glyph * 0.22))).Append("\" y2=\"").Append(F(cy))
+                        .Append("\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.06)).Append("\" />");
+                    _ = sb.Append("<line x1=\"").Append(F(cx - (glyph * 0.12))).Append("\" y1=\"").Append(F(cy - (glyph * 0.14)))
+                        .Append("\" x2=\"").Append(F(cx + (glyph * 0.12))).Append("\" y2=\"").Append(F(cy + (glyph * 0.14)))
+                        .Append("\" stroke=\"#7a5a32\" stroke-width=\"").Append(F(glyph * 0.05)).Append("\" />");
+                }
+                break;
+            default:
+                _ = sb.Append("<path d=\"M").Append(F(cx)).Append(' ').Append(F(top + (glyph * 0.18)))
+                    .Append(" L").Append(F(cx + (glyph * 0.10))).Append(' ').Append(F(cy - (glyph * 0.02)))
+                    .Append(" L").Append(F(cx + (glyph * 0.26))).Append(' ').Append(F(cy - (glyph * 0.02)))
+                    .Append(" L").Append(F(cx + (glyph * 0.14))).Append(' ').Append(F(cy + (glyph * 0.10)))
+                    .Append(" L").Append(F(cx + (glyph * 0.20))).Append(' ').Append(F(bottom - (glyph * 0.14)))
+                    .Append(" L").Append(F(cx)).Append(' ').Append(F(cy + (glyph * 0.18)))
+                    .Append(" L").Append(F(cx - (glyph * 0.20))).Append(' ').Append(F(bottom - (glyph * 0.14)))
+                    .Append(" L").Append(F(cx - (glyph * 0.14))).Append(' ').Append(F(cy + (glyph * 0.10)))
+                    .Append(" L").Append(F(cx - (glyph * 0.26))).Append(' ').Append(F(cy - (glyph * 0.02)))
+                    .Append(" L").Append(F(cx - (glyph * 0.10))).Append(' ').Append(F(cy - (glyph * 0.02)))
+                    .Append(" Z\" fill=\"#7a5a32\" />");
+                break;
+        }
+    }
+
+    private static string NormalizeFocalPointTrait(string trait)
+    {
+        const string Prefix = "focal-point-";
+        if (trait.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return trait[Prefix.Length..].ToLowerInvariant();
+        }
+
+        return trait.ToLowerInvariant();
     }
 
     private static FruitProfile FruitStyleFor(string? label)

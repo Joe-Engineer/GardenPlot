@@ -26,9 +26,42 @@ public enum PaletteKind
     Tree,
     Bush,
     Plant,
+    FocalPoint,
     CustomTile,
     GroundCover,
     GroundCoverSurface,
+}
+
+/// <summary>User-facing palette categories shown in the combobox.</summary>
+public enum PaletteCategory
+{
+    BedKits,
+    TreesFruit,
+    TreesNut,
+    TreesOrnamentalFlowering,
+    TreesShade,
+    TreesEvergreen,
+    ShrubsBerry,
+    ShrubsFlowering,
+    ShrubsEvergreen,
+    VinesEdible,
+    VinesOrnamental,
+    Vegetables,
+    HerbsCulinary,
+    HerbsMedicinal,
+    FlowersAnnual,
+    FlowersPerennial,
+    Bulbs,
+    FocalPoint,
+    GroundCoverPlants,
+    GroundCoverMaterials,
+    GroundCoverSurface,
+    GrassesTurf,
+    GrassesOrnamental,
+    Succulents,
+    PollinatorNatives,
+    CoverCrops,
+    CustomTiles,
 }
 
 public enum DropPattern

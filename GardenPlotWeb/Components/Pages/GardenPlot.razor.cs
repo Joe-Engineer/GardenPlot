@@ -398,7 +398,7 @@ public partial class GardenPlot
         currentPlot.TakeoffIds.Next = nextId;
     }
 
-    private static (CatalogSource Source, string? PackId, string Code) ResolveCatalogRefForShape(Shape shape)
+    private (CatalogSource Source, string? PackId, string Code) ResolveCatalogRefForShape(Shape shape)
     {
         string? gc = shape.GroundCoverCode;
         if (!string.IsNullOrWhiteSpace(gc))
@@ -408,7 +408,79 @@ public partial class GardenPlot
 
         string? label = shape.Label;
         string code = string.IsNullOrWhiteSpace(label) ? shape.Kind.ToString() : label;
-        return (CatalogSource.Base, null, code);
+        bool isCustomPaletteItem = library.CustomPaletteItems.Any(i => string.Equals(i.Code, code, StringComparison.OrdinalIgnoreCase));
+        return (isCustomPaletteItem ? CatalogSource.Custom : CatalogSource.Base, null, code);
+    }
+
+    private void RefreshCustomCatalogItems()
+    {
+        List<CatalogItem> customCatalogItems = [.. library.CustomCatalogItems];
+        customCatalogItems.AddRange(library.CustomPaletteItems.Select(ProjectCustomPaletteCatalogItem));
+        Catalog.SetCustomCatalogItems(customCatalogItems);
+    }
+
+    private static CatalogItem ProjectCustomPaletteCatalogItem(PaletteItem item)
+    {
+        (string kind, string? unit, LaborType laborType, double hoursPerUnit) = item.Kind switch
+        {
+            PaletteKind.FocalPoint => ("Focal Point", "ea", LaborType.Hardscape, 0.5),
+            PaletteKind.CustomTile => ("Custom", "ea", LaborType.Other, 0.0),
+            _ => (item.Kind.ToString(), "ea", LaborType.Other, 0.0),
+        };
+
+        return new CatalogItem
+        {
+            Code = item.Code,
+            Source = CatalogSource.Custom,
+            PackId = null,
+            Kind = kind,
+            DisplayName = item.Code,
+            Unit = unit,
+            DefaultDepthIn = item.DefaultDepthIn,
+            DefaultWastePercent = null,
+            LaborType = laborType,
+            LaborHoursPerUnit = hoursPerUnit,
+            BagSize = null,
+            Notes = item.Notes,
+        };
+    }
+
+    private static string EffectivePaletteTrait(PaletteItem item)
+    {
+        if (item.Kind == PaletteKind.CustomTile)
+        {
+            return string.IsNullOrWhiteSpace(item.Trait) ? "custom-tile" : item.Trait;
+        }
+
+        if (item.Kind == PaletteKind.FocalPoint)
+        {
+            return string.IsNullOrWhiteSpace(item.Trait) ? "focal-point-sculpture" : item.Trait;
+        }
+
+        return item.Trait;
+    }
+
+    private static bool IsFocalPointTrait(string trait)
+    {
+        return PlantRendering.IsFocalPointTrait(trait);
+    }
+
+    private static string FocalPointTraitLabel(string trait)
+    {
+        const string Prefix = "focal-point-";
+        string normalized = string.IsNullOrWhiteSpace(trait)
+            ? "custom"
+            : trait.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)
+                ? trait[Prefix.Length..]
+                : trait;
+
+        return normalized switch
+        {
+            "path-light" => "Path Light",
+            "gazing-ball" => "Gazing Ball",
+            _ => string.Join(' ', normalized.Split('-', StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => char.ToUpperInvariant(part[0]) + part[1..])),
+        };
     }
 
     /// <summary>Resolves the catalog item bound to <paramref name="item"/>, or null when unbound.</summary>
@@ -779,6 +851,11 @@ public partial class GardenPlot
             && string.Equals(s.Trait, "custom-tile", StringComparison.OrdinalIgnoreCase))
         {
             return "Custom";
+        }
+
+        if (s.Kind == ShapeKind.Plant && IsFocalPointTrait(s.Trait))
+        {
+            return "Focal Point";
         }
 
         return s.Kind switch
@@ -1166,9 +1243,7 @@ public partial class GardenPlot
         W = item.WidthFt,
         H = item.HeightFt,
         Label = item.Code,
-        Trait = item.Kind == PaletteKind.CustomTile
-            ? (string.IsNullOrWhiteSpace(item.Trait) ? "custom-tile" : item.Trait)
-            : item.Trait,
+        Trait = EffectivePaletteTrait(item),
         Stroke = item.StrokeColor,
         Fill = item.FillColor,
         TileBackgroundImageFileName = item.TileBackgroundImageFileName,
@@ -1274,12 +1349,14 @@ public partial class GardenPlot
     private string? canvasScaleStatus;
     private string? canvasScaleError;
     private bool showAddCustomTileDialog;
+    private PaletteKind customPaletteItemKind = PaletteKind.CustomTile;
     private string newCustomTileName = string.Empty;
     private string newCustomTileShape = "Rectangle";
     private double newCustomTileWidthFt = 2;
     private double newCustomTileHeightFt = 2;
     private string newCustomTileStrokeColor = "#7a3520";
     private string newCustomTileFillColor = "#e2725b";
+    private string newCustomFocalPointTrait = "focal-point-sculpture";
     private string? newCustomTilePreviewImageFileName;
     private string? newCustomTileBackgroundImageFileName;
     private string? newCustomTilePreviewImageWarning;
@@ -1288,6 +1365,23 @@ public partial class GardenPlot
     private bool newCustomTileUseButtonImageForBackground;
     private string? editingCustomTileOriginalCode;
     private string newCustomTileCitationUrl = string.Empty;
+    private static readonly (string Value, string Label)[] FocalPointTraitOptions =
+    [
+        ("focal-point-sculpture", "Sculpture"),
+        ("focal-point-buddha", "Buddha"),
+        ("focal-point-bench", "Garden Bench"),
+        ("focal-point-birdbath", "Birdbath"),
+        ("focal-point-planter", "Urn / Planter"),
+        ("focal-point-sundial", "Sundial"),
+        ("focal-point-astrolabe", "Astrolabe"),
+        ("focal-point-gazing-ball", "Gazing Ball"),
+        ("focal-point-path-light", "Path Light"),
+        ("focal-point-lantern", "Lantern"),
+        ("focal-point-trellis", "Trellis"),
+        ("focal-point-obelisk", "Obelisk"),
+        ("focal-point-arbour", "Arbour"),
+        ("focal-point-sconce", "Wall-mounted Sconce"),
+    ];
     private const long CustomTileImageWarnBytes = 2 * 1024 * 1024;
     private const long CustomTileImageMaxBytes = 20 * 1024 * 1024;
     private const long PlotImageWarnBytes = 3 * 1024 * 1024;
@@ -1581,6 +1675,7 @@ public partial class GardenPlot
                     SetZoom(library.Ui.Zoom ?? 1.0, persist: false);
                     showTakeoffPanel = library.Ui.TakeoffPanelVisible ?? false;
                     currentCategory = library.Ui.LastPaletteCategory ?? DefaultPaletteCategory;
+                    RefreshCustomCatalogItems();
                     restoreViewportPending = true;
 
                     // Only save when we created a fresh default plot for a brand-new
@@ -1874,6 +1969,7 @@ public partial class GardenPlot
         safe.Plots ??= new List<PlotData>();
         safe.Ui ??= new UiPreferences();
         safe.CustomPaletteItems ??= new List<PaletteItem>();
+        safe.CustomCatalogItems ??= new List<CatalogItem>();
 
         foreach (var p in safe.Plots)
         {
@@ -2604,6 +2700,7 @@ public partial class GardenPlot
 
     private void ShowAddCustomTileDialog()
     {
+        customPaletteItemKind = currentCategory == PaletteCategory.FocalPoint ? PaletteKind.FocalPoint : PaletteKind.CustomTile;
         ResetCustomTileDraft();
         addCustomTileError = null;
         showAddCustomTileDialog = true;
@@ -2611,12 +2708,14 @@ public partial class GardenPlot
 
     private void ShowEditSelectedCustomTileDialog()
     {
-        if (selectedItem?.Kind != PaletteKind.CustomTile)
+        if (selectedItem is null || !CanEditSelectedCustomPaletteItem)
         {
             return;
         }
 
-        var item = library.CustomPaletteItems.FirstOrDefault(i => string.Equals(i.Code, selectedItem.Code, StringComparison.OrdinalIgnoreCase));
+        var item = library.CustomPaletteItems.FirstOrDefault(i =>
+            i.Kind == selectedItem.Kind
+            && string.Equals(i.Code, selectedItem.Code, StringComparison.OrdinalIgnoreCase));
         if (item is not null)
         {
             ShowEditCustomTileDialog(item);
@@ -2625,6 +2724,7 @@ public partial class GardenPlot
 
     private void ShowEditCustomTileDialog(PaletteItem item)
     {
+        customPaletteItemKind = item.Kind;
         editingCustomTileOriginalCode = item.Code;
         newCustomTileName = item.Code;
         newCustomTileShape = item.StampShapeKind is ShapeKind.Oval ? "Oval" : "Rectangle";
@@ -2632,6 +2732,7 @@ public partial class GardenPlot
         newCustomTileHeightFt = item.HeightFt;
         newCustomTileStrokeColor = item.StrokeColor ?? "#7a3520";
         newCustomTileFillColor = item.FillColor ?? "#e2725b";
+        newCustomFocalPointTrait = string.IsNullOrWhiteSpace(item.Trait) ? "focal-point-sculpture" : item.Trait;
         newCustomTilePreviewImageFileName = item.TilePreviewImageFileName;
         newCustomTileBackgroundImageFileName = item.TileBackgroundImageFileName;
         newCustomTileUseButtonImageForBackground = !string.IsNullOrWhiteSpace(item.TilePreviewImageFileName)
@@ -2659,6 +2760,7 @@ public partial class GardenPlot
         newCustomTileHeightFt = 2;
         newCustomTileStrokeColor = "#7a3520";
         newCustomTileFillColor = "#e2725b";
+        newCustomFocalPointTrait = "focal-point-sculpture";
         newCustomTilePreviewImageFileName = null;
         newCustomTileBackgroundImageFileName = null;
         newCustomTileUseButtonImageForBackground = false;
@@ -2668,6 +2770,12 @@ public partial class GardenPlot
     }
 
     private bool IsEditingCustomTile => !string.IsNullOrWhiteSpace(editingCustomTileOriginalCode);
+    private bool IsCustomFocalPointDialog => customPaletteItemKind == PaletteKind.FocalPoint;
+    private bool CanEditSelectedCustomPaletteItem => selectedItem is not null
+        && library.CustomPaletteItems.Any(i => i.Kind == selectedItem.Kind && string.Equals(i.Code, selectedItem.Code, StringComparison.OrdinalIgnoreCase));
+    private string CustomPaletteDialogTitle => IsEditingCustomTile
+        ? IsCustomFocalPointDialog ? "Edit Custom Focal Point" : "Edit Custom Tile"
+        : IsCustomFocalPointDialog ? "Add Custom Focal Point" : "Add Custom Tile";
 
     private void OnCategoryChanged(ChangeEventArgs e)
     {
@@ -2696,6 +2804,7 @@ public partial class GardenPlot
         PaletteCategory.FlowersAnnual => "Flowers — Annual",
         PaletteCategory.FlowersPerennial => "Flowers — Perennial",
         PaletteCategory.Bulbs => "Bulbs",
+        PaletteCategory.FocalPoint => "Focal Points",
         PaletteCategory.GroundCoverPlants => "Ground Cover Plants",
         PaletteCategory.GroundCoverMaterials => "Materials — Ground Cover",
         PaletteCategory.GroundCoverSurface => "Ground Cover — Surface",
@@ -2708,11 +2817,28 @@ public partial class GardenPlot
         _ => k.ToString(),
     };
 
+    private static bool CategorySupportsClimateFilter(PaletteCategory category)
+    {
+        return category is not (PaletteCategory.BedKits
+            or PaletteCategory.FocalPoint
+            or PaletteCategory.GroundCoverMaterials
+            or PaletteCategory.GroundCoverSurface
+            or PaletteCategory.CustomTiles);
+    }
+
     private IReadOnlyList<PaletteItem> PaletteItemsForCurrentCategory()
     {
-        IReadOnlyList<PaletteItem> source = currentCategory == PaletteCategory.CustomTiles
-            ? library.CustomPaletteItems
-            : PaletteCatalog.For(currentCategory);
+        IReadOnlyList<PaletteItem> source = currentCategory switch
+        {
+            PaletteCategory.CustomTiles => [.. library.CustomPaletteItems.Where(i => i.Kind == PaletteKind.CustomTile)],
+            PaletteCategory.FocalPoint => [.. PaletteCatalog.FocalPoints.Concat(library.CustomPaletteItems.Where(i => i.Kind == PaletteKind.FocalPoint))],
+            _ => PaletteCatalog.For(currentCategory),
+        };
+
+        if (!CategorySupportsClimateFilter(currentCategory))
+        {
+            return [.. source.OrderBy(i => i.Code, StringComparer.OrdinalIgnoreCase)];
+        }
 
         ClimateRegion? region = PaletteRegionFilter;
         bool nativeOnly = PaletteNativeOnly;
@@ -2727,9 +2853,6 @@ public partial class GardenPlot
         {
             PlantProfile? profile = PlantProfiles.GetProfile(item);
 
-            // Items without a profile (e.g. bed kits) are always shown when the user
-            // is not filtering by region, and always hidden when they are — they have
-            // no climate metadata to compare against.
             if (region is { } r)
             {
                 if (profile is null)
@@ -2757,7 +2880,6 @@ public partial class GardenPlot
             }
             else if (nativeOnly)
             {
-                // Native-only without a region picked: keep anything explicitly marked native somewhere.
                 if (profile?.NativeRegions is not { Length: > 0 })
                 {
                     continue;
@@ -2806,41 +2928,57 @@ public partial class GardenPlot
             return;
         }
 
-        if (newCustomTileWidthFt <= 0 || newCustomTileHeightFt <= 0)
+        PaletteItem item;
+        if (IsCustomFocalPointDialog)
         {
-            addCustomTileError = "Width and height must be greater than 0.";
-            return;
+            item = new PaletteItem(
+                Code: name,
+                Kind: PaletteKind.FocalPoint,
+                WidthFt: 1.5,
+                HeightFt: 1.5,
+                Trait: newCustomFocalPointTrait);
         }
-
-        var backgroundImageFileName = newCustomTileUseButtonImageForBackground
-            ? newCustomTilePreviewImageFileName
-            : newCustomTileBackgroundImageFileName;
-        var citationUrl = string.IsNullOrWhiteSpace(newCustomTileCitationUrl) ? null : newCustomTileCitationUrl.Trim();
-        if (!IsEditingCustomTile && string.IsNullOrWhiteSpace(citationUrl))
+        else
         {
-            citationUrl = await TryGetDefaultWikipediaCitationUrl(name);
-        }
+            if (newCustomTileWidthFt <= 0 || newCustomTileHeightFt <= 0)
+            {
+                addCustomTileError = "Width and height must be greater than 0.";
+                return;
+            }
 
-        var item = new PaletteItem(
-            Code: name,
-            Kind: PaletteKind.CustomTile,
-            WidthFt: Math.Clamp(newCustomTileWidthFt, 0.1, 200),
-            HeightFt: Math.Clamp(newCustomTileHeightFt, 0.1, 200),
-            Trait: "custom-tile",
-            StampShapeKind: string.Equals(newCustomTileShape, "Oval", StringComparison.OrdinalIgnoreCase) ? ShapeKind.Oval : ShapeKind.Rectangle,
-            StrokeColor: newCustomTileStrokeColor,
-            FillColor: newCustomTileFillColor,
-            TilePreviewImageFileName: newCustomTilePreviewImageFileName,
-            TileBackgroundImageFileName: backgroundImageFileName,
-            CitationUrl: citationUrl);
+            var backgroundImageFileName = newCustomTileUseButtonImageForBackground
+                ? newCustomTilePreviewImageFileName
+                : newCustomTileBackgroundImageFileName;
+            var citationUrl = string.IsNullOrWhiteSpace(newCustomTileCitationUrl) ? null : newCustomTileCitationUrl.Trim();
+            if (!IsEditingCustomTile && string.IsNullOrWhiteSpace(citationUrl))
+            {
+                citationUrl = await TryGetDefaultWikipediaCitationUrl(name);
+            }
+
+            item = new PaletteItem(
+                Code: name,
+                Kind: PaletteKind.CustomTile,
+                WidthFt: Math.Clamp(newCustomTileWidthFt, 0.1, 200),
+                HeightFt: Math.Clamp(newCustomTileHeightFt, 0.1, 200),
+                Trait: "custom-tile",
+                StampShapeKind: string.Equals(newCustomTileShape, "Oval", StringComparison.OrdinalIgnoreCase) ? ShapeKind.Oval : ShapeKind.Rectangle,
+                StrokeColor: newCustomTileStrokeColor,
+                FillColor: newCustomTileFillColor,
+                TilePreviewImageFileName: newCustomTilePreviewImageFileName,
+                TileBackgroundImageFileName: backgroundImageFileName,
+                CitationUrl: citationUrl);
+        }
 
         if (!string.IsNullOrWhiteSpace(editingCustomTileOriginalCode)
             && !string.Equals(editingCustomTileOriginalCode, item.Code, StringComparison.OrdinalIgnoreCase))
         {
-            library.CustomPaletteItems.RemoveAll(i => string.Equals(i.Code, editingCustomTileOriginalCode, StringComparison.OrdinalIgnoreCase));
+            library.CustomPaletteItems.RemoveAll(i =>
+                i.Kind == customPaletteItemKind
+                && string.Equals(i.Code, editingCustomTileOriginalCode, StringComparison.OrdinalIgnoreCase));
         }
 
-        var existingIndex = library.CustomPaletteItems.FindIndex(i => string.Equals(i.Code, item.Code, StringComparison.OrdinalIgnoreCase));
+        var existingIndex = library.CustomPaletteItems.FindIndex(i =>
+            i.Kind == item.Kind && string.Equals(i.Code, item.Code, StringComparison.OrdinalIgnoreCase));
         if (existingIndex >= 0)
         {
             library.CustomPaletteItems[existingIndex] = item;
@@ -2850,10 +2988,11 @@ public partial class GardenPlot
             library.CustomPaletteItems.Add(item);
         }
 
+        RefreshCustomCatalogItems();
         showAddCustomTileDialog = false;
         ResetCustomTileDraft();
         selectedItem = item;
-        currentCategory = PaletteCategory.CustomTiles;
+        currentCategory = item.Kind == PaletteKind.FocalPoint ? PaletteCategory.FocalPoint : PaletteCategory.CustomTiles;
         currentTool = Tool.Stamp;
         ApplyDefaultDropSpacing(item);
         await SaveAsync();
@@ -3201,6 +3340,10 @@ public partial class GardenPlot
         else
         {
             currentTool = Tool.Stamp;
+            if (item.Kind == PaletteKind.FocalPoint)
+            {
+                dropPattern = DropPattern.One;
+            }
         }
 
         ApplyDefaultDropSpacing(item);
@@ -3447,13 +3590,14 @@ public partial class GardenPlot
     }
 
     private DropPattern ActiveDropPattern(bool shift, bool ctrl, bool alt)
-        => IsMultiDropActive(shift, ctrl, alt) ? dropPattern : DropPattern.One;
+        => selectedItem?.Kind == PaletteKind.FocalPoint ? DropPattern.One : IsMultiDropActive(shift, ctrl, alt) ? dropPattern : DropPattern.One;
 
     private static ShapeKind ShapeKindFromPalette(PaletteItem item) => item.Kind switch
     {
         PaletteKind.Tree => ShapeKind.Tree,
         PaletteKind.Bush => ShapeKind.Bush,
         PaletteKind.Plant => ShapeKind.Plant,
+        PaletteKind.FocalPoint => ShapeKind.Plant,
         PaletteKind.CustomTile => item.StampShapeKind is ShapeKind.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
         _ => ShapeKind.BedKit,
     };
@@ -3469,9 +3613,7 @@ public partial class GardenPlot
             H = item.HeightFt,
             Rotation = rotation,
             Label = item.Code,
-            Trait = item.Kind == PaletteKind.CustomTile
-                ? (string.IsNullOrWhiteSpace(item.Trait) ? "custom-tile" : item.Trait)
-                : item.Trait,
+            Trait = EffectivePaletteTrait(item),
             Stroke = item.StrokeColor,
             Fill = item.FillColor,
             TileBackgroundImageFileName = item.TileBackgroundImageFileName,
@@ -5611,13 +5753,22 @@ public partial class GardenPlot
     /// </summary>
     private static string ComputeSpacingStatus(Shape plant, IReadOnlyList<Shape> all)
     {
+        if (IsFocalPointTrait(plant.Trait))
+        {
+            return "good";
+        }
+
         var pcx = plant.X + plant.W / 2;
         var pcy = plant.Y + plant.H / 2;
         var pr = plant.W / 2;
         double worst = 0;
         foreach (var q in all)
         {
-            if (ReferenceEquals(q, plant)) continue;
+            if (ReferenceEquals(q, plant) || IsFocalPointTrait(q.Trait))
+            {
+                continue;
+            }
+
             var qcx = q.X + q.W / 2;
             var qcy = q.Y + q.H / 2;
             var qr = q.W / 2;
@@ -5626,7 +5777,6 @@ public partial class GardenPlot
             var dist = Math.Sqrt(dx * dx + dy * dy);
             var sumR = pr + qr;
             if (dist >= sumR || sumR <= 0) continue;
-            // overlap fraction in [0,1] where 1 == centers coincident.
             var frac = (sumR - dist) / sumR;
             if (frac > worst) worst = frac;
         }
@@ -5638,13 +5788,18 @@ public partial class GardenPlot
     /// <summary>Plants within 2x the selected plant's spacing distance, sorted by distance.</summary>
     private static List<(Shape other, double distFt)> NearbyPlants(Shape sel, IEnumerable<Shape> all)
     {
+        if (IsFocalPointTrait(sel.Trait))
+        {
+            return [];
+        }
+
         var pcx = sel.X + sel.W / 2;
         var pcy = sel.Y + sel.H / 2;
-        var threshold = sel.W * 2.0; // 2x spacing
+        var threshold = sel.W * 2.0;
         var results = new List<(Shape, double)>();
         foreach (var q in all)
         {
-            if (q.Kind != ShapeKind.Plant || ReferenceEquals(q, sel)) continue;
+            if (q.Kind != ShapeKind.Plant || ReferenceEquals(q, sel) || IsFocalPointTrait(q.Trait)) continue;
             var qcx = q.X + q.W / 2;
             var qcy = q.Y + q.H / 2;
             var dx = pcx - qcx;
@@ -5834,6 +5989,7 @@ public partial class GardenPlot
             ShapeKind.Tree => $"Tree · {s.Label}",
             ShapeKind.Bush => $"Bush · {s.Label}",
             ShapeKind.BedKit => $"Bed Kit · {s.Label}",
+            ShapeKind.Plant => IsFocalPointTrait(s.Trait) ? $"Focal Point · {s.Label}" : $"Plant · {s.Label}",
             ShapeKind.Rectangle => "Rectangle",
             ShapeKind.Oval => "Oval",
             ShapeKind.FreeDraw => "Freehand",
@@ -5864,6 +6020,15 @@ public partial class GardenPlot
                 break;
             case ShapeKind.Plant:
                 {
+                    if (IsFocalPointTrait(s.Trait))
+                    {
+                        lines.Add($"<span class=\"text-muted\">Focal point:</span> <strong>{Esc(s.Label ?? "")}</strong>");
+                        lines.Add("<div class=\"badge-row\"><span class=\"badge badge-trait\">single drop</span>" +
+                            $"<span class=\"badge badge-trait\">{Esc(FocalPointTraitLabel(s.Trait))}</span></div>");
+                        lines.Add($"<span class=\"text-muted\">Rotation:</span> {F(s.Rotation)}°");
+                        break;
+                    }
+
                     lines.Add($"<span class=\"text-muted\">Plant:</span> <strong>{Esc(s.Label ?? "")}</strong>");
                     var meta = PaletteCatalog.Plants.FirstOrDefault(p => string.Equals(p.Code, s.Label, StringComparison.OrdinalIgnoreCase));
                     var badges = new List<string>

@@ -37,10 +37,21 @@ public sealed class PlantRenderingTests
     [InlineData("flower")]
     [InlineData("herb")]
     [InlineData("")]
+    [InlineData("focal-point-birdbath")]
+    [InlineData("focal-point-trellis")]
     public void PlantSpriteSvg_AllTraitBranches_ProduceMarkup(string trait)
     {
         string svg = PlantRendering.PlantSpriteSvg(5, 5, 1.5, trait);
         Assert.False(string.IsNullOrEmpty(svg));
+    }
+
+    [Fact]
+    public void PlantSpriteSvg_FocalPointTraits_RenderTaggedBadge()
+    {
+        string svg = PlantRendering.PlantSpriteSvg(5, 5, 1.5, "focal-point-buddha");
+        Assert.Contains("#f6efe0", svg);
+        Assert.True(PlantRendering.IsFocalPointTrait("focal-point-buddha"));
+        Assert.False(PlantRendering.IsFocalPointTrait("flower"));
     }
 
     [Theory]
