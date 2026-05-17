@@ -3228,40 +3228,16 @@ public partial class GardenPlot
         }
 
         var members = SelectedShapes().ToList();
-        if (members.Count < 2)
+        if (!GardenPlotGroupingOperations.CanGroupSelection(members))
         {
             return;
         }
 
         RecordUndoState();
 
-        var ordered = members
-            .OrderBy(s => s.Y)
-            .ThenBy(s => s.X)
-            .ThenBy(s => s.Id)
-            .ToList();
-
-        var anchor = ordered[0];
-        var group = new DropGroup
-        {
-            Pattern = DropPattern.Line,
-            ItemCount = ordered.Count,
-            Rows = 1,
-            CenterSpacingXFt = Math.Max(0.1, anchor.W),
-            CenterSpacingYFt = Math.Max(0.1, anchor.H),
-            Rotation = 0,
-            AnchorCenterX = anchor.X + (anchor.W / 2),
-            AnchorCenterY = anchor.Y + (anchor.H / 2),
-        };
-
-        for (var i = 0; i < ordered.Count; i++)
-        {
-            ordered[i].GroupId = group.Id;
-            ordered[i].GroupIndex = i;
-        }
-
-        currentPlot.DropGroups.RemoveAll(g => g.Id == group.Id);
-        currentPlot.DropGroups.Add(group);
+        var ordered = GardenPlotGroupingOperations.GroupSelectedItems(members, currentPlot.DropGroups);
+        CleanupOrphanDropGroups();
+        SyncDropGroupsFromCurrentShapes();
         selectedIds.Clear();
         selectedIds.AddRange(ordered.Select(s => s.Id));
 
@@ -3275,26 +3251,14 @@ public partial class GardenPlot
             return;
         }
 
-        RecordUndoState();
-
-        var selectedGroupIds = SelectedShapes()
-            .Where(s => s.GroupId is not null)
-            .Select(s => s.GroupId!.Value)
-            .Distinct()
-            .ToHashSet();
-
-        if (selectedGroupIds.Count == 0)
+        var members = SelectedShapes().ToList();
+        if (!GardenPlotGroupingOperations.CanUngroupSelection(members))
         {
             return;
         }
 
-        foreach (var shape in currentPlot.Shapes.Where(s => s.GroupId is Guid gid && selectedGroupIds.Contains(gid)))
-        {
-            shape.GroupId = null;
-            shape.GroupIndex = null;
-        }
-
-        currentPlot.DropGroups.RemoveAll(g => selectedGroupIds.Contains(g.Id));
+        RecordUndoState();
+        GardenPlotGroupingOperations.UngroupSelectedItems(currentPlot.Shapes, members, currentPlot.DropGroups);
         await SaveAsync();
     }
 
@@ -3465,11 +3429,10 @@ public partial class GardenPlot
 
     private bool CanGroupSelection
         => currentPlot is not null
-           && selectedIds.Count >= 2
-           && SelectedShapes().All(s => s.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant);
+           && GardenPlotGroupingOperations.CanGroupSelection(SelectedShapes());
 
     private bool CanUngroupSelection
-        => selectedIds.Count > 0 && SelectedShapes().Any(s => s.GroupId is not null);
+        => GardenPlotGroupingOperations.CanUngroupSelection(SelectedShapes());
 
     private bool IsMultiDropActive(bool shift, bool ctrl, bool alt)
     {
