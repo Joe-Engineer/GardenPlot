@@ -161,6 +161,9 @@ else
                 <button class="toolbar-icon-btn" @onclick="UngroupSelectedItems" disabled="@(!CanUngroupSelection)" title="Ungroup selection" aria-label="Ungroup selection">
                     <svg viewBox="0 0 24 24"><rect x="4" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="14" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="9" y="13" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M10 10H14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /><path d="M12 12L12 12" stroke="currentColor" stroke-width="1.6" /></svg>
                 </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="PlaceSelectedItemAlongPath" disabled="@(!CanPlaceAlongPath)" title="Place selected stamp item along the selected path">
+                    Along path
+                </button>
             </div>
 
             <div class="align-toolbar align-toolbar-inline" role="toolbar" aria-label="Position controls">
@@ -1775,9 +1778,13 @@ else
     var groupGapY = (selectedDropGroup is null || groupMembers.Count == 0) ? 0 : groupCenterSpacingY - groupMembers[0].H;
     var groupLength = selectedDropGroup is null
         ? 0
-        : selectedDropGroup.Pattern == DropPattern.Line
-            ? Math.Max(0, (groupMembers.Count - 1) * groupCenterSpacingX)
-            : Math.Max(0, (groupCols - 1) * groupCenterSpacingX);
+        : selectedDropGroup.Pattern == DropPattern.AlongPath
+            ? GetAlongPathSourceLengthFt(selectedDropGroup)
+            : selectedDropGroup.Pattern == DropPattern.Line
+                ? Math.Max(0, (groupMembers.Count - 1) * groupCenterSpacingX)
+                : Math.Max(0, (groupCols - 1) * groupCenterSpacingX);
+    var groupSpacingOverrideValue = selectedDropGroup?.SpacingFtOverride?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty;
+    var groupOffsetValue = selectedDropGroup?.OffsetIn?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty;
 
     <div class="floating-panel info-panel @(positioned ? "" : "default-info-pos")"
          @ref="infoPanelRef"
@@ -1975,34 +1982,62 @@ else
                     <label>Pattern</label>
                     <div><strong>@selectedDropGroup.Pattern</strong> · @groupMembers.Count items</div>
 
-                    <label>Orientation</label>
-                    <div><strong>@F(selectedDropGroup.Rotation)°</strong></div>
-
-                    <label>Length (ft)</label>
-                    <input type="number" min="0" max="500" step="0.1" value="@F(groupLength)" @onchange="OnGroupLengthChanged" />
-
-                    <label>Center X (ft)</label>
-                    <input type="number" min="0.1" max="200" step="0.1" value="@F(groupCenterSpacingX)" @onchange="(e) => OnGroupCenterSpacingChanged(e, true)" />
-
-                    <label>Gap X (ft)</label>
-                    <input type="number" min="-200" max="200" step="0.1" value="@F(groupGapX)" @onchange="(e) => OnGroupBoundingSpacingChanged(e, true)" />
-
-                    @if (selectedDropGroup.Pattern == DropPattern.Array)
+                    @if (selectedDropGroup.Pattern == DropPattern.AlongPath)
                     {
-                        <label>Rows</label>
-                        <input type="number" min="1" max="@Math.Max(1, groupMembers.Count)" step="1" value="@selectedDropGroup.Rows" @onchange="OnGroupRowsChanged" />
+                        <label>Rotation</label>
+                        <div><strong>@(selectedDropGroup.AlignToTangent ? "Path tangent" : $"{F(selectedDropGroup.Rotation)}°")</strong></div>
 
-                        <label>Center Y (ft)</label>
-                        <input type="number" min="0" max="200" step="0.1" value="@F(selectedDropGroup.CenterSpacingYFt)" title="0 = item default or √3/2 × X when triangulated" @onchange="(e) => OnGroupCenterSpacingChanged(e, false)" />
+                        <label>Source path</label>
+                        <div>
+                            <strong>@F(groupLength) ft</strong>
+                            <button class="btn btn-link btn-sm p-0 ms-2" @onclick="() => SelectAlongPathSource(selectedDropGroup)">select</button>
+                        </div>
 
-                        <label>Gap Y (ft)</label>
-                        <input type="number" min="-200" max="200" step="0.1" value="@F(groupGapY)" @onchange="(e) => OnGroupBoundingSpacingChanged(e, false)" />
+                        <label>Spacing (ft)</label>
+                        <input type="number" min="0.1" max="200" step="0.1" value="@groupSpacingOverrideValue" placeholder="@F(groupCenterSpacingX)" @onchange="OnAlongPathSpacingOverrideChanged" />
 
-                        <label>Triangulated</label>
-                        <label class="small" title="Offsets every other row by half an X spacing. With Center Y = 0, rows become equilateral."><input type="checkbox" checked="@selectedDropGroup.Triangulated" @onchange="OnGroupTriangulatedChanged" /> Triangulated</label>
+                        <label>Offset (in)</label>
+                        <input type="number" min="-240" max="240" step="0.5" value="@groupOffsetValue" @onchange="OnAlongPathOffsetChanged" />
 
-                        <label>Rotate</label>
-                        <label class="small"><input type="checkbox" checked="@selectedDropGroup.AutoShiftOnRotate" @onchange="OnGroupRotationAutoShiftChanged" /> Auto-shift into bounds</label>
+                        <label>Anchor</label>
+                        <select @onchange="OnAlongPathAnchorChanged" value="@selectedDropGroup.Anchor">
+                            @foreach (var anchor in Enum.GetValues<AlongPathAnchor>())
+                            {
+                                <option value="@anchor">@anchor</option>
+                            }
+                        </select>
+
+                        <label>Align</label>
+                        <label class="small"><input type="checkbox" checked="@selectedDropGroup.AlignToTangent" @onchange="OnAlongPathAlignChanged" /> Tangent rotation</label>
+                    }
+                    else
+                    {
+                        <label>Orientation</label>
+                        <div><strong>@F(selectedDropGroup.Rotation)°</strong></div>
+
+                        <label>Length (ft)</label>
+                        <input type="number" min="0" max="500" step="0.1" value="@F(groupLength)" @onchange="OnGroupLengthChanged" />
+
+                        <label>Center X (ft)</label>
+                        <input type="number" min="0.1" max="200" step="0.1" value="@F(groupCenterSpacingX)" @onchange="(e) => OnGroupCenterSpacingChanged(e, true)" />
+
+                        <label>Gap X (ft)</label>
+                        <input type="number" min="-200" max="200" step="0.1" value="@F(groupGapX)" @onchange="(e) => OnGroupBoundingSpacingChanged(e, true)" />
+
+                        @if (selectedDropGroup.Pattern == DropPattern.Array)
+                        {
+                            <label>Rows</label>
+                            <input type="number" min="1" max="@Math.Max(1, groupMembers.Count)" step="1" value="@selectedDropGroup.Rows" @onchange="OnGroupRowsChanged" />
+
+                            <label>Center Y (ft)</label>
+                            <input type="number" min="0.1" max="200" step="0.1" value="@F(groupCenterSpacingY)" @onchange="(e) => OnGroupCenterSpacingChanged(e, false)" />
+
+                            <label>Gap Y (ft)</label>
+                            <input type="number" min="-200" max="200" step="0.1" value="@F(groupGapY)" @onchange="(e) => OnGroupBoundingSpacingChanged(e, false)" />
+
+                            <label>Triangulated</label>
+                            <label class="small" title="Offsets every other row by half an X spacing. With Center Y = 0, rows become equilateral."><input type="checkbox" checked="@selectedDropGroup.Triangulated" @onchange="OnGroupTriangulatedChanged" /> Triangulated</label>
+                        }
                     }
                 </div>
             }

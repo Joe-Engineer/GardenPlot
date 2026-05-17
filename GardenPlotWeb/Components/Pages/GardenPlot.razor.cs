@@ -506,7 +506,6 @@ public partial class GardenPlot
             }
         }
 
-        // 1. New shapes -> mint a takeoff item bound to each.
         foreach (Shape shape in currentPlot.Shapes)
         {
             if (boundShapeIds.Contains(shape.Id))
@@ -526,7 +525,6 @@ public partial class GardenPlot
             });
         }
 
-        // 2. Orphan takeoff items whose bound shape was deleted.
         bool autoDelete = library.Ui.AutoDeleteTakeoffOnShapeDelete;
         for (int i = currentPlot.Takeoff.Count - 1; i >= 0; i--)
         {
@@ -1187,6 +1185,7 @@ public partial class GardenPlot
     private static string DropPatternLabel(DropPattern pattern) => pattern switch
     {
         DropPattern.One => "Single",
+        DropPattern.AlongPath => "Along Path",
         _ => pattern.ToString(),
     };
 
@@ -4245,7 +4244,12 @@ public partial class GardenPlot
 
     private void SelectItem(PaletteItem item)
     {
-        ClearSelection();
+        var preserveSelection = IsStampablePaletteItem(item) && GetSelectedAlongPathSourceShape() is not null;
+        if (!preserveSelection)
+        {
+            ClearSelection();
+        }
+
         HideShapeContextMenu();
         selectedItem = item;
 
@@ -4290,6 +4294,34 @@ public partial class GardenPlot
         lineCenterSpacingFt = Math.Max(0.1, item.WidthFt);
         arrayCenterSpacingXFt = Math.Max(0.1, item.WidthFt);
         arrayCenterSpacingYFt = Math.Max(0.1, item.HeightFt);
+    }
+
+    private async Task PlaceSelectedItemAlongPath()
+    {
+        if (currentPlot is null || selectedItem is not { } item || !IsStampablePaletteItem(item))
+        {
+            return;
+        }
+
+        var sourcePath = GetSelectedAlongPathSourceShape();
+        if (sourcePath is null)
+        {
+            return;
+        }
+
+        var placement = BuildAlongPathPlacement(item, sourcePath, assignNewIds: true);
+        if (placement.Group is null || placement.Shapes.Count == 0)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        currentPlot.Shapes.AddRange(placement.Shapes);
+        currentPlot.DropGroups.RemoveAll(g => g.Id == placement.Group.Id);
+        currentPlot.DropGroups.Add(placement.Group);
+        selectedIds.Clear();
+        selectedIds.AddRange(placement.Shapes.Select(shape => shape.Id));
+        await SaveAsync();
     }
 
     private async Task GroupSelectedItems()
@@ -4475,6 +4507,12 @@ public partial class GardenPlot
             Rotation = source.Rotation,
             AnchorCenterX = source.AnchorCenterX,
             AnchorCenterY = source.AnchorCenterY,
+            AutoShiftOnRotate = source.AutoShiftOnRotate,
+            SourcePathShapeId = source.SourcePathShapeId,
+            SpacingFtOverride = source.SpacingFtOverride,
+            OffsetIn = source.OffsetIn,
+            Anchor = source.Anchor,
+            AlignToTangent = source.AlignToTangent,
         };
     }
 
@@ -4546,6 +4584,48 @@ public partial class GardenPlot
     private DropPattern ActiveDropPattern(bool shift, bool ctrl, bool alt)
         => selectedItem?.Kind == PaletteKind.FocalPoint ? DropPattern.One : IsMultiDropActive(shift, ctrl, alt) ? dropPattern : DropPattern.One;
 
+    private bool CanPlaceAlongPath
+        => selectedItem is not null
+           && IsStampablePaletteItem(selectedItem)
+           && GetSelectedAlongPathSourceShape() is not null;
+
+    private static bool IsStampablePaletteItem(PaletteItem item)
+        => item.Kind is not PaletteKind.GroundCover and not PaletteKind.GroundCoverSurface;
+
+    private static bool IsPathShape(Shape shape)
+        => shape.Kind == ShapeKind.Ruler || (shape.Kind == ShapeKind.FreeDraw && !IsGroundCoverShape(shape));
+
+    private Shape? GetSelectedAlongPathSourceShape()
+    {
+        if (currentPlot is null || selectedIds.Count != 1)
+        {
+            return null;
+        }
+
+        var shape = currentPlot.Shapes.FirstOrDefault(s => s.Id == selectedIds[0]);
+        return shape is not null && IsPathShape(shape) && PolylineSampler.TotalLengthFt(shape.Points) > 0
+            ? shape
+            : null;
+    }
+
+    private Shape? GetAlongPathSourceShape(DropGroup group)
+    {
+        if (currentPlot is null || group.SourcePathShapeId is not Guid sourcePathId)
+        {
+            return null;
+        }
+
+        var source = currentPlot.Shapes.FirstOrDefault(s => s.Id == sourcePathId);
+        return source is not null && IsPathShape(source)
+            ? source
+            : null;
+    }
+
+    private double GetAlongPathSourceLengthFt(DropGroup group)
+        => GetAlongPathSourceShape(group) is { } source
+            ? PolylineSampler.TotalLengthFt(source.Points)
+            : 0;
+
     private static ShapeKind ShapeKindFromPalette(PaletteItem item) => item.Kind switch
     {
         PaletteKind.Tree => ShapeKind.Tree,
@@ -4581,6 +4661,99 @@ public partial class GardenPlot
     {
         public List<Shape> Shapes { get; init; } = new();
         public DropGroup? Group { get; init; }
+    }
+
+    private static double EffectiveAlongPathSpacingFt(DropGroup group, double defaultSpacingFt)
+        => Math.Clamp(group.SpacingFtOverride is > 0 ? group.SpacingFtOverride.Value : defaultSpacingFt, 0.1, 200);
+
+    private static Shape CloneStampTemplateAt(Shape template, double centerX, double centerY, double rotation, Guid groupId, int groupIndex, bool assignNewId)
+    {
+        var clone = CloneShape(template, assignNewId);
+        clone.X = centerX - (template.W / 2);
+        clone.Y = centerY - (template.H / 2);
+        clone.Rotation = rotation;
+        clone.GroupId = groupId;
+        clone.GroupIndex = groupIndex;
+        return clone;
+    }
+
+    private static void ApplyAlongPathMetadata(DropGroup group, IReadOnlyList<Shape> shapes, double spacingFt)
+    {
+        group.Rows = 1;
+        group.CenterSpacingXFt = spacingFt;
+        if (shapes.Count > 0)
+        {
+            group.CenterSpacingYFt = shapes[0].H;
+            group.ItemCount = shapes.Count;
+            group.AnchorCenterX = shapes[0].X + (shapes[0].W / 2);
+            group.AnchorCenterY = shapes[0].Y + (shapes[0].H / 2);
+        }
+        else
+        {
+            group.ItemCount = 0;
+        }
+    }
+
+    private List<Shape> BuildAlongPathShapes(
+        DropGroup group,
+        Shape sourcePath,
+        double defaultSpacingFt,
+        Func<Point, double, int, Shape> shapeFactory)
+    {
+        var spacingFt = EffectiveAlongPathSpacingFt(group, defaultSpacingFt);
+        var samples = PolylineSampler.SamplePoints(sourcePath.Points, spacingFt, group.Anchor, group.OffsetIn, group.AlignToTangent);
+        var shapes = new List<Shape>(samples.Count);
+        for (var i = 0; i < samples.Count; i++)
+        {
+            var rotation = group.AlignToTangent ? samples[i].AngleDeg : group.Rotation;
+            shapes.Add(shapeFactory(samples[i].Pos, rotation, i));
+        }
+
+        ApplyAlongPathMetadata(group, shapes, spacingFt);
+        return shapes;
+    }
+
+    private StampPlacement BuildAlongPathPlacement(PaletteItem item, Shape sourcePath, bool assignNewIds)
+    {
+        var group = new DropGroup
+        {
+            Pattern = DropPattern.AlongPath,
+            Rotation = stampRotation,
+            SourcePathShapeId = sourcePath.Id,
+            Anchor = AlongPathAnchor.Start,
+            AlignToTangent = true,
+            CenterSpacingYFt = item.HeightFt,
+        };
+
+        var shapes = BuildAlongPathShapes(
+            group,
+            sourcePath,
+            item.WidthFt,
+            (position, rotation, index) =>
+            {
+                var shape = BuildStampShapeAt(item, position.X, position.Y, rotation, group.Id, index);
+                if (!assignNewIds)
+                {
+                    shape.Id = Guid.Empty;
+                }
+
+                return shape;
+            });
+        return new StampPlacement { Shapes = shapes, Group = group };
+    }
+
+    private List<Shape> RebuildAlongPathShapes(DropGroup group, Shape sourcePath, Shape template)
+    {
+        if (!group.AlignToTangent)
+        {
+            group.Rotation = template.Rotation;
+        }
+
+        return BuildAlongPathShapes(
+            group,
+            sourcePath,
+            template.W,
+            (position, rotation, index) => CloneStampTemplateAt(template, position.X, position.Y, rotation, group.Id, index, assignNewId: true));
     }
 
     private StampPlacement BuildStampPlacement(PaletteItem item, double centerX, double centerY, DropPattern pattern, bool assignNewIds)
@@ -5139,7 +5312,7 @@ public partial class GardenPlot
         }
     }
 
-    private void OnPointerUp(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
+    private async Task OnPointerUp(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
         if (currentPlot is null) return;
 
@@ -5156,7 +5329,7 @@ public partial class GardenPlot
 
             if (panActive)
             {
-                _ = SaveAsync();
+                await SaveAsync();
                 suppressContextMenuOnce = panButton == 2;
             }
 
@@ -5169,16 +5342,25 @@ public partial class GardenPlot
         if (isDragging)
         {
             isDragging = false;
-            _ = SaveAsync();
+            var movedSourceShapeIds = SelectedShapes()
+                .Where(IsPathShape)
+                .Select(shape => shape.Id)
+                .ToList();
+            await ReflowAlongPathGroupsForSourceShapes(movedSourceShapeIds, save: false);
+            SyncDropGroupsFromCurrentShapes();
+            await SaveAsync();
             return;
         }
 
         if (isHandleDragging)
         {
+            var sourceShapeId = handleShapeId;
             isHandleDragging = false;
             handleShapeId = Guid.Empty;
             handleIndex = -1;
-            _ = SaveAsync();
+            await ReflowAlongPathGroupsForSourceShapes([sourceShapeId], save: false);
+            SyncDropGroupsFromCurrentShapes();
+            await SaveAsync();
             return;
         }
 
@@ -5734,6 +5916,36 @@ public partial class GardenPlot
         }
     }
 
+    private async Task ReflowAlongPathGroupsForSourceShapes(IEnumerable<Guid> sourceShapeIds, bool save = false)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        var sourceIds = sourceShapeIds.Distinct().ToHashSet();
+        if (sourceIds.Count == 0)
+        {
+            return;
+        }
+
+        var groups = currentPlot.DropGroups
+            .Where(g => g.Pattern == DropPattern.AlongPath
+                && g.SourcePathShapeId is Guid sourcePathId
+                && sourceIds.Contains(sourcePathId))
+            .ToList();
+
+        foreach (var group in groups)
+        {
+            await ReflowDropGroup(group, save: false);
+        }
+
+        if (save)
+        {
+            await SaveAsync();
+        }
+    }
+
     private List<DropGroup> GetSelectedDropGroups()
     {
         if (currentPlot is null || selectedIds.Count == 0)
@@ -6111,7 +6323,7 @@ public partial class GardenPlot
         }
 
         var selected = SelectedShapes().ToList();
-        if (selected.Count < 2)
+        if (selected.Count == 0)
         {
             return null;
         }
@@ -6298,8 +6510,102 @@ public partial class GardenPlot
         }
     }
 
+    private async Task OnAlongPathSpacingOverrideChanged(ChangeEventArgs e)
+    {
+        var group = GetCurrentSelectedDropGroup();
+        if (group is null || group.Pattern != DropPattern.AlongPath)
+        {
+            return;
+        }
+
+        var raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            group.SpacingFtOverride = null;
+            await ReflowDropGroup(group);
+            return;
+        }
+
+        if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var spacingFt))
+        {
+            group.SpacingFtOverride = Math.Clamp(spacingFt, 0.1, 200);
+            await ReflowDropGroup(group);
+        }
+    }
+
+    private async Task OnAlongPathOffsetChanged(ChangeEventArgs e)
+    {
+        var group = GetCurrentSelectedDropGroup();
+        if (group is null || group.Pattern != DropPattern.AlongPath)
+        {
+            return;
+        }
+
+        var raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            group.OffsetIn = null;
+            await ReflowDropGroup(group);
+            return;
+        }
+
+        if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var offsetIn))
+        {
+            group.OffsetIn = Math.Clamp(offsetIn, -240, 240);
+            await ReflowDropGroup(group);
+        }
+    }
+
+    private async Task OnAlongPathAnchorChanged(ChangeEventArgs e)
+    {
+        var group = GetCurrentSelectedDropGroup();
+        if (group is null || group.Pattern != DropPattern.AlongPath)
+        {
+            return;
+        }
+
+        if (Enum.TryParse<AlongPathAnchor>(e.Value?.ToString(), ignoreCase: true, out var anchor))
+        {
+            group.Anchor = anchor;
+            await ReflowDropGroup(group);
+        }
+    }
+
+    private async Task OnAlongPathAlignChanged(ChangeEventArgs e)
+    {
+        var group = GetCurrentSelectedDropGroup();
+        if (group is null || group.Pattern != DropPattern.AlongPath)
+        {
+            return;
+        }
+
+        if (bool.TryParse(e.Value?.ToString(), out var align))
+        {
+            group.AlignToTangent = align;
+            await ReflowDropGroup(group);
+        }
+    }
+
+    private Task SelectAlongPathSource(DropGroup group)
+    {
+        if (GetAlongPathSourceShape(group) is { } source)
+        {
+            currentTool = Tool.Select;
+            selectedItem = null;
+            ghostX = ghostY = null;
+            SelectOnly(source.Id);
+        }
+
+        return Task.CompletedTask;
+    }
+
     private async Task ReflowDropGroup(DropGroup group, bool save = true, bool autoShiftIntoBounds = true)
     {
+        if (group.Pattern == DropPattern.AlongPath)
+        {
+            autoShiftIntoBounds = false;
+        }
+
         if (currentPlot is null)
         {
             return;
@@ -6309,7 +6615,40 @@ public partial class GardenPlot
         if (members.Count == 0)
         {
             currentPlot.DropGroups.RemoveAll(g => g.Id == group.Id);
-            await SaveAsync();
+            if (save)
+            {
+                await SaveAsync();
+            }
+
+            return;
+        }
+
+        if (group.Pattern == DropPattern.AlongPath)
+        {
+            var sourcePath = GetAlongPathSourceShape(group);
+            if (sourcePath is not null)
+            {
+                var hadSelection = members.Any(member => selectedIds.Contains(member.Id));
+                var template = members[0];
+                currentPlot.Shapes.RemoveAll(shape => shape.GroupId == group.Id);
+                var rebuilt = RebuildAlongPathShapes(group, sourcePath, template);
+                currentPlot.Shapes.AddRange(rebuilt);
+                if (hadSelection)
+                {
+                    selectedIds.Clear();
+                    selectedIds.AddRange(rebuilt.Select(shape => shape.Id));
+                }
+            }
+            else
+            {
+                ApplyAlongPathMetadata(group, members, EffectiveAlongPathSpacingFt(group, members[0].W));
+            }
+
+            if (save)
+            {
+                await SaveAsync();
+            }
+
             return;
         }
 
@@ -6462,6 +6801,15 @@ public partial class GardenPlot
                 continue;
             }
 
+            if (group.Pattern == DropPattern.AlongPath && !group.AlignToTangent)
+            {
+                var member = currentPlot.Shapes.FirstOrDefault(s => s.GroupId == group.Id);
+                if (member is not null)
+                {
+                    group.Rotation = member.Rotation;
+                }
+            }
+
             EnsureGroupSpacingForRotation(group);
             await ReflowDropGroup(group, save: false, autoShiftIntoBounds: true);
         }
@@ -6470,6 +6818,11 @@ public partial class GardenPlot
     private void EnsureGroupSpacingForRotation(DropGroup group)
     {
         if (currentPlot is null)
+        {
+            return;
+        }
+
+        if (group.Pattern == DropPattern.AlongPath)
         {
             return;
         }
@@ -6549,11 +6902,7 @@ public partial class GardenPlot
     }
 
     private static double RulerLength(List<Point> pts)
-    {
-        double total = 0;
-        for (int i = 1; i < pts.Count; i++) total += Distance(pts[i - 1], pts[i]);
-        return total;
-    }
+        => PolylineSampler.TotalLengthFt(pts);
 
     private static bool IsRulerShape(Shape s)
         => s.Kind == ShapeKind.Ruler || s.Kind == ShapeKind.CircleRuler || s.Kind == ShapeKind.RectRuler;
@@ -7195,9 +7544,7 @@ public partial class GardenPlot
                 break;
             case ShapeKind.FreeDraw:
                 {
-                    double total = 0;
-                    for (int i = 1; i < s.Points.Count; i++)
-                        total += Distance(s.Points[i - 1], s.Points[i]);
+                    var total = PolylineSampler.TotalLengthFt(s.Points);
                     lines.Add($"<span class=\"text-muted\">Vertices:</span> {s.Points.Count}");
                     lines.Add($"<span class=\"text-muted\">Path length:</span> {F(total)} ft");
                 }
@@ -7427,6 +7774,12 @@ public partial class GardenPlot
                 }
         }
 
+        var movedSourceShapeIds = units
+            .SelectMany(unit => unit.Members)
+            .Where(IsPathShape)
+            .Select(shape => shape.Id)
+            .ToList();
+        await ReflowAlongPathGroupsForSourceShapes(movedSourceShapeIds, save: false);
         SyncDropGroupsFromCurrentShapes();
         await SaveAsync();
     }
@@ -7472,6 +7825,12 @@ public partial class GardenPlot
             }
         }
 
+        var movedSourceShapeIds = units
+            .SelectMany(unit => unit.Members)
+            .Where(IsPathShape)
+            .Select(shape => shape.Id)
+            .ToList();
+        await ReflowAlongPathGroupsForSourceShapes(movedSourceShapeIds, save: false);
         SyncDropGroupsFromCurrentShapes();
         await SaveAsync();
     }

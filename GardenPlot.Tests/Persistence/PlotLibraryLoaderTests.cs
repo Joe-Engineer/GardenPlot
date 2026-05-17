@@ -196,6 +196,48 @@ public class PlotLibraryLoaderTests
     }
 
     [Fact]
+    public void Load_CurrentVersion_PreservesAlongPathDropGroups()
+    {
+        var pathId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var source = new PlotLibrary();
+        source.Plots.Add(new PlotData
+        {
+            Name = "A",
+            Shapes =
+            [
+                new Shape { Id = pathId, Kind = ShapeKind.Ruler, Points = [new Point(0, 0), new Point(10, 0)] },
+                new Shape { GroupId = groupId, GroupIndex = 0, Kind = ShapeKind.Tree, Label = "Oak", W = 4, H = 4 },
+            ],
+            DropGroups =
+            [
+                new DropGroup
+                {
+                    Id = groupId,
+                    Pattern = DropPattern.AlongPath,
+                    SourcePathShapeId = pathId,
+                    SpacingFtOverride = 6,
+                    OffsetIn = 18,
+                    Anchor = AlongPathAnchor.End,
+                    AlignToTangent = false,
+                },
+            ],
+        });
+        string json = JsonSerializer.Serialize(source);
+
+        var loader = CreateLoader();
+        var lib = loader.Load(json, "unit-test");
+
+        var group = Assert.Single(Assert.Single(lib!.Plots).DropGroups);
+        Assert.Equal(DropPattern.AlongPath, group.Pattern);
+        Assert.Equal(pathId, group.SourcePathShapeId);
+        Assert.Equal(6, group.SpacingFtOverride);
+        Assert.Equal(18, group.OffsetIn);
+        Assert.Equal(AlongPathAnchor.End, group.Anchor);
+        Assert.False(group.AlignToTangent);
+    }
+
+    [Fact]
     public void Load_RoundTrip_PreservesLayerStates()
     {
         var source = new PlotLibrary();

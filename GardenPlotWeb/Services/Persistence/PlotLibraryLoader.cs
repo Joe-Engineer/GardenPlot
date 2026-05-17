@@ -204,11 +204,12 @@ public sealed class PlotLibraryLoader
     /// Loader for schema v1. v1 documents predate the per-plot <c>Takeoff</c> list,
     /// <c>TakeoffIds</c> sequence, library-level <c>CustomCatalogItems</c>, costing defaults,
     /// legacy triangulation migration, the v2 grass / ground-cover surface catalog rebind,
-    /// <see cref="PlotData.BackgroundFit"/>, and per-plot <c>LayerStates</c>. We deserialize as
-    /// the current shape (forward-compatible — extra absent fields are tolerated by
-    /// <c>JsonSerializer</c>), synthesize one <see cref="TakeoffItem"/> per existing
-    /// <see cref="Shape"/>, normalize missing layer state, rebind legacy plant/tile placements
-    /// onto the surface catalog, then project legacy triangulation flags onto
+    /// <see cref="PlotData.BackgroundFit"/>, per-plot <c>LayerStates</c>, and the
+    /// <see cref="DropGroup"/> along-path fields. We deserialize as the current shape
+    /// (forward-compatible — missing along-path fields take safe defaults, extra absent fields
+    /// are tolerated by <c>JsonSerializer</c>), synthesize one <see cref="TakeoffItem"/> per
+    /// existing <see cref="Shape"/>, normalize missing layer state, rebind legacy plant/tile
+    /// placements onto the surface catalog, then project legacy triangulation flags onto
     /// <see cref="DropGroup.Triangulated"/> and stamp a valid background-fit value.
     /// </summary>
     private static PlotLibrary? LoadFromVersion1(JsonObject root, JsonSerializerOptions? options)
