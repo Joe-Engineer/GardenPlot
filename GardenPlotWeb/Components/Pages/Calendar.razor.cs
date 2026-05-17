@@ -169,6 +169,7 @@ public partial class Calendar
             ShapeKind.Rectangle => string.IsNullOrWhiteSpace(shape.Label) ? "Rectangle area" : shape.Label,
             ShapeKind.Oval => string.IsNullOrWhiteSpace(shape.Label) ? "Oval area" : shape.Label,
             ShapeKind.FreeDraw => string.IsNullOrWhiteSpace(shape.Label) ? "Freehand area" : shape.Label,
+            ShapeKind.Edge => string.IsNullOrWhiteSpace(shape.Label) ? "Edge" : $"Edge · {shape.Label}",
             ShapeKind.BedKit => string.IsNullOrWhiteSpace(shape.Label) ? "Bed kit" : shape.Label,
             ShapeKind.Ruler => shape.Kind.ToString(),
             ShapeKind.CircleRuler => shape.Kind.ToString(),
@@ -176,6 +177,7 @@ public partial class Calendar
             ShapeKind.Tree => $"Tree · {shape.Label}",
             ShapeKind.Bush => $"Bush · {shape.Label}",
             ShapeKind.Plant => $"Plant · {shape.Label}",
+            ShapeKind.SoilMarker => string.IsNullOrWhiteSpace(shape.Label) ? "Soil marker" : $"Soil marker · {shape.Label}",
             _ => throw new ArgumentOutOfRangeException(nameof(shape), shape.Kind, null),
         };
     }

@@ -136,7 +136,6 @@ public class PlotLibraryLoaderTests
         Assert.Single(lib.Plots);
         Assert.Empty(lib.Plots[0].Tasks);
     }
-    }
 
     [Fact]
     public void Load_Version2TriangulatedPayload_MigratesLegacyStaggerHalf()
