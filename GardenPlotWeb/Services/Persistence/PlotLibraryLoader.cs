@@ -205,13 +205,13 @@ public sealed class PlotLibraryLoader
     /// <c>TakeoffIds</c> sequence, library-level <c>CustomCatalogItems</c>, costing defaults,
     /// legacy triangulation migration, the v2 grass / ground-cover surface catalog rebind,
     /// <see cref="PlotData.BackgroundFit"/>, per-plot <c>LayerStates</c>, the
-    /// <see cref="DropGroup"/> along-path fields, and <see cref="Shape.ClippedBy"/> metadata.
-    /// We deserialize as the current shape (forward-compatible — missing fields take safe
-    /// defaults, extra absent fields are tolerated by <c>JsonSerializer</c>), synthesize one
-    /// <see cref="TakeoffItem"/> per existing <see cref="Shape"/>, normalize missing layer state,
-    /// rebind legacy plant/tile placements onto the surface catalog, then project legacy
-    /// triangulation flags onto <see cref="DropGroup.Triangulated"/> and stamp a valid
-    /// background-fit value.
+    /// <see cref="DropGroup"/> along-path fields, <see cref="Shape.ClippedBy"/> metadata, and
+    /// <see cref="PlotData.Tasks"/> collections. We deserialize as the current shape
+    /// (forward-compatible — missing fields take safe defaults, extra absent fields are tolerated
+    /// by <c>JsonSerializer</c>), synthesize one <see cref="TakeoffItem"/> per existing
+    /// <see cref="Shape"/>, normalize missing layer state and task collections, rebind legacy
+    /// plant/tile placements onto the surface catalog, then project legacy triangulation flags
+    /// onto <see cref="DropGroup.Triangulated"/> and stamp a valid background-fit value.
     /// </summary>
     private static PlotLibrary? LoadFromVersion1(JsonObject root, JsonSerializerOptions? options)
     {
@@ -229,20 +229,22 @@ public sealed class PlotLibraryLoader
         }
 
         RebindMovedGroundCoverSurfaceShapes(library);
+        EnsureTaskCollections(library);
         return BackfillBackgroundFit(UpgradeLegacyTriangulation(library));
     }
 
     /// <summary>
     /// Loader for schema v2. v2 documents already have takeoff items, but may still contain
     /// legacy plant/custom-tile placements for area-based grasses or ground covers, predate the
-    /// costing fields, soil-marker reading lists, clipping metadata, the <c>StaggerHalf</c> to
-    /// <see cref="DropGroup.Triangulated"/> rename, the <see cref="PlotData.BackgroundFit"/>
-    /// field, and per-plot <c>LayerStates</c>. Direct typed deserialization is sufficient because
-    /// the newer members carry safe model defaults (markup 25%, labor rate 75, internal view on,
-    /// line total on, default rotation for shapes/drop groups, empty soil-reading + clip lists,
-    /// and <c>Fit</c> for background image rendering); we then rebind moved surface palette
-    /// items, normalize missing layer state, project legacy triangulation, and stamp a valid
-    /// background-fit value before the document is rewritten as the current schema.
+    /// costing fields, soil-marker reading lists, clipping metadata, task collections, the
+    /// <c>StaggerHalf</c> to <see cref="DropGroup.Triangulated"/> rename, the
+    /// <see cref="PlotData.BackgroundFit"/> field, and per-plot <c>LayerStates</c>. Direct typed
+    /// deserialization is sufficient because the newer members carry safe model defaults
+    /// (markup 25%, labor rate 75, internal view on, line total on, default rotation for
+    /// shapes/drop groups, empty soil-reading + clip lists, empty task collections, and
+    /// <c>Fit</c> for background image rendering); we then rebind moved surface palette items,
+    /// normalize missing layer state and task collections, project legacy triangulation, and
+    /// stamp a valid background-fit value before the document is rewritten as the current schema.
     /// </summary>
     private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
     {
@@ -255,6 +257,7 @@ public sealed class PlotLibraryLoader
         library = NormalizeLibrary(library);
         RebindMovedGroundCoverSurfaceShapes(library);
         EnsureLayerStates(library);
+        EnsureTaskCollections(library);
         return BackfillBackgroundFit(UpgradeLegacyTriangulation(library));
     }
 
@@ -271,12 +274,13 @@ public sealed class PlotLibraryLoader
         }
 
         EnsureLayerStates(library);
+        EnsureTaskCollections(library);
         return BackfillBackgroundFit(library);
     }
 
     /// <summary>
     /// Loader for schema v4 — the current shape. Direct typed deserialization onto
-    /// <see cref="PlotLibrary"/> plus normalization of per-plot layer state entries.
+    /// <see cref="PlotLibrary"/> plus normalization of per-plot layer state and task entries.
     /// </summary>
     private static PlotLibrary? LoadFromVersion4(JsonObject root, JsonSerializerOptions? options)
     {
@@ -287,7 +291,25 @@ public sealed class PlotLibraryLoader
         }
 
         EnsureLayerStates(library);
+        EnsureTaskCollections(library);
         return library;
+    }
+
+    private static void EnsureTaskCollections(PlotLibrary? library)
+    {
+        if (library?.Plots is null)
+        {
+            return;
+        }
+
+        foreach (PlotData plot in library.Plots)
+        {
+            plot.Tasks ??= new List<GardenTask>();
+            foreach (GardenTask task in plot.Tasks)
+            {
+                task.CompletedUtc ??= new List<DateTime>();
+            }
+        }
     }
 
     private static PlotLibrary UpgradeLegacyTriangulation(PlotLibrary library)

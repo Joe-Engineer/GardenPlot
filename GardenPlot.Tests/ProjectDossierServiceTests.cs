@@ -8,6 +8,7 @@ using GardenPlotWeb.Services.Catalog;
 
 namespace GardenPlot.Tests;
 
+[Collection(TestCollections.DataRootEnvironment)]
 public sealed class ProjectDossierServiceTests : IDisposable
 {
     private readonly string previousEnv;

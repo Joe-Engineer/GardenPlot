@@ -1910,7 +1910,24 @@ public partial class GardenPlot
     private readonly Dictionary<string, PlotBackgroundImageDimensions> plotBackgroundImageDimensions =
         new(StringComparer.OrdinalIgnoreCase);
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "plotId")]
+    public Guid? RequestedPlotId { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "shapeId")]
+    public Guid? RequestedShapeId { get; set; }
+
     private bool loaded;
+    private bool routeSelectionPending = true;
+    private Guid? taskEditorShapeId;
+    private Guid? editingTaskId;
+    private string taskDraftTitle = string.Empty;
+    private TaskCadence taskDraftCadence = TaskCadence.Once;
+    private string? taskDraftCustomCron;
+    private Season? taskDraftSeason = Season.Spring;
+    private string? taskDraftNotes;
+    private string taskDraftNextDueLocal = string.Empty;
 
     private static bool IsBindingMatch(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, string? binding)
     {
@@ -2285,6 +2302,11 @@ public partial class GardenPlot
         }
     }
 
+    protected override void OnParametersSet()
+    {
+        routeSelectionPending = true;
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -2466,6 +2488,11 @@ public partial class GardenPlot
             }
         }
 
+        if (routeSelectionPending && ApplyRouteSelectionIfRequested())
+        {
+            StateHasChanged();
+        }
+
         if (restoreViewportPending && jsModule is not null && currentPlot is not null)
         {
             await RestoreViewportAsync();
@@ -2552,6 +2579,53 @@ public partial class GardenPlot
         }
 
         await EnsureFloatingPanelsInViewAsync();
+    }
+
+    private bool ApplyRouteSelectionIfRequested()
+    {
+        if (!routeSelectionPending || library.Plots.Count == 0)
+        {
+            return false;
+        }
+
+        routeSelectionPending = false;
+
+        PlotData? targetPlot = RequestedPlotId is Guid requestedPlotId
+            ? library.Plots.FirstOrDefault(plot => plot.Id == requestedPlotId)
+            : currentPlot;
+
+        if (targetPlot is null && RequestedShapeId is Guid requestedShapeId)
+        {
+            targetPlot = library.Plots.FirstOrDefault(plot => plot.Shapes.Any(shape => shape.Id == requestedShapeId));
+        }
+
+        if (targetPlot is null)
+        {
+            return false;
+        }
+
+        bool changed = !ReferenceEquals(currentPlot, targetPlot);
+        if (changed)
+        {
+            currentPlot = targetPlot;
+            library.LastPlotId = currentPlot.Id;
+            undoStack.Clear();
+            ClearSelection();
+            selectedItem = null;
+            currentTool = Tool.Select;
+            ghostX = ghostY = null;
+        }
+
+        if (RequestedShapeId is Guid shapeId && currentPlot is not null && currentPlot.Shapes.FirstOrDefault(shape => shape.Id == shapeId) is Shape targetShape)
+        {
+            SelectOnly(targetShape.Id);
+            library.Ui.ViewCenterXFt = targetShape.X + (targetShape.W / 2.0);
+            library.Ui.ViewCenterYFt = targetShape.Y + (targetShape.H / 2.0);
+            restoreViewportPending = true;
+            changed = true;
+        }
+
+        return changed;
     }
 
     private async Task<(PlotLibrary? Library, string? SourceKey, bool Authoritative)> TryLoadLibraryAsync()
@@ -2712,6 +2786,12 @@ public partial class GardenPlot
         {
             p.Shapes ??= new List<Shape>();
             p.DropGroups ??= new List<DropGroup>();
+            p.Tasks ??= new List<GardenTask>();
+            foreach (GardenTask task in p.Tasks)
+            {
+                task.CompletedUtc ??= new List<DateTime>();
+            }
+
             p.KitRotations ??= new Dictionary<string, double>(StringComparer.Ordinal);
             p.PhotoFileNames ??= new List<string>();
             p.Takeoff ??= new List<TakeoffItem>();
@@ -3096,6 +3176,7 @@ public partial class GardenPlot
             currentPlot = library.Plots.FirstOrDefault(p => p.Id == id);
             undoStack.Clear();
             ClearSelection();
+            CancelTaskEdit();
             selectedItem = null;
             currentTool = Tool.Select;
             ghostX = ghostY = null;
@@ -4419,8 +4500,10 @@ public partial class GardenPlot
         if (currentPlot is null) return;
         if (currentPlot.Shapes.Count == 0) return;
         RecordUndoState();
+        HashSet<Guid> removedShapeIds = currentPlot.Shapes.Select(shape => shape.Id).ToHashSet();
         currentPlot.Shapes.Clear();
         currentPlot.DropGroups.Clear();
+        RemoveTasksForShapeIds(currentPlot, removedShapeIds);
         ClearSelection();
         await SaveAsync();
     }
@@ -4432,8 +4515,10 @@ public partial class GardenPlot
         var ids = selectedIds.ToHashSet();
         currentPlot.Shapes.RemoveAll(s => ids.Contains(s.Id));
         RemoveClipReferences(currentPlot.Shapes, ids);
+        RemoveTasksForShapeIds(currentPlot, ids);
         CleanupOrphanDropGroups();
         ClearSelection();
+        CancelTaskEdit();
         await SaveAsync();
     }
 
@@ -7819,6 +7904,177 @@ public partial class GardenPlot
     }
 
     private double GrossAreaFt2(Shape shape) => TakeoffMath.GrossAreaFt2(shape);
+
+    private static bool CanBindTasks(Shape shape)
+        => shape.Kind is ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw;
+
+    private IReadOnlyList<GardenTask> TasksForShape(Guid shapeId)
+    {
+        if (currentPlot is null)
+        {
+            return [];
+        }
+
+        return currentPlot.Tasks
+            .Where(task => task.ShapeId == shapeId)
+            .OrderBy(task => task.NextDueUtc ?? DateTime.MaxValue)
+            .ThenBy(task => task.Title, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
+    private bool TaskEditorMatchesShape(Guid shapeId) => taskEditorShapeId == shapeId;
+
+    private void BeginNewTask(Shape shape)
+    {
+        taskEditorShapeId = shape.Id;
+        editingTaskId = null;
+        taskDraftTitle = string.Empty;
+        taskDraftCadence = TaskCadence.Once;
+        taskDraftCustomCron = null;
+        taskDraftSeason = Season.Spring;
+        taskDraftNotes = null;
+        taskDraftNextDueLocal = string.Empty;
+    }
+
+    private void UseTaskTemplate(Shape shape, GardenTaskTemplate template)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+
+        BeginNewTask(shape);
+        GardenTask suggestedTask = template.CreateTask(shape.Id, DateTime.UtcNow);
+        taskDraftTitle = suggestedTask.Title;
+        taskDraftCadence = suggestedTask.Cadence;
+        taskDraftCustomCron = suggestedTask.CustomCron;
+        taskDraftSeason = suggestedTask.Season ?? Season.Spring;
+        taskDraftNotes = suggestedTask.Notes;
+        taskDraftNextDueLocal = ToLocalTaskDateTimeInput(suggestedTask.NextDueUtc);
+    }
+
+    private void EditTask(GardenTask task)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+
+        taskEditorShapeId = task.ShapeId;
+        editingTaskId = task.Id;
+        taskDraftTitle = task.Title;
+        taskDraftCadence = task.Cadence;
+        taskDraftCustomCron = task.CustomCron;
+        taskDraftSeason = task.Season ?? Season.Spring;
+        taskDraftNotes = task.Notes;
+        taskDraftNextDueLocal = ToLocalTaskDateTimeInput(task.NextDueUtc);
+    }
+
+    private async Task DeleteTaskAsync(Guid taskId)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        int removed = currentPlot.Tasks.RemoveAll(task => task.Id == taskId);
+        if (editingTaskId == taskId)
+        {
+            CancelTaskEdit();
+        }
+
+        if (removed > 0)
+        {
+            await SaveAsync();
+        }
+    }
+
+    private async Task SaveTaskAsync()
+    {
+        if (currentPlot is null || taskEditorShapeId is not Guid shapeId)
+        {
+            return;
+        }
+
+        string title = taskDraftTitle.Trim();
+        if (title.Length == 0)
+        {
+            return;
+        }
+
+        GardenTask? task = editingTaskId is Guid existingTaskId
+            ? currentPlot.Tasks.FirstOrDefault(existing => existing.Id == existingTaskId)
+            : null;
+        bool isNewTask = task is null;
+        task ??= new GardenTask();
+
+        task.Title = title;
+        task.Cadence = taskDraftCadence;
+        task.CustomCron = string.IsNullOrWhiteSpace(taskDraftCustomCron) ? null : taskDraftCustomCron.Trim();
+        task.Season = taskDraftCadence is TaskCadence.SeasonStart or TaskCadence.SeasonEnd ? taskDraftSeason ?? Season.Spring : null;
+        task.ShapeId = shapeId;
+        task.Notes = string.IsNullOrWhiteSpace(taskDraftNotes) ? null : taskDraftNotes.Trim();
+        task.NextDueUtc = ParseTaskDueUtc(taskDraftNextDueLocal);
+        task.CompletedUtc ??= new List<DateTime>();
+
+        if (task.NextDueUtc is null && task.Cadence is not TaskCadence.Once)
+        {
+            task.NextDueUtc = GardenTaskScheduler.RecomputeNextDueUtc(task, DateTime.UtcNow);
+        }
+
+        if (isNewTask)
+        {
+            currentPlot.Tasks.Add(task);
+        }
+
+        CancelTaskEdit();
+        await SaveAsync();
+    }
+
+    private void CancelTaskEdit()
+    {
+        taskEditorShapeId = null;
+        editingTaskId = null;
+        taskDraftTitle = string.Empty;
+        taskDraftCadence = TaskCadence.Once;
+        taskDraftCustomCron = null;
+        taskDraftSeason = Season.Spring;
+        taskDraftNotes = null;
+        taskDraftNextDueLocal = string.Empty;
+    }
+
+    private void OnTaskDueChanged(ChangeEventArgs e)
+        => taskDraftNextDueLocal = e.Value?.ToString() ?? string.Empty;
+
+    private static string FormatTaskDue(DateTime nextDueUtc)
+        => nextDueUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture);
+
+    private static string ToLocalTaskDateTimeInput(DateTime? utcDateTime)
+        => utcDateTime is DateTime dueUtc
+            ? dueUtc.ToLocalTime().ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture)
+            : string.Empty;
+
+    private static DateTime? ParseTaskDueUtc(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out DateTime localDateTime))
+        {
+            return null;
+        }
+
+        DateTime normalizedLocal = localDateTime.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(localDateTime, DateTimeKind.Local)
+            : localDateTime;
+        return normalizedLocal.ToUniversalTime();
+    }
+
+    private static void RemoveTasksForShapeIds(PlotData plot, HashSet<Guid> shapeIds)
+    {
+        if (shapeIds.Count == 0)
+        {
+            return;
+        }
+
+        _ = plot.Tasks.RemoveAll(task => task.ShapeId is Guid shapeId && shapeIds.Contains(shapeId));
+    }
 
     private static string PanelTitleFor(Shape s)
     {

@@ -62,6 +62,7 @@ public class PlotLibraryLoaderTests
             Assert.True(state.Visible);
             Assert.False(state.Locked);
         });
+        Assert.Empty(lib.Plots[0].Tasks);
     }
 
     [Fact]
@@ -101,6 +102,39 @@ public class PlotLibraryLoaderTests
             Assert.True(state.Visible);
             Assert.False(state.Locked);
         });
+        Assert.Empty(lib.Plots[0].Tasks);
+    }
+
+    [Fact]
+    public void Load_Version1PlotWithoutTasks_MigratesEmptyTaskList()
+    {
+        JsonObject plot = new()
+        {
+            ["Id"] = Guid.NewGuid(),
+            ["Name"] = "Migrated Garden",
+            ["WidthFt"] = 40,
+            ["HeightFt"] = 25,
+            ["Shapes"] = new JsonArray(),
+            ["DropGroups"] = new JsonArray(),
+            ["KitRotations"] = new JsonObject(),
+            ["CreatedUtc"] = DateTime.UtcNow,
+            ["ModifiedUtc"] = DateTime.UtcNow,
+        };
+        JsonObject document = new()
+        {
+            ["SchemaVersion"] = 1,
+            ["Plots"] = new JsonArray(plot),
+            ["Ui"] = new JsonObject(),
+            ["CustomPaletteItems"] = new JsonArray(),
+        };
+
+        var loader = CreateLoader();
+        var lib = loader.Load(document.ToJsonString(), "unit-test");
+
+        Assert.NotNull(lib);
+        Assert.Equal(PlotSchema.Current, lib!.SchemaVersion);
+        Assert.Single(lib.Plots);
+        Assert.Empty(lib.Plots[0].Tasks);
     }
 
     [Fact]
