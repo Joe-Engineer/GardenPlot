@@ -26,6 +26,22 @@ public class UiPreferences
     /// </summary>
     public bool AutoDeleteTakeoffOnShapeDelete { get; set; } = true;
 
+    public bool ShowInternalView { get; set; } = true;
+
+    public bool ShowMaterialCostColumn { get; set; }
+
+    public bool ShowLaborCostColumn { get; set; }
+
+    public bool ShowMarkupPercentColumn { get; set; }
+
+    public bool ShowLineTotalColumn { get; set; } = true;
+
+    public decimal DefaultLaborRatePerHour { get; set; } = 75m;
+
+    public string FirmName { get; set; } = string.Empty;
+
+    public DateTime? CustomerCutDate { get; set; }
+
     public double? Zoom { get; set; }
     public double? ViewCenterXFt { get; set; }
     public double? ViewCenterYFt { get; set; }

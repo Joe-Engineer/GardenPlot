@@ -57,6 +57,8 @@ public class PlotData
     /// <summary>Monotonic, never-reused integer source for <see cref="TakeoffItem.Id"/>.</summary>
     public TakeoffSequence TakeoffIds { get; set; } = new();
 
+    public double DefaultMarkupPercent { get; set; } = 25.0;
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime ModifiedUtc { get; set; } = DateTime.UtcNow;
 }

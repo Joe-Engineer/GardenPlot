@@ -108,6 +108,7 @@ public sealed class PlotLibraryLoader
             {
                 1 => LoadFromVersion1(root, options),
                 2 => LoadFromVersion2(root, options),
+                3 => LoadFromVersion3(root, options),
 
                 // Future versions: add a 'N => LoadFromVersionN(root, options),' line here when
                 // PlotSchema.Current is bumped. The previous version's method is then updated to
@@ -116,7 +117,7 @@ public sealed class PlotLibraryLoader
                     // Forward-from-future: the document was written by a newer build than this one.
                     // Best effort: try to deserialize directly as current; the user's newer fields
                     // will be tolerated (PlotLibrary uses default opts) and dropped on next save.
-                    LoadFromVersion2(root, options),
+                    LoadFromVersion3(root, options),
                 _ => throw new InvalidOperationException(
                     $"No loader registered for plot library schema v{fromVersion}."),
             };
@@ -172,10 +173,10 @@ public sealed class PlotLibraryLoader
     }
 
     /// <summary>
-    /// Loader for schema v1. v1 documents predate the per-plot <c>Takeoff</c> list and
-    /// <c>TakeoffIds</c> sequence, and library-level <c>CustomCatalogItems</c>. We deserialize as
-    /// the current shape (forward-compatible — extra absent fields are tolerated by
-    /// <c>JsonSerializer</c>) and then synthesize one <see cref="TakeoffItem"/> per existing
+    /// Loader for schema v1. v1 documents predate the per-plot <c>Takeoff</c> list,
+    /// <c>TakeoffIds</c> sequence, library-level <c>CustomCatalogItems</c>, and costing defaults.
+    /// We deserialize as the current shape (forward-compatible — extra absent fields are tolerated
+    /// by <c>JsonSerializer</c>) and then synthesize one <see cref="TakeoffItem"/> per existing
     /// <see cref="Shape"/> so the new Item view lights up without data loss.
     /// </summary>
     private static PlotLibrary? LoadFromVersion1(JsonObject root, JsonSerializerOptions? options)
@@ -194,15 +195,25 @@ public sealed class PlotLibraryLoader
         return library;
     }
 
-    /// <summary>Loader for schema v2 — the current shape. Direct typed deserialization.</summary>
+    /// <summary>
+    /// Loader for schema v2. v2 documents already have takeoff items, but predate costing fields.
+    /// Direct typed deserialization is sufficient because the new v3 members carry safe model
+    /// defaults (markup 25%, labor rate 75, internal view on, line total on).
+    /// </summary>
     private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
+    {
+        return root.Deserialize<PlotLibrary>(options ?? JsonSerializerOptions.Default);
+    }
+
+    /// <summary>Loader for schema v3 — the current shape. Direct typed deserialization.</summary>
+    private static PlotLibrary? LoadFromVersion3(JsonObject root, JsonSerializerOptions? options)
     {
         return root.Deserialize<PlotLibrary>(options ?? JsonSerializerOptions.Default);
     }
 
     /// <summary>
     /// Mints a <see cref="TakeoffItem"/> for every <see cref="Shape"/> in <paramref name="plot"/>
-    /// that doesn't already have a corresponding takeoff entry. Used by the v1 -> v2 migration
+    /// that doesn't already have a corresponding takeoff entry. Used by the v1 -> v3 migration
     /// path. <see cref="TakeoffSequence.Next"/> is initialised to <c>max(synthesized Id) + 1</c>.
     /// </summary>
     private static void BackfillTakeoffItemsForLegacyPlot(PlotData plot)

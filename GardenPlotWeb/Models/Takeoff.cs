@@ -2,6 +2,8 @@
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
+using System.Globalization;
+
 namespace GardenPlotWeb.Models;
 
 /// <summary>Selected view mode for the Takeoff panel.</summary>
@@ -46,6 +48,8 @@ public sealed class TakeoffItem
     public LaborType? LaborTypeOverride { get; set; }
 
     public double? LaborHoursPerUnitOverride { get; set; }
+
+    public double? MarkupPercentOverride { get; set; }
 
     public string? Notes { get; set; }
 
@@ -117,8 +121,79 @@ public static class TakeoffMath
         return EffectiveLaborHoursPerUnit(item, catalog) * item.Quantity;
     }
 
+    public static decimal EffectiveLaborRatePerHour(TakeoffItem item, CatalogItem? catalog, UiPreferences uiPreferences)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(uiPreferences);
+        return catalog?.LaborRatePerHour ?? uiPreferences.DefaultLaborRatePerHour;
+    }
+
     public static double EffectiveQuantityWithWaste(TakeoffItem item, CatalogItem? catalog)
     {
         return item.Quantity * (1.0 + (EffectiveWastePercent(item, catalog) / 100.0));
+    }
+
+    public static decimal? EffectiveMaterialCost(TakeoffItem item, CatalogItem? catalog)
+    {
+        if (catalog?.MaterialUnitCost is not decimal unitCost)
+        {
+            return null;
+        }
+
+        decimal quantity = (decimal)item.Quantity;
+        decimal wasteFactor = 1m + ((decimal)EffectiveWastePercent(item, catalog) / 100m);
+        return quantity * unitCost * wasteFactor;
+    }
+
+    public static decimal EffectiveLaborCost(TakeoffItem item, CatalogItem? catalog, UiPreferences uiPreferences)
+    {
+        decimal hours = (decimal)EffectiveLaborHours(item, catalog);
+        return hours * EffectiveLaborRatePerHour(item, catalog, uiPreferences);
+    }
+
+    public static double EffectiveMarkupPercent(TakeoffItem item, PlotData? plot)
+    {
+        return item.MarkupPercentOverride ?? plot?.DefaultMarkupPercent ?? 25.0;
+    }
+
+    public static decimal? LineTotal(TakeoffItem item, CatalogItem? catalog, UiPreferences uiPreferences, PlotData? plot)
+    {
+        decimal? materialCost = EffectiveMaterialCost(item, catalog);
+        decimal laborCost = EffectiveLaborCost(item, catalog, uiPreferences);
+        if (!materialCost.HasValue && laborCost == 0m)
+        {
+            return null;
+        }
+
+        decimal subtotal = (materialCost ?? 0m) + laborCost;
+        decimal markupFactor = 1m + ((decimal)EffectiveMarkupPercent(item, plot) / 100m);
+        return subtotal * markupFactor;
+    }
+
+    public static decimal? SumCurrency(IEnumerable<decimal?> amounts)
+    {
+        ArgumentNullException.ThrowIfNull(amounts);
+
+        decimal total = 0m;
+        bool hasValue = false;
+        foreach (decimal? amount in amounts)
+        {
+            if (!amount.HasValue)
+            {
+                continue;
+            }
+
+            total += amount.Value;
+            hasValue = true;
+        }
+
+        return hasValue ? total : null;
+    }
+
+    public static string FormatCurrency(decimal? amount)
+    {
+        return amount.HasValue
+            ? "$" + amount.Value.ToString("0.00", CultureInfo.InvariantCulture)
+            : "—";
     }
 }
