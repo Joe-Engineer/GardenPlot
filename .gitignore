@@ -68,4 +68,9 @@ build.log
 
 # Local user data (personal plots) - must not be published
 GardenPlotWeb/App_Data/
+!GardenPlotWeb/App_Data/
+GardenPlotWeb/App_Data/*
+!GardenPlotWeb/App_Data/plots/
+GardenPlotWeb/App_Data/plots/*
+!GardenPlotWeb/App_Data/plots/*.json
 
