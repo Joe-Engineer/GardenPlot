@@ -905,6 +905,75 @@
 .comp-bad     { color: #7a1414; }
 .comp-neutral { color: #555; }
 
+/* ===== Soil marker panel ===== */
+
+.soil-marker-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.soil-sparkline-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.soil-sparkline-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.soil-reading-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.soil-reading-card {
+    border: 1px solid #d8d3c2;
+    border-radius: 4px;
+    background: #fcfaf5;
+    padding: 0.5rem;
+}
+
+.soil-reading-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.45rem;
+}
+
+.soil-reading-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.72rem;
+    color: #5b5b5b;
+}
+
+.soil-reading-grid-notes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.soil-reading-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.4rem;
+}
+
+.soil-reading-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.soil-warning {
+    color: #7a3f00;
+}
+
 /* ===== Takeoff list ===== */
 
 .takeoff-panel {

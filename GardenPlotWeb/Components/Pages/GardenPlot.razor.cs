@@ -1171,6 +1171,7 @@ public partial class GardenPlot
             ShapeKind.Tree => "Tree",
             ShapeKind.Bush => "Bush",
             ShapeKind.Plant => "Plant",
+            ShapeKind.SoilMarker => "Soil Marker",
             ShapeKind.Rectangle => "Rectangle",
             ShapeKind.Oval => "Oval",
             ShapeKind.FreeDraw => "Freehand",
@@ -1205,6 +1206,7 @@ public partial class GardenPlot
             ShapeKind.Ruler => "(measurement)",
             ShapeKind.CircleRuler => $"r={Math.Abs(s.W / 2):0.##}'",
             ShapeKind.RectRuler => $"{Math.Abs(s.W):0.##}'×{Math.Abs(s.H):0.##}'",
+            ShapeKind.SoilMarker => SoilMarkerName(s),
             _ => "(unnamed)",
         };
     }
@@ -3632,6 +3634,7 @@ public partial class GardenPlot
         PaletteCategory.GroundCoverMaterials => "Materials — Ground Cover",
         PaletteCategory.GroundCoverSurface => "Ground Cover — Surface",
         PaletteCategory.Edging => "Materials — Edging",
+        PaletteCategory.SoilMarkers => "Markers — Soil",
         PaletteCategory.GrassesTurf => "Grasses — Turf",
         PaletteCategory.GrassesOrnamental => "Grasses — Ornamental",
         PaletteCategory.Succulents => "Succulents & Cacti",
@@ -3648,6 +3651,7 @@ public partial class GardenPlot
             or PaletteCategory.GroundCoverMaterials
             or PaletteCategory.GroundCoverSurface
             or PaletteCategory.Edging
+            or PaletteCategory.SoilMarkers
             or PaletteCategory.CustomTiles);
     }
 
@@ -3668,7 +3672,7 @@ public partial class GardenPlot
         ClimateRegion? region = PaletteRegionFilter;
         bool nativeOnly = PaletteNativeOnly;
 
-        if (region is null && !nativeOnly)
+        if (currentCategory == PaletteCategory.SoilMarkers || (region is null && !nativeOnly))
         {
             return [.. source.OrderBy(i => i.Code, StringComparer.OrdinalIgnoreCase)];
         }
@@ -4076,7 +4080,7 @@ public partial class GardenPlot
     private static string PreviewViewBox(PaletteItem item)
     {
         // Plants render with a label below; allocate extra vertical space.
-        if (item.Kind is PaletteKind.BedKit or PaletteKind.CustomTile)
+        if (item.Kind is PaletteKind.BedKit or PaletteKind.CustomTile or PaletteKind.SoilMarker)
             return $"0 0 {F(item.WidthFt)} {F(item.HeightFt)}";
         var pad = item.WidthFt * 0.15;
         var labelRoom = item.HeightFt * 0.35;
@@ -4490,6 +4494,19 @@ public partial class GardenPlot
             IsGroundCoverSurface = source.IsGroundCoverSurface,
             TextureKey = source.TextureKey,
             TextureImageId = source.TextureImageId,
+            Readings = source.Readings.Select(r => new SoilReading
+            {
+                TakenOnUtc = r.TakenOnUtc,
+                PhValue = r.PhValue,
+                SalinityEcDsm = r.SalinityEcDsm,
+                OrganicMatterPct = r.OrganicMatterPct,
+                NitrogenPpm = r.NitrogenPpm,
+                PhosphorusPpm = r.PhosphorusPpm,
+                PotassiumPpm = r.PotassiumPpm,
+                DrainageNotes = r.DrainageNotes,
+                GeneralNotes = r.GeneralNotes,
+                LabSource = r.LabSource,
+            }).ToList(),
         };
     }
 
@@ -4632,6 +4649,7 @@ public partial class GardenPlot
         PaletteKind.Bush => ShapeKind.Bush,
         PaletteKind.Plant => ShapeKind.Plant,
         PaletteKind.FocalPoint => ShapeKind.Plant,
+        PaletteKind.SoilMarker => ShapeKind.SoilMarker,
         PaletteKind.CustomTile => item.StampShapeKind is ShapeKind.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
         PaletteKind.Edging => ShapeKind.Edge,
         _ => ShapeKind.BedKit,
@@ -7113,6 +7131,7 @@ public partial class GardenPlot
         ShapeKind.Ruler => "#c81e1e",
         ShapeKind.CircleRuler => "#c81e1e",
         ShapeKind.RectRuler => "#c81e1e",
+        ShapeKind.SoilMarker => "#6b4b2a",
         _ => "#3a3a3a",
     };
 
@@ -7123,6 +7142,7 @@ public partial class GardenPlot
         ShapeKind.BedKit => "#e2725b",
         ShapeKind.CircleRuler => "#c81e1e",
         ShapeKind.RectRuler => "#c81e1e",
+        ShapeKind.SoilMarker => "#d49b52",
         _ => "#000000",
     };
 
@@ -7298,6 +7318,164 @@ public partial class GardenPlot
         }
         results.Sort((a, b) => a.Item2.CompareTo(b.Item2));
         return results;
+    }
+
+    private async Task AddSoilReading(Shape marker)
+    {
+        if (marker.Kind != ShapeKind.SoilMarker)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        marker.Readings.Add(SoilMarkerAnalysis.CreateDraftReading(marker.Readings, DateTime.UtcNow));
+        await SaveAsync();
+    }
+
+    private async Task DeleteSoilReading(Shape marker, SoilReading reading)
+    {
+        if (marker.Kind != ShapeKind.SoilMarker || !marker.Readings.Contains(reading))
+        {
+            return;
+        }
+
+        RecordUndoState();
+        _ = marker.Readings.Remove(reading);
+        await SaveAsync();
+    }
+
+    private async Task OnSoilReadingDateChanged(Shape marker, SoilReading reading, ChangeEventArgs e)
+    {
+        if (marker.Kind != ShapeKind.SoilMarker)
+        {
+            return;
+        }
+
+        string? value = e.Value?.ToString();
+        if (!DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTime takenOn))
+        {
+            return;
+        }
+
+        RecordUndoState();
+        reading.TakenOnUtc = DateTime.SpecifyKind(takenOn.Date, DateTimeKind.Utc);
+        await SaveAsync();
+    }
+
+    private async Task OnSoilReadingNumberChanged(Shape marker, SoilReading reading, string propertyName, ChangeEventArgs e)
+    {
+        if (marker.Kind != ShapeKind.SoilMarker || !TryParseNullableDouble(e.Value?.ToString(), out double? value))
+        {
+            return;
+        }
+
+        RecordUndoState();
+        switch (propertyName)
+        {
+            case nameof(SoilReading.PhValue):
+                reading.PhValue = value;
+                break;
+            case nameof(SoilReading.SalinityEcDsm):
+                reading.SalinityEcDsm = value;
+                break;
+            case nameof(SoilReading.OrganicMatterPct):
+                reading.OrganicMatterPct = value;
+                break;
+            case nameof(SoilReading.NitrogenPpm):
+                reading.NitrogenPpm = value;
+                break;
+            case nameof(SoilReading.PhosphorusPpm):
+                reading.PhosphorusPpm = value;
+                break;
+            case nameof(SoilReading.PotassiumPpm):
+                reading.PotassiumPpm = value;
+                break;
+            default:
+                return;
+        }
+
+        await SaveAsync();
+    }
+
+    private async Task OnSoilReadingTextChanged(Shape marker, SoilReading reading, string propertyName, ChangeEventArgs e)
+    {
+        if (marker.Kind != ShapeKind.SoilMarker)
+        {
+            return;
+        }
+
+        string? value = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value?.ToString()?.Trim();
+        RecordUndoState();
+        switch (propertyName)
+        {
+            case nameof(SoilReading.DrainageNotes):
+                reading.DrainageNotes = value;
+                break;
+            case nameof(SoilReading.GeneralNotes):
+                reading.GeneralNotes = value;
+                break;
+            case nameof(SoilReading.LabSource):
+                reading.LabSource = value;
+                break;
+            default:
+                return;
+        }
+
+        await SaveAsync();
+    }
+
+    private static string SoilDateValue(DateTime takenOnUtc)
+    {
+        return DateTime.SpecifyKind(takenOnUtc, DateTimeKind.Utc).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+
+    private static string SoilNumberValue(double? value)
+    {
+        return value?.ToString("0.###", CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    private static bool HasSoilSparkline(IEnumerable<SoilReading> readings, Func<SoilReading, double?> selector)
+    {
+        return readings.Count(r => selector(r) is not null) >= 2;
+    }
+
+    private static string FormatSoilPhRange(NumericRange? range)
+    {
+        if (range is null)
+        {
+            return string.Empty;
+        }
+
+        return range switch
+        {
+            { Min: double min, Max: double max } => $"{min.ToString("0.##", CultureInfo.InvariantCulture)}–{max.ToString("0.##", CultureInfo.InvariantCulture)}",
+            { Min: double min } => $">= {min.ToString("0.##", CultureInfo.InvariantCulture)}",
+            { Max: double max } => $"<= {max.ToString("0.##", CultureInfo.InvariantCulture)}",
+            _ => string.Empty,
+        };
+    }
+
+    private static string SoilMarkerName(Shape marker)
+    {
+        return string.IsNullOrWhiteSpace(marker.Label) ? "Soil Marker" : marker.Label;
+    }
+
+    private static bool IsPlantLikeShape(Shape shape)
+    {
+        return shape.Kind is ShapeKind.Plant or ShapeKind.Tree or ShapeKind.Bush;
+    }
+
+    private static bool TryParseNullableDouble(string? value, out double? parsed)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            parsed = null;
+            return true;
+        }
+
+        bool success = double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double numericValue);
+        parsed = success ? numericValue : null;
+        return success;
     }
 
     // ===== Floating panel drag =====
@@ -7479,6 +7657,7 @@ public partial class GardenPlot
             ShapeKind.Bush => $"Bush · {s.Label}",
             ShapeKind.BedKit => $"Bed Kit · {s.Label}",
             ShapeKind.Plant => IsFocalPointTrait(s.Trait) ? $"Focal Point · {s.Label}" : $"Plant · {s.Label}",
+            ShapeKind.SoilMarker => $"Soil Marker · {SoilMarkerName(s)}",
             ShapeKind.Rectangle => "Rectangle",
             ShapeKind.Oval => "Oval",
             ShapeKind.FreeDraw => "Freehand",
@@ -7534,6 +7713,17 @@ public partial class GardenPlot
                     }
                     lines.Add("<div class=\"badge-row\">" + string.Join("", badges) + "</div>");
                     lines.Add($"<span class=\"text-muted\">Rotation:</span> {F(s.Rotation)}°");
+                }
+                break;
+            case ShapeKind.SoilMarker:
+                {
+                    SoilReading? latest = SoilMarkerAnalysis.LatestReading(s);
+                    lines.Add($"<span class=\"text-muted\">Marker:</span> <strong>{Esc(s.Label ?? "Soil Marker")}</strong>");
+                    lines.Add($"<span class=\"text-muted\">Readings:</span> <strong>{s.Readings.Count}</strong>");
+                    if (latest is not null)
+                    {
+                        lines.Add($"<span class=\"text-muted\">Latest sample:</span> <strong>{latest.TakenOnUtc:yyyy-MM-dd}</strong>");
+                    }
                 }
                 break;
             case ShapeKind.Rectangle:

@@ -17,6 +17,7 @@ public enum ShapeKind
     Tree,
     Bush,
     Plant,
+    SoilMarker,
 }
 
 public record struct Point(double X, double Y);
@@ -28,6 +29,7 @@ public enum PaletteKind
     Bush,
     Plant,
     FocalPoint,
+    SoilMarker,
     CustomTile,
     GroundCover,
     GroundCoverSurface,
@@ -71,6 +73,7 @@ public enum PaletteCategory
     GroundCoverMaterials,
     GroundCoverSurface,
     Edging,
+    SoilMarkers,
     GrassesTurf,
     GrassesOrnamental,
     Succulents,

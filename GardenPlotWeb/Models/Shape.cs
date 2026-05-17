@@ -64,6 +64,9 @@ public class Shape
 
     /// <summary>Optional custom-image texture id (GUID into client-local IndexedDB). Overrides TextureKey when set.</summary>
     public string? TextureImageId { get; set; }
+
+    /// <summary>Per-marker soil readings. Used only when <see cref="Kind"/> is <see cref="ShapeKind.SoilMarker"/>.</summary>
+    public List<SoilReading> Readings { get; set; } = new();
 }
 
 public enum AlongPathAnchor

@@ -384,6 +384,83 @@ public class PlotLibraryLoaderTests
     }
 
     [Fact]
+    public void Load_Version2Document_InitializesEmptyReadings()
+    {
+        string json = JsonSerializer.Serialize(new
+        {
+            SchemaVersion = 2,
+            Plots = new[]
+            {
+                new
+                {
+                    Name = "Legacy",
+                    Shapes = new[]
+                    {
+                        new { Kind = ShapeKind.Rectangle, X = 1.0, Y = 2.0, W = 3.0, H = 4.0 },
+                    },
+                },
+            },
+        });
+
+        var loader = CreateLoader();
+        var lib = loader.Load(json, "unit-test");
+
+        Assert.NotNull(lib);
+        Assert.Empty(lib!.Plots[0].Shapes[0].Readings);
+        Assert.Equal(PlotSchema.Current, lib.SchemaVersion);
+    }
+
+    [Fact]
+    public void Load_CurrentVersion_PreservesSoilMarkerReadings()
+    {
+        PlotLibrary source = new();
+        source.Plots.Add(new PlotData
+        {
+            Name = "Soil",
+            Shapes =
+            [
+                new Shape
+                {
+                    Kind = ShapeKind.SoilMarker,
+                    X = 4,
+                    Y = 5,
+                    W = 1.2,
+                    H = 1.6,
+                    Label = "North Bed",
+                    Readings =
+                    [
+                        new SoilReading
+                        {
+                            TakenOnUtc = DateTime.SpecifyKind(new DateTime(2026, 5, 1), DateTimeKind.Utc),
+                            PhValue = 6.2,
+                            SalinityEcDsm = 1.1,
+                            LabSource = "County Lab",
+                        },
+                        new SoilReading
+                        {
+                            TakenOnUtc = DateTime.SpecifyKind(new DateTime(2026, 5, 20), DateTimeKind.Utc),
+                            PhValue = 6.6,
+                            SalinityEcDsm = 1.3,
+                            GeneralNotes = "After compost",
+                        },
+                    ],
+                },
+            ],
+        });
+        string json = JsonSerializer.Serialize(source);
+
+        var loader = CreateLoader();
+        var lib = loader.Load(json, "unit-test");
+
+        Assert.NotNull(lib);
+        Shape marker = Assert.Single(lib!.Plots[0].Shapes);
+        Assert.Equal(ShapeKind.SoilMarker, marker.Kind);
+        Assert.Equal(2, marker.Readings.Count);
+        Assert.Equal(6.6, marker.Readings[1].PhValue);
+        Assert.Equal("After compost", marker.Readings[1].GeneralNotes);
+    }
+
+    [Fact]
     public void Load_FutureVersion_FallsBackToCurrentShape()
     {
         var doc = new JsonObject

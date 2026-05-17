@@ -13,6 +13,8 @@ public sealed class ModelDefaultsTests
         Assert.Equal(string.Empty, a.Trait);
         Assert.NotNull(a.Points);
         Assert.Empty(a.Points);
+        Assert.NotNull(a.Readings);
+        Assert.Empty(a.Readings);
     }
 
     [Fact]

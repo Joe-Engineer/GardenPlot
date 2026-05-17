@@ -533,6 +533,9 @@ public sealed class ProjectDossierService
                     .Append(stroke)
                     .Append("\" stroke-width=\"0.06\" />");
                 break;
+            case ShapeKind.SoilMarker:
+                _ = sb.Append(PlantRendering.SoilMarkerSvg(shape.X, shape.Y, shape.W, shape.H, shape.Label, fill, stroke));
+                break;
             default:
                 break;
         }
@@ -614,6 +617,7 @@ public sealed class ProjectDossierService
             ShapeKind.Ruler => "#c81e1e",
             ShapeKind.CircleRuler => "#2f5a3a",
             ShapeKind.RectRuler => "#2f5a3a",
+            ShapeKind.SoilMarker => "#6b4b2a",
             _ => "#2f5a3a",
         };
     }
@@ -638,6 +642,7 @@ public sealed class ProjectDossierService
             ShapeKind.Tree => "#9fcf9f",
             ShapeKind.Bush => "#9fcf9f",
             ShapeKind.Plant => "#9fcf9f",
+            ShapeKind.SoilMarker => "#d49b52",
             _ => "#9fcf9f",
         };
     }
@@ -657,6 +662,7 @@ public sealed class ProjectDossierService
             ShapeKind.Tree => 0.6,
             ShapeKind.Bush => 0.6,
             ShapeKind.Plant => 0.6,
+            ShapeKind.SoilMarker => 1.0,
             _ => 0.6,
         };
     }

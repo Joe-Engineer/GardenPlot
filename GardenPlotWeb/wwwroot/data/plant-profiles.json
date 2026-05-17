@@ -115,6 +115,10 @@
       "WetSoilTolerant": false,
       "SoilDrainage": "well-drained",
       "SoilPh": "6.0-7.0",
+      "SoilPhRange": {
+        "Min": 6.0,
+        "Max": 7.0
+      },
       "MatureHeightFt": 15,
       "MatureSpreadFt": 15,
       "GrowthRate": "Medium",
@@ -3575,6 +3579,10 @@
       "DroughtTolerant": false,
       "WetSoilTolerant": false,
       "SoilPh": "6.0-6.8",
+      "SoilPhRange": {
+        "Min": 6.0,
+        "Max": 6.8
+      },
       "SpacingFt": 2,
       "BloomTime": "summer",
       "Evergreen": false,
