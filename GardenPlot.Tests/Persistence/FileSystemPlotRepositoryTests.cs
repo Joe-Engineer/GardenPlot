@@ -121,6 +121,46 @@ public sealed class FileSystemPlotRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task SavePlot_ThenLoadPlot_RoundTripsEdgeGeometryAndBinding()
+    {
+        var plot = new PlotData { Name = "Edges", WidthFt = 40, HeightFt = 20 };
+        plot.Shapes.Add(new Shape
+        {
+            Kind = ShapeKind.Edge,
+            Label = "Steel Edging (6\")",
+            CloseEdge = true,
+            Points = new List<Point> { new(1, 1), new(8, 1), new(8, 6), new(3, 9) },
+            Takeoff = new TakeoffItem
+            {
+                CatalogCode = "Steel Edging (6\")",
+                Unit = "lf",
+                LaborType = LaborType.Hardscape,
+                LaborHoursPerUnit = 0.12,
+                WastePercent = 10,
+                DefaultThicknessIn = 0.125,
+                Quantity = 23.45,
+                QuantityOverride = 24.56,
+            },
+        });
+
+        await repo.SavePlotAsync(plot);
+
+        var loaded = await repo.LoadPlotAsync(plot.Id);
+
+        Assert.NotNull(loaded);
+        var edge = Assert.Single(loaded!.Shapes);
+        Assert.Equal(ShapeKind.Edge, edge.Kind);
+        Assert.True(edge.CloseEdge);
+        Assert.Equal(4, edge.Points.Count);
+        Assert.Equal(3, edge.Points[3].X);
+        Assert.Equal(9, edge.Points[3].Y);
+        Assert.NotNull(edge.Takeoff);
+        Assert.Equal("Steel Edging (6\")", edge.Takeoff!.CatalogCode);
+        Assert.Equal("lf", edge.Takeoff.Unit);
+        Assert.Equal(24.56, edge.Takeoff.QuantityOverride);
+    }
+
+    [Fact]
     public async Task SavePlot_AddsIndexEntry_ListSeesIt()
     {
         var plot = new PlotData { Name = "Indexed" };

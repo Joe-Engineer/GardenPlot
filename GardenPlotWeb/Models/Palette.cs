@@ -9,6 +9,7 @@ public enum ShapeKind
     Rectangle,
     Oval,
     FreeDraw,
+    Edge,
     BedKit,
     Ruler,
     CircleRuler,
@@ -30,6 +31,7 @@ public enum PaletteKind
     CustomTile,
     GroundCover,
     GroundCoverSurface,
+    Edging,
 }
 
 /// <summary>User-facing palette categories shown in the combobox.</summary>
@@ -56,6 +58,7 @@ public enum PaletteCategory
     GroundCoverPlants,
     GroundCoverMaterials,
     GroundCoverSurface,
+    Edging,
     GrassesTurf,
     GrassesOrnamental,
     Succulents,

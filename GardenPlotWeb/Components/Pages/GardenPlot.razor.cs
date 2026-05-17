@@ -75,13 +75,16 @@ public partial class GardenPlot
     private double PlotWidthFt => currentPlot?.WidthFt ?? 60;
     private double PlotHeightFt => currentPlot?.HeightFt ?? 8;
 
-    private enum Tool { Select, FreeDraw, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover }
+    private enum Tool { Select, FreeDraw, Edge, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover }
     private enum DropActivationMode { ClickToggle, HoldKey }
     private enum DropModifierKey { Shift, Ctrl, Alt }
+
+    private enum EdgeSubMode { StraightSegments, Freehand }
 
     /// <summary>Ground-cover drawing sub-mode (selected when Tool.GroundCover is active).</summary>
     private enum GroundCoverSubMode { Polygon, Rectangle, Oval, FreehandArea }
 
+    private EdgeSubMode edgeSubMode = EdgeSubMode.StraightSegments;
     private GroundCoverSubMode groundCoverSubMode = GroundCoverSubMode.Polygon;
 
     /// <summary>True while a click-by-vertex polygon is being built. The last point in
@@ -97,6 +100,7 @@ public partial class GardenPlot
     {
         ["Select"] = Tool.Select,
         ["Free Draw"] = Tool.FreeDraw,
+        ["Edge"] = Tool.Edge,
         ["Rectangle"] = Tool.Rectangle,
         ["Oval"] = Tool.Oval,
         ["Ruler"] = Tool.Ruler,
@@ -955,6 +959,86 @@ public partial class GardenPlot
         _ = SaveAsync();
     }
 
+    private static double EdgeStrokeWidthFt(Shape shape)
+    {
+        var thicknessIn = shape.Takeoff?.DefaultThicknessIn
+            ?? GardenPlotWeb.Models.Catalog.Find(shape.Takeoff?.CatalogCode ?? shape.Label)?.DefaultThicknessIn
+            ?? 0.125;
+        return Math.Max(0.01, thicknessIn / 12.0);
+    }
+
+    private static Shape CreateEdgeDraft(PaletteItem item)
+    {
+        return new Shape
+        {
+            Kind = ShapeKind.Edge,
+            Label = item.Code,
+            Trait = string.IsNullOrWhiteSpace(item.Trait) ? "edge" : item.Trait,
+            Stroke = item.StrokeColor,
+            Takeoff = GardenPlotWeb.Models.Catalog.CreateTakeoff(item.Code),
+        };
+    }
+
+    private static void AppendEdgePoint(Shape shape, Point point, double minDistanceFt = 0)
+    {
+        if (shape.Points.Count == 0)
+        {
+            shape.Points.Add(point);
+            return;
+        }
+
+        if (Distance(shape.Points[^1], point) >= minDistanceFt)
+        {
+            shape.Points.Add(point);
+        }
+    }
+
+    private static void TrimDuplicateEdgePoints(Shape shape)
+    {
+        const double tolerance = 0.01;
+        for (var i = shape.Points.Count - 1; i > 0; i--)
+        {
+            if (Distance(shape.Points[i], shape.Points[i - 1]) <= tolerance)
+            {
+                shape.Points.RemoveAt(i);
+            }
+        }
+
+        if (shape.CloseEdge && shape.Points.Count > 1 && Distance(shape.Points[0], shape.Points[^1]) <= tolerance)
+        {
+            shape.Points.RemoveAt(shape.Points.Count - 1);
+        }
+    }
+
+    private void CancelEdgeDraftInProgress()
+    {
+        if (drafting?.Kind == ShapeKind.Edge)
+        {
+            drafting = null;
+            buildingPolygon = false;
+        }
+    }
+
+    private async Task OnEdgeCloseChanged(Shape shape, ChangeEventArgs e)
+    {
+        var isClosed = e.Value switch
+        {
+            bool b => b,
+            string s => string.Equals(s, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(s, "on", StringComparison.OrdinalIgnoreCase),
+            _ => false,
+        };
+
+        if (shape.CloseEdge == isClosed)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        shape.CloseEdge = isClosed;
+        TakeoffMath.Reconcile(shape);
+        await SaveAsync();
+    }
+
     private static string TakeoffKind(Shape s)
     {
         if ((s.Kind == ShapeKind.Rectangle || s.Kind == ShapeKind.Oval)
@@ -977,6 +1061,7 @@ public partial class GardenPlot
             ShapeKind.Rectangle => "Rectangle",
             ShapeKind.Oval => "Oval",
             ShapeKind.FreeDraw => "Freehand",
+            ShapeKind.Edge => "Edging",
             ShapeKind.Ruler => "Ruler",
             ShapeKind.CircleRuler => "Circle Ruler",
             ShapeKind.RectRuler => "Rectangle Ruler",
@@ -1002,6 +1087,7 @@ public partial class GardenPlot
             ShapeKind.Rectangle => $"{s.W:0.##}'×{s.H:0.##}'",
             ShapeKind.Oval => $"{s.W:0.##}'×{s.H:0.##}'",
             ShapeKind.FreeDraw => "(unnamed)",
+            ShapeKind.Edge => s.Takeoff?.CatalogCode ?? s.Label ?? "(unnamed edge)",
             ShapeKind.Ruler => "(measurement)",
             ShapeKind.CircleRuler => $"r={Math.Abs(s.W / 2):0.##}'",
             ShapeKind.RectRuler => $"{Math.Abs(s.W):0.##}'×{Math.Abs(s.H):0.##}'",
@@ -1506,6 +1592,7 @@ public partial class GardenPlot
         Stroke = item.StrokeColor,
         Fill = item.FillColor,
         TileBackgroundImageFileName = item.TileBackgroundImageFileName,
+        Takeoff = item.Kind == PaletteKind.Edging ? GardenPlotWeb.Models.Catalog.CreateTakeoff(item.Code) : null,
     };
 
     /// <summary>Resolves the optional PlantProfile for a placed shape or stamp preview.</summary>
@@ -2247,6 +2334,15 @@ public partial class GardenPlot
             p.PhotoFileNames ??= new List<string>();
             p.Takeoff ??= new List<TakeoffItem>();
             p.TakeoffIds ??= new TakeoffSequence();
+
+            foreach (var shape in p.Shapes)
+            {
+                shape.Points ??= new List<Point>();
+                if (shape.Kind == ShapeKind.Edge)
+                {
+                    TakeoffMath.Reconcile(shape);
+                }
+            }
         }
 
         return safe;
@@ -2394,6 +2490,14 @@ public partial class GardenPlot
             RefreshCatalogOverrides();
             currentPlot.ModifiedUtc = DateTime.UtcNow;
             library.LastPlotId = currentPlot.Id;
+        }
+
+        foreach (var plot in library.Plots)
+        {
+            foreach (var shape in plot.Shapes.Where(s => s.Kind == ShapeKind.Edge))
+            {
+                TakeoffMath.Reconcile(shape);
+            }
         }
 
         await CaptureViewportStateAsync();
@@ -3033,9 +3137,16 @@ public partial class GardenPlot
             selectedItem = null;
             ghostX = ghostY = null;
         }
+
         if (t != Tool.Ruler && drafting?.Kind == ShapeKind.Ruler)
         {
             drafting = null;
+        }
+
+        if (t != Tool.Edge && drafting?.Kind == ShapeKind.Edge)
+        {
+            drafting = null;
+            buildingPolygon = false;
         }
 
         if (t != Tool.Select)
@@ -3175,6 +3286,7 @@ public partial class GardenPlot
         PaletteCategory.GroundCoverPlants => "Ground Cover Plants",
         PaletteCategory.GroundCoverMaterials => "Materials — Ground Cover",
         PaletteCategory.GroundCoverSurface => "Ground Cover — Surface",
+        PaletteCategory.Edging => "Materials — Edging",
         PaletteCategory.GrassesTurf => "Grasses — Turf",
         PaletteCategory.GrassesOrnamental => "Grasses — Ornamental",
         PaletteCategory.Succulents => "Succulents & Cacti",
@@ -3190,6 +3302,7 @@ public partial class GardenPlot
             or PaletteCategory.FocalPoint
             or PaletteCategory.GroundCoverMaterials
             or PaletteCategory.GroundCoverSurface
+            or PaletteCategory.Edging
             or PaletteCategory.CustomTiles);
     }
 
@@ -3704,6 +3817,11 @@ public partial class GardenPlot
                 ? (item.DefaultDepthIn ?? 3.0)
                 : null;
         }
+        else if (item.Kind == PaletteKind.Edging)
+        {
+            CancelEdgeDraftInProgress();
+            currentTool = Tool.Edge;
+        }
         else
         {
             currentTool = Tool.Stamp;
@@ -3966,6 +4084,7 @@ public partial class GardenPlot
         PaletteKind.Plant => ShapeKind.Plant,
         PaletteKind.FocalPoint => ShapeKind.Plant,
         PaletteKind.CustomTile => item.StampShapeKind is ShapeKind.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
+        PaletteKind.Edging => ShapeKind.Edge,
         _ => ShapeKind.BedKit,
     };
 
@@ -4207,6 +4326,35 @@ public partial class GardenPlot
             case Tool.FreeDraw:
                 drafting = new Shape { Kind = ShapeKind.FreeDraw };
                 drafting.Points.Add(new Point(x, y));
+                break;
+            case Tool.Edge when selectedItem is { } edgeItem && edgeItem.Kind == PaletteKind.Edging:
+                {
+                    if (edgeSubMode == EdgeSubMode.StraightSegments)
+                    {
+                        if (drafting is null || drafting.Kind != ShapeKind.Edge || !buildingPolygon)
+                        {
+                            drafting = CreateEdgeDraft(edgeItem);
+                            drafting.Points.Add(new Point(x, y));
+                            drafting.Points.Add(new Point(x, y));
+                            buildingPolygon = true;
+                        }
+                        else
+                        {
+                            drafting.Points[^1] = new Point(x, y);
+                            drafting.Points.Add(new Point(x, y));
+                        }
+                    }
+                    else
+                    {
+                        if (drafting is null || drafting.Kind != ShapeKind.Edge || buildingPolygon || !string.Equals(drafting.Label, edgeItem.Code, StringComparison.OrdinalIgnoreCase))
+                        {
+                            drafting = CreateEdgeDraft(edgeItem);
+                        }
+
+                        buildingPolygon = false;
+                        AppendEdgePoint(drafting, new Point(x, y), 0.01);
+                    }
+                }
                 break;
             case Tool.Rectangle:
                 drafting = new Shape { Kind = ShapeKind.Rectangle, X = x, Y = y, W = 0, H = 0 };
@@ -4457,7 +4605,7 @@ public partial class GardenPlot
             {
                 var s = currentPlot.Shapes.FirstOrDefault(z => z.Id == snap.Id);
                 if (s is null) continue;
-                if (s.Kind == ShapeKind.FreeDraw || s.Kind == ShapeKind.Ruler)
+                if (IsPointBased(s))
                 {
                     if (snap.OrigPoints is null) continue;
                     for (int i = 0; i < s.Points.Count && i < snap.OrigPoints.Length; i++)
@@ -4484,6 +4632,16 @@ public partial class GardenPlot
                 else
                 {
                     drafting.Points.Add(new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt)));
+                }
+                break;
+            case ShapeKind.Edge:
+                if (buildingPolygon && drafting.Points.Count >= 1)
+                {
+                    drafting.Points[^1] = new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt));
+                }
+                else if ((e.Buttons & 1) != 0)
+                {
+                    AppendEdgePoint(drafting, new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt)), 0.05);
                 }
                 break;
             case ShapeKind.Ruler:
@@ -4588,6 +4746,8 @@ public partial class GardenPlot
         if (drafting is null) return;
         // Rulers are finalized on pointer-down only (multi-click flow).
         if (drafting.Kind == ShapeKind.Ruler) return;
+        // Edge paths are always finalized on double-click, not pointer-up.
+        if (drafting.Kind == ShapeKind.Edge) return;
         // Click-by-vertex polygons are finalized on double-click, not pointer-up.
         if (buildingPolygon) return;
         var minSize = 0.1;
@@ -5169,12 +5329,40 @@ public partial class GardenPlot
     }
 
     /// <summary>
-    /// Finalizes a click-by-vertex ground-cover polygon. The last point is the
-    /// cursor-tracking endpoint that has not been committed; drop it before saving.
+    /// Finalizes a click-by-vertex ground-cover polygon or an in-progress edge path.
+    /// The trailing cursor-tracking endpoint is dropped before persisting straight-segment drafts.
     /// </summary>
     private void OnCanvasDoubleClick(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
     {
-        if (!buildingPolygon || drafting is null || currentPlot is null)
+        if (drafting is null || currentPlot is null)
+        {
+            return;
+        }
+
+        if (drafting.Kind == ShapeKind.Edge)
+        {
+            if (buildingPolygon && drafting.Points.Count > 0)
+            {
+                drafting.Points.RemoveAt(drafting.Points.Count - 1);
+            }
+
+            TrimDuplicateEdgePoints(drafting);
+            if (drafting.Points.Count >= 2)
+            {
+                TakeoffMath.Reconcile(drafting);
+                RecordUndoState();
+                currentPlot.Shapes.Add(drafting);
+                SelectOnly(drafting.Id);
+                _ = SaveAsync();
+            }
+
+            drafting = null;
+            buildingPolygon = false;
+            StateHasChanged();
+            return;
+        }
+
+        if (!buildingPolygon)
         {
             return;
         }
@@ -5862,7 +6050,7 @@ public partial class GardenPlot
 
     private static (double x, double y, double w, double h) GetBounds(Shape s)
     {
-        if ((s.Kind == ShapeKind.FreeDraw || s.Kind == ShapeKind.Ruler) && s.Points.Count > 0)
+        if (IsPointBased(s) && s.Points.Count > 0)
         {
             var minX = s.Points.Min(p => p.X);
             var minY = s.Points.Min(p => p.Y);
@@ -5873,7 +6061,7 @@ public partial class GardenPlot
         return (s.X, s.Y, s.W, s.H);
     }
 
-    private static bool IsPointBased(Shape s) => s.Kind == ShapeKind.FreeDraw || s.Kind == ShapeKind.Ruler;
+    private static bool IsPointBased(Shape s) => s.Kind == ShapeKind.FreeDraw || s.Kind == ShapeKind.Edge || s.Kind == ShapeKind.Ruler;
 
     private static double Distance(Point a, Point b)
     {
@@ -6082,7 +6270,7 @@ public partial class GardenPlot
 
     /// <summary>Shape kinds whose stroke/fill can be customized via the selection panel.</summary>
     private static bool IsColorCustomizable(Shape s) => s.Kind is ShapeKind.Rectangle
-        or ShapeKind.Oval or ShapeKind.FreeDraw or ShapeKind.BedKit or ShapeKind.Ruler
+        or ShapeKind.Oval or ShapeKind.FreeDraw or ShapeKind.Edge or ShapeKind.BedKit or ShapeKind.Ruler
         or ShapeKind.CircleRuler or ShapeKind.RectRuler;
 
     private static bool IsFontCustomizable(Shape s) => s.Kind is ShapeKind.BedKit
@@ -6093,6 +6281,7 @@ public partial class GardenPlot
         ShapeKind.Rectangle => "#2f5a3a",
         ShapeKind.Oval => "#2f5a3a",
         ShapeKind.FreeDraw => "#3a3a3a",
+        ShapeKind.Edge => "#6d655e",
         ShapeKind.BedKit => "#7a3520",
         ShapeKind.Ruler => "#c81e1e",
         ShapeKind.CircleRuler => "#c81e1e",
@@ -6466,6 +6655,7 @@ public partial class GardenPlot
             ShapeKind.Rectangle => "Rectangle",
             ShapeKind.Oval => "Oval",
             ShapeKind.FreeDraw => "Freehand",
+            ShapeKind.Edge => $"Edge · {(s.Takeoff?.CatalogCode ?? s.Label ?? "(unnamed)")}",
             ShapeKind.Ruler => "Line Ruler",
             ShapeKind.CircleRuler => "Circle Ruler",
             ShapeKind.RectRuler => "Rectangle Ruler",
@@ -6533,6 +6723,9 @@ public partial class GardenPlot
                     lines.Add($"<span class=\"text-muted\">Vertices:</span> {s.Points.Count}");
                     lines.Add($"<span class=\"text-muted\">Path length:</span> {F(total)} ft");
                 }
+                break;
+            case ShapeKind.Edge:
+                lines.Add($"<span class=\"text-muted\">Material:</span> <strong>{Esc(s.Takeoff?.CatalogCode ?? s.Label ?? "(unnamed edge)")}</strong>");
                 break;
             case ShapeKind.Ruler:
                 {
@@ -6639,7 +6832,7 @@ public partial class GardenPlot
     /// <summary>Translates a shape by (dx, dy), handling both bounding-box and point-based kinds.</summary>
     private static void ShiftShape(Shape s, double dx, double dy)
     {
-        if (s.Kind == ShapeKind.FreeDraw || s.Kind == ShapeKind.Ruler)
+        if (IsPointBased(s))
         {
             for (int i = 0; i < s.Points.Count; i++)
                 s.Points[i] = new Point(s.Points[i].X + dx, s.Points[i].Y + dy);

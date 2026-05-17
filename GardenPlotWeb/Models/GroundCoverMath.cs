@@ -18,6 +18,7 @@ public static class GroundCoverMath
             ShapeKind.Rectangle => Math.Abs(s.W) * Math.Abs(s.H),
             ShapeKind.Oval => Math.PI * (Math.Abs(s.W) / 2.0) * (Math.Abs(s.H) / 2.0),
             ShapeKind.FreeDraw => PolygonArea(s.Points),
+            ShapeKind.Edge => 0,
             ShapeKind.BedKit => Math.Abs(s.W) * Math.Abs(s.H),
             ShapeKind.Ruler => 0,
             ShapeKind.CircleRuler => 0,

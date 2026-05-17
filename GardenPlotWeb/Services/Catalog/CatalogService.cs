@@ -105,6 +105,7 @@ public sealed class CatalogService : ICatalogService
                 "GroundCoverSurfaceCovers" => ("Ground Cover", "ft²", LaborType.Planting, 0.0),
                 "GroundCoverMaterials" => ("Material", "yd³", LaborType.Mulching, 0.5),
                 "FocalPoints" => ("Focal Point", "ea", LaborType.Hardscape, 0.5),
+                "Edging" => ("Material", "lf", LaborType.Hardscape, 0.0),
                 _ => (field.Name, "ea", LaborType.Other, 0.0),
             };
             AddRange(items, arr, kind, unit, labor, hours);
@@ -131,13 +132,41 @@ public sealed class CatalogService : ICatalogService
                 Kind = kind,
                 DisplayName = p.Code,
                 Unit = unit,
-                DefaultDepthIn = p.DefaultDepthIn,
-                DefaultWastePercent = laborType == LaborType.Mulching ? 10.0 : null,
+                DefaultDepthIn = p.Kind == PaletteKind.Edging ? null : p.DefaultDepthIn,
+                DefaultThicknessIn = GetDefaultThicknessIn(p),
+                DefaultWastePercent = GetDefaultWastePercent(p, laborType),
                 LaborType = laborType,
-                LaborHoursPerUnit = hoursPerUnit,
+                LaborHoursPerUnit = GetLaborHoursPerUnit(p, hoursPerUnit),
                 BagSize = null,
                 Notes = p.Notes,
             });
         }
+    }
+
+    private static double? GetDefaultWastePercent(PaletteItem item, LaborType laborType)
+    {
+        if (item.Kind == PaletteKind.Edging)
+        {
+            return GardenPlotWeb.Models.Catalog.Find(item.Code)?.DefaultWastePercent ?? 0;
+        }
+
+        return laborType == LaborType.Mulching ? 10.0 : null;
+    }
+
+    private static double GetLaborHoursPerUnit(PaletteItem item, double defaultHoursPerUnit)
+    {
+        if (item.Kind == PaletteKind.Edging)
+        {
+            return GardenPlotWeb.Models.Catalog.Find(item.Code)?.LaborHoursPerUnit ?? defaultHoursPerUnit;
+        }
+
+        return defaultHoursPerUnit;
+    }
+
+    private static double? GetDefaultThicknessIn(PaletteItem item)
+    {
+        return item.Kind == PaletteKind.Edging
+            ? GardenPlotWeb.Models.Catalog.Find(item.Code)?.DefaultThicknessIn
+            : null;
     }
 }

@@ -88,6 +88,9 @@ else
                             case Tool.FreeDraw:
                                 <svg viewBox="0 0 24 24"><path d="M4 17C7 14 9 9 14 7C16 6 18 7 19 9C20 11 19 13 17 14C12 17 9 20 4 17Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
                                 break;
+                            case Tool.Edge:
+                                <svg viewBox="0 0 24 24"><path d="M4 17L9 7L15 11L20 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                                break;
                             case Tool.Rectangle:
                                 <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
                                 break;
@@ -215,6 +218,44 @@ else
             <label class="drop-check small" title="Offsets every other row by half an X spacing. With Y ft = 0, rows become equilateral."><input type="checkbox" @bind="arrayTriangulated" /> Triangulated</label>
             <label class="drop-check small"><input type="checkbox" @bind="arrayRotationAutoShift" /> Auto-shift on rotate</label>
             </span>
+
+            @if (currentTool == Tool.Edge)
+            {
+                <span class="ground-cover-controls">
+                    <span class="badge text-bg-secondary">Edge</span>
+                    <label class="small text-muted">Draw as</label>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Edge shape">
+                        <button type="button"
+                                class="btn @(edgeSubMode == EdgeSubMode.StraightSegments ? "btn-primary" : "btn-outline-secondary")"
+                                title="Click to add vertices, double-click to finish"
+                                @onclick="() => { edgeSubMode = EdgeSubMode.StraightSegments; CancelEdgeDraftInProgress(); }">Straight segments</button>
+                        <button type="button"
+                                class="btn @(edgeSubMode == EdgeSubMode.Freehand ? "btn-primary" : "btn-outline-secondary")"
+                                title="Click and drag to sketch a freeform edge"
+                                @onclick="() => { edgeSubMode = EdgeSubMode.Freehand; CancelEdgeDraftInProgress(); }">Freehand</button>
+                    </div>
+                    @if (selectedItem is null || selectedItem.Kind != PaletteKind.Edging)
+                    {
+                        <span class="small text-warning ms-2">Pick an Edging material from the palette.</span>
+                    }
+                    else
+                    {
+                        <span class="small ms-2 d-inline-flex align-items-center gap-1">
+                            <span class="gc-swatch gc-swatch-sm"
+                                  style="@($"background:{selectedItem.StrokeColor ?? "#6d655e"};border-color:{selectedItem.StrokeColor ?? "#6d655e"};")"></span>
+                            <strong>@selectedItem.Code</strong>
+                            @if (edgeSubMode == EdgeSubMode.StraightSegments)
+                            {
+                                <span class="text-muted ms-2">Click vertices · double-click to finish · Esc to cancel</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted ms-2">Click-drag to sketch · double-click to finish · Esc to cancel</span>
+                            }
+                        </span>
+                    }
+                </span>
+            }
 
             @if (currentTool == Tool.GroundCover)
             {
@@ -385,6 +426,9 @@ else
                             PaletteKind.CustomTile => $"{item.StampShapeKind ?? ShapeKind.Rectangle} · {item.WidthFt}'×{item.HeightFt}'",
                             PaletteKind.GroundCover => item.DefaultDepthIn is double dd ? $"area · {item.Trait} · {dd:0.#}\" default" : $"area · {item.Trait}",
                             PaletteKind.GroundCoverSurface => $"surface · {item.Trait}",
+                            PaletteKind.Edging => GardenPlotWeb.Models.Catalog.Find(item.Code) is { } edgeCatalog && edgeCatalog.DefaultThicknessIn is double thickness
+                                ? $"linear · {thickness:0.###}\" visual · {edgeCatalog.LaborHoursPerUnit:0.##} h/lf"
+                                : "linear · lf",
                             _ => $"{item.WidthFt}' Ø · {item.Trait}",
                         };
                         <button class="palette-item @(isActive ? "active" : "")"
@@ -442,6 +486,13 @@ else
                                                     <rect x="0" y="0" width="@F(item.WidthFt)" height="@F(item.HeightFt)"
                                                           fill="@($"url(#tex-{item.TextureKey})")" opacity="0.95" />
                                                 }
+                                                break;
+                                            case PaletteKind.Edging:
+                                                <line x1="0.4" y1="0.5" x2="@F(Math.Max(0.4, item.WidthFt - 0.4))" y2="0.5"
+                                                      stroke="@(item.StrokeColor ?? "#6d655e")"
+                                                      stroke-width="@F(Math.Max(0.08, (GardenPlotWeb.Models.Catalog.Find(item.Code)?.DefaultThicknessIn ?? 0.125) / 12.0))"
+                                                      stroke-linecap="round"
+                                                      stroke-linejoin="round" />
                                                 break;
                                         }
                                     </svg>
@@ -631,6 +682,23 @@ else
                                       width="@F(sb.w + 0.2)" height="@F(sb.h + 0.2)"
                                       fill="transparent" stroke="none" />
                                 break;
+                            case ShapeKind.Edge:
+                                @if (s.CloseEdge && s.Points.Count > 1)
+                                {
+                                    <polygon points="@PointsString(s.Points)"
+                                             fill="none" stroke="@EffectiveStroke(s)" stroke-width="@F(EdgeStrokeWidthFt(s))"
+                                             stroke-linecap="round" stroke-linejoin="round" />
+                                }
+                                else
+                                {
+                                    <polyline points="@PointsString(s.Points)"
+                                              fill="none" stroke="@EffectiveStroke(s)" stroke-width="@F(EdgeStrokeWidthFt(s))"
+                                              stroke-linecap="round" stroke-linejoin="round" />
+                                }
+                                <rect x="@F(sb.x - 0.1)" y="@F(sb.y - 0.1)"
+                                      width="@F(sb.w + 0.2)" height="@F(sb.h + 0.2)"
+                                      fill="transparent" stroke="none" />
+                                break;
                             case ShapeKind.CircleRuler:
                                 <circle cx="@F(s.X + (s.W / 2))" cy="@F(s.Y + (s.H / 2))" r="@F(s.W / 2)"
                                         fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
@@ -731,6 +799,17 @@ else
                                 <polyline points="@PointsString(drafting.Points)"
                                           fill="none" stroke="#3a3a3a" stroke-width="0.08"
                                           stroke-linecap="round" stroke-linejoin="round" pointer-events="none" />
+                            }
+                            break;
+                        case ShapeKind.Edge:
+                            <polyline points="@PointsString(drafting.Points)"
+                                      fill="none" stroke="@(drafting.Stroke ?? "#6d655e")" stroke-width="@F(EdgeStrokeWidthFt(drafting))"
+                                      stroke-linecap="round" stroke-linejoin="round"
+                                      stroke-dasharray="0.2,0.1" pointer-events="none" />
+                            @foreach (var p in drafting.Points.Take(buildingPolygon ? Math.Max(0, drafting.Points.Count - 1) : drafting.Points.Count))
+                            {
+                                <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.08"
+                                        fill="#fff" stroke="@(drafting.Stroke ?? "#6d655e")" stroke-width="0.04" pointer-events="none" />
                             }
                             break;
                         case ShapeKind.Ruler:
@@ -1613,6 +1692,23 @@ else
                 @if (!isPreview && drafting is not null && drafting.Kind == ShapeKind.Ruler && single!.Id == drafting.Id)
                 {
                     <div class="x-small text-muted mt-1">Click to finish · Ctrl+click to add a vertex</div>
+                }
+
+                @if (!isPreview && single!.Kind == ShapeKind.Edge)
+                {
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Edge</div>
+                        <div class="small mb-1">
+                            <strong>@($"{TakeoffMath.EffectiveLengthFt(single!):0.##} lf")</strong>
+                            <span class="text-muted"> · segments: @TakeoffMath.EffectiveSegmentCount(single!)</span>
+                        </div>
+                        <label class="small d-inline-flex align-items-center gap-1 mb-0">
+                            <input type="checkbox"
+                                   checked="@single!.CloseEdge"
+                                   @onchange="@(e => OnEdgeCloseChanged(single!, e))" />
+                            <span>Close edge</span>
+                        </label>
+                    </div>
                 }
 
                 @if (!isPreview && IsGroundCoverShape(single!))
