@@ -13,6 +13,8 @@ public class UiPreferences
     public double? InfoPanelY { get; set; }
     public double? TakeoffPanelX { get; set; }
     public double? TakeoffPanelY { get; set; }
+    public double? CalibrationPanelX { get; set; }
+    public double? CalibrationPanelY { get; set; }
     public bool? TakeoffPanelVisible { get; set; }
     public double? Zoom { get; set; }
     public double? ViewCenterXFt { get; set; }

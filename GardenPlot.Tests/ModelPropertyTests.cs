@@ -8,6 +8,9 @@ namespace GardenPlot.Tests;
 /// </summary>
 public sealed class ModelPropertyTests
 {
+    private static readonly string[] TomatoSynonyms = ["Lycopersicon esculentum"];
+    private static readonly string[] TomatoCommonNames = ["Tomato"];
+
     [Fact]
     public void Shape_AllProperties_RoundTrip()
     {
@@ -39,8 +42,10 @@ public sealed class ModelPropertyTests
 
         Assert.Equal(id, s.Id);
         Assert.Equal(ShapeKind.Oval, s.Kind);
-        Assert.Equal(1, s.X); Assert.Equal(2, s.Y);
-        Assert.Equal(3, s.W); Assert.Equal(4, s.H);
+        Assert.Equal(1, s.X);
+        Assert.Equal(2, s.Y);
+        Assert.Equal(3, s.W);
+        Assert.Equal(4, s.H);
         Assert.Equal(45, s.Rotation);
         Assert.Same(pts, s.Points);
         Assert.Equal("Bed", s.Label);
@@ -91,24 +96,36 @@ public sealed class ModelPropertyTests
     {
         var u = new UiPreferences
         {
-            RulerPanelX = 1, RulerPanelY = 2,
-            InfoPanelX = 3, InfoPanelY = 4,
-            TakeoffPanelX = 5, TakeoffPanelY = 6,
+            RulerPanelX = 1,
+            RulerPanelY = 2,
+            InfoPanelX = 3,
+            InfoPanelY = 4,
+            TakeoffPanelX = 5,
+            TakeoffPanelY = 6,
+            CalibrationPanelX = 7,
+            CalibrationPanelY = 8,
             TakeoffPanelVisible = true,
             Zoom = 1.5,
-            ViewCenterXFt = 10, ViewCenterYFt = 20,
+            ViewCenterXFt = 10,
+            ViewCenterYFt = 20,
             DefaultClimateRegion = ClimateRegion.Mediterranean,
             DefaultWater = WaterAvailability.Low,
             DefaultSun = SunExposure.FullSun,
             PaletteRegionFilter = ClimateRegion.AridDesert,
             PaletteNativeOnly = true,
         };
-        Assert.Equal(1, u.RulerPanelX); Assert.Equal(2, u.RulerPanelY);
-        Assert.Equal(3, u.InfoPanelX); Assert.Equal(4, u.InfoPanelY);
-        Assert.Equal(5, u.TakeoffPanelX); Assert.Equal(6, u.TakeoffPanelY);
+        Assert.Equal(1, u.RulerPanelX);
+        Assert.Equal(2, u.RulerPanelY);
+        Assert.Equal(3, u.InfoPanelX);
+        Assert.Equal(4, u.InfoPanelY);
+        Assert.Equal(5, u.TakeoffPanelX);
+        Assert.Equal(6, u.TakeoffPanelY);
+        Assert.Equal(7, u.CalibrationPanelX);
+        Assert.Equal(8, u.CalibrationPanelY);
         Assert.True(u.TakeoffPanelVisible);
         Assert.Equal(1.5, u.Zoom);
-        Assert.Equal(10, u.ViewCenterXFt); Assert.Equal(20, u.ViewCenterYFt);
+        Assert.Equal(10, u.ViewCenterXFt);
+        Assert.Equal(20, u.ViewCenterYFt);
         Assert.Equal(ClimateRegion.Mediterranean, u.DefaultClimateRegion);
         Assert.Equal(WaterAvailability.Low, u.DefaultWater);
         Assert.Equal(SunExposure.FullSun, u.DefaultSun);
@@ -121,8 +138,8 @@ public sealed class ModelPropertyTests
     {
         var p = new PlantProfile(
             ScientificName: "Solanum lycopersicum",
-            Synonyms: new[] { "Lycopersicon esculentum" },
-            CommonNames: new[] { "Tomato" },
+            Synonyms: TomatoSynonyms,
+            CommonNames: TomatoCommonNames,
             Family: "Solanaceae",
             Genus: "Solanum",
             Cultivar: "San Marzano",

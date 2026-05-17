@@ -135,6 +135,7 @@ public partial class GardenPlot
     private ElementReference rulerPanelRef = default;
     private ElementReference infoPanelRef;
     private ElementReference takeoffPanelRef;
+    private ElementReference calibrationPanelRef;
     private bool showTakeoffPanel;
     private readonly List<Shape> clipboard = new();
     private readonly Stack<List<Shape>> undoStack = new();
@@ -1581,6 +1582,21 @@ public partial class GardenPlot
                 }
             }
 
+            // Scale calibration panel nominal size from CSS: width 320, modest height.
+            if (library.Ui.CalibrationPanelX is double cx && library.Ui.CalibrationPanelY is double cy)
+            {
+                var maxX = Math.Max(PanelEdgePadding, width - 320 - PanelEdgePadding);
+                var maxY = Math.Max(PanelEdgePadding, height - 220 - PanelEdgePadding);
+                var nx = Math.Clamp(cx, PanelEdgePadding, maxX);
+                var ny = Math.Clamp(cy, PanelEdgePadding, maxY);
+                if (Math.Abs(nx - cx) > 0.01 || Math.Abs(ny - cy) > 0.01)
+                {
+                    library.Ui.CalibrationPanelX = nx;
+                    library.Ui.CalibrationPanelY = ny;
+                    changed = true;
+                }
+            }
+
             if (changed)
             {
                 await SaveAsync();
@@ -1869,6 +1885,8 @@ public partial class GardenPlot
         library.Ui.RulerPanelY = null;
         library.Ui.InfoPanelX = null;
         library.Ui.InfoPanelY = null;
+        library.Ui.CalibrationPanelX = null;
+        library.Ui.CalibrationPanelY = null;
         restoreViewportPending = true;
         await SaveAsync();
     }
@@ -5302,6 +5320,7 @@ public partial class GardenPlot
     private Task StartRulerPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("ruler", e);
     private Task StartInfoPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("info", e);
     private Task StartTakeoffPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("takeoff", e);
+    private Task StartCalibrationPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("calibration", e);
 
     private async Task StartPanelDrag(string name, Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
@@ -5311,6 +5330,7 @@ public partial class GardenPlot
             "ruler" => rulerPanelRef,
             "info" => infoPanelRef,
             "takeoff" => takeoffPanelRef,
+            "calibration" => calibrationPanelRef,
             _ => infoPanelRef,
         };
         var (curX, curY) = await GetPanelClientPositionAsync(panelElement, name);
@@ -5341,6 +5361,11 @@ public partial class GardenPlot
         {
             library.Ui.TakeoffPanelX = curX;
             library.Ui.TakeoffPanelY = curY;
+        }
+        else if (name == "calibration")
+        {
+            library.Ui.CalibrationPanelX = curX;
+            library.Ui.CalibrationPanelY = curY;
         }
         else
         {
@@ -5387,6 +5412,11 @@ public partial class GardenPlot
             library.Ui.TakeoffPanelX = x;
             library.Ui.TakeoffPanelY = y;
         }
+        else if (draggingPanel == "calibration")
+        {
+            library.Ui.CalibrationPanelX = x;
+            library.Ui.CalibrationPanelY = y;
+        }
     }
 
     private async Task OnPanelDragEnd()
@@ -5416,6 +5446,7 @@ public partial class GardenPlot
         if (name == "ruler" && prefs.RulerPanelX is double rx && prefs.RulerPanelY is double ry) return (rx, ry);
         if (name == "info" && prefs.InfoPanelX is double ix && prefs.InfoPanelY is double iy) return (ix, iy);
         if (name == "takeoff" && prefs.TakeoffPanelX is double tx && prefs.TakeoffPanelY is double ty) return (tx, ty);
+        if (name == "calibration" && prefs.CalibrationPanelX is double cx && prefs.CalibrationPanelY is double cy) return (cx, cy);
         try
         {
             if (jsModule is not null)
@@ -5425,6 +5456,7 @@ public partial class GardenPlot
                 var height = size.GetProperty("height").GetDouble();
                 if (name == "ruler") return (width - 280 - 40, 40);
                 if (name == "takeoff") return (width - 300 - 40, 90);
+                if (name == "calibration") return (width - 320 - 46, height - 180 - 84);
                 return (width - 320 - 40, height - 220 - 40);
             }
         }
