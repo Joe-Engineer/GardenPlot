@@ -1640,6 +1640,12 @@ public partial class GardenPlot
     private bool showRotationShiftHint;
     private string rotationShiftHintText = string.Empty;
     private CancellationTokenSource? rotationShiftHintCts;
+    private Guid? selectedRotationInputShapeId;
+    private double? selectedRotationInputCommittedValue;
+    private string selectedRotationInput = string.Empty;
+    private Guid? selectedGroupRotationInputGroupId;
+    private double? selectedGroupRotationInputCommittedValue;
+    private string selectedGroupRotationInput = string.Empty;
 
     // drag state
     private bool isDragging;
@@ -1846,6 +1852,203 @@ public partial class GardenPlot
         undoStack.Pop().RestoreInto(currentPlot);
         ClearSelection();
         await SaveAsync();
+    }
+
+    private string GetSelectedRotationInputValue(Shape shape)
+    {
+        var normalized = NormalizeRotationDegrees(shape.Rotation);
+        if (selectedRotationInputShapeId != shape.Id
+            || selectedRotationInputCommittedValue is null
+            || Math.Abs(selectedRotationInputCommittedValue.Value - normalized) > 0.0005)
+        {
+            selectedRotationInputShapeId = shape.Id;
+            selectedRotationInputCommittedValue = normalized;
+            selectedRotationInput = F(normalized);
+        }
+
+        return selectedRotationInput;
+    }
+
+    private void OnSelectedRotationInput(ChangeEventArgs e)
+    {
+        selectedRotationInput = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task OnSelectedRotationChanged(ChangeEventArgs e)
+    {
+        OnSelectedRotationInput(e);
+        await CommitSelectedShapeRotationAsync();
+    }
+
+    private async Task OnSelectedRotationKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await CommitSelectedShapeRotationAsync();
+        }
+    }
+
+    private async Task CommitSelectedShapeRotationAsync(double? requestedRotation = null)
+    {
+        if (currentPlot is null || selectedIds.Count != 1 || PrimarySelectedId is not { } selectedId)
+        {
+            return;
+        }
+
+        var shape = currentPlot.Shapes.FirstOrDefault(candidate => candidate.Id == selectedId);
+        if (shape is null)
+        {
+            return;
+        }
+
+        if (!TryResolveRotationValue(requestedRotation, selectedRotationInput, out var rotation))
+        {
+            selectedRotationInputShapeId = shape.Id;
+            selectedRotationInputCommittedValue = NormalizeRotationDegrees(shape.Rotation);
+            selectedRotationInput = F(selectedRotationInputCommittedValue.Value);
+            return;
+        }
+
+        var currentRotation = NormalizeRotationDegrees(shape.Rotation);
+        if (Math.Abs(currentRotation - rotation) <= 0.0005)
+        {
+            selectedRotationInputShapeId = shape.Id;
+            selectedRotationInputCommittedValue = currentRotation;
+            selectedRotationInput = F(currentRotation);
+            return;
+        }
+
+        RecordUndoState();
+        await ApplyShapeRotationAsync(shape, rotation);
+        selectedRotationInputShapeId = shape.Id;
+        selectedRotationInputCommittedValue = NormalizeRotationDegrees(shape.Rotation);
+        selectedRotationInput = F(selectedRotationInputCommittedValue.Value);
+    }
+
+    private async Task ApplyShapeRotationAsync(Shape shape, double rotation)
+    {
+        shape.Rotation = rotation;
+        var aabb = RotatedAABB(shape);
+        double tx = 0;
+        double ty = 0;
+        if (aabb.minX < 0)
+        {
+            tx = -aabb.minX;
+        }
+        else if (aabb.maxX > PlotWidthFt)
+        {
+            tx = PlotWidthFt - aabb.maxX;
+        }
+
+        if (aabb.minY < 0)
+        {
+            ty = -aabb.minY;
+        }
+        else if (aabb.maxY > PlotHeightFt)
+        {
+            ty = PlotHeightFt - aabb.maxY;
+        }
+
+        if (tx != 0 || ty != 0)
+        {
+            ShiftShape(shape, tx, ty);
+        }
+
+        await ReflowAffectedGroupsForMemberRotation(new List<Shape> { shape });
+        SyncDropGroupsFromCurrentShapes();
+        await SaveAsync();
+    }
+
+    private string GetSelectedGroupRotationInputValue(DropGroup group)
+    {
+        var normalized = NormalizeRotationDegrees(group.Rotation);
+        if (selectedGroupRotationInputGroupId != group.Id
+            || selectedGroupRotationInputCommittedValue is null
+            || Math.Abs(selectedGroupRotationInputCommittedValue.Value - normalized) > 0.0005)
+        {
+            selectedGroupRotationInputGroupId = group.Id;
+            selectedGroupRotationInputCommittedValue = normalized;
+            selectedGroupRotationInput = F(normalized);
+        }
+
+        return selectedGroupRotationInput;
+    }
+
+    private void OnSelectedGroupRotationInput(ChangeEventArgs e)
+    {
+        selectedGroupRotationInput = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task OnSelectedGroupRotationChanged(ChangeEventArgs e)
+    {
+        OnSelectedGroupRotationInput(e);
+        await CommitSelectedGroupRotationAsync();
+    }
+
+    private async Task OnSelectedGroupRotationKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await CommitSelectedGroupRotationAsync();
+        }
+    }
+
+    private async Task CommitSelectedGroupRotationAsync(double? requestedRotation = null)
+    {
+        var group = GetCurrentSelectedDropGroup();
+        if (group is null || group.Pattern != DropPattern.Array)
+        {
+            return;
+        }
+
+        if (!TryResolveRotationValue(requestedRotation, selectedGroupRotationInput, out var rotation))
+        {
+            selectedGroupRotationInputGroupId = group.Id;
+            selectedGroupRotationInputCommittedValue = NormalizeRotationDegrees(group.Rotation);
+            selectedGroupRotationInput = F(selectedGroupRotationInputCommittedValue.Value);
+            return;
+        }
+
+        var currentRotation = NormalizeRotationDegrees(group.Rotation);
+        if (Math.Abs(currentRotation - rotation) <= 0.0005)
+        {
+            selectedGroupRotationInputGroupId = group.Id;
+            selectedGroupRotationInputCommittedValue = currentRotation;
+            selectedGroupRotationInput = F(currentRotation);
+            return;
+        }
+
+        RecordUndoState();
+        group.Rotation = rotation;
+        await ReflowDropGroup(group, save: false);
+        selectedGroupRotationInputGroupId = group.Id;
+        selectedGroupRotationInputCommittedValue = NormalizeRotationDegrees(group.Rotation);
+        selectedGroupRotationInput = F(selectedGroupRotationInputCommittedValue.Value);
+        await SaveAsync();
+    }
+
+    private static bool TryResolveRotationValue(double? requestedRotation, string input, out double rotation)
+    {
+        if (requestedRotation is double explicitRotation)
+        {
+            rotation = NormalizeRotationDegrees(Math.Clamp(explicitRotation, 0, 360));
+            return true;
+        }
+
+        if (double.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+        {
+            rotation = NormalizeRotationDegrees(Math.Clamp(parsed, 0, 360));
+            return true;
+        }
+
+        rotation = 0;
+        return false;
+    }
+
+    private static double NormalizeRotationDegrees(double rotation)
+    {
+        rotation %= 360;
+        return rotation < 0 ? rotation + 360 : rotation;
     }
 
     private void HideShapeContextMenu()
@@ -4006,6 +4209,29 @@ public partial class GardenPlot
             FontScale = source.FontScale,
             GroupId = assignNewId ? null : source.GroupId,
             GroupIndex = assignNewId ? null : source.GroupIndex,
+            TileBackgroundImageFileName = source.TileBackgroundImageFileName,
+            GroundCoverCode = source.GroundCoverCode,
+            GroundCoverDepthIn = source.GroundCoverDepthIn,
+            IsGroundCoverSurface = source.IsGroundCoverSurface,
+            TextureKey = source.TextureKey,
+            TextureImageId = source.TextureImageId,
+        };
+    }
+
+    private static DropGroup CloneDropGroup(DropGroup source)
+    {
+        return new DropGroup
+        {
+            Id = source.Id,
+            Pattern = source.Pattern,
+            ItemCount = source.ItemCount,
+            Rows = source.Rows,
+            CenterSpacingXFt = source.CenterSpacingXFt,
+            CenterSpacingYFt = source.CenterSpacingYFt,
+            StaggerHalf = source.StaggerHalf,
+            Rotation = source.Rotation,
+            AnchorCenterX = source.AnchorCenterX,
+            AnchorCenterY = source.AnchorCenterY,
         };
     }
 

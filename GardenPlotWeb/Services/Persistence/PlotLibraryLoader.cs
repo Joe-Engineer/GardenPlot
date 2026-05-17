@@ -201,9 +201,10 @@ public sealed class PlotLibraryLoader
     /// <summary>
     /// Loader for schema v2. v2 documents already have takeoff items, but predate costing fields
     /// and may still carry the legacy <c>StaggerHalf</c> drop-group flag. Direct typed
-    /// deserialization is sufficient because the new v3 members carry safe model defaults
-    /// (markup 25%, labor rate 75, internal view on, line total on), then legacy triangulation is
-    /// projected onto <see cref="DropGroup.Triangulated"/> so the next save writes schema v3.
+    /// deserialization is sufficient because the v3 members carry safe model defaults (markup 25%,
+    /// labor rate 75, internal view on, line total on, and default rotation for shapes/drop groups
+    /// when absent), then legacy triangulation is projected onto <see cref="DropGroup.Triangulated"/>
+    /// so the next save writes schema v3.
     /// </summary>
     private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
     {
