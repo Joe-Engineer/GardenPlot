@@ -236,7 +236,6 @@ public static class PaletteCatalog
         new("Peony",              PaletteKind.Plant, 3.0,  3.0,  "flower-perennial", 0, "full",    "medium", 365),
         new("Iris (Bearded)",     PaletteKind.Plant, 1.5,  1.5,  "flower-perennial", 0, "full",    "low",    365),
         new("Astilbe",            PaletteKind.Plant, 2.0,  2.0,  "flower-perennial", 0, "shade",   "high",   365),
-        new("Sedum (Stonecrop)",  PaletteKind.Plant, 1.5,  1.5,  "flower-perennial", 0, "full",    "low",    365),
         new("Russian Sage",       PaletteKind.Plant, 3.0,  3.0,  "flower-perennial", 0, "full",    "low",    365),
         new("Coreopsis",          PaletteKind.Plant, 1.5,  1.5,  "flower-perennial", 0, "full",    "low",    365),
         new("Lupine",             PaletteKind.Plant, 1.5,  1.5,  "flower-perennial", 0, "full",    "medium", 365),
@@ -283,7 +282,6 @@ public static class PaletteCatalog
 
         // Succulents & cacti
         new("Hens & Chicks",      PaletteKind.Plant, 0.5,  0.5,  "succulent", 0, "full",    "low", 365),
-        new("Sedum (Creeping)",   PaletteKind.Plant, 1.0,  1.0,  "succulent", 0, "full",    "low", 365),
         new("Echeveria",          PaletteKind.Plant, 0.6,  0.6,  "succulent", 0, "full",    "low", 365),
         new("Aloe Vera",          PaletteKind.Plant, 1.5,  1.5,  "succulent", 0, "full",    "low", 365),
         new("Agave",              PaletteKind.Plant, 4.0,  4.0,  "succulent", 0, "full",    "low", 365),
@@ -314,29 +312,11 @@ public static class PaletteCatalog
         new("Annual Ryegrass",        PaletteKind.GroundCoverSurface, 1, 1, "cover-crop", 0, "full", "medium", 90,  FillColor: "#7fa852", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
         new("Cowpea",                 PaletteKind.GroundCoverSurface, 1, 1, "cover-crop", 0, "full", "low",    75,  FillColor: "#8a9a5a", StrokeColor: "#4a5a2a", TextureKey: "clover"),
 
-        // Ground cover plants (living mats, not materials)
-        new("Creeping Thyme",         PaletteKind.Plant, 1.0,  1.0,  "groundcover", 0, "full",    "low",    365),
-        new("Creeping Phlox",         PaletteKind.Plant, 1.5,  1.5,  "groundcover", 0, "full",    "low",    365),
-        new("Sweet Woodruff",         PaletteKind.Plant, 1.0,  1.0,  "groundcover", 0, "shade",   "medium", 365),
-        new("Vinca (Periwinkle)",     PaletteKind.Plant, 1.5,  1.5,  "groundcover", 0, "partial", "medium", 365),
-        new("Pachysandra",            PaletteKind.Plant, 1.0,  1.0,  "groundcover", 0, "shade",   "medium", 365),
-        new("Ajuga (Bugleweed)",      PaletteKind.Plant, 1.0,  1.0,  "groundcover", 0, "partial", "medium", 365),
-        new("Lamb's Ear",             PaletteKind.Plant, 1.5,  1.5,  "groundcover", 0, "full",    "low",    365),
-        new("Lily of the Valley",     PaletteKind.Plant, 0.8,  0.8,  "groundcover", 0, "shade",   "medium", 365),
-        new("Mondo Grass (Dwarf)",    PaletteKind.Plant, 0.5,  0.5,  "groundcover", 0, "partial", "medium", 365),
-        new("Wild Ginger",            PaletteKind.Plant, 1.0,  1.0,  "groundcover", 0, "shade",   "medium", 365),
-        new("Bunchberry",             PaletteKind.Plant, 1.0,  1.0,  "groundcover", 0, "shade",   "medium", 365),
-        new("Wild Strawberry",        PaletteKind.Plant, 0.8,  0.8,  "groundcover", 0, "partial", "medium", 365),
-        new("Bearberry (Kinnikinnick)", PaletteKind.Plant, 2.0, 2.0, "groundcover", 0, "full",    "low",    365),
-        new("Stonecrop (Groundcover)",  PaletteKind.Plant, 1.0, 1.0, "groundcover", 0, "full",    "low",    365),
-        new("Mazus",                  PaletteKind.Plant, 0.8,  0.8,  "groundcover", 0, "partial", "medium", 365),
-        new("Corsican Mint",          PaletteKind.Plant, 0.5,  0.5,  "groundcover", 0, "partial", "medium", 365),
-        new("Irish Moss",             PaletteKind.Plant, 0.5,  0.5,  "groundcover", 0, "partial", "medium", 365),
     ];
 
     /// <summary>Grass palette items. Turf grasses are area-drawn (surface ground covers) so they
-    /// follow lawn edges instead of being stamped as fixed rectangles. Ornamental grasses remain
-    /// stampable specimens because they represent individual clumps with characteristic shapes.</summary>
+    /// follow lawn edges instead of being stamped as fixed rectangles. Large specimen grasses
+    /// remain stampable, while smaller mass-planted grasses live with other surface covers.</summary>
     public static readonly PaletteItem[] Grasses =
     [
         new("Lawn (Bluegrass)",    PaletteKind.GroundCoverSurface, 1, 1, "grass", StampShapeKind: ShapeKind.Rectangle, FillColor: "#6a9a4f", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
@@ -345,8 +325,6 @@ public static class PaletteCatalog
         new("Bermuda Grass",       PaletteKind.GroundCoverSurface, 1, 1, "grass", StampShapeKind: ShapeKind.Rectangle, FillColor: "#94b34d", StrokeColor: "#5e7a25", TextureKey: "grass-blades"),
         new("Zoysia",              PaletteKind.GroundCoverSurface, 1, 1, "grass", StampShapeKind: ShapeKind.Rectangle, FillColor: "#7c9b40", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
         new("Buffalo Grass",       PaletteKind.GroundCoverSurface, 1, 1, "grass", StampShapeKind: ShapeKind.Rectangle, FillColor: "#8aa56e", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
-        new("Mondo (Ornamental)",  PaletteKind.CustomTile, 2,   2,   "grass-ornamental", StampShapeKind: ShapeKind.Rectangle, FillColor: "#3a5b34", StrokeColor: "#1f3a22"),
-        new("Blue Fescue",         PaletteKind.CustomTile, 1.5, 1.5, "grass-ornamental", StampShapeKind: ShapeKind.Oval,      FillColor: "#7896a0", StrokeColor: "#3f6a2d"),
         new("Maiden Grass",        PaletteKind.CustomTile, 4,   4,   "grass-ornamental", StampShapeKind: ShapeKind.Oval,      FillColor: "#a6b56e", StrokeColor: "#5e7a25"),
         new("Pampas Grass",        PaletteKind.CustomTile, 6,   6,   "grass-ornamental", StampShapeKind: ShapeKind.Oval,      FillColor: "#c8b777", StrokeColor: "#7a5b2a"),
     ];
@@ -394,7 +372,7 @@ public static class PaletteCatalog
     ];
 
     /// <summary>
-    /// Surface ground covers (no depth) sold by area: lawn seed mixes, clovers, wildflower mixes, etc.
+    /// Surface ground covers (no depth) sold by area: seed mixes, living plant mats, and ornamental grass drifts.
     /// </summary>
     public static readonly PaletteItem[] GroundCoverSurfaceCovers =
     [
@@ -406,6 +384,33 @@ public static class PaletteCatalog
         new("Zoysia Seed",              PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#7c9b40", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
         new("Buffalo Grass Seed",       PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#8aa56e", StrokeColor: "#3f6a2d", TextureKey: "grass-blades"),
         new("Drought-Tolerant Mix",     PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#94a86a", StrokeColor: "#5a7028", TextureKey: "grass-blades"),
+
+        // Grass-like ornamental drifts and living ground-cover plants are placed by area.
+        new("Blue Fescue",              PaletteKind.GroundCoverSurface, 1.5, 1.5, "grass",        0, "full",    "low",    365, FillColor: "#7896a0", StrokeColor: "#4b6570", TextureKey: "grass-blades"),
+        new("Mondo (Ornamental)",       PaletteKind.GroundCoverSurface, 2.0, 2.0, "grass",        0, "partial", "medium", 365, FillColor: "#3a5b34", StrokeColor: "#1f3a22", TextureKey: "grass-blades"),
+        new("Carex (Sedge)",            PaletteKind.GroundCoverSurface, 1.5, 1.5, "grass",        0, "partial", "medium", 365, FillColor: "#6f8a5c", StrokeColor: "#3e5630", TextureKey: "grass-blades"),
+        new("Liriope",                  PaletteKind.GroundCoverSurface, 1.5, 1.5, "grass",        0, "partial", "medium", 365, FillColor: "#4f6f5d", StrokeColor: "#30483a", TextureKey: "grass-blades"),
+        new("Lomandra",                 PaletteKind.GroundCoverSurface, 2.0, 2.0, "grass",        0, "full",    "low",    365, FillColor: "#7c9b60", StrokeColor: "#4b6438", TextureKey: "grass-blades"),
+        new("Ornamental Sedge",         PaletteKind.GroundCoverSurface, 1.5, 1.5, "grass",        0, "partial", "medium", 365, FillColor: "#738a4a", StrokeColor: "#44582a", TextureKey: "grass-blades"),
+        new("Creeping Thyme",           PaletteKind.GroundCoverSurface, 1.0, 1.0, "ground-cover", 0, "full",    "low",    365, FillColor: "#7c8f76", StrokeColor: "#4a5c46", TextureKey: "clover"),
+        new("Creeping Phlox",           PaletteKind.GroundCoverSurface, 1.5, 1.5, "ground-cover", 0, "full",    "low",    365, FillColor: "#b694c8", StrokeColor: "#6d4d84", TextureKey: "wildflower"),
+        new("Sweet Woodruff",           PaletteKind.GroundCoverSurface, 1.0, 1.0, "ground-cover", 0, "shade",   "medium", 365, FillColor: "#7e9c70", StrokeColor: "#4b6840", TextureKey: "clover"),
+        new("Vinca (Periwinkle)",       PaletteKind.GroundCoverSurface, 1.5, 1.5, "ground-cover", 0, "partial", "medium", 365, FillColor: "#7489b0", StrokeColor: "#44516c", TextureKey: "clover"),
+        new("Pachysandra",              PaletteKind.GroundCoverSurface, 1.0, 1.0, "ground-cover", 0, "shade",   "medium", 365, FillColor: "#5f8a4a", StrokeColor: "#345028", TextureKey: "clover"),
+        new("Ajuga (Bugleweed)",        PaletteKind.GroundCoverSurface, 1.0, 1.0, "ground-cover", 0, "partial", "medium", 365, FillColor: "#6b5a8c", StrokeColor: "#3f2d58", TextureKey: "clover"),
+        new("Lamb's Ear",               PaletteKind.GroundCoverSurface, 1.5, 1.5, "ground-cover", 0, "full",    "low",    365, FillColor: "#a7b2a0", StrokeColor: "#687062", TextureKey: "scales"),
+        new("Lily of the Valley",       PaletteKind.GroundCoverSurface, 0.8, 0.8, "ground-cover", 0, "shade",   "medium", 365, FillColor: "#7a9368", StrokeColor: "#4a5e3c", TextureKey: "clover"),
+        new("Mondo Grass (Dwarf)",      PaletteKind.GroundCoverSurface, 0.5, 0.5, "ground-cover", 0, "partial", "medium", 365, FillColor: "#355036", StrokeColor: "#1f3121", TextureKey: "grass-blades"),
+        new("Wild Ginger",              PaletteKind.GroundCoverSurface, 1.0, 1.0, "ground-cover", 0, "shade",   "medium", 365, FillColor: "#587247", StrokeColor: "#34452b", TextureKey: "clover"),
+        new("Bunchberry",               PaletteKind.GroundCoverSurface, 1.0, 1.0, "ground-cover", 0, "shade",   "medium", 365, FillColor: "#6c875b", StrokeColor: "#40523a", TextureKey: "wildflower"),
+        new("Wild Strawberry",          PaletteKind.GroundCoverSurface, 0.8, 0.8, "ground-cover", 0, "partial", "medium", 365, FillColor: "#7b9551", StrokeColor: "#4b5f2e", TextureKey: "clover"),
+        new("Bearberry (Kinnikinnick)", PaletteKind.GroundCoverSurface, 2.0, 2.0, "ground-cover", 0, "full",    "low",    365, FillColor: "#5e7d52", StrokeColor: "#364a30", TextureKey: "clover"),
+        new("Sedum (Stonecrop)",        PaletteKind.GroundCoverSurface, 1.5, 1.5, "ground-cover", 0, "full",    "low",    365, FillColor: "#94a86a", StrokeColor: "#566338", TextureKey: "dots"),
+        new("Sedum (Creeping)",         PaletteKind.GroundCoverSurface, 1.0, 1.0, "ground-cover", 0, "full",    "low",    365, FillColor: "#8ea35c", StrokeColor: "#526332", TextureKey: "dots"),
+        new("Stonecrop (Groundcover)",  PaletteKind.GroundCoverSurface, 1.0, 1.0, "ground-cover", 0, "full",    "low",    365, FillColor: "#88a05d", StrokeColor: "#506030", TextureKey: "dots"),
+        new("Mazus",                    PaletteKind.GroundCoverSurface, 0.8, 0.8, "ground-cover", 0, "partial", "medium", 365, FillColor: "#7f8fc0", StrokeColor: "#4d5a78", TextureKey: "wildflower"),
+        new("Corsican Mint",            PaletteKind.GroundCoverSurface, 0.5, 0.5, "ground-cover", 0, "partial", "medium", 365, FillColor: "#6c955f", StrokeColor: "#3d5d34", TextureKey: "clover"),
+        new("Irish Moss",               PaletteKind.GroundCoverSurface, 0.5, 0.5, "ground-cover", 0, "partial", "medium", 365, FillColor: "#7aa35b", StrokeColor: "#466433", TextureKey: "clover"),
 
         new("White Clover",             PaletteKind.GroundCoverSurface, 1, 1, "seed-clover",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#6e8c4a", StrokeColor: "#3f5a25", TextureKey: "clover"),
         new("Micro Clover",             PaletteKind.GroundCoverSurface, 1, 1, "seed-clover",  StampShapeKind: ShapeKind.Rectangle, FillColor: "#79994f", StrokeColor: "#3f5a25", TextureKey: "clover"),
@@ -457,9 +462,9 @@ public static class PaletteCatalog
             PaletteCategory.GroundCoverSurface => GroundCoverSurfaceCovers,
             PaletteCategory.Edging => Edging,
             PaletteCategory.Bulbs => [.. Plants.Where(p => string.Equals(p.Trait, "bulb", StringComparison.OrdinalIgnoreCase))],
-            PaletteCategory.GroundCoverPlants => [.. Plants.Where(p => string.Equals(p.Trait, "groundcover", StringComparison.OrdinalIgnoreCase))],
-            PaletteCategory.GrassesTurf => [.. Grasses.Where(g => !string.Equals(g.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase))],
-            PaletteCategory.GrassesOrnamental => [.. Grasses.Where(g => string.Equals(g.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.GroundCoverPlants => [.. GroundCoverSurfaceCovers.Where(IsGroundCoverPlantSurfaceItem)],
+            PaletteCategory.GrassesTurf => [.. Grasses.Where(g => g.Kind == PaletteKind.GroundCoverSurface)],
+            PaletteCategory.GrassesOrnamental => [.. Grasses.Where(g => string.Equals(g.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(IsOrnamentalGrassSurfaceItem))],
             PaletteCategory.Succulents => [.. Plants.Where(p => string.Equals(p.Trait, "succulent", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.PollinatorNatives => [.. Plants.Where(p => string.Equals(p.Trait, "pollinator-native", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.CoverCrops => [.. Plants.Where(p => string.Equals(p.Trait, "cover-crop", StringComparison.OrdinalIgnoreCase))],
@@ -496,7 +501,7 @@ public static class PaletteCatalog
                 "flower" or "flower-annual" => PaletteCategory.FlowersAnnual,
                 "flower-perennial" => PaletteCategory.FlowersPerennial,
                 "bulb" => PaletteCategory.Bulbs,
-                "groundcover" => PaletteCategory.GroundCoverPlants,
+                "groundcover" or "ground-cover" => PaletteCategory.GroundCoverPlants,
                 "succulent" => PaletteCategory.Succulents,
                 "pollinator-native" => PaletteCategory.PollinatorNatives,
                 "cover-crop" => PaletteCategory.CoverCrops,
@@ -512,15 +517,45 @@ public static class PaletteCatalog
                 _ => PaletteCategory.CustomTiles,
             },
             PaletteKind.GroundCover => PaletteCategory.GroundCoverMaterials,
-            PaletteKind.GroundCoverSurface => PaletteCategory.GroundCoverSurface,
+            PaletteKind.GroundCoverSurface => item.Trait?.ToLowerInvariant() switch
+            {
+                "cover-crop" => PaletteCategory.CoverCrops,
+                "ground-cover" => PaletteCategory.GroundCoverPlants,
+                "grass" when IsOrnamentalGrassSurfaceItem(item) => PaletteCategory.GrassesOrnamental,
+                "grass" => PaletteCategory.GrassesTurf,
+                _ => PaletteCategory.GroundCoverSurface,
+            },
             PaletteKind.Edging => PaletteCategory.Edging,
             _ => PaletteCategory.BedKits,
         };
     }
 
+    private static readonly HashSet<string> OrnamentalGrassSurfaceCodes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Blue Fescue",
+        "Mondo (Ornamental)",
+        "Carex (Sedge)",
+        "Liriope",
+        "Lomandra",
+        "Ornamental Sedge",
+    };
+
     private static bool IsEdibleBush(PaletteItem b)
     {
         return string.Equals(b.Trait, "fruit", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsGroundCoverPlantSurfaceItem(PaletteItem item)
+    {
+        return item.Kind == PaletteKind.GroundCoverSurface
+            && string.Equals(item.Trait, "ground-cover", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsOrnamentalGrassSurfaceItem(PaletteItem item)
+    {
+        return item.Kind == PaletteKind.GroundCoverSurface
+            && string.Equals(item.Trait, "grass", StringComparison.OrdinalIgnoreCase)
+            && OrnamentalGrassSurfaceCodes.Contains(item.Code);
     }
 }
 

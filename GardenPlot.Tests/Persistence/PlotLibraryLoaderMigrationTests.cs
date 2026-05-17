@@ -115,6 +115,66 @@ public class PlotLibraryLoaderMigrationTests
     }
 
     [Fact]
+    public void LoadV1_ChainsGroundCoverRebindAndTriangulationUpgrade()
+    {
+        var v1 = new
+        {
+            SchemaVersion = 1,
+            Plots = new[]
+            {
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Legacy",
+                    Shapes = new[]
+                    {
+                        new
+                        {
+                            Id = Guid.NewGuid(),
+                            Kind = (int)ShapeKind.Plant,
+                            Label = "Creeping Thyme",
+                            Trait = "groundcover",
+                            X = 1.0,
+                            Y = 2.0,
+                            W = 3.0,
+                            H = 4.0,
+                        },
+                    },
+                    DropGroups = new[]
+                    {
+                        new
+                        {
+                            Id = Guid.NewGuid(),
+                            Pattern = (int)DropPattern.Array,
+                            ItemCount = 6,
+                            Rows = 2,
+                            CenterSpacingXFt = 3.0,
+                            CenterSpacingYFt = 2.0,
+                            StaggerHalf = true,
+                        },
+                    },
+                },
+            },
+        };
+
+        var loaded = CreateLoader().Load(JsonSerializer.Serialize(v1), "unit-test");
+
+        Assert.NotNull(loaded);
+        Assert.Equal(PlotSchema.Current, loaded!.SchemaVersion);
+
+        PlotData plot = Assert.Single(loaded.Plots);
+        Shape shape = Assert.Single(plot.Shapes);
+        Assert.Equal(ShapeKind.Oval, shape.Kind);
+        Assert.Equal("Creeping Thyme", shape.GroundCoverCode);
+        Assert.True(shape.IsGroundCoverSurface);
+        Assert.Null(shape.GroundCoverDepthIn);
+
+        DropGroup group = Assert.Single(plot.DropGroups);
+        Assert.True(group.Triangulated);
+        Assert.False(group.StaggerHalf);
+    }
+
+    [Fact]
     public void LoadV2_AddsCostingDefaults_AndBackgroundFit_WhenFieldsAreMissing()
     {
         var v2 = new

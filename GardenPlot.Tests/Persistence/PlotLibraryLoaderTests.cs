@@ -267,6 +267,90 @@ public class PlotLibraryLoaderTests
     }
 
     [Fact]
+    public void Load_Version2_RebindsMovedGroundCoverPlacements()
+    {
+        Guid plantedShapeId = Guid.NewGuid();
+        Guid tileShapeId = Guid.NewGuid();
+        DateTime timestamp = new(2025, 5, 1, 12, 0, 0, DateTimeKind.Utc);
+        string legacyJson = JsonSerializer.Serialize(new
+        {
+            SchemaVersion = 2,
+            Plots = new[]
+            {
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Legacy Ground Covers",
+                    WidthFt = 20.0,
+                    HeightFt = 10.0,
+                    Shapes = new object[]
+                    {
+                        new
+                        {
+                            Id = plantedShapeId,
+                            Kind = ShapeKind.Plant,
+                            X = 1.0,
+                            Y = 2.0,
+                            W = 1.0,
+                            H = 1.0,
+                            Label = "Creeping Thyme",
+                            Trait = "groundcover",
+                        },
+                        new
+                        {
+                            Id = tileShapeId,
+                            Kind = ShapeKind.Oval,
+                            X = 5.0,
+                            Y = 6.0,
+                            W = 1.5,
+                            H = 1.5,
+                            Label = "Blue Fescue",
+                            Trait = "grass-ornamental",
+                        },
+                    },
+                    CreatedUtc = timestamp,
+                    ModifiedUtc = timestamp,
+                },
+            },
+        });
+
+        var loader = CreateLoader();
+        PlotLibrary? library = loader.Load(legacyJson, "unit-test");
+
+        Assert.NotNull(library);
+        Assert.Equal(PlotSchema.Current, library!.SchemaVersion);
+        PlotData plot = Assert.Single(library.Plots);
+
+        Shape plantedShape = Assert.Single(plot.Shapes, shape => shape.Id == plantedShapeId);
+        PaletteItem plantedItem = Assert.Single(PaletteCatalog.GroundCoverSurfaceCovers, item => item.Code == "Creeping Thyme");
+        Assert.Equal(ShapeKind.Oval, plantedShape.Kind);
+        Assert.Equal(1.0, plantedShape.X);
+        Assert.Equal(2.0, plantedShape.Y);
+        Assert.Equal(1.0, plantedShape.W);
+        Assert.Equal(1.0, plantedShape.H);
+        Assert.Equal(plantedItem.Trait, plantedShape.Trait);
+        Assert.Equal("Creeping Thyme", plantedShape.GroundCoverCode);
+        Assert.True(plantedShape.IsGroundCoverSurface);
+        Assert.Null(plantedShape.GroundCoverDepthIn);
+        Assert.Equal(plantedItem.FillColor, plantedShape.Fill);
+        Assert.Equal(plantedItem.TextureKey, plantedShape.TextureKey);
+
+        Shape tileShape = Assert.Single(plot.Shapes, shape => shape.Id == tileShapeId);
+        PaletteItem tileItem = Assert.Single(PaletteCatalog.GroundCoverSurfaceCovers, item => item.Code == "Blue Fescue");
+        Assert.Equal(ShapeKind.Oval, tileShape.Kind);
+        Assert.Equal(5.0, tileShape.X);
+        Assert.Equal(6.0, tileShape.Y);
+        Assert.Equal(1.5, tileShape.W);
+        Assert.Equal(1.5, tileShape.H);
+        Assert.Equal(tileItem.Trait, tileShape.Trait);
+        Assert.Equal("Blue Fescue", tileShape.GroundCoverCode);
+        Assert.True(tileShape.IsGroundCoverSurface);
+        Assert.Null(tileShape.GroundCoverDepthIn);
+        Assert.Equal(tileItem.FillColor, tileShape.Fill);
+        Assert.Equal(tileItem.TextureKey, tileShape.TextureKey);
+    }
+
+    [Fact]
     public void Load_EmitsLoadMetric_OnHappyPath()
     {
         var observed = new List<(string Name, long Value, IReadOnlyDictionary<string, object?> Tags)>();

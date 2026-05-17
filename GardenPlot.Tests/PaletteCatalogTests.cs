@@ -1,10 +1,11 @@
 ﻿using System.Reflection;
+using System.Text.RegularExpressions;
 using GardenPlotWeb.Models;
 using GardenPlotWeb.Services.Catalog;
 
 namespace GardenPlot.Tests;
 
-public sealed class PaletteCatalogTests
+public sealed partial class PaletteCatalogTests
 {
     /// <summary>All static <c>PaletteItem[]</c> fields on <see cref="PaletteCatalog"/>.</summary>
     public static IEnumerable<object[]> CatalogArrays()
@@ -14,6 +15,16 @@ public sealed class PaletteCatalogTests
         {
             yield return new object[] { field.Name, (PaletteItem[])field.GetValue(null)! };
         }
+    }
+
+    [GeneratedRegex("fescue|carex|liriope|mondo|lomandra|sedge", RegexOptions.IgnoreCase)]
+    private static partial Regex GrassLikeCodeRegex();
+
+    private static IEnumerable<PaletteItem> AllCatalogItems()
+    {
+        return typeof(PaletteCatalog).GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(f => f.FieldType == typeof(PaletteItem[]))
+            .SelectMany(f => (PaletteItem[])f.GetValue(null)!);
     }
 
     [Theory]
@@ -94,5 +105,27 @@ public sealed class PaletteCatalogTests
             Assert.Equal(LaborType.Hardscape, item.LaborType);
             Assert.Equal(0.5, item.LaborHoursPerUnit);
         }
+    }
+
+    [Fact]
+    public void GrassLikeCodes_AreNeverPalettePlants()
+    {
+        PaletteItem[] matches = AllCatalogItems()
+            .Where(item => GrassLikeCodeRegex().IsMatch(item.Code))
+            .ToArray();
+
+        Assert.NotEmpty(matches);
+        Assert.DoesNotContain(matches, item => item.Kind == PaletteKind.Plant);
+    }
+
+    [Fact]
+    public void GroundCoverPlantCategory_UsesAreaBasedPlacement()
+    {
+        PaletteItem[] items = PaletteCatalog.For(PaletteCategory.GroundCoverPlants)
+            .Where(item => string.Equals(item.Trait, "ground-cover", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        Assert.NotEmpty(items);
+        Assert.All(items, item => Assert.Equal(PaletteKind.GroundCoverSurface, item.Kind));
     }
 }
