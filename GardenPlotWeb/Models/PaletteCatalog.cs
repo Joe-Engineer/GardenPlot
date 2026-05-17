@@ -151,6 +151,7 @@ public static class PaletteCatalog
             PaletteKind.CustomTile => [],
             PaletteKind.GroundCover => GroundCoverMaterials,
             PaletteKind.GroundCoverSurface => GroundCoverSurfaceCovers,
+            PaletteKind.Edging => Edging,
             _ => [],
         };
     }
@@ -417,6 +418,19 @@ public static class PaletteCatalog
         new("Eco-Lawn Mix",             PaletteKind.GroundCoverSurface, 1, 1, "seed-grass",   StampShapeKind: ShapeKind.Rectangle, FillColor: "#84a35a", StrokeColor: "#4a6a2a", TextureKey: "grass-blades"),
     ];
 
+    /// <summary>Linear edging materials sold by length and rendered as edge polylines.</summary>
+    public static readonly PaletteItem[] Edging =
+    [
+        new("Steel Edging (4\")", PaletteKind.Edging, 4, 1, "edging", StrokeColor: "#4f5962"),
+        new("Steel Edging (6\")", PaletteKind.Edging, 4, 1, "edging", StrokeColor: "#55606a"),
+        new("Aluminum Edging", PaletteKind.Edging, 4, 1, "edging", StrokeColor: "#9ea6ae"),
+        new("Polyethylene Edging (Trex-style)", PaletteKind.Edging, 4, 1, "edging", StrokeColor: "#705746"),
+        new("Brick on edge", PaletteKind.Edging, 4, 1, "edging", StrokeColor: "#91513d"),
+        new("Cobble", PaletteKind.Edging, 4, 1, "edging", StrokeColor: "#6d655e"),
+        new("Concrete Curb", PaletteKind.Edging, 4, 1, "edging", StrokeColor: "#9c9b96"),
+        new("Paver Soldier Course", PaletteKind.Edging, 4, 1, "edging", StrokeColor: "#7d5b47"),
+    ];
+
     /// <summary>Filters items by user-facing palette category (combobox option).</summary>
     public static IReadOnlyList<PaletteItem> For(PaletteCategory category)
     {
@@ -441,6 +455,7 @@ public static class PaletteCatalog
             PaletteCategory.FocalPoint => FocalPoints,
             PaletteCategory.GroundCoverMaterials => GroundCoverMaterials,
             PaletteCategory.GroundCoverSurface => GroundCoverSurfaceCovers,
+            PaletteCategory.Edging => Edging,
             PaletteCategory.Bulbs => [.. Plants.Where(p => string.Equals(p.Trait, "bulb", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.GroundCoverPlants => [.. Plants.Where(p => string.Equals(p.Trait, "groundcover", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.GrassesTurf => [.. Grasses.Where(g => !string.Equals(g.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase))],
@@ -498,6 +513,7 @@ public static class PaletteCatalog
             },
             PaletteKind.GroundCover => PaletteCategory.GroundCoverMaterials,
             PaletteKind.GroundCoverSurface => PaletteCategory.GroundCoverSurface,
+            PaletteKind.Edging => PaletteCategory.Edging,
             _ => PaletteCategory.BedKits,
         };
     }

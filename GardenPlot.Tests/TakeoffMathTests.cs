@@ -1,13 +1,14 @@
-﻿// <copyright file="TakeoffMathTests.cs" company="Garden Plot">
+// <copyright file="TakeoffMathTests.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
+using System.Collections.Generic;
 using GardenPlotWeb.Models;
 using Xunit;
 
 namespace GardenPlot.Tests;
 
-public class TakeoffMathTests
+public sealed class TakeoffMathTests
 {
     private static CatalogItem MakeCatalog(
         double? defaultWaste = 10,
@@ -166,5 +167,90 @@ public class TakeoffMathTests
         var item = new TakeoffItem { CatalogCode = "X", NameOverride = "Custom name" };
 
         Assert.Equal("Custom name", TakeoffMath.DisplayName(item, catalog));
+    }
+
+    [Fact]
+    public void EffectiveLengthFt_ZeroOrOnePoint_ReturnsZero()
+    {
+        var empty = new Shape { Kind = ShapeKind.Edge };
+        var single = new Shape { Kind = ShapeKind.Edge, Points = new List<Point> { new(1, 2) } };
+
+        Assert.Equal(0, TakeoffMath.EffectiveLengthFt(empty));
+        Assert.Equal(0, TakeoffMath.EffectiveLengthFt(single));
+    }
+
+    [Fact]
+    public void EffectiveLengthFt_SingleSegment_ReturnsSegmentLength()
+    {
+        var edge = new Shape
+        {
+            Kind = ShapeKind.Edge,
+            Points = new List<Point> { new(0, 0), new(3, 4) },
+        };
+
+        Assert.Equal(5, TakeoffMath.EffectiveLengthFt(edge));
+    }
+
+    [Fact]
+    public void EffectiveLengthFt_LShape_ReturnsSumOfSegments()
+    {
+        var edge = new Shape
+        {
+            Kind = ShapeKind.Edge,
+            Points = new List<Point> { new(0, 0), new(3, 0), new(3, 4) },
+        };
+
+        Assert.Equal(7, TakeoffMath.EffectiveLengthFt(edge));
+    }
+
+    [Fact]
+    public void EffectiveLengthFt_ClosedLoop_ReturnsClosedPerimeter()
+    {
+        var edge = new Shape
+        {
+            Kind = ShapeKind.Edge,
+            CloseEdge = true,
+            Points = new List<Point> { new(0, 0), new(4, 0), new(4, 3), new(0, 3) },
+        };
+
+        Assert.Equal(14, TakeoffMath.EffectiveLengthFt(edge));
+        Assert.Equal(4, TakeoffMath.EffectiveSegmentCount(edge));
+    }
+
+    [Fact]
+    public void Reconcile_EdgeQuantityRoundsGeometryAndHonorsOverride()
+    {
+        var edge = new Shape
+        {
+            Kind = ShapeKind.Edge,
+            Label = "Steel Edging (4\")",
+            Points = new List<Point> { new(0, 0), new(1.234, 0), new(1.234, 5.678) },
+        };
+
+        TakeoffMath.Reconcile(edge, Catalog.Find(edge.Label));
+
+        Assert.NotNull(edge.Takeoff);
+        Assert.Equal("lf", edge.Takeoff!.Unit);
+        Assert.Equal(LaborType.Hardscape, edge.Takeoff.LaborType);
+        Assert.Equal(6.91, edge.Takeoff.Quantity);
+
+        edge.Takeoff.QuantityOverride = 9.876;
+        TakeoffMath.Reconcile(edge, Catalog.Find(edge.Label));
+
+        Assert.Equal(9.88, edge.Takeoff.Quantity);
+    }
+
+    [Fact]
+    public void Catalog_EdgingSeeds_UseLinearFeetAndHardscape()
+    {
+        Assert.True(Catalog.Edging.Length >= 8);
+        Assert.All(Catalog.Edging, item =>
+        {
+            Assert.Equal("lf", item.Unit);
+            Assert.Equal(LaborType.Hardscape, item.LaborType);
+            Assert.True(item.LaborHoursPerUnit > 0);
+            Assert.True((item.DefaultWastePercent ?? 0) > 0);
+            Assert.NotNull(item.DefaultThicknessIn);
+        });
     }
 }

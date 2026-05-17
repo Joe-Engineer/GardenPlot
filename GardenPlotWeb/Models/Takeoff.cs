@@ -1,4 +1,4 @@
-﻿// <copyright file="Takeoff.cs" company="Garden Plot">
+// <copyright file="Takeoff.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -39,6 +39,8 @@ public sealed class TakeoffItem
 
     public double Quantity { get; set; } = 1;
 
+    public double? QuantityOverride { get; set; }
+
     public string? UnitOverride { get; set; }
 
     public double? DepthInOverride { get; set; }
@@ -55,6 +57,16 @@ public sealed class TakeoffItem
 
     /// <summary>Bound canvas shape, or <see langword="null"/> for virtual items.</summary>
     public Guid? ShapeId { get; set; }
+
+    public string Unit { get; set; } = "ea";
+
+    public LaborType LaborType { get; set; } = LaborType.None;
+
+    public double LaborHoursPerUnit { get; set; }
+
+    public double WastePercent { get; set; }
+
+    public double? DefaultThicknessIn { get; set; }
 }
 
 /// <summary>Monotonic, never-decremented integer source for <see cref="TakeoffItem.Id"/>.</summary>
@@ -93,7 +105,12 @@ public static class TakeoffMath
             return item.UnitOverride!;
         }
 
-        return catalog?.Unit ?? "ea";
+        if (!string.IsNullOrWhiteSpace(catalog?.Unit))
+        {
+            return catalog.Unit!;
+        }
+
+        return string.IsNullOrWhiteSpace(item.Unit) ? "ea" : item.Unit;
     }
 
     public static double? EffectiveDepthIn(TakeoffItem item, CatalogItem? catalog)
@@ -103,17 +120,17 @@ public static class TakeoffMath
 
     public static double EffectiveWastePercent(TakeoffItem item, CatalogItem? catalog)
     {
-        return item.WastePercentOverride ?? catalog?.DefaultWastePercent ?? 0;
+        return item.WastePercentOverride ?? catalog?.DefaultWastePercent ?? item.WastePercent;
     }
 
     public static LaborType EffectiveLaborType(TakeoffItem item, CatalogItem? catalog)
     {
-        return item.LaborTypeOverride ?? catalog?.LaborType ?? LaborType.None;
+        return item.LaborTypeOverride ?? catalog?.LaborType ?? item.LaborType;
     }
 
     public static double EffectiveLaborHoursPerUnit(TakeoffItem item, CatalogItem? catalog)
     {
-        return item.LaborHoursPerUnitOverride ?? catalog?.LaborHoursPerUnit ?? 0;
+        return item.LaborHoursPerUnitOverride ?? catalog?.LaborHoursPerUnit ?? item.LaborHoursPerUnit;
     }
 
     public static double EffectiveLaborHours(TakeoffItem item, CatalogItem? catalog)
@@ -195,5 +212,97 @@ public static class TakeoffMath
         return amount.HasValue
             ? "$" + amount.Value.ToString("0.00", CultureInfo.InvariantCulture)
             : "—";
+    }
+
+    public static double EffectiveLengthFt(Shape shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+
+        if (shape.Points.Count < 2)
+        {
+            return 0;
+        }
+
+        double total = 0;
+        for (var i = 1; i < shape.Points.Count; i++)
+        {
+            total += Distance(shape.Points[i - 1], shape.Points[i]);
+        }
+
+        if (shape.CloseEdge)
+        {
+            total += Distance(shape.Points[0], shape.Points[^1]);
+        }
+
+        return total;
+    }
+
+    public static int EffectiveSegmentCount(Shape shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+
+        if (shape.Points.Count < 2)
+        {
+            return 0;
+        }
+
+        return (shape.Points.Count - 1) + (shape.CloseEdge ? 1 : 0);
+    }
+
+    public static void Reconcile(Shape shape, CatalogItem? catalogItem = null)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+
+        if (shape.Kind != ShapeKind.Edge)
+        {
+            return;
+        }
+
+        catalogItem ??= Catalog.Find(shape.Takeoff?.CatalogCode ?? shape.Label);
+        shape.Takeoff ??= Catalog.CreateTakeoff(shape.Takeoff?.CatalogCode ?? shape.Label);
+
+        if (catalogItem is not null)
+        {
+            shape.Takeoff.CatalogSource = catalogItem.Source;
+            shape.Takeoff.CatalogPackId = catalogItem.PackId;
+            shape.Takeoff.CatalogCode = catalogItem.Code;
+            shape.Takeoff.Unit = catalogItem.Unit ?? "lf";
+            shape.Takeoff.LaborType = catalogItem.LaborType;
+            shape.Takeoff.LaborHoursPerUnit = catalogItem.LaborHoursPerUnit;
+            shape.Takeoff.WastePercent = catalogItem.DefaultWastePercent ?? 0;
+            shape.Takeoff.DefaultThicknessIn = catalogItem.DefaultThicknessIn;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(shape.Takeoff.CatalogCode) && !string.IsNullOrWhiteSpace(shape.Label))
+            {
+                shape.Takeoff.CatalogCode = shape.Label;
+            }
+
+            shape.Takeoff.CatalogSource = CatalogSource.Base;
+            if (string.IsNullOrWhiteSpace(shape.Takeoff.Unit))
+            {
+                shape.Takeoff.Unit = "lf";
+            }
+
+            if (shape.Takeoff.LaborType == LaborType.None)
+            {
+                shape.Takeoff.LaborType = LaborType.Hardscape;
+            }
+        }
+
+        shape.Takeoff.Quantity = shape.Takeoff.QuantityOverride is double overrideQuantity
+            ? RoundLengthFt(overrideQuantity)
+            : RoundLengthFt(EffectiveLengthFt(shape));
+    }
+
+    private static double RoundLengthFt(double lengthFt)
+        => Math.Round(lengthFt, 2, MidpointRounding.AwayFromZero);
+
+    private static double Distance(Point a, Point b)
+    {
+        var dx = a.X - b.X;
+        var dy = a.Y - b.Y;
+        return Math.Sqrt((dx * dx) + (dy * dy));
     }
 }

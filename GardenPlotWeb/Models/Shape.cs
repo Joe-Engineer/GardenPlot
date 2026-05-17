@@ -14,6 +14,7 @@ public class Shape
     public double H { get; set; }
     public double Rotation { get; set; }
     public List<Point> Points { get; set; } = new();
+    public bool CloseEdge { get; set; }
     public string? Label { get; set; }
 
     /// <summary>
@@ -43,6 +44,9 @@ public class Shape
     /// <summary>Optional custom tile background image reference. New values are client-local GUIDs (IndexedDB);
     /// legacy values are filenames served from /tile-images/.</summary>
     public string? TileBackgroundImageFileName { get; set; }
+
+    /// <summary>Optional bound takeoff item for length-based materials such as edging.</summary>
+    public TakeoffItem? Takeoff { get; set; }
 
     /// <summary>Ground-cover palette item code (e.g. "Pea Gravel"). Empty for non-ground-cover shapes.</summary>
     public string? GroundCoverCode { get; set; }

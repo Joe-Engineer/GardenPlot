@@ -1,4 +1,4 @@
-﻿// <copyright file="Catalog.cs" company="Garden Plot">
+// <copyright file="Catalog.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -55,6 +55,8 @@ public sealed class CatalogItem
 
     public double? DefaultDepthIn { get; set; }
 
+    public double? DefaultThicknessIn { get; set; }
+
     public double? DefaultWastePercent { get; set; }
 
     public decimal? MaterialUnitCost { get; set; }
@@ -75,3 +77,47 @@ public sealed class CatalogItem
 /// <param name="PackId">Pack identifier when <paramref name="Source"/> is <see cref="CatalogSource.Pack"/>.</param>
 /// <param name="Code">The item's stable code within the source/pack.</param>
 public readonly record struct CatalogItemRef(CatalogSource Source, string? PackId, string Code);
+
+public static class Catalog
+{
+    public static readonly CatalogItem[] Edging =
+    [
+        new() { Code = "Steel Edging (4\")", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Steel Edging (4\")", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.10, DefaultThicknessIn = 0.125 },
+        new() { Code = "Steel Edging (6\")", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Steel Edging (6\")", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.12, DefaultThicknessIn = 0.125 },
+        new() { Code = "Aluminum Edging", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Aluminum Edging", Unit = "lf", DefaultWastePercent = 5, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.08, DefaultThicknessIn = 0.125 },
+        new() { Code = "Polyethylene Edging (Trex-style)", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Polyethylene Edging (Trex-style)", Unit = "lf", DefaultWastePercent = 5, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.05, DefaultThicknessIn = 0.25 },
+        new() { Code = "Brick on edge", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Brick on edge", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.25, DefaultThicknessIn = 4.0 },
+        new() { Code = "Cobble", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Cobble", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.35, DefaultThicknessIn = 4.0 },
+        new() { Code = "Concrete Curb", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Concrete Curb", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.60, DefaultThicknessIn = 6.0 },
+        new() { Code = "Paver Soldier Course", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Paver Soldier Course", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.30, DefaultThicknessIn = 4.0 },
+    ];
+
+    public static readonly CatalogItem[] Base = [.. Edging];
+
+    public static CatalogItem? Find(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return null;
+        }
+
+        return Array.Find(Base, item => string.Equals(item.Code, code, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static TakeoffItem CreateTakeoff(string? code)
+    {
+        var resolved = Find(code);
+        return new TakeoffItem
+        {
+            CatalogSource = CatalogSource.Base,
+            CatalogPackId = null,
+            CatalogCode = resolved?.Code ?? code ?? string.Empty,
+            Quantity = 0,
+            Unit = resolved?.Unit ?? "lf",
+            LaborType = resolved?.LaborType ?? LaborType.Hardscape,
+            LaborHoursPerUnit = resolved?.LaborHoursPerUnit ?? 0,
+            WastePercent = resolved?.DefaultWastePercent ?? 0,
+            DefaultThicknessIn = resolved?.DefaultThicknessIn,
+        };
+    }
+}
