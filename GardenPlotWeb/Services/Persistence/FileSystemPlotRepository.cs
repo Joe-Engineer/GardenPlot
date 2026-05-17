@@ -27,7 +27,7 @@ namespace GardenPlotWeb.Services.Persistence;
 /// </remarks>
 public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
 {
-    internal const int IndexSchemaVersion = 1;
+    internal const int IndexSchemaVersion = 2;
 
     /// <summary>Filename used for the per-user plot index alongside the plot JSON files.</summary>
     public const string IndexFileName = "index.json";
@@ -93,6 +93,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                     LastPlotId = index.LastPlotId,
                     Ui = index.Ui ?? new UiPreferences(),
                     CustomPaletteItems = index.CustomPaletteItems ?? new List<PaletteItem>(),
+                    CustomCatalogItems = index.CustomCatalogItems ?? new List<CatalogItem>(),
                     Plots = new List<PlotData>(),
                 };
 
@@ -161,6 +162,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                 LastPlotId = library.LastPlotId,
                 Ui = library.Ui,
                 CustomPaletteItems = library.CustomPaletteItems,
+                CustomCatalogItems = library.CustomCatalogItems,
                 Plots = new List<PlotStoreIndexEntry>(),
             };
 
@@ -432,6 +434,8 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
         public UiPreferences Ui { get; set; } = new();
 
         public List<PaletteItem> CustomPaletteItems { get; set; } = new();
+
+        public List<CatalogItem> CustomCatalogItems { get; set; } = new();
 
         public List<PlotStoreIndexEntry> Plots { get; set; } = new();
     }

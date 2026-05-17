@@ -42,6 +42,9 @@ public static class ServiceCollectionExtensions
         // Catalog of static facts behind each takeoff item kind (Base + future Packs + per-library Custom).
         _ = services.AddSingleton<Catalog.ICatalogService, Catalog.CatalogService>();
 
+        // Project dossier helpers (as-built cloning, PNG export, photo storage, catalog suggestions).
+        _ = services.AddSingleton<ProjectDossierService>();
+
         return services;
     }
 }

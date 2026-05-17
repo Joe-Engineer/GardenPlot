@@ -228,6 +228,13 @@ export async function exportPng(svgEl, filename, scale) {
     }, 'image/png');
 }
 
+export function exportContainerSvgPng(containerEl, filename, scale) {
+    if (!containerEl) return;
+    const svgEl = containerEl.querySelector('svg');
+    if (!svgEl) return;
+    return exportPng(svgEl, filename, scale);
+}
+
 // Opens a print preview window with the given SVG element. The user can save as PDF from the print dialog.
 export function printSvg(svgEl, title) {
     if (!svgEl) return;

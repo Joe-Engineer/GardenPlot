@@ -326,6 +326,7 @@ public partial class GardenPlot
         double WastePercent,
         LaborType LaborType,
         double LaborHours,
+        double? ActualLaborHours,
         bool Bound,
         string? Notes,
         decimal? MaterialCost,
@@ -564,6 +565,7 @@ public partial class GardenPlot
                     TakeoffMath.EffectiveWastePercent(t, catalog),
                     TakeoffMath.EffectiveLaborType(t, catalog),
                     TakeoffMath.EffectiveLaborHours(t, catalog),
+                    t.ActualLaborHours,
                     t.ShapeId.HasValue,
                     t.Notes,
                     TakeoffMath.EffectiveMaterialCost(t, catalog),
@@ -618,6 +620,52 @@ public partial class GardenPlot
     {
         ArgumentNullException.ThrowIfNull(uiPreferences);
         return (uiPreferences.CustomerCutDate?.Date ?? DateTime.Today).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+
+    private async Task OnActualLaborHoursChangedAsync(TakeoffItem item, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double actual) && actual >= 0)
+        {
+            item.ActualLaborHours = actual;
+        }
+        else
+        {
+            item.ActualLaborHours = null;
+        }
+
+        await SaveAsync();
+    }
+
+    private void OpenCurrentDossier()
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        Navigation.NavigateTo($"/dossier/{currentPlot.Id}");
+    }
+
+    private async Task MakeAsBuiltCopyAsync()
+    {
+        if (currentPlot is null || currentPlot.Phase != PhaseKind.Design)
+        {
+            return;
+        }
+
+        PlotData clone = ProjectDossierService.CreateAsBuiltClone(currentPlot);
+        library.Plots.Add(clone);
+        currentPlot = clone;
+        undoStack.Clear();
+        ClearSelection();
+        selectedItem = null;
+        currentTool = Tool.Select;
+        await SaveAsync();
+    }
+
+    private void RefreshCatalogOverrides()
+    {
+        Catalog.SetCustomCatalogItems(library.CustomCatalogItems);
     }
 
     private static bool IsGroundCoverShape(Shape s)
@@ -986,7 +1034,7 @@ public partial class GardenPlot
         {
             if (isInternalView)
             {
-                sb.AppendLine("Id,Kind,Name,Quantity,Unit,WastePercent,LaborType,LaborHours,MaterialCost,LaborCost,MarkupPercent,LineTotal,Bound,Notes");
+                sb.AppendLine("Id,Kind,Name,Quantity,Unit,WastePercent,LaborType,LaborHours,ActualLaborHours,MaterialCost,LaborCost,MarkupPercent,LineTotal,Bound,Notes");
                 foreach (TakeoffItemRow row in itemRows)
                 {
                     sb.Append(row.Id.ToString(CultureInfo.InvariantCulture)).Append(',')
@@ -997,6 +1045,7 @@ public partial class GardenPlot
                       .Append(FormatTakeoffPercent(row.WastePercent)).Append(',')
                       .Append(CsvField(row.LaborType.ToString())).Append(',')
                       .Append(FormatTakeoffNumber(row.LaborHours)).Append(',')
+                      .Append(CsvField(row.ActualLaborHours?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty)).Append(',')
                       .Append(CsvField(TakeoffMath.FormatCurrency(row.MaterialCost))).Append(',')
                       .Append(CsvField(TakeoffMath.FormatCurrency(row.LaborCost))).Append(',')
                       .Append(FormatTakeoffPercent(row.MarkupPercent)).Append(',')
@@ -1885,7 +1934,7 @@ public partial class GardenPlot
                             SessionTraceId, loadedFromKey ?? "(none)", loadWasAuthoritative);
                     }
 
-                    Catalog.SetCustomCatalogItems(library.CustomCatalogItems);
+                    RefreshCatalogOverrides();
                     currentPlot = library.Plots.FirstOrDefault(p => p.Id == library.LastPlotId)
                                   ?? library.Plots[0];
                     library.LastPlotId = currentPlot.Id;
@@ -1927,6 +1976,7 @@ public partial class GardenPlot
                             if (retryAuthoritative && retryLibrary is not null && TotalShapeCount(retryLibrary) > 0)
                             {
                                 library = retryLibrary;
+                                RefreshCatalogOverrides();
                                 currentPlot = library.Plots.FirstOrDefault(p => p.Id == library.LastPlotId)
                                               ?? library.Plots.FirstOrDefault()
                                               ?? currentPlot;
@@ -1947,6 +1997,7 @@ public partial class GardenPlot
                 {
                     // Last-resort recovery so the page does not stay stuck on Loading…
                     library = new PlotLibrary();
+                    RefreshCatalogOverrides();
                     var fallback = new PlotData { Name = "Garden", WidthFt = 120, HeightFt = 120 };
                     library.Plots.Add(fallback);
                     library.LastPlotId = fallback.Id;
@@ -2193,6 +2244,7 @@ public partial class GardenPlot
             p.Shapes ??= new List<Shape>();
             p.DropGroups ??= new List<DropGroup>();
             p.KitRotations ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            p.PhotoFileNames ??= new List<string>();
             p.Takeoff ??= new List<TakeoffItem>();
             p.TakeoffIds ??= new TakeoffSequence();
         }
@@ -2339,6 +2391,7 @@ public partial class GardenPlot
 
         if (currentPlot is not null)
         {
+            RefreshCatalogOverrides();
             currentPlot.ModifiedUtc = DateTime.UtcNow;
             library.LastPlotId = currentPlot.Id;
         }

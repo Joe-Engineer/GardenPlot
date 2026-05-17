@@ -6,10 +6,24 @@ using GardenPlotWeb.Services.Persistence;
 
 namespace GardenPlotWeb.Models;
 
+public enum PhaseKind
+{
+    Design,
+    AsBuilt,
+}
+
 public class PlotData
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "Garden";
+    public PhaseKind Phase { get; set; } = PhaseKind.Design;
+    public Guid? SourcePlotId { get; set; }
+    public string? Address { get; set; }
+    public DateTime? DesignStartedUtc { get; set; }
+    public DateTime? InstalledUtc { get; set; }
+    public DateTime? HandedOverUtc { get; set; }
+    public string? Notes { get; set; }
+    public List<string> PhotoFileNames { get; set; } = new();
     public double WidthFt { get; set; } = 120;
     public double HeightFt { get; set; } = 120;
 

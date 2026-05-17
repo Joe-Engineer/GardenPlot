@@ -1,0 +1,599 @@
+﻿@page "/dossier/{PlotId:guid}"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@using System.Globalization
+@using System.Text.Json
+@using GardenPlotWeb.Models
+@using GardenPlotWeb.Services
+@using GardenPlotWeb.Services.Persistence
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject ProjectDossierService DossierService
+@inject PlotLibraryLoader PlotLibraryLoader
+@inject IPlotRepository PlotRepository
+@inject ILogger<Dossier> Logger
+
+<PageTitle>Project Dossier</PageTitle>
+
+@if (!loaded)
+{
+    <p><em>Loading dossier…</em></p>
+}
+else if (currentPlot is null)
+{
+    <div class="alert alert-warning">Plot not found.</div>
+    <button class="btn btn-sm btn-outline-secondary" @onclick="GoBack">Back to plot</button>
+}
+else
+{
+    var sourcePlot = currentPlot.SourcePlotId is Guid sourcePlotId ? library.Plots.FirstOrDefault(plot => plot.Id == sourcePlotId) : null;
+
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="mb-1">Project dossier</h1>
+            <div class="text-muted small d-flex flex-wrap gap-2 align-items-center">
+                <span class="badge @(currentPlot.Phase == PhaseKind.AsBuilt ? "text-bg-warning" : "text-bg-secondary")">@(currentPlot.Phase == PhaseKind.AsBuilt ? "As-built" : "Design")</span>
+                @if (sourcePlot is not null)
+                {
+                    <span>Source: @sourcePlot.Name</span>
+                }
+            </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="GoBack">Back to plot</button>
+            <button class="btn btn-sm btn-primary" @onclick="SaveDetailsAsync">Save dossier</button>
+            <button class="btn btn-sm btn-outline-success" @onclick="ExportPlotPngAsync">Export final plot PNG</button>
+            <button class="btn btn-sm btn-outline-secondary" disabled title="TODO: enable when QuestPDF / issue #6 lands">PDF export TODO</button>
+            @if (currentPlot.Phase == PhaseKind.AsBuilt)
+            {
+                <button class="btn btn-sm btn-outline-warning" @onclick="OpenCatalogSuggestionsAsync">Suggest catalog updates</button>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="alert alert-success py-2">@statusMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger py-2">@errorMessage</div>
+    }
+
+    <div class="row g-3">
+        <div class="col-12 col-xl-5">
+            <div class="card h-100">
+                <div class="card-header">Project details</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label small">Project name</label>
+                        <input class="form-control" @bind="currentPlot.Name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">Address</label>
+                        <textarea class="form-control" rows="3" @bind="currentPlot.Address"></textarea>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label small">Design started</label>
+                            <input class="form-control" type="date" value="@DateInputValue(currentPlot.DesignStartedUtc)" @onchange="e => OnDateChanged(e, value => currentPlot.DesignStartedUtc = value)" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Installed</label>
+                            <input class="form-control" type="date" value="@DateInputValue(currentPlot.InstalledUtc)" @onchange="e => OnDateChanged(e, value => currentPlot.InstalledUtc = value)" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Handed over</label>
+                            <input class="form-control" type="date" value="@DateInputValue(currentPlot.HandedOverUtc)" @onchange="e => OnDateChanged(e, value => currentPlot.HandedOverUtc = value)" />
+                        </div>
+                    </div>
+                    <div class="small text-muted mt-3">
+                        Created @currentPlot.CreatedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                        · Updated @currentPlot.ModifiedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-7">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Final plot</span>
+                    <span class="small text-muted">PNG export uses the existing SVG→PNG pipeline.</span>
+                </div>
+                <div class="card-body bg-light">
+                    <div class="border rounded bg-white p-2" @ref="plotPreviewHost">
+                        @((MarkupString)plotPreviewMarkup)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-8">
+            <div class="card h-100">
+                <div class="card-header">As-built takeoff</div>
+                <div class="card-body p-0">
+                    @if (takeoffRows.Count == 0)
+                    {
+                        <div class="p-3 text-muted small">Nothing placed yet.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0 align-middle">
+                                <thead>
+                                    <tr>
+                                        <th class="ps-3">Type</th>
+                                        <th>Name</th>
+                                        <th class="text-end">Qty</th>
+                                        <th>Unit</th>
+                                        <th class="text-end">Est. hrs</th>
+                                        <th class="text-end pe-3">Actual hrs</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (DossierTakeoffRow row in takeoffRows)
+                                    {
+                                        <tr>
+                                            <td class="ps-3">@row.Kind</td>
+                                            <td>@row.Name</td>
+                                            <td class="text-end">@row.Quantity</td>
+                                            <td>@row.UnitOfMeasure</td>
+                                            <td class="text-end">@row.EstimatedLaborHours.ToString("0.##", CultureInfo.InvariantCulture)</td>
+                                            <td class="text-end pe-3" style="min-width:7rem;">
+                                                <input type="number"
+                                                       min="0"
+                                                       step="0.25"
+                                                       class="form-control form-control-sm text-end"
+                                                       value="@(row.Item.ActualLaborHours?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty)"
+                                                       @onchange="@(async e => await OnActualHoursChangedAsync(row, e))" />
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-4">
+            <div class="card h-100">
+                <div class="card-header">Hours summary</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Estimated total</span>
+                        <strong>@hoursSummary.EstimatedHours.ToString("0.##", CultureInfo.InvariantCulture) hrs</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Actual total</span>
+                        <strong>@hoursSummary.ActualHours.ToString("0.##", CultureInfo.InvariantCulture) hrs</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Variance</span>
+                        <strong>@(hoursSummary.ActualHours - hoursSummary.EstimatedHours).ToString("0.##", CultureInfo.InvariantCulture) hrs</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">Photo gallery</div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <div class="small text-muted">Photos are stored under a per-project plot-images folder.</div>
+                        <InputFile OnChange="OnPhotosSelectedAsync" multiple accept="image/*" class="form-control" style="max-width:22rem;" />
+                    </div>
+                    @if (currentPlot.PhotoFileNames.Count == 0)
+                    {
+                        <div class="text-muted small">No photos uploaded yet.</div>
+                    }
+                    else
+                    {
+                        <div class="row g-3">
+                            @foreach (string photo in currentPlot.PhotoFileNames)
+                            {
+                                <div class="col-12 col-md-6 col-xl-3">
+                                    <div class="border rounded p-2 h-100">
+                                        <img src="@PhotoUrl(photo)" alt="Project photo" class="img-fluid rounded mb-2" />
+                                        <div class="small text-truncate" title="@photo">@Path.GetFileName(photo)</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">Notes</div>
+                <div class="card-body">
+                    <textarea class="form-control" rows="6" @bind="currentPlot.Notes"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showCatalogSuggestionModal)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Suggest catalog updates</h5>
+                    <button type="button" class="btn-close" @onclick="CloseCatalogSuggestionModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted">Create or update custom catalog overrides for takeoff items whose actual labor diverges by more than 20%.</p>
+                    @if (catalogSuggestions.Count == 0)
+                    {
+                        <div class="alert alert-secondary mb-0">No takeoff items are above the 20% divergence threshold.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>Item</th>
+                                        <th class="text-end">Current / unit</th>
+                                        <th class="text-end">Suggested / unit</th>
+                                        <th class="text-end">Estimated</th>
+                                        <th class="text-end">Actual</th>
+                                        <th class="text-end">Divergence</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (CatalogUpdateSuggestion suggestion in catalogSuggestions)
+                                    {
+                                        string key = SuggestionKey(suggestion);
+                                        <tr>
+                                            <td><input type="checkbox" checked="@selectedSuggestionKeys.Contains(key)" @onchange="e => ToggleSuggestion(key, e)" /></td>
+                                            <td>
+                                                <div>@suggestion.Name</div>
+                                                <div class="x-small text-muted">@suggestion.Code · @suggestion.UnitOfMeasure</div>
+                                            </td>
+                                            <td class="text-end">@suggestion.CurrentLaborHoursPerUnit.ToString("0.###", CultureInfo.InvariantCulture)</td>
+                                            <td class="text-end">@suggestion.SuggestedLaborHoursPerUnit.ToString("0.###", CultureInfo.InvariantCulture)</td>
+                                            <td class="text-end">@suggestion.EstimatedHours.ToString("0.##", CultureInfo.InvariantCulture)</td>
+                                            <td class="text-end">@suggestion.ActualHours.ToString("0.##", CultureInfo.InvariantCulture)</td>
+                                            <td class="text-end">@((suggestion.DivergenceRatio * 100).ToString("0.#", CultureInfo.InvariantCulture))%</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-secondary" @onclick="CloseCatalogSuggestionModal">Close</button>
+                    <button class="btn btn-sm btn-primary" @onclick="ApplySelectedCatalogSuggestionsAsync" disabled="@(catalogSuggestions.Count == 0 || selectedSuggestionKeys.Count == 0)">Apply selected</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid PlotId { get; set; }
+
+    private const string StorageKeyPrimary = "gardenplot.library.v2";
+    private const string StorageKeyBackup1 = "gardenplot.library.v2.bak1";
+    private const string StorageKeyBackup2 = "gardenplot.library.v2.bak2";
+    private const string StorageKeyLegacy = "gardenplot.library.v1";
+    private const long ProjectPhotoMaxBytes = 30L * 1024 * 1024;
+
+    private PlotLibrary library = new();
+    private PlotData? currentPlot;
+    private bool loaded;
+    private string? statusMessage;
+    private string? errorMessage;
+    private IJSObjectReference? jsModule;
+    private ElementReference plotPreviewHost;
+    private string plotPreviewMarkup = string.Empty;
+    private List<DossierTakeoffRow> takeoffRows = [];
+    private (double EstimatedHours, double ActualHours) hoursSummary;
+    private bool showCatalogSuggestionModal;
+    private List<CatalogUpdateSuggestion> catalogSuggestions = [];
+    private HashSet<string> selectedSuggestionKeys = [];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/gardenplot.js");
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (jsModule is not null)
+        {
+            try
+            {
+                await jsModule.DisposeAsync();
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            PlotLibrary? loadedLibrary = null;
+            string[] keys = [StorageKeyPrimary, StorageKeyBackup1, StorageKeyBackup2, StorageKeyLegacy];
+
+            if (jsModule is not null)
+            {
+                string? idbJson = await jsModule.InvokeAsync<string?>("idbGet", StorageKeyPrimary);
+                if (!string.IsNullOrWhiteSpace(idbJson))
+                {
+                    loadedLibrary = NormalizeLibrary(PlotLibraryLoader.Load(idbJson, "dossier-indexeddb"));
+                }
+            }
+
+            if (loadedLibrary is null)
+            {
+                foreach (string key in keys)
+                {
+                    string? json = await JS.InvokeAsync<string?>("localStorage.getItem", key);
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        loadedLibrary = NormalizeLibrary(PlotLibraryLoader.Load(json, $"dossier-localstorage:{key}"));
+                        if (loadedLibrary.Plots.Count > 0)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            library = loadedLibrary ?? NormalizeLibrary(await PlotRepository.LoadLibraryAsync()) ?? new PlotLibrary();
+            currentPlot = library.Plots.FirstOrDefault(plot => plot.Id == PlotId);
+            RefreshDerivedState();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Dossier load failed for plot {PlotId}.", PlotId);
+            errorMessage = "Could not load the dossier.";
+        }
+        finally
+        {
+            loaded = true;
+        }
+    }
+
+    private async Task SaveDetailsAsync()
+    {
+        statusMessage = null;
+        errorMessage = null;
+
+        try
+        {
+            await SaveLibraryAsync();
+            statusMessage = "Dossier saved.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Dossier save failed for plot {PlotId}.", PlotId);
+            errorMessage = "Could not save the dossier.";
+        }
+    }
+
+    private async Task SaveLibraryAsync()
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        currentPlot.ModifiedUtc = DateTime.UtcNow;
+        library.LastPlotId = currentPlot.Id;
+        string json = JsonSerializer.Serialize(library);
+
+        if (jsModule is not null)
+        {
+            await jsModule.InvokeVoidAsync("idbSet", StorageKeyPrimary, json);
+        }
+
+        await JS.InvokeVoidAsync("localStorage.setItem", StorageKeyPrimary, json);
+        await JS.InvokeVoidAsync("localStorage.setItem", StorageKeyBackup1, json);
+        try
+        {
+            await PlotRepository.SaveLibraryAsync(library);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Repository save failed while saving dossier for plot {PlotId}.", PlotId);
+        }
+
+        RefreshDerivedState();
+    }
+
+    private void RefreshDerivedState()
+    {
+        if (currentPlot is null)
+        {
+            takeoffRows = [];
+            plotPreviewMarkup = string.Empty;
+            hoursSummary = default;
+            return;
+        }
+
+        takeoffRows = DossierService.BuildDossierTakeoff(currentPlot, library.CustomCatalogItems).ToList();
+        hoursSummary = ProjectDossierService.SummarizeHours(takeoffRows);
+        plotPreviewMarkup = DossierService.BuildPlotSvg(currentPlot);
+    }
+
+    private async Task ExportPlotPngAsync()
+    {
+        if (jsModule is null || currentPlot is null)
+        {
+            return;
+        }
+
+        await jsModule.InvokeVoidAsync(
+            "exportContainerSvgPng",
+            plotPreviewHost,
+            $"{Sanitize(currentPlot.Name)}-dossier-plot.png",
+            2);
+    }
+
+    private async Task OnPhotosSelectedAsync(InputFileChangeEventArgs e)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        errorMessage = null;
+        statusMessage = null;
+
+        try
+        {
+            foreach (IBrowserFile file in e.GetMultipleFiles())
+            {
+                await using Stream input = file.OpenReadStream(ProjectPhotoMaxBytes);
+                string relativePath = await DossierService.SaveProjectPhotoAsync(currentPlot.Id, file.Name, input);
+                currentPlot.PhotoFileNames.Add(relativePath);
+            }
+
+            await SaveLibraryAsync();
+            statusMessage = "Photos uploaded.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Photo upload failed for plot {PlotId}.", PlotId);
+            errorMessage = "Could not upload one or more photos.";
+        }
+    }
+
+    private async Task OnActualHoursChangedAsync(DossierTakeoffRow row, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double actual) && actual >= 0)
+        {
+            row.Item.ActualLaborHours = actual;
+        }
+        else
+        {
+            row.Item.ActualLaborHours = null;
+        }
+
+        await SaveLibraryAsync();
+    }
+
+    private async Task OpenCatalogSuggestionsAsync()
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        catalogSuggestions = DossierService.SuggestCatalogUpdates(currentPlot, library.CustomCatalogItems).ToList();
+        selectedSuggestionKeys = catalogSuggestions.Select(SuggestionKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        showCatalogSuggestionModal = true;
+        await Task.CompletedTask;
+    }
+
+    private void CloseCatalogSuggestionModal()
+    {
+        showCatalogSuggestionModal = false;
+    }
+
+    private async Task ApplySelectedCatalogSuggestionsAsync()
+    {
+        IEnumerable<CatalogUpdateSuggestion> selected = catalogSuggestions.Where(suggestion => selectedSuggestionKeys.Contains(SuggestionKey(suggestion)));
+        int applied = DossierService.ApplyCatalogUpdates(library, selected);
+        showCatalogSuggestionModal = false;
+        await SaveLibraryAsync();
+        statusMessage = applied == 1 ? "Applied 1 custom catalog update." : $"Applied {applied} custom catalog updates.";
+    }
+
+    private void ToggleSuggestion(string key, ChangeEventArgs e)
+    {
+        bool isChecked = e.Value is bool value && value;
+        if (isChecked)
+        {
+            _ = selectedSuggestionKeys.Add(key);
+        }
+        else
+        {
+            _ = selectedSuggestionKeys.Remove(key);
+        }
+    }
+
+    private static string SuggestionKey(CatalogUpdateSuggestion suggestion)
+    {
+        return $"{suggestion.Source}|{suggestion.PackId}|{suggestion.Code}";
+    }
+
+    private static PlotLibrary NormalizeLibrary(PlotLibrary? loaded)
+    {
+        PlotLibrary safe = loaded ?? new PlotLibrary();
+        safe.Plots ??= [];
+        safe.Ui ??= new UiPreferences();
+        safe.CustomPaletteItems ??= [];
+        safe.CustomCatalogItems ??= [];
+
+        foreach (PlotData plot in safe.Plots)
+        {
+            plot.Shapes ??= [];
+            plot.DropGroups ??= [];
+            plot.KitRotations ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            plot.PhotoFileNames ??= [];
+            plot.Takeoff ??= [];
+            plot.TakeoffIds ??= new TakeoffSequence();
+        }
+
+        return safe;
+    }
+
+    private static string DateInputValue(DateTime? value)
+    {
+        return value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    private static void OnDateChanged(ChangeEventArgs e, Action<DateTime?> setter)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime parsed))
+        {
+            setter(parsed.Date.ToUniversalTime());
+        }
+        else
+        {
+            setter(null);
+        }
+    }
+
+    private static string PhotoUrl(string relativePath)
+    {
+        return ProjectDossierService.ProjectPhotoUrl(relativePath);
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    private static string Sanitize(string name)
+    {
+        char[] chars = name.Select(c => char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '_').ToArray();
+        string value = new string(chars).Trim('_');
+        return string.IsNullOrEmpty(value) ? "garden-plot" : value;
+    }
+}

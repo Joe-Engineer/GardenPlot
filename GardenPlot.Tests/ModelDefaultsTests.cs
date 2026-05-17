@@ -21,6 +21,8 @@ public sealed class ModelDefaultsTests
         var p = new PlotData();
         Assert.NotEqual(Guid.Empty, p.Id);
         Assert.Equal("Garden", p.Name);
+        Assert.Equal(PhaseKind.Design, p.Phase);
+        Assert.Null(p.SourcePlotId);
         Assert.Equal(120, p.WidthFt);
         Assert.Equal(120, p.HeightFt);
         Assert.True(p.ShowGrid);
@@ -28,6 +30,9 @@ public sealed class ModelDefaultsTests
         Assert.True(p.GridLineWidth > 0);
         Assert.Empty(p.Shapes);
         Assert.Empty(p.DropGroups);
+        Assert.Empty(p.PhotoFileNames);
+        Assert.Empty(p.Takeoff);
+        Assert.Equal(1, p.TakeoffIds.Next);
         Assert.InRange((DateTime.UtcNow - p.CreatedUtc).TotalSeconds, 0, 60);
     }
 
@@ -37,6 +42,7 @@ public sealed class ModelDefaultsTests
         var lib = new PlotLibrary();
         Assert.Empty(lib.Plots);
         Assert.Empty(lib.CustomPaletteItems);
+        Assert.Empty(lib.CustomCatalogItems);
         Assert.NotNull(lib.Ui);
     }
 

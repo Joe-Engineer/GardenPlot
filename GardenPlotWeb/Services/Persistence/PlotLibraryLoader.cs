@@ -133,6 +133,7 @@ public sealed class PlotLibraryLoader
                 return null;
             }
 
+            library = NormalizeLibrary(library);
             library.SchemaVersion = PlotSchema.Current;
 
             LoadCounter.Add(
@@ -277,6 +278,28 @@ public sealed class PlotLibraryLoader
         string? label = shape.Label;
         string code = string.IsNullOrWhiteSpace(label) ? shape.Kind.ToString() : label;
         return (CatalogSource.Base, null, code);
+    }
+
+    private static PlotLibrary NormalizeLibrary(PlotLibrary library)
+    {
+        ArgumentNullException.ThrowIfNull(library);
+
+        library.Plots ??= [];
+        library.Ui ??= new UiPreferences();
+        library.CustomPaletteItems ??= [];
+        library.CustomCatalogItems ??= [];
+
+        foreach (PlotData plot in library.Plots)
+        {
+            plot.Shapes ??= [];
+            plot.DropGroups ??= [];
+            plot.KitRotations ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            plot.PhotoFileNames ??= [];
+            plot.Takeoff ??= [];
+            plot.TakeoffIds ??= new TakeoffSequence();
+        }
+
+        return library;
     }
 
     private static int ReadVersion(JsonObject root)
