@@ -103,6 +103,9 @@ Plant sizes are based on commonly cited horticultural references (extension serv
 - **Multi-select** via **Shift+click**.
 - **Group drag**: snapshot all selected shapes' origins on `pointerdown`, apply the same delta on move, clamp the **union** of rotated AABBs to the plot.
 - **Group rotate**: Ctrl+wheel rotates each selected shape around its own center, with per-shape post-rotation reclamp.
+- **Group / Ungroup toolbar actions**:
+  - **Group** is enabled whenever **≥ 2** shapes are selected, even if the selection spans existing groups; regrouping assigns a fresh `GroupId` and contiguous `GroupIndex` values to the full selection.
+  - **Ungroup** is enabled whenever **any** selected shape has a `GroupId`; a multi-group selection ungroups every selected group in one operation.
 - **Alignment toolbar** (visible when ≥ 2 selected): six SVG-icon buttons.
   - Align Left / Right / Top / Bottom — uses rotated-AABB edges.
   - Distribute Horizontally / Vertically (≥ 3 selected) — anchors outermost shapes, equal gaps for the middle ones: `gap = (span − Σwidths) / (n − 1)`.
