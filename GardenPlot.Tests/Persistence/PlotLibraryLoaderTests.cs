@@ -40,7 +40,6 @@ public class PlotLibraryLoaderTests
     [Fact]
     public void Load_UnversionedDocument_TreatedAsLegacyVersionAndStampedToCurrent()
     {
-        // Legacy library JSON written before SchemaVersion existed.
         string legacyJson = JsonSerializer.Serialize(new
         {
             Plots = new[]
@@ -75,6 +74,37 @@ public class PlotLibraryLoaderTests
     }
 
     [Fact]
+    public void Load_Version1Document_DefaultsAsBuiltFields()
+    {
+        JsonObject doc = new()
+        {
+            ["SchemaVersion"] = 1,
+            ["Plots"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["Id"] = Guid.NewGuid(),
+                    ["Name"] = "Legacy Garden",
+                    ["WidthFt"] = 20.0,
+                    ["HeightFt"] = 10.0,
+                },
+            },
+        };
+
+        var loader = CreateLoader();
+        PlotLibrary? lib = loader.Load(doc.ToJsonString(), "unit-test");
+
+        Assert.NotNull(lib);
+        PlotData plot = Assert.Single(lib!.Plots);
+        Assert.Equal(PhaseKind.Design, plot.Phase);
+        Assert.Null(plot.SourcePlotId);
+        Assert.Null(plot.Address);
+        Assert.Empty(plot.PhotoFileNames);
+        Assert.Empty(plot.Takeoff);
+        Assert.Empty(lib.CustomCatalogItems);
+    }
+
+    [Fact]
     public void Load_RoundTrip_PreservesSchemaVersion()
     {
         var source = new PlotLibrary();
@@ -88,12 +118,62 @@ public class PlotLibraryLoaderTests
     }
 
     [Fact]
+    public void Load_RoundTrip_PreservesAsBuiltMetadataAndActualLaborHours()
+    {
+        PlotLibrary source = new();
+        source.CustomCatalogItems.Add(new CatalogItem
+        {
+            Code = "Tomato",
+            Source = CatalogSource.Custom,
+            Kind = "Plant",
+            DisplayName = "Tomato",
+            Unit = "ea",
+            LaborHoursPerUnit = 0.5,
+        });
+        source.Plots.Add(new PlotData
+        {
+            Name = "Installed Garden",
+            Phase = PhaseKind.AsBuilt,
+            SourcePlotId = Guid.NewGuid(),
+            Address = "123 Orchard Lane",
+            DesignStartedUtc = new DateTime(2025, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+            InstalledUtc = new DateTime(2025, 2, 3, 0, 0, 0, DateTimeKind.Utc),
+            HandedOverUtc = new DateTime(2025, 3, 4, 0, 0, 0, DateTimeKind.Utc),
+            Notes = "Installed as specified.",
+            PhotoFileNames = ["abc/photo.png"],
+            Takeoff =
+            [
+                new TakeoffItem
+                {
+                    Id = 1,
+                    CatalogSource = CatalogSource.Custom,
+                    CatalogCode = "Tomato",
+                    Quantity = 4,
+                    ActualLaborHours = 1.5,
+                },
+            ],
+            TakeoffIds = new TakeoffSequence { Next = 2 },
+        });
+        string json = JsonSerializer.Serialize(source);
+
+        var loader = CreateLoader();
+        PlotLibrary? lib = loader.Load(json, "unit-test");
+
+        Assert.NotNull(lib);
+        PlotData plot = Assert.Single(lib!.Plots);
+        Assert.Equal(PhaseKind.AsBuilt, plot.Phase);
+        Assert.NotNull(plot.SourcePlotId);
+        Assert.Equal("123 Orchard Lane", plot.Address);
+        Assert.Single(plot.PhotoFileNames);
+        Assert.Single(plot.Takeoff);
+        Assert.Equal(1.5, plot.Takeoff[0].ActualLaborHours);
+        Assert.Single(lib.CustomCatalogItems);
+        Assert.Equal(0.5, lib.CustomCatalogItems[0].LaborHoursPerUnit);
+    }
+
+    [Fact]
     public void Load_FutureVersion_FallsBackToCurrentShape()
     {
-        // A document written by a hypothetical newer build (version Current + 1).
-        // Today's loader has no per-version method for it, but should not crash —
-        // it best-effort-deserializes against the current shape and stamps SchemaVersion
-        // to Current so the next save migrates it down.
         var doc = new JsonObject
         {
             ["SchemaVersion"] = PlotSchema.Current + 1,
@@ -110,9 +190,6 @@ public class PlotLibraryLoaderTests
     [Fact]
     public void Load_EmitsLoadMetric_OnHappyPath()
     {
-        // Subscribe to the loader's meter and capture the counter readings so we can prove
-        // the metric fires with the expected outcome/source tags. This is the deterministic
-        // CI-friendly version of the Aspire dashboard verification step.
         var observed = new List<(string Name, long Value, IReadOnlyDictionary<string, object?> Tags)>();
         using var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, l) =>

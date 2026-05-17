@@ -51,6 +51,8 @@ public sealed class TakeoffItem
 
     public double? MarkupPercentOverride { get; set; }
 
+    public double? ActualLaborHours { get; set; }
+
     public string? Notes { get; set; }
 
     /// <summary>Bound canvas shape, or <see langword="null"/> for virtual items.</summary>

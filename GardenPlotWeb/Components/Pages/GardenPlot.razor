@@ -16,9 +16,11 @@
 @inject IWebHostEnvironment Env
 @inject DataRootProvider DataRoot
 @inject IPlantProfileService PlantProfiles
+@inject ProjectDossierService ProjectDossierService
 @inject GardenPlotWeb.Services.Persistence.PlotLibraryLoader PlotLibraryLoader
 @inject GardenPlotWeb.Services.Persistence.IPlotRepository PlotRepository
 @inject GardenPlotWeb.Services.Catalog.ICatalogService Catalog
+@inject NavigationManager Navigation
 @inject ILogger<GardenPlot> Logger
 
 <PageTitle>Garden Plot</PageTitle>
@@ -31,7 +33,7 @@
                 @onchange="OnPlotChanged">
             @foreach (var p in library.Plots)
             {
-                <option value="@p.Id">@p.Name (@F(p.WidthFt)' × @F(p.HeightFt)')</option>
+                <option value="@p.Id">@p.Name [@(p.Phase == PhaseKind.AsBuilt ? "As-built" : "Design")] (@F(p.WidthFt)' × @F(p.HeightFt)')</option>
             }
         </select>
     }
@@ -39,6 +41,11 @@
     @if (currentPlot is not null)
     {
         <button class="btn btn-sm btn-outline-secondary" @onclick="ShowEditPlotDialog">Edit Plot</button>
+        <button class="btn btn-sm btn-outline-primary" @onclick="OpenCurrentDossier">Dossier</button>
+    }
+    @if (currentPlot is not null && currentPlot.Phase == PhaseKind.Design)
+    {
+        <button class="btn btn-sm btn-outline-warning" @onclick="MakeAsBuiltCopyAsync">Make as-built copy</button>
     }
     @if (currentPlot is not null && library.Plots.Count > 1)
     {
@@ -49,8 +56,14 @@
 
 @if (currentPlot is not null)
 {
-    <div class="text-muted small mb-2 plot-info-line">
-        @F(currentPlot.WidthFt) ft × @F(currentPlot.HeightFt) ft &mdash; flat. Pick a tool, then draw or stamp on the plot.
+    <div class="text-muted small mb-2 plot-info-line d-flex flex-wrap gap-2 align-items-center">
+        <span>@F(currentPlot.WidthFt) ft × @F(currentPlot.HeightFt) ft &mdash; flat. Pick a tool, then draw or stamp on the plot.</span>
+        <span class="badge @(currentPlot.Phase == PhaseKind.AsBuilt ? "text-bg-warning" : "text-bg-secondary")">@(currentPlot.Phase == PhaseKind.AsBuilt ? "As-built" : "Design")</span>
+        @if (currentPlot.SourcePlotId is Guid sourcePlotId)
+        {
+            var sourcePlot = library.Plots.FirstOrDefault(plot => plot.Id == sourcePlotId);
+            <span class="small">Source: @(sourcePlot?.Name ?? sourcePlotId.ToString())</span>
+        }
     </div>
 }
 
@@ -1002,7 +1015,7 @@ else
     var showLaborCost = isInternalView && library.Ui.ShowLaborCostColumn;
     var showMarkupPercent = isInternalView && library.Ui.ShowMarkupPercentColumn;
     var showLineTotal = !isInternalView || library.Ui.ShowLineTotalColumn;
-    var itemInternalColumnCount = 9 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
+    var itemInternalColumnCount = 10 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
     var summaryInternalColumnCount = 5 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
 
     @if (showTakeoffPanel)
@@ -1158,6 +1171,7 @@ else
                                         <th class="text-end">Waste %</th>
                                         <th>Labor</th>
                                         <th class="text-end">Hours</th>
+                                        <th class="text-end">Actual hrs</th>
                                         @if (showMaterialCost)
                                         {
                                             <th class="text-end">Material $</th>
@@ -1224,6 +1238,14 @@ else
                                                 }
                                             </td>
                                             <td class="text-end">@FormatTakeoffNumber(row.LaborHours)</td>
+                                            <td class="text-end" style="min-width:6.5rem;" @onclick:stopPropagation="true">
+                                                <input type="number"
+                                                       min="0"
+                                                       step="0.25"
+                                                       class="form-control form-control-sm text-end"
+                                                       value="@(sourceItem.ActualLaborHours?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty)"
+                                                       @onchange="@(async e => await OnActualLaborHoursChangedAsync(sourceItem, e))" />
+                                            </td>
                                             @if (showMaterialCost)
                                             {
                                                 <td class="text-end">@TakeoffMath.FormatCurrency(row.MaterialCost)</td>
