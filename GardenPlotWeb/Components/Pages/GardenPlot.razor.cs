@@ -1675,6 +1675,10 @@ public partial class GardenPlot
         public Point[]? OrigPoints;
     }
 
+    private sealed record PlotBackgroundImageDimensions(double Width, double Height);
+
+    private sealed record PlotBackgroundRenderInfo(double X, double Y, double Width, double Height);
+
     // New-plot dialog state
     private bool showNewPlotDialog;
     private bool isEditingPlotSettings;
@@ -1686,6 +1690,7 @@ public partial class GardenPlot
     private bool aspectLocked;
     private double? aspectRatio;
     private string? newPlotBackgroundImageFileName;
+    private BackgroundFit newPlotBackgroundFit = BackgroundFit.Fit;
     private double newPlotBackgroundOpacity = 0.92;
     private bool newPlotShowGrid = true;
     private string newPlotGridColor = "#cfd8c5";
@@ -1744,6 +1749,8 @@ public partial class GardenPlot
     private const long CustomTileImageMaxBytes = 20 * 1024 * 1024;
     private const long PlotImageWarnBytes = 3 * 1024 * 1024;
     private const long PlotImageMaxBytes = 30 * 1024 * 1024;
+    private readonly Dictionary<string, PlotBackgroundImageDimensions> plotBackgroundImageDimensions =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private bool loaded;
 
@@ -2302,6 +2309,17 @@ public partial class GardenPlot
         {
             await RestoreViewportAsync();
             restoreViewportPending = false;
+        }
+
+        if (jsModule is not null)
+        {
+            bool loadedPlotBackgroundDimensions =
+                await EnsurePlotBackgroundImageDimensionsAsync(currentPlot?.BackgroundImageFileName) |
+                await EnsurePlotBackgroundImageDimensionsAsync(newPlotBackgroundImageFileName);
+            if (loadedPlotBackgroundDimensions)
+            {
+                StateHasChanged();
+            }
         }
 
         // Resolve any client-local image placeholders to blob: URLs after the DOM is updated.
@@ -3044,6 +3062,7 @@ public partial class GardenPlot
         newPlotHeight = 8;
         ResetAspectLock();
         newPlotBackgroundImageFileName = null;
+        newPlotBackgroundFit = BackgroundFit.Fit;
         newPlotBackgroundOpacity = 0.92;
         newPlotShowGrid = true;
         newPlotGridColor = "#cfd8c5";
@@ -3070,6 +3089,7 @@ public partial class GardenPlot
         newPlotHeight = currentPlot.HeightFt;
         ResetAspectLock();
         newPlotBackgroundImageFileName = currentPlot.BackgroundImageFileName;
+        newPlotBackgroundFit = EffectivePlotBackgroundFit(currentPlot);
         newPlotBackgroundOpacity = EffectivePlotBackgroundOpacity(currentPlot);
         newPlotShowGrid = currentPlot.ShowGrid;
         newPlotGridColor = EffectivePlotGridColor(currentPlot);
@@ -3103,6 +3123,7 @@ public partial class GardenPlot
                 WidthFt = w,
                 HeightFt = h,
                 BackgroundImageFileName = newPlotBackgroundImageFileName,
+                BackgroundFit = newPlotBackgroundFit,
                 BackgroundImageOpacity = Math.Clamp(newPlotBackgroundOpacity, 0, 1),
                 ShowGrid = newPlotShowGrid,
                 GridColor = EffectiveDraftGridColor(),
@@ -3123,6 +3144,7 @@ public partial class GardenPlot
             currentPlot.WidthFt = w;
             currentPlot.HeightFt = h;
             currentPlot.BackgroundImageFileName = newPlotBackgroundImageFileName;
+            currentPlot.BackgroundFit = newPlotBackgroundFit;
             currentPlot.BackgroundImageOpacity = Math.Clamp(newPlotBackgroundOpacity, 0, 1);
             currentPlot.ShowGrid = newPlotShowGrid;
             currentPlot.GridColor = EffectiveDraftGridColor();
@@ -3143,6 +3165,7 @@ public partial class GardenPlot
     private async Task OnPlotBackgroundImageSelected(InputFileChangeEventArgs e)
     {
         newPlotBackgroundImageFileName = await SavePlotBackgroundImageAsync(e.File);
+        _ = await EnsurePlotBackgroundImageDimensionsAsync(newPlotBackgroundImageFileName);
     }
 
     private void ClearPlotBackgroundImage()
@@ -3936,6 +3959,71 @@ public partial class GardenPlot
 
     private static string PlotImageUrl(string fileName)
         => $"/plot-images/{Uri.EscapeDataString(fileName)}";
+
+    private static BackgroundFit EffectivePlotBackgroundFit(PlotData plot)
+        => Enum.IsDefined(plot.BackgroundFit) ? plot.BackgroundFit : BackgroundFit.Fit;
+
+    private PlotBackgroundRenderInfo? GetPlotBackgroundRenderInfo(PlotData plot)
+    {
+        if (string.IsNullOrWhiteSpace(plot.BackgroundImageFileName) ||
+            !plotBackgroundImageDimensions.TryGetValue(plot.BackgroundImageFileName, out PlotBackgroundImageDimensions? dimensions) ||
+            dimensions.Width <= 0 ||
+            dimensions.Height <= 0)
+        {
+            return null;
+        }
+
+        if (EffectivePlotBackgroundFit(plot) == BackgroundFit.Stretch)
+        {
+            return new PlotBackgroundRenderInfo(0, 0, plot.WidthFt, plot.HeightFt);
+        }
+
+        double scale = Math.Min(plot.WidthFt / dimensions.Width, plot.HeightFt / dimensions.Height);
+        double width = dimensions.Width * scale;
+        double height = dimensions.Height * scale;
+        double x = Math.Max(0, (plot.WidthFt - width) / 2);
+        double y = Math.Max(0, (plot.HeightFt - height) / 2);
+        return new PlotBackgroundRenderInfo(x, y, width, height);
+    }
+
+    private static string PlotBackgroundPreserveAspectRatio(PlotData plot)
+        => EffectivePlotBackgroundFit(plot) switch
+        {
+            BackgroundFit.Stretch => "none",
+            _ => "xMidYMid meet",
+        };
+
+    private async Task<bool> EnsurePlotBackgroundImageDimensionsAsync(string? fileName)
+    {
+        if (jsModule is null || string.IsNullOrWhiteSpace(fileName) || plotBackgroundImageDimensions.ContainsKey(fileName))
+        {
+            return false;
+        }
+
+        try
+        {
+            JsonElement dimensions = await jsModule.InvokeAsync<JsonElement>("getImageDimensions", PlotImageUrl(fileName));
+            if (!dimensions.TryGetProperty("width", out JsonElement widthNode) ||
+                !dimensions.TryGetProperty("height", out JsonElement heightNode))
+            {
+                return false;
+            }
+
+            double width = widthNode.GetDouble();
+            double height = heightNode.GetDouble();
+            if (width <= 0 || height <= 0)
+            {
+                return false;
+            }
+
+            plotBackgroundImageDimensions[fileName] = new PlotBackgroundImageDimensions(width, height);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     private static double EffectivePlotBackgroundOpacity(PlotData plot)
         => Math.Clamp(plot.BackgroundImageOpacity, 0, 1);

@@ -194,6 +194,21 @@ export function normalizedPointInElement(el, clientX, clientY) {
     return { x, y };
 }
 
+export async function getImageDimensions(url) {
+    if (!url) return { width: 0, height: 0 };
+    const img = new Image();
+    img.decoding = 'async';
+    await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+    });
+    return {
+        width: img.naturalWidth || 0,
+        height: img.naturalHeight || 0,
+    };
+}
+
 // Serializes the SVG element to a PNG and triggers a browser download.
 export async function exportPng(svgEl, filename, scale) {
     if (!svgEl) return;

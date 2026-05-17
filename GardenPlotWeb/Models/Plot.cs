@@ -12,6 +12,13 @@ public enum PhaseKind
     AsBuilt,
 }
 
+public enum BackgroundFit
+{
+    Fit,
+    Letterbox,
+    Stretch,
+}
+
 public class PlotData
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -38,6 +45,9 @@ public class PlotData
 
     /// <summary>Optional plot background image filename (served from app data store).</summary>
     public string? BackgroundImageFileName { get; set; }
+
+    /// <summary>How the background image is fitted into the plot canvas.</summary>
+    public BackgroundFit BackgroundFit { get; set; } = BackgroundFit.Fit;
 
     /// <summary>Background image opacity (0..1) when rendered on the canvas.</summary>
     public double BackgroundImageOpacity { get; set; } = 0.92;
