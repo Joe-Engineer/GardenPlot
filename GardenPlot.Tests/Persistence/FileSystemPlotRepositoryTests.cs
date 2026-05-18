@@ -62,8 +62,9 @@ public sealed class FileSystemPlotRepositoryTests : IDisposable
     public async Task SaveLibrary_ThenLoadLibrary_RoundTripsPlots()
     {
         var lib = new PlotLibrary();
-        lib.Plots.Add(new PlotData { Name = "Front Yard", WidthFt = 40, HeightFt = 30 });
-        lib.Plots.Add(new PlotData { Name = "Back Yard", WidthFt = 60, HeightFt = 50 });
+        lib.Ui.RecentPlotSizes.Add((40, 30));
+        lib.Plots.Add(new PlotData { Name = "Front Yard", WidthFt = 40, HeightFt = 30, LinearUnit = LinearUnit.Meters });
+        lib.Plots.Add(new PlotData { Name = "Back Yard", WidthFt = 60, HeightFt = 50, LinearUnit = LinearUnit.Inches });
         lib.LastPlotId = lib.Plots[0].Id;
 
         await repo.SaveLibraryAsync(lib);
@@ -73,8 +74,9 @@ public sealed class FileSystemPlotRepositoryTests : IDisposable
         Assert.Equal(PlotSchema.Current, loaded!.SchemaVersion);
         Assert.Equal(2, loaded.Plots.Count);
         Assert.Equal(lib.LastPlotId, loaded.LastPlotId);
-        Assert.Contains(loaded.Plots, p => p.Name == "Front Yard");
-        Assert.Contains(loaded.Plots, p => p.Name == "Back Yard");
+        Assert.Equal((40d, 30d), loaded.Ui.RecentPlotSizes[0]);
+        Assert.Contains(loaded.Plots, p => p.Name == "Front Yard" && p.LinearUnit == LinearUnit.Meters);
+        Assert.Contains(loaded.Plots, p => p.Name == "Back Yard" && p.LinearUnit == LinearUnit.Inches);
     }
 
     [Fact]
@@ -136,7 +138,7 @@ public sealed class FileSystemPlotRepositoryTests : IDisposable
     [Fact]
     public async Task SavePlot_ThenLoadPlot_RoundTripsSinglePlot()
     {
-        var plot = new PlotData { Name = "Solo", WidthFt = 25, HeightFt = 15 };
+        var plot = new PlotData { Name = "Solo", WidthFt = 25, HeightFt = 15, LinearUnit = LinearUnit.Yards };
         await repo.SavePlotAsync(plot);
 
         var loaded = await repo.LoadPlotAsync(plot.Id);
@@ -144,6 +146,7 @@ public sealed class FileSystemPlotRepositoryTests : IDisposable
         Assert.NotNull(loaded);
         Assert.Equal("Solo", loaded!.Name);
         Assert.Equal(25, loaded.WidthFt);
+        Assert.Equal(LinearUnit.Yards, loaded.LinearUnit);
     }
 
     [Fact]

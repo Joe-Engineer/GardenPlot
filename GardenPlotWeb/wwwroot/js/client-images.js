@@ -236,6 +236,18 @@ export async function putImageFromBase64(base64, mime, suggestedName) {
     return putImage(blob);
 }
 
+export async function probeImageDimensions(url) {
+    if (!url) {
+        return null;
+    }
+    return await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
+        img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+        img.src = url;
+    });
+}
+
 // Revoke all cached blob URLs (called on page unload).
 function revokeAll() {
     for (const url of urlCache.values()) {
@@ -263,6 +275,7 @@ if (typeof window !== 'undefined') {
         isLegacyImageFilename,
         readFileInput,
         applyClientImages,
+        probeImageDimensions,
     };
 }
 

@@ -2,6 +2,9 @@
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace GardenPlotWeb.Models;
 
 /// <summary>Saved view modes for the plot canvas.</summary>
@@ -77,6 +80,26 @@ public class UiPreferences
     /// overlay runs polygon-clipping per affected shape on every render, so we leave it as an
     /// opt-in control (toggleable from the canvas status bar).</summary>
     public bool ShowClipHatch { get; set; }
+
+    /// <summary>Last-used plot sizes, stored in feet and shown as quick-picks in the new-plot flow.</summary>
+    [JsonConverter(typeof(RecentPlotSizesJsonConverter))]
+    public List<(double WidthFt, double HeightFt)> RecentPlotSizes { get; set; } = new();
+
+    public void PushRecentPlotSize(double widthFt, double heightFt)
+    {
+        widthFt = Math.Clamp(widthFt, 1, 500);
+        heightFt = Math.Clamp(heightFt, 1, 500);
+
+        _ = RecentPlotSizes.RemoveAll(size =>
+            Math.Abs(size.WidthFt - widthFt) < 0.0001 &&
+            Math.Abs(size.HeightFt - heightFt) < 0.0001);
+
+        RecentPlotSizes.Insert(0, (widthFt, heightFt));
+        if (RecentPlotSizes.Count > 10)
+        {
+            RecentPlotSizes.RemoveRange(10, RecentPlotSizes.Count - 10);
+        }
+    }
 }
 
 public class KeyBindingSettings
@@ -109,5 +132,85 @@ public class KeyBindingSettings
 
     public string RotateGroupOrientationCounterClockwise { get; set; } = "Alt+[";
     public string RotateGroupOrientationClockwise { get; set; } = "Alt+]";
+}
+
+internal sealed class RecentPlotSizesJsonConverter : JsonConverter<List<(double WidthFt, double HeightFt)>>
+{
+    public override List<(double WidthFt, double HeightFt)> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return new List<(double WidthFt, double HeightFt)>();
+        }
+
+        if (reader.TokenType != JsonTokenType.StartArray)
+        {
+            throw new JsonException("RecentPlotSizes must be an array.");
+        }
+
+        List<(double WidthFt, double HeightFt)> sizes = new();
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndArray)
+            {
+                return sizes;
+            }
+
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                throw new JsonException("RecentPlotSizes entries must be objects.");
+            }
+
+            double? widthFt = null;
+            double? heightFt = null;
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+            {
+                if (reader.TokenType != JsonTokenType.PropertyName)
+                {
+                    throw new JsonException("RecentPlotSizes entry contains invalid JSON.");
+                }
+
+                string? propertyName = reader.GetString();
+                _ = reader.Read();
+                switch (propertyName)
+                {
+                    case "WidthFt":
+                    case "widthFt":
+                    case "Item1":
+                        widthFt = reader.GetDouble();
+                        break;
+                    case "HeightFt":
+                    case "heightFt":
+                    case "Item2":
+                        heightFt = reader.GetDouble();
+                        break;
+                    default:
+                        reader.Skip();
+                        break;
+                }
+            }
+
+            if (widthFt is double width && heightFt is double height)
+            {
+                sizes.Add((width, height));
+            }
+        }
+
+        throw new JsonException("RecentPlotSizes JSON ended unexpectedly.");
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<(double WidthFt, double HeightFt)> value, JsonSerializerOptions options)
+    {
+        writer.WriteStartArray();
+        foreach ((double WidthFt, double HeightFt) size in value)
+        {
+            writer.WriteStartObject();
+            writer.WriteNumber("WidthFt", size.WidthFt);
+            writer.WriteNumber("HeightFt", size.HeightFt);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+    }
 }
 

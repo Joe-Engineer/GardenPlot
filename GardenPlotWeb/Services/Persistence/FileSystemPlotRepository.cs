@@ -96,6 +96,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                     CustomCatalogItems = index.CustomCatalogItems ?? new List<CatalogItem>(),
                     Plots = new List<PlotData>(),
                 };
+                lib.Ui.RecentPlotSizes ??= new List<(double WidthFt, double HeightFt)>();
 
                 foreach (PlotStoreIndexEntry entry in index.Plots)
                 {
@@ -116,7 +117,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                         continue;
                     }
 
-                    PlotData? plot = JsonSerializer.Deserialize<PlotData>(plotJson, PlotLibraryLoader.SerializerOptions);
+                    PlotData? plot = DeserializePlotData(plotJson);
                     if (plot is not null)
                     {
                         lib.Plots.Add(plot);
@@ -237,7 +238,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
         try
         {
             string json = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
-            PlotData? plot = string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<PlotData>(json, PlotLibraryLoader.SerializerOptions);
+            PlotData? plot = string.IsNullOrWhiteSpace(json) ? null : DeserializePlotData(json);
             RecordOp("load-plot", plot is null ? "empty" : "loaded", sw);
             return plot;
         }
@@ -386,12 +387,38 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
             return new PlotStoreIndex();
         }
 
-        return JsonSerializer.Deserialize<PlotStoreIndex>(json, PlotLibraryLoader.SerializerOptions) ?? new PlotStoreIndex();
+        PlotStoreIndex index = JsonSerializer.Deserialize<PlotStoreIndex>(json, PlotLibraryLoader.SerializerOptions) ?? new PlotStoreIndex();
+        index.Ui ??= new UiPreferences();
+        index.Ui.RecentPlotSizes ??= new List<(double WidthFt, double HeightFt)>();
+        index.CustomPaletteItems ??= new List<PaletteItem>();
+        index.Plots ??= new List<PlotStoreIndexEntry>();
+        return index;
     }
 
     private static string PlotFileName(Guid id)
     {
         return $"{id:N}.json";
+    }
+
+    private static PlotData? DeserializePlotData(string json)
+    {
+        PlotData? plot = JsonSerializer.Deserialize<PlotData>(json);
+        if (plot is null)
+        {
+            return null;
+        }
+
+        using JsonDocument doc = JsonDocument.Parse(json);
+        bool hasLinearUnit = doc.RootElement.ValueKind == JsonValueKind.Object &&
+            doc.RootElement.TryGetProperty(nameof(PlotData.LinearUnit), out _);
+        plot.LinearUnit = hasLinearUnit ? plot.LinearUnit : LinearUnit.Feet;
+        plot.HasExplicitLinearUnit = hasLinearUnit;
+        plot.Shapes ??= new List<Shape>();
+        plot.DropGroups ??= new List<DropGroup>();
+        plot.KitRotations ??= new Dictionary<string, double>();
+        plot.Takeoff ??= new List<TakeoffItem>();
+        plot.TakeoffIds ??= new TakeoffSequence();
+        return plot;
     }
 
     private static async Task WriteAtomicTextFileAsync(string targetPath, string content, CancellationToken ct)

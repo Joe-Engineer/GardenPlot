@@ -71,11 +71,15 @@ public partial class GardenPlot
     // into CS0162 unreachable-code errors.
     private static readonly bool FileStoreEnabled = false;
     private const double PxPerFt = 16.0; // also used by ToFt()
+    private const double DefaultPlotWidthFt = 40.0;
+    private const double DefaultPlotHeightFt = 30.0;
+    private const double DefaultPlotPixelsPerFoot = PxPerFt;
 
-    private double PlotWidthFt => currentPlot?.WidthFt ?? 60;
-    private double PlotHeightFt => currentPlot?.HeightFt ?? 8;
+    private double PlotWidthFt => currentPlot?.WidthFt ?? DefaultPlotWidthFt;
+    private double PlotHeightFt => currentPlot?.HeightFt ?? DefaultPlotHeightFt;
 
     private enum Tool { Select, FreeDraw, Edge, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover }
+    private enum NewPlotDialogStep { ImageFirst, Configure }
     private enum DropActivationMode { ClickToggle, HoldKey }
     private enum DropModifierKey { Shift, Ctrl, Alt }
 
@@ -2181,10 +2185,16 @@ public partial class GardenPlot
     private KeyBindingSettings keyBindingDraft = new();
     private string newPlotName = "Garden";
     private string newPlotShape = "Rectangle";
-    private double newPlotWidth = 60;
-    private double newPlotHeight = 8;
+    private double newPlotWidth = DefaultPlotWidthFt;
+    private double newPlotHeight = DefaultPlotHeightFt;
     private bool aspectLocked;
     private double? aspectRatio;
+    private LinearUnit newPlotLinearUnit = LinearUnit.Feet;
+    private bool newPlotLinearUnitReadOnly;
+    private NewPlotDialogStep newPlotDialogStep = NewPlotDialogStep.ImageFirst;
+    private bool newPlotDimensionsDerivedFromImage;
+    private int? newPlotImagePixelWidth;
+    private int? newPlotImagePixelHeight;
     private string? newPlotBackgroundImageFileName;
     private BackgroundFit newPlotBackgroundFit = BackgroundFit.Fit;
     private double newPlotBackgroundOpacity = 0.92;
@@ -2660,7 +2670,7 @@ public partial class GardenPlot
                 // load completes we preserve their work and skip the replacement.
                 if (currentPlot is null)
                 {
-                    var startupFallback = new PlotData { Name = "Garden", WidthFt = 120, HeightFt = 120 };
+                    var startupFallback = new PlotData { Name = "Garden", WidthFt = DefaultPlotWidthFt, HeightFt = DefaultPlotHeightFt };
                     LayerResolver.EnsureLayerStates(startupFallback);
                     library = new PlotLibrary();
                     library.Plots.Add(startupFallback);
@@ -2742,7 +2752,7 @@ public partial class GardenPlot
 
                     if (library.Plots.Count == 0)
                     {
-                        var defaultPlot = new PlotData { Name = "Garden", WidthFt = 120, HeightFt = 120 };
+                        var defaultPlot = new PlotData { Name = "Garden", WidthFt = DefaultPlotWidthFt, HeightFt = DefaultPlotHeightFt };
                         LayerResolver.EnsureLayerStates(defaultPlot);
                         library.Plots.Add(defaultPlot);
                         library.LastPlotId = library.Plots[0].Id;
@@ -2816,7 +2826,7 @@ public partial class GardenPlot
                     // Last-resort recovery so the page does not stay stuck on Loading…
                     library = new PlotLibrary();
                     RefreshCatalogOverrides();
-                    var fallback = new PlotData { Name = "Garden", WidthFt = 120, HeightFt = 120 };
+                    var fallback = new PlotData { Name = "Garden", WidthFt = DefaultPlotWidthFt, HeightFt = DefaultPlotHeightFt };
                     library.Plots.Add(fallback);
                     library.LastPlotId = fallback.Id;
                     currentPlot = fallback;
@@ -3117,12 +3127,14 @@ public partial class GardenPlot
         var safe = loaded ?? new PlotLibrary();
         safe.Plots ??= new List<PlotData>();
         safe.Ui ??= new UiPreferences();
+        safe.Ui.RecentPlotSizes ??= new List<(double WidthFt, double HeightFt)>();
         safe.CustomPaletteItems ??= new List<PaletteItem>();
         safe.CustomCatalogItems ??= new List<CatalogItem>();
 
-        foreach (var p in safe.Plots)
+        foreach (PlotData p in safe.Plots)
         {
             p.Ui ??= new UiPreferences();
+            p.LinearUnit = p.HasExplicitLinearUnit ? p.LinearUnit : LinearUnit.Feet;
             p.Shapes ??= new List<Shape>();
             p.DropGroups ??= new List<DropGroup>();
             p.Tasks ??= new List<GardenTask>();
@@ -3562,20 +3574,6 @@ public partial class GardenPlot
         await SaveAsync();
     }
 
-    private static double ClampPlotDimension(double value) => Math.Clamp(value, 1, 500);
-
-    private static bool TryParsePlotDimension(ChangeEventArgs e, out double value)
-    {
-        if (!double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
-        {
-            value = 0;
-            return false;
-        }
-
-        value = ClampPlotDimension(parsed);
-        return true;
-    }
-
     private void ResetAspectLock()
     {
         aspectLocked = false;
@@ -3584,8 +3582,8 @@ public partial class GardenPlot
 
     private bool CaptureAspectRatio()
     {
-        newPlotWidth = ClampPlotDimension(newPlotWidth);
-        newPlotHeight = ClampPlotDimension(newPlotHeight);
+        newPlotWidth = ClampPlotDimensionFt(newPlotWidth);
+        newPlotHeight = ClampPlotDimensionFt(newPlotHeight);
         aspectRatio = newPlotHeight / newPlotWidth;
         return aspectRatio > 0;
     }
@@ -3623,52 +3621,13 @@ public partial class GardenPlot
         return ratio > 0;
     }
 
-    private void OnNewPlotWidthChanged(ChangeEventArgs e)
-    {
-        if (!TryParsePlotDimension(e, out var width))
-        {
-            return;
-        }
-
-        newPlotWidth = width;
-        if (TryGetAspectRatio(out var ratio))
-        {
-            newPlotHeight = ClampPlotDimension(width * ratio);
-        }
-    }
-
-    private void OnNewPlotHeightChanged(ChangeEventArgs e)
-    {
-        if (!TryParsePlotDimension(e, out var height))
-        {
-            return;
-        }
-
-        newPlotHeight = height;
-        if (TryGetAspectRatio(out var ratio))
-        {
-            newPlotWidth = ClampPlotDimension(height / ratio);
-        }
-    }
-
     private void ShowNewPlotDialog()
     {
         isEditingPlotSettings = false;
         newPlotName = $"Plot {library.Plots.Count + 1}";
-        newPlotShape = "Rectangle";
-        newPlotWidth = 60;
-        newPlotHeight = 8;
-        ResetAspectLock();
-        newPlotBackgroundImageFileName = null;
-        newPlotBackgroundFit = BackgroundFit.Fit;
-        newPlotBackgroundOpacity = 0.92;
-        newPlotShowGrid = true;
-        newPlotGridColor = "#cfd8c5";
-        newPlotGridLineWidth = 0.02;
-        newPlotGridOpacity = 1.0;
-        newPlotShowScaleDisplay = false;
-        newPlotBackgroundImageWarning = null;
-        newPlotError = null;
+        ResetNewPlotDraft();
+        ApplyDefaultNewPlotSize();
+        newPlotDialogStep = NewPlotDialogStep.ImageFirst;
         showCanvasScalePanel = false;
         showNewPlotDialog = true;
     }
@@ -3682,10 +3641,12 @@ public partial class GardenPlot
 
         isEditingPlotSettings = true;
         newPlotName = currentPlot.Name;
-        newPlotShape = "Rectangle";
-        newPlotWidth = currentPlot.WidthFt;
-        newPlotHeight = currentPlot.HeightFt;
-        ResetAspectLock();
+        ResetNewPlotDraft();
+        newPlotWidth = ClampPlotDimensionFt(currentPlot.WidthFt);
+        newPlotHeight = ClampPlotDimensionFt(currentPlot.HeightFt);
+        newPlotLinearUnit = currentPlot.LinearUnit;
+        newPlotLinearUnitReadOnly = !currentPlot.HasExplicitLinearUnit;
+        newPlotDialogStep = NewPlotDialogStep.Configure;
         newPlotBackgroundImageFileName = currentPlot.BackgroundImageFileName;
         newPlotBackgroundFit = EffectivePlotBackgroundFit(currentPlot);
         newPlotBackgroundOpacity = EffectivePlotBackgroundOpacity(currentPlot);
@@ -3694,10 +3655,119 @@ public partial class GardenPlot
         newPlotGridLineWidth = EffectivePlotGridLineWidth(currentPlot);
         newPlotGridOpacity = EffectivePlotGridOpacity(currentPlot);
         newPlotShowScaleDisplay = currentPlot.ShowScaleDisplay;
-        newPlotBackgroundImageWarning = null;
-        newPlotError = null;
+        CaptureAspectRatio();
         showCanvasScalePanel = false;
         showNewPlotDialog = true;
+    }
+
+    private void ResetNewPlotDraft()
+    {
+        newPlotShape = "Rectangle";
+        newPlotWidth = DefaultPlotWidthFt;
+        newPlotHeight = DefaultPlotHeightFt;
+        newPlotLinearUnit = LinearUnit.Feet;
+        newPlotLinearUnitReadOnly = false;
+        newPlotDialogStep = NewPlotDialogStep.Configure;
+        newPlotDimensionsDerivedFromImage = false;
+        ResetAspectLock();
+        newPlotImagePixelWidth = null;
+        newPlotImagePixelHeight = null;
+        newPlotBackgroundImageFileName = null;
+        newPlotBackgroundOpacity = 0.92;
+        newPlotShowGrid = true;
+        newPlotGridColor = "#cfd8c5";
+        newPlotGridLineWidth = 0.02;
+        newPlotGridOpacity = 1.0;
+        newPlotShowScaleDisplay = false;
+        newPlotBackgroundImageWarning = null;
+        newPlotError = null;
+        newPlotGeometryScaleFactor = 1.0;
+    }
+
+    private void ApplyDefaultNewPlotSize()
+    {
+        if (library.Ui.RecentPlotSizes.Count > 0)
+        {
+            (double WidthFt, double HeightFt) recent = library.Ui.RecentPlotSizes[0];
+            SetNewPlotSizeFt(recent.WidthFt, recent.HeightFt, keepAspectLocked: false);
+            return;
+        }
+
+        SetNewPlotSizeFt(DefaultPlotWidthFt, DefaultPlotHeightFt, keepAspectLocked: false);
+    }
+
+    private void ContinueWithoutPlotImage()
+    {
+        newPlotDialogStep = NewPlotDialogStep.Configure;
+        newPlotDimensionsDerivedFromImage = false;
+        ResetAspectLock();
+        if (string.IsNullOrWhiteSpace(newPlotBackgroundImageFileName))
+        {
+            ApplyDefaultNewPlotSize();
+        }
+    }
+
+    private void ApplyRecentPlotSize((double WidthFt, double HeightFt) size)
+    {
+        newPlotDimensionsDerivedFromImage = false;
+        SetNewPlotSizeFt(size.WidthFt, size.HeightFt, keepAspectLocked: false);
+    }
+
+    private double NewPlotWidthDisplay
+    {
+        get => Math.Round(LinearUnitConversion.FromFt(newPlotWidth, newPlotLinearUnit), 3);
+        set => SetNewPlotWidthDisplay(value);
+    }
+
+    private double NewPlotHeightDisplay
+    {
+        get => Math.Round(LinearUnitConversion.FromFt(newPlotHeight, newPlotLinearUnit), 3);
+        set => SetNewPlotHeightDisplay(value);
+    }
+
+    private bool ShowRecentPlotSizeQuickPicks =>
+        !isEditingPlotSettings &&
+        !newPlotDimensionsDerivedFromImage &&
+        library.Ui.RecentPlotSizes.Count > 0;
+
+    private void SetNewPlotWidthDisplay(double value)
+    {
+        double widthFt = ClampPlotDimensionFt(LinearUnitConversion.ToFt(value, newPlotLinearUnit));
+        newPlotWidth = widthFt;
+        if (TryGetAspectRatio(out double ratio))
+        {
+            newPlotHeight = ClampPlotDimensionFt(widthFt * ratio);
+        }
+        else
+        {
+            CaptureAspectRatio();
+        }
+    }
+
+    private void SetNewPlotHeightDisplay(double value)
+    {
+        double heightFt = ClampPlotDimensionFt(LinearUnitConversion.ToFt(value, newPlotLinearUnit));
+        newPlotHeight = heightFt;
+        if (TryGetAspectRatio(out double ratio))
+        {
+            newPlotWidth = ClampPlotDimensionFt(heightFt / ratio);
+        }
+        else
+        {
+            CaptureAspectRatio();
+        }
+    }
+
+    private void SetNewPlotSizeFt(double widthFt, double heightFt, bool keepAspectLocked)
+    {
+        newPlotWidth = ClampPlotDimensionFt(widthFt);
+        newPlotHeight = ClampPlotDimensionFt(heightFt);
+        bool captured = CaptureAspectRatio();
+        aspectLocked = keepAspectLocked && captured;
+        if (!captured)
+        {
+            aspectRatio = null;
+        }
     }
 
     private void CancelNewPlot()
@@ -3706,20 +3776,23 @@ public partial class GardenPlot
         ResetAspectLock();
         newPlotError = null;
         newPlotBackgroundImageWarning = null;
+        showCanvasScalePanel = false;
     }
 
     private async Task SavePlotSettingsAsync()
     {
-        var w = ClampPlotDimension(newPlotWidth);
-        var h = ClampPlotDimension(newPlotHeight);
+        double w = ClampPlotDimensionFt(newPlotWidth);
+        double h = ClampPlotDimensionFt(newPlotHeight);
 
         if (!isEditingPlotSettings)
         {
-            var p = new PlotData
+            PlotData p = new()
             {
                 Name = string.IsNullOrWhiteSpace(newPlotName) ? "Untitled" : newPlotName.Trim(),
                 WidthFt = w,
                 HeightFt = h,
+                LinearUnit = newPlotLinearUnit,
+                HasExplicitLinearUnit = true,
                 BackgroundImageFileName = newPlotBackgroundImageFileName,
                 BackgroundFit = newPlotBackgroundFit,
                 BackgroundImageOpacity = Math.Clamp(newPlotBackgroundOpacity, 0, 1),
@@ -3730,6 +3803,7 @@ public partial class GardenPlot
                 ShowScaleDisplay = newPlotShowScaleDisplay,
             };
             LayerResolver.EnsureLayerStates(p);
+            library.Ui.PushRecentPlotSize(w, h);
             library.Plots.Add(p);
             currentPlot = p;
         }
@@ -3740,8 +3814,11 @@ public partial class GardenPlot
             {
                 ScalePlotGeometry(currentPlot, newPlotGeometryScaleFactor);
             }
+
             currentPlot.WidthFt = w;
             currentPlot.HeightFt = h;
+            currentPlot.LinearUnit = newPlotLinearUnit;
+            currentPlot.HasExplicitLinearUnit = true;
             currentPlot.BackgroundImageFileName = newPlotBackgroundImageFileName;
             currentPlot.BackgroundFit = newPlotBackgroundFit;
             currentPlot.BackgroundImageOpacity = Math.Clamp(newPlotBackgroundOpacity, 0, 1);
@@ -3764,16 +3841,74 @@ public partial class GardenPlot
     private async Task OnPlotBackgroundImageSelected(InputFileChangeEventArgs e)
     {
         newPlotBackgroundImageFileName = await SavePlotBackgroundImageAsync(e.File);
+        if (string.IsNullOrWhiteSpace(newPlotBackgroundImageFileName))
+        {
+            return;
+        }
+
         _ = await EnsurePlotBackgroundImageDimensionsAsync(newPlotBackgroundImageFileName);
+        newPlotDialogStep = NewPlotDialogStep.Configure;
+        await ApplyDerivedImageSizeAsync(newPlotBackgroundImageFileName);
+    }
+
+    private async Task ApplyDerivedImageSizeAsync(string fileName)
+    {
+        (int Width, int Height)? imageSize = await TryReadPlotImageSizeAsync(fileName);
+        if (imageSize is null)
+        {
+            newPlotDimensionsDerivedFromImage = false;
+            return;
+        }
+
+        newPlotImagePixelWidth = imageSize.Value.Width;
+        newPlotImagePixelHeight = imageSize.Value.Height;
+        double widthFt = ClampPlotDimensionFt(imageSize.Value.Width / DefaultPlotPixelsPerFoot);
+        double heightFt = ClampPlotDimensionFt(imageSize.Value.Height / DefaultPlotPixelsPerFoot);
+        SetNewPlotSizeFt(widthFt, heightFt, keepAspectLocked: true);
+        newPlotDimensionsDerivedFromImage = true;
+    }
+
+    private async Task<(int Width, int Height)?> TryReadPlotImageSizeAsync(string fileName)
+    {
+        try
+        {
+            if (clientImagesModule is null)
+            {
+                using CancellationTokenSource importCts = new(TimeSpan.FromSeconds(3));
+                clientImagesModule = await JS.InvokeAsync<IJSObjectReference>("import", importCts.Token, "./js/client-images.js");
+            }
+
+            JsonElement size = await clientImagesModule.InvokeAsync<JsonElement>(
+                "probeImageDimensions",
+                $"{PlotImageUrl(fileName)}?v={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}");
+            if (size.TryGetProperty("width", out JsonElement widthNode) &&
+                size.TryGetProperty("height", out JsonElement heightNode))
+            {
+                return (Math.Max(1, widthNode.GetInt32()), Math.Max(1, heightNode.GetInt32()));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Could not probe plot background image dimensions for {FileName}.", fileName);
+        }
+
+        return null;
     }
 
     private void ClearPlotBackgroundImage()
     {
         newPlotBackgroundImageFileName = null;
+        newPlotDimensionsDerivedFromImage = false;
+        newPlotImagePixelWidth = null;
+        newPlotImagePixelHeight = null;
+        ResetAspectLock();
         newPlotBackgroundImageWarning = null;
         newPlotError = null;
         showCanvasScalePanel = false;
     }
+
+    private static double ClampPlotDimensionFt(double valueFt)
+        => Math.Clamp(valueFt, 1, 500);
 
     private async Task<string?> SavePlotBackgroundImageAsync(IBrowserFile? file)
     {
@@ -3782,7 +3917,7 @@ public partial class GardenPlot
             return null;
         }
 
-        var ext = Path.GetExtension(file.Name);
+        string ext = Path.GetExtension(file.Name);
         if (string.IsNullOrWhiteSpace(ext))
         {
             ext = ".img";
@@ -3798,11 +3933,11 @@ public partial class GardenPlot
         }
 
         Directory.CreateDirectory(DataRoot.PlotImagesDirectory);
-        var fileName = $"{Guid.NewGuid():N}{ext}";
-        var path = Path.Combine(DataRoot.PlotImagesDirectory, fileName);
+        string fileName = $"{Guid.NewGuid():N}{ext}";
+        string path = Path.Combine(DataRoot.PlotImagesDirectory, fileName);
 
-        await using var input = file.OpenReadStream(PlotImageMaxBytes);
-        await using var output = File.Create(path);
+        await using Stream input = file.OpenReadStream(PlotImageMaxBytes);
+        await using FileStream output = File.Create(path);
         await input.CopyToAsync(output);
         newPlotError = null;
         return fileName;
@@ -9112,6 +9247,37 @@ public partial class GardenPlot
     }
 
     private static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+
+    private static string LinearUnitShortLabel(LinearUnit unit)
+        => unit switch
+        {
+            LinearUnit.Meters => "m",
+            LinearUnit.Yards => "yd",
+            LinearUnit.Feet => "ft",
+            LinearUnit.Inches => "in",
+            _ => "ft",
+        };
+
+    private static string FormatPlotSizeLabel(double widthFt, double heightFt, LinearUnit unit)
+    {
+        double width = LinearUnitConversion.FromFt(widthFt, unit);
+        double height = LinearUnitConversion.FromFt(heightFt, unit);
+        return $"{F(width)} × {F(height)} {LinearUnitShortLabel(unit)}";
+    }
+
+    private static string PhaseLabel(PhaseKind phase)
+        => phase == PhaseKind.AsBuilt ? "As-built" : "Design";
+
+    private static string PlotPickerLabel(PlotData plot)
+        => $"{plot.Name} [{PhaseLabel(plot.Phase)}] ({FormatPlotSizeLabel(plot.WidthFt, plot.HeightFt, plot.LinearUnit)})";
+
+    private string CurrentPlotSizeLabel()
+        => currentPlot is null
+            ? FormatPlotSizeLabel(DefaultPlotWidthFt, DefaultPlotHeightFt, LinearUnit.Feet)
+            : FormatPlotSizeLabel(currentPlot.WidthFt, currentPlot.HeightFt, currentPlot.LinearUnit);
+
+    private string RecentPlotSizeLabel((double WidthFt, double HeightFt) size)
+        => FormatPlotSizeLabel(size.WidthFt, size.HeightFt, newPlotLinearUnit);
 
     /// <summary>Formats a plant spacing diameter (in feet) as feet-or-inches text.</summary>
     private static string FormatPlantSpacing(double ft)

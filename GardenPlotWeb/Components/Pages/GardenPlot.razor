@@ -33,7 +33,7 @@
                 @onchange="OnPlotChanged">
             @foreach (var p in library.Plots)
             {
-                <option value="@p.Id">@p.Name [@(p.Phase == PhaseKind.AsBuilt ? "As-built" : "Design")] (@F(p.WidthFt)' × @F(p.HeightFt)')</option>
+                <option value="@p.Id">@PlotPickerLabel(p)</option>
             }
         </select>
 
@@ -87,11 +87,11 @@
     <div class="text-muted small mb-2 plot-info-line d-flex flex-wrap gap-2 align-items-center @(IsConceptMode ? "concept-info-line" : string.Empty)">
         @if (IsConceptMode)
         {
-            <span>@F(currentPlot.WidthFt) ft × @F(currentPlot.HeightFt) ft &mdash; Concept presentation mode. Edit interactions are disabled.</span>
+            <span>@CurrentPlotSizeLabel() &mdash; Concept presentation mode. Edit interactions are disabled.</span>
         }
         else
         {
-            <span>@F(currentPlot.WidthFt) ft × @F(currentPlot.HeightFt) ft &mdash; flat. Pick a tool, then draw or stamp on the plot.</span>
+            <span>@CurrentPlotSizeLabel() &mdash; flat. Pick a tool, then draw or stamp on the plot.</span>
         }
         <span class="badge @(currentPlot.Phase == PhaseKind.AsBuilt ? "text-bg-warning" : "text-bg-secondary")">@(currentPlot.Phase == PhaseKind.AsBuilt ? "As-built" : "Design")</span>
         @if (currentPlot.SourcePlotId is Guid sourcePlotId)
@@ -2822,119 +2822,176 @@ else
                     <button type="button" class="btn-close" @onclick="CancelNewPlot"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-2">
-                        <label class="form-label small">Name</label>
-                        <input class="form-control form-control-sm" @bind="newPlotName" />
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label small">Shape</label>
-                        <select class="form-select form-select-sm" @bind="newPlotShape">
-                            <option value="Rectangle">Rectangle (flat)</option>
-                        </select>
-                    </div>
-                    <div class="row g-2 plot-dimension-row">
-                        <div class="col plot-dimension-col">
-                            <label class="form-label small">Width (ft)</label>
-                            <input type="number" min="1" max="500" step="0.5" class="form-control form-control-sm"
-                                   value="@F(newPlotWidth)" @onchange="OnNewPlotWidthChanged" />
+                    @if (!isEditingPlotSettings && newPlotDialogStep == NewPlotDialogStep.ImageFirst)
+                    {
+                        <div class="small text-muted mb-2">Step 1 of 2 &middot; Start with a background image, or skip to manual dimensions.</div>
+                        <div class="mb-2">
+                            <label class="form-label small">Background image</label>
+                            <InputFile OnChange="OnPlotBackgroundImageSelected" accept="image/*" class="form-control form-control-sm" />
+                            @if (!string.IsNullOrWhiteSpace(newPlotBackgroundImageWarning))
+                            {
+                                <div class="x-small text-warning mt-1">@newPlotBackgroundImageWarning</div>
+                            }
                         </div>
-                        <div class="col-auto plot-dimension-lock-col">
-                            <button type="button"
-                                    class="aspect-lock-toggle @(aspectLocked ? "locked" : string.Empty)"
-                                    @onclick="ToggleAspectLock"
-                                    aria-label="Lock aspect ratio"
-                                    aria-pressed="@aspectLocked"
-                                    title="Lock aspect ratio">
-                                @if (aspectLocked)
-                                {
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path fill="currentColor" d="M14.41 4.76C15.96 3.21 18.49 3.21 20.04 4.76C21.59 6.32 21.59 8.84 20.04 10.4L17.76 12.68C16.21 14.23 13.68 14.23 12.12 12.68L11.56 12.12L13.26 10.42L13.83 10.98C14.44 11.6 15.44 11.6 16.06 10.98L18.34 8.7C18.96 8.08 18.96 7.08 18.34 6.46C17.72 5.84 16.72 5.84 16.1 6.46L13.82 8.74L12.12 7.04ZM11.88 11.32L12.44 11.88L10.74 13.58L10.17 13.02C9.56 12.4 8.56 12.4 7.94 13.02L5.66 15.3C5.04 15.92 5.04 16.92 5.66 17.54C6.28 18.16 7.28 18.16 7.9 17.54L10.18 15.26L11.88 16.96L9.59 19.24C8.04 20.79 5.51 20.79 3.96 19.24C2.41 17.68 2.41 15.16 3.96 13.6L6.24 11.32C7.79 9.77 10.32 9.77 11.88 11.32ZM8.54 11.88L11.88 8.54L15.46 12.12L12.12 15.46Z" />
-                                    </svg>
-                                }
-                                else
-                                {
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M10.6 13.4C9.43 12.23 9.43 10.34 10.6 9.17L13.17 6.6C14.34 5.43 16.23 5.43 17.4 6.6C18.57 7.77 18.57 9.66 17.4 10.83L15.9 12.33" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                                        <path d="M13.4 10.6C14.57 11.77 14.57 13.66 13.4 14.83L10.83 17.4C9.66 18.57 7.77 18.57 6.6 17.4C5.43 16.23 5.43 14.34 6.6 13.17L8.1 11.67" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                }
-                            </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ContinueWithoutPlotImage">No image, enter dimensions manually</button>
+                    }
+                    else
+                    {
+                        <div class="small text-muted mb-2">
+                            @(isEditingPlotSettings
+                                ? "Update the saved plot size and display units."
+                                : newPlotDimensionsDerivedFromImage
+                                    ? "Step 2 of 2 · Review the size derived from your image."
+                                    : "Step 2 of 2 · Enter plot dimensions manually.")
                         </div>
-                        <div class="col plot-dimension-col">
-                            <label class="form-label small">Height (ft)</label>
-                            <input type="number" min="1" max="500" step="0.5" class="form-control form-control-sm"
-                                   value="@F(newPlotHeight)" @onchange="OnNewPlotHeightChanged" />
+
+                        <div class="mb-2">
+                            <label class="form-label small">Name</label>
+                            <input class="form-control form-control-sm" @bind="newPlotName" />
                         </div>
-                    </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Shape</label>
+                            <select class="form-select form-select-sm" @bind="newPlotShape">
+                                <option value="Rectangle">Rectangle (flat)</option>
+                            </select>
+                        </div>
 
-                    <div class="mb-2 mt-2">
-                        <label class="form-label small">Background image</label>
-                        <InputFile OnChange="OnPlotBackgroundImageSelected" accept="image/*" class="form-control form-control-sm" />
-                        @if (!string.IsNullOrWhiteSpace(newPlotBackgroundImageWarning))
-                        {
-                            <div class="x-small text-warning mt-1">@newPlotBackgroundImageWarning</div>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(newPlotBackgroundImageFileName))
-                        {
-                            <div class="row g-2 mt-2 align-items-end">
-                                <div class="col-sm-7">
-                                    <label class="form-label x-small">Background opacity</label>
-                                    <input type="range" min="0" max="1" step="0.05" class="form-range"
-                                           @bind="newPlotBackgroundOpacity" />
-                                    <div class="x-small text-muted">@F(newPlotBackgroundOpacity * 100)%</div>
-                                </div>
-                                <div class="col-sm-5">
-                                    <label class="form-label x-small">Background fit</label>
-                                    <InputSelect class="form-select form-select-sm" @bind-Value="newPlotBackgroundFit">
-                                        <option value="@BackgroundFit.Fit">Fit</option>
-                                        <option value="@BackgroundFit.Letterbox">Letterbox</option>
-                                        <option value="@BackgroundFit.Stretch">Stretch</option>
-                                    </InputSelect>
-                                </div>
+                        <div class="row g-2 plot-dimension-row align-items-end">
+                            <div class="col plot-dimension-col">
+                                <label class="form-label small">Width (@LinearUnitShortLabel(newPlotLinearUnit))</label>
+                                <input type="number" min="1" max="6000" step="0.1" class="form-control form-control-sm"
+                                       @bind="NewPlotWidthDisplay" />
                             </div>
-                            <div class="d-flex align-items-center gap-2 mt-2">
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearPlotBackgroundImage">Remove image</button>
-                                <span class="x-small text-muted">Use the Scale button to calibrate directly on the main canvas. Fit preserves aspect ratio; Stretch distorts to fill.</span>
+                            <div class="col-auto plot-dimension-lock-col">
+                                <button type="button"
+                                        class="aspect-lock-toggle @(aspectLocked ? "locked" : string.Empty)"
+                                        @onclick="ToggleAspectLock"
+                                        aria-label="Lock aspect ratio"
+                                        aria-pressed="@aspectLocked"
+                                        title="Lock aspect ratio">
+                                    @if (aspectLocked)
+                                    {
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path fill="currentColor" d="M14.41 4.76C15.96 3.21 18.49 3.21 20.04 4.76C21.59 6.32 21.59 8.84 20.04 10.4L17.76 12.68C16.21 14.23 13.68 14.23 12.12 12.68L11.56 12.12L13.26 10.42L13.83 10.98C14.44 11.6 15.44 11.6 16.06 10.98L18.34 8.7C18.96 8.08 18.96 7.08 18.34 6.46C17.72 5.84 16.72 5.84 16.1 6.46L13.82 8.74L12.12 7.04ZM11.88 11.32L12.44 11.88L10.74 13.58L10.17 13.02C9.56 12.4 8.56 12.4 7.94 13.02L5.66 15.3C5.04 15.92 5.04 16.92 5.66 17.54C6.28 18.16 7.28 18.16 7.9 17.54L10.18 15.26L11.88 16.96L9.59 19.24C8.04 20.79 5.51 20.79 3.96 19.24C2.41 17.68 2.41 15.16 3.96 13.6L6.24 11.32C7.79 9.77 10.32 9.77 11.88 11.32ZM8.54 11.88L11.88 8.54L15.46 12.12L12.12 15.46Z" />
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M10.6 13.4C9.43 12.23 9.43 10.34 10.6 9.17L13.17 6.6C14.34 5.43 16.23 5.43 17.4 6.6C18.57 7.77 18.57 9.66 17.4 10.83L15.9 12.33" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                            <path d="M13.4 10.6C14.57 11.77 14.57 13.66 13.4 14.83L10.83 17.4C9.66 18.57 7.77 18.57 6.6 17.4C5.43 16.23 5.43 14.34 6.6 13.17L8.1 11.67" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    }
+                                </button>
                             </div>
-                            <img class="plot-calibration-image mt-2"
-                                 src="@PlotImageUrl(newPlotBackgroundImageFileName!)"
-                                 alt="Plot background calibration preview" />
-                        }
-                    </div>
+                            <div class="col plot-dimension-col">
+                                <label class="form-label small">Height (@LinearUnitShortLabel(newPlotLinearUnit))</label>
+                                <input type="number" min="1" max="6000" step="0.1" class="form-control form-control-sm"
+                                       @bind="NewPlotHeightDisplay" />
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label small">Units</label>
+                                <select class="form-select form-select-sm" @bind="newPlotLinearUnit" disabled="@newPlotLinearUnitReadOnly">
+                                    @foreach (var unit in Enum.GetValues<LinearUnit>())
+                                    {
+                                        <option value="@unit">@LinearUnitShortLabel(unit)</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
 
-                    <div class="mb-2">
-                        <label class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" @bind="newPlotShowGrid" />
-                            <span class="form-check-label small">Show grid</span>
-                        </label>
-
-                        @if (newPlotShowGrid)
+                        <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
+                            <span class="x-small text-muted">Stored as @F(newPlotWidth) × @F(newPlotHeight) ft</span>
+                            @if (newPlotDimensionsDerivedFromImage && newPlotImagePixelWidth is not null && newPlotImagePixelHeight is not null)
+                            {
+                                <span class="x-small text-muted">Derived from @newPlotImagePixelWidth × @newPlotImagePixelHeight px at @F(DefaultPlotPixelsPerFoot) px/ft.</span>
+                            }
+                        </div>
+                        @if (newPlotLinearUnitReadOnly)
                         {
-                            <div class="row g-2">
-                                <div class="col-4">
-                                    <label class="form-label x-small">Line color</label>
-                                    <input type="color" class="form-control form-control-sm form-control-color custom-color" @bind="newPlotGridColor" />
-                                </div>
-                                <div class="col-4">
-                                    <label class="form-label x-small">Line width</label>
-                                    <input type="number" min="0.001" max="0.2" step="0.001" class="form-control form-control-sm" @bind="newPlotGridLineWidth" />
-                                </div>
-                                <div class="col-4">
-                                    <label class="form-label x-small">Opacity</label>
-                                    <input type="number" min="0" max="1" step="0.05" class="form-control form-control-sm" @bind="newPlotGridOpacity" />
-                                </div>
-                            </div>
+                            <div class="x-small text-muted mt-1">Legacy plots default to feet until they are saved with an explicit unit.</div>
                         }
 
-                    </div>
+                        @if (ShowRecentPlotSizeQuickPicks)
+                        {
+                            <div class="mt-2">
+                                <label class="form-label x-small">Recent sizes</label>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach (var size in library.Ui.RecentPlotSizes.Take(10))
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="@(() => ApplyRecentPlotSize(size))">@RecentPlotSizeLabel(size)</button>
+                                    }
+                                </div>
+                            </div>
+                        }
 
-                    <div class="mb-2">
-                        <label class="form-check mb-1">
-                            <input class="form-check-input" type="checkbox" @bind="newPlotShowScaleDisplay" />
-                            <span class="form-check-label small">Show scale display on canvas</span>
-                        </label>
-                        <button class="btn btn-sm btn-outline-primary" @onclick="BeginScaleCalibrationFromDialog">Scale</button>
-                    </div>
+                        <div class="mb-2 mt-3">
+                            <label class="form-label small">Background image</label>
+                            <InputFile OnChange="OnPlotBackgroundImageSelected" accept="image/*" class="form-control form-control-sm" />
+                            @if (!string.IsNullOrWhiteSpace(newPlotBackgroundImageWarning))
+                            {
+                                <div class="x-small text-warning mt-1">@newPlotBackgroundImageWarning</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(newPlotBackgroundImageFileName))
+                            {
+                                <div class="row g-2 mt-2">
+                                    <div class="col">
+                                        <label class="form-label x-small">Background opacity</label>
+                                        <input type="range" min="0" max="1" step="0.05" class="form-range"
+                                               @bind="newPlotBackgroundOpacity" />
+                                        <div class="x-small text-muted">@F(newPlotBackgroundOpacity * 100)%</div>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ClearPlotBackgroundImage">Remove image</button>
+                                    @if (isEditingPlotSettings)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="BeginScaleCalibrationFromDialog">Scale</button>
+                                        <span class="x-small text-muted">Use Scale on the main canvas to refine the fit.</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="x-small text-muted">Create the plot first, then use Scale on the main canvas if you need to refine it.</span>
+                                    }
+                                </div>
+                                <img class="plot-calibration-image mt-2"
+                                     src="@PlotImageUrl(newPlotBackgroundImageFileName!)"
+                                     alt="Plot background calibration preview" />
+                            }
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" @bind="newPlotShowGrid" />
+                                <span class="form-check-label small">Show grid</span>
+                            </label>
+
+                            @if (newPlotShowGrid)
+                            {
+                                <div class="row g-2">
+                                    <div class="col-4">
+                                        <label class="form-label x-small">Line color</label>
+                                        <input type="color" class="form-control form-control-sm form-control-color custom-color" @bind="newPlotGridColor" />
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label x-small">Line width</label>
+                                        <input type="number" min="0.001" max="0.2" step="0.001" class="form-control form-control-sm" @bind="newPlotGridLineWidth" />
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label x-small">Opacity</label>
+                                        <input type="number" min="0" max="1" step="0.05" class="form-control form-control-sm" @bind="newPlotGridOpacity" />
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-check mb-1">
+                                <input class="form-check-input" type="checkbox" @bind="newPlotShowScaleDisplay" />
+                                <span class="form-check-label small">Show scale display on canvas</span>
+                            </label>
+                        </div>
+                    }
 
                     @if (!string.IsNullOrWhiteSpace(newPlotError))
                     {
@@ -2943,7 +3000,14 @@ else
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-sm btn-secondary" @onclick="CancelNewPlot">Cancel</button>
-                    <button class="btn btn-sm btn-primary" @onclick="SavePlotSettingsAsync">@(isEditingPlotSettings ? "Save" : "Create")</button>
+                    @if (!isEditingPlotSettings && newPlotDialogStep == NewPlotDialogStep.ImageFirst)
+                    {
+                        <button class="btn btn-sm btn-primary" @onclick="ContinueWithoutPlotImage">Next</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-primary" @onclick="SavePlotSettingsAsync">@(isEditingPlotSettings ? "Save" : "Create")</button>
+                    }
                 </div>
             </div>
         </div>

@@ -30,6 +30,7 @@ public sealed class ModelDefaultsTests
         Assert.Null(p.SourcePlotId);
         Assert.Equal(120, p.WidthFt);
         Assert.Equal(120, p.HeightFt);
+        Assert.Equal(LinearUnit.Feet, p.LinearUnit);
         Assert.True(p.ShowGrid);
         Assert.Equal(BackgroundFit.Fit, p.BackgroundFit);
         Assert.InRange(p.BackgroundImageOpacity, 0, 1);
@@ -66,6 +67,7 @@ public sealed class ModelDefaultsTests
     {
         var u = new UiPreferences();
         Assert.NotNull(u.KeyBindings);
+        Assert.Empty(u.RecentPlotSizes);
         Assert.Equal("Ctrl+Z", u.KeyBindings.Undo);
         Assert.Equal("Ctrl+A", u.KeyBindings.SelectAll);
         Assert.Equal("Escape", u.KeyBindings.Escape);
