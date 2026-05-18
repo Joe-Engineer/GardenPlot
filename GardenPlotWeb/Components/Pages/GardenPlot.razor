@@ -729,12 +729,23 @@ else
 
                     // Plant spacing overlay (under shapes): one set of rings per plant, color-coded by overlap.
                     var plantList = visibleShapes.Where(z => z.Kind == ShapeKind.Plant && !IsFocalPointTrait(z.Trait)).ToList();
-                    var allShapesById = currentPlot.Shapes.ToDictionary(z => z.Id);
-                    var clipHatches = library.Ui.ShowClipHatch
-                        ? currentPlot.Shapes
-                            .Where(CanShapeBeClipped)
-                            .ToDictionary(z => z.Id, z => TakeoffMath.ClipOverlapUnion(z, allShapesById))
-                        : new Dictionary<Guid, IReadOnlyList<IReadOnlyList<Point>>>();
+                    // Build the clip-hatch overlay only when (a) the toggle is on AND (b) at least one
+                    // shape has a non-empty ClippedBy list. Polygon clipping is O(N²) per render, and
+                    // wheel-zoom triggers re-renders, so the early-out keeps interactive zoom snappy
+                    // on plots that don't use clipping.
+                    Dictionary<Guid, Shape>? allShapesById = null;
+                    Dictionary<Guid, IReadOnlyList<IReadOnlyList<Point>>> clipHatches;
+                    if (library.Ui.ShowClipHatch && currentPlot.Shapes.Any(z => z.ClippedBy.Count > 0))
+                    {
+                        allShapesById = currentPlot.Shapes.ToDictionary(z => z.Id);
+                        clipHatches = currentPlot.Shapes
+                            .Where(z => z.ClippedBy.Count > 0 && CanShapeBeClipped(z))
+                            .ToDictionary(z => z.Id, z => TakeoffMath.ClipOverlapUnion(z, allShapesById));
+                    }
+                    else
+                    {
+                        clipHatches = new Dictionary<Guid, IReadOnlyList<IReadOnlyList<Point>>>();
+                    }
                 }
                 @if (plantList.Count > 0)
                 {

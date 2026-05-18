@@ -66,7 +66,7 @@ public sealed class ModelDefaultsTests
         Assert.Equal("Ctrl+Z", u.KeyBindings.Undo);
         Assert.Equal("Ctrl+A", u.KeyBindings.SelectAll);
         Assert.Equal("Escape", u.KeyBindings.Escape);
-        Assert.True(u.ShowClipHatch);
+        Assert.False(u.ShowClipHatch);
     }
 
     [Fact]
