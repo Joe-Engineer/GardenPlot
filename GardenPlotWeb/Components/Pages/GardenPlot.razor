@@ -36,6 +36,31 @@
                 <option value="@p.Id">@p.Name [@(p.Phase == PhaseKind.AsBuilt ? "As-built" : "Design")] (@F(p.WidthFt)' × @F(p.HeightFt)')</option>
             }
         </select>
+
+        <div class="btn-group btn-group-sm view-mode-toggle" role="group" aria-label="Plot view mode">
+            <button type="button"
+                    class="btn @(CurrentViewMode == ViewMode.Design ? "btn-success" : "btn-outline-secondary")"
+                    aria-pressed="@(CurrentViewMode == ViewMode.Design)"
+                    @onclick='() => SetViewModeAsync(ViewMode.Design)'>Design</button>
+            <button type="button"
+                    class="btn @(CurrentViewMode == ViewMode.Concept ? "btn-success" : "btn-outline-secondary")"
+                    aria-pressed="@(CurrentViewMode == ViewMode.Concept)"
+                    @onclick='() => SetViewModeAsync(ViewMode.Concept)'>Concept</button>
+        </div>
+
+        <div class="header-export-group">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ExportPng">PNG</button>
+            @if (IsConceptMode)
+            {
+                <button class="btn btn-sm btn-outline-secondary" disabled title="@ConceptPdfTodoNote">PDF TODO</button>
+            }
+            else
+            {
+                <button class="btn btn-sm btn-outline-secondary"
+                        @onclick="PrintPlot"
+                        title="Open print preview (use 'Save as PDF' from the print dialog)">Print / PDF</button>
+            }
+        </div>
     }
     <button class="btn btn-sm btn-outline-success" @onclick="ShowNewPlotDialog">+ New Plot</button>
     @if (currentPlot is not null)
@@ -59,8 +84,15 @@
 
 @if (currentPlot is not null)
 {
-    <div class="text-muted small mb-2 plot-info-line d-flex flex-wrap gap-2 align-items-center">
-        <span>@F(currentPlot.WidthFt) ft × @F(currentPlot.HeightFt) ft &mdash; flat. Pick a tool, then draw or stamp on the plot.</span>
+    <div class="text-muted small mb-2 plot-info-line d-flex flex-wrap gap-2 align-items-center @(IsConceptMode ? "concept-info-line" : string.Empty)">
+        @if (IsConceptMode)
+        {
+            <span>@F(currentPlot.WidthFt) ft × @F(currentPlot.HeightFt) ft &mdash; Concept presentation mode. Edit interactions are disabled.</span>
+        }
+        else
+        {
+            <span>@F(currentPlot.WidthFt) ft × @F(currentPlot.HeightFt) ft &mdash; flat. Pick a tool, then draw or stamp on the plot.</span>
+        }
         <span class="badge @(currentPlot.Phase == PhaseKind.AsBuilt ? "text-bg-warning" : "text-bg-secondary")">@(currentPlot.Phase == PhaseKind.AsBuilt ? "As-built" : "Design")</span>
         @if (currentPlot.SourcePlotId is Guid sourcePlotId)
         {
@@ -76,7 +108,9 @@
 }
 else
 {
-    <div class="plot-toolbar">
+    @if (!IsConceptMode)
+    {
+        <div class="plot-toolbar">
         <div class="toolbar-row toolbar-row-global">
             <div class="toolbar-group" role="toolbar" aria-label="Drawing tools">
                 @foreach (var t in tools)
@@ -353,15 +387,10 @@ else
                 <button class="toolbar-icon-btn" @onclick="ShowKeyBindingsDialog" title="Keyboard mappings" aria-label="Keyboard mappings">
                     <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M7 10H9M11 10H13M15 10H17M7 14H11M13 14H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
                 </button>
-                <button class="toolbar-icon-btn" @onclick="ExportPng" title="Export the plot as a PNG image" aria-label="Export PNG">
-                    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M7 15L10 12L13 15L16 11L19 15" fill="none" stroke="currentColor" stroke-width="1.8" /><circle cx="9" cy="8" r="1.4" fill="currentColor" /></svg>
-                </button>
-                <button class="toolbar-icon-btn" @onclick="PrintPlot" title="Open print preview (use 'Save as PDF' from the print dialog)" aria-label="Print or save PDF">
-                    <svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="6" fill="none" stroke="currentColor" stroke-width="2" /><rect x="5" y="10" width="14" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="2" /><rect x="7" y="14" width="10" height="6" fill="none" stroke="currentColor" stroke-width="2" /></svg>
-                </button>
             </span>
         </div>
-    </div>
+        </div>
+    }
 
 @if (showKeyBindingsDialog)
 {
@@ -416,8 +445,10 @@ else
     </div>
 }
 
-    <div class="plot-workspace">
-            <aside class="plot-palette">
+    <div class="plot-workspace @(IsConceptMode ? "concept-workspace" : string.Empty)">
+            @if (!IsConceptMode)
+            {
+                <aside class="plot-palette">
                 <div class="palette-header">
                     <select class="form-select form-select-sm palette-combobox"
                             value="@currentCategory"
@@ -552,7 +583,8 @@ else
                                 disabled="@(!CanEditSelectedCustomPaletteItem)">Edit Item</button>
                     </div>
                 }
-            </aside>
+                </aside>
+            }
 
             <aside class="layers-dock">
                 <button type="button"
@@ -616,15 +648,15 @@ else
                 }
             </aside>
 
-            <div class="plot-viewport-frame">
-            <div class="plot-scroll-view" @ref="wrapRef">
-            <div class="plot-canvas-wrap">
-                <svg class="plot-canvas @(showCanvasScalePanel ? "scale-capture-active" : string.Empty)"
+            <div class="plot-viewport-frame @(IsConceptMode ? "concept-mode-frame" : string.Empty)">
+            <div class="plot-scroll-view @(IsConceptMode ? "concept-scroll-view" : string.Empty)" @ref="wrapRef">
+            <div class="plot-canvas-wrap @(IsConceptMode ? "concept-canvas-wrap" : string.Empty)">
+                <svg class="plot-canvas @(showCanvasScalePanel ? "scale-capture-active" : string.Empty) @(IsConceptMode ? "concept-mode" : string.Empty)"
                      @ref="canvasRef"
                      tabindex="0"
                      data-zoom="@F(zoom)"
-                     style="width:@(PlotWidthFt * PxPerFt * zoom)px; height:@(PlotHeightFt * PxPerFt * zoom)px;"
-                     viewBox="0 0 @F(PlotWidthFt) @F(PlotHeightFt)"
+                     style="width:@(CanvasWidthFt * PxPerFt * zoom)px; height:@(CanvasHeightFt * PxPerFt * zoom)px;"
+                     viewBox="@($"{F(CanvasViewBoxXFt)} {F(CanvasViewBoxYFt)} {F(CanvasWidthFt)} {F(CanvasHeightFt)}")"
                      preserveAspectRatio="xMidYMid meet"
                      @onkeydown="OnKeyDown"
                      @onkeydown:preventDefault="true"
@@ -638,6 +670,11 @@ else
                      @onpointerdown:preventDefault="true">
 
                 <defs>
+                    <style>@((MarkupString)ConceptSvgStyles)</style>
+                    @if (IsConceptMode)
+                    {
+                        @((MarkupString)PlantRendering.ConceptShadowFilterDef())
+                    }
                     @if (currentPlot.ShowGrid)
                     {
                         <pattern id="ftgrid" width="1" height="1" patternUnits="userSpaceOnUse">
@@ -661,10 +698,53 @@ else
                     </pattern>
                 </defs>
 
-                @{ 
+                @{
                     var backgroundFit = EffectivePlotBackgroundFit(currentPlot);
                     var backgroundRenderInfo = GetPlotBackgroundRenderInfo(currentPlot);
                 }
+
+                @if (IsConceptMode)
+                {
+                    var conceptLegendRows = BuildConceptLegendRows();
+                    var legendPanelX = PlotWidthFt + ConceptLegendPanelInsetLeftFt;
+                    var legendPanelY = -ConceptMarginTopFt + ConceptLegendPanelInsetTopFt;
+                    var northArrowX = PlotWidthFt + (ConceptMarginRightFt - 2.0);
+                    var scaleBarY = PlotHeightFt + (ConceptMarginBottomFt - 1.35);
+                    var conceptScaleLenFt = NiceScaleLengthFt(PxPerFt * zoom, maxPx: 160);
+                    <rect class="concept-sheet-bg" x="@F(CanvasViewBoxXFt)" y="@F(CanvasViewBoxYFt)" width="@F(CanvasWidthFt)" height="@F(CanvasHeightFt)" />
+                    <rect class="concept-sheet-frame" x="@F(CanvasViewBoxXFt + 0.2)" y="@F(CanvasViewBoxYFt + 0.2)" width="@F(CanvasWidthFt - 0.4)" height="@F(CanvasHeightFt - 0.4)" rx="0.35" ry="0.35" />
+                    <svg:text class="concept-title" x="0" y="@F(-ConceptMarginTopFt + 1.6)" font-size="1.7">@currentPlot.Name</svg:text>
+                    <svg:text class="concept-subtitle" x="0" y="@F(-ConceptMarginTopFt + 2.95)" font-size="0.75">@ConceptProjectName</svg:text>
+                    <svg:text class="concept-meta" x="0" y="@F(-ConceptMarginTopFt + 4.05)" font-size="0.58">Prepared @ConceptPreparedDate</svg:text>
+                    <rect class="concept-legend-panel" x="@F(legendPanelX)" y="@F(legendPanelY)" width="@F(ConceptLegendPanelWidthFt)" height="@F(PlotHeightFt + ConceptMarginTopFt + ConceptMarginBottomFt - 1.6)" rx="0.3" ry="0.3" />
+                    <svg:text class="concept-legend-heading" x="@F(legendPanelX + 0.7)" y="@F(legendPanelY + 0.85)" font-size="0.66">Palette swatches</svg:text>
+                    <g transform="translate(@F(northArrowX) @F(-ConceptMarginTopFt + 0.95))">
+                        <line x1="0" y1="1.2" x2="0" y2="0.12" stroke="#4f4334" stroke-width="0.08" />
+                        <polygon points="-0.16,0.28 0,0 0.16,0.28" fill="#4f4334" />
+                        <text class="concept-north-label" x="0" y="1.95" text-anchor="middle" font-size="0.6">N↑</text>
+                    </g>
+                    <g transform="translate(0 @F(scaleBarY))">
+                        <line x1="0" y1="0" x2="@F(conceptScaleLenFt)" y2="0" stroke="#4f4334" stroke-width="0.11" />
+                        <line x1="0" y1="-0.16" x2="0" y2="0.16" stroke="#4f4334" stroke-width="0.08" />
+                        <line x1="@F(conceptScaleLenFt)" y1="-0.16" x2="@F(conceptScaleLenFt)" y2="0.16" stroke="#4f4334" stroke-width="0.08" />
+                        <text class="concept-scale-label" x="@F(conceptScaleLenFt / 2)" y="0.95" text-anchor="middle" font-size="0.56">@F(conceptScaleLenFt)' scale</text>
+                    </g>
+                    @for (var legendIndex = 0; legendIndex < conceptLegendRows.Count; legendIndex++)
+                    {
+                        var row = conceptLegendRows[legendIndex];
+                        var y = legendPanelY + 1.55 + (legendIndex * ConceptLegendRowHeightFt);
+                        <rect x="@F(legendPanelX + 0.55)" y="@F(y - 0.48)" width="0.78" height="0.78" rx="0.08" ry="0.08"
+                              fill="@row.Fill" stroke="@row.Stroke" stroke-width="0.05" />
+                        @if (!string.IsNullOrWhiteSpace(row.TextureKey))
+                        {
+                            <rect x="@F(legendPanelX + 0.55)" y="@F(y - 0.48)" width="0.78" height="0.78" rx="0.08" ry="0.08"
+                                  fill="@($"url(#tex-{row.TextureKey})")" stroke="@row.Stroke" stroke-width="0.05" />
+                        }
+                        <svg:text class="concept-legend-name" x="@F(legendPanelX + 1.6)" y="@F(y)" font-size="0.5">@row.Name</svg:text>
+                        <svg:text class="concept-legend-qty" x="@F(legendPanelX + ConceptLegendPanelWidthFt - 0.6)" y="@F(y)" font-size="0.48" text-anchor="end">@row.Quantity</svg:text>
+                    }
+                }
+
                 <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="#f3efe3" />
                 @if (!string.IsNullOrWhiteSpace(currentPlot.BackgroundImageFileName))
                 {
@@ -686,7 +766,7 @@ else
                 }
                 @if (currentPlot.ShowGrid)
                 {
-                    <rect x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="url(#ftgrid)" />
+                    <rect class="concept-grid" x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)" fill="url(#ftgrid)" />
                 }
                 @if (backgroundFit == BackgroundFit.Letterbox && backgroundRenderInfo is not null)
                 {
@@ -750,7 +830,7 @@ else
                         clipHatches = new Dictionary<Guid, IReadOnlyList<IReadOnlyList<Point>>>();
                     }
                 }
-                @if (plantList.Count > 0)
+                @if (!IsConceptMode && plantList.Count > 0)
                 {
                     <g pointer-events="none">
                         @foreach (var p in plantList)
@@ -768,19 +848,23 @@ else
                     var sb = GetBounds(s);
                     var scx = sb.x + sb.w / 2;
                     var scy = sb.y + sb.h / 2;
-                    <g class="shape @(IsSelected(s.Id) ? "selected" : "")"
+                    <g class="shape @(IsSelected(s.Id) && !IsConceptMode ? "selected" : string.Empty) @(IsRulerShape(s) ? "concept-ruler" : string.Empty) @(UseConceptPlantEffects(s) ? "concept-shadowed" : string.Empty)"
                        transform="rotate(@F(s.Rotation) @F(scx) @F(scy))"
-                       pointer-events="@(currentTool == Tool.Select && CanSelectShape(s) && CanReceiveShapePointer(s) ? "auto" : "none")"
+                       pointer-events="@(!IsConceptMode && currentTool == Tool.Select && CanSelectShape(s) && CanReceiveShapePointer(s) ? "auto" : "none")"
                        @onpointerdown="(e) => OnShapePointerDown(e, s)"
                        @onpointerdown:stopPropagation="true"
                        @oncontextmenu="(e) => OnShapeContextMenu(e, s)"
                        @oncontextmenu:preventDefault="true"
                        @oncontextmenu:stopPropagation="true">
+                        @if (UseConceptPlantEffects(s) && MatureSpreadDiameterFt(s) is double spreadDiameterFt)
+                        {
+                            @((MarkupString)PlantRendering.MatureSpreadHaloSvg(scx, scy, spreadDiameterFt, s.Trait))
+                        }
                         @switch (s.Kind)
                         {
                             case ShapeKind.Rectangle:
                                 var rectClipId = $"tile-clip-{s.Id:N}";
-                                <rect x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
+                                <rect class="@((IsGroundCoverShape(s) && (!string.IsNullOrWhiteSpace(s.TextureKey) || !string.IsNullOrWhiteSpace(s.TextureImageId))) ? "ground-cover-textured" : string.Empty)" x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
                                       fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
                                       stroke="@EffectiveStroke(s)" stroke-width="0.06" />
                                 var rectImgRef = !string.IsNullOrWhiteSpace(s.TextureImageId) ? s.TextureImageId : s.TileBackgroundImageFileName;
@@ -798,7 +882,7 @@ else
                                 break;
                             case ShapeKind.Oval:
                                 var ovalClipId = $"tile-clip-{s.Id:N}";
-                                <ellipse cx="@F(s.X + s.W / 2)" cy="@F(s.Y + s.H / 2)"
+                                <ellipse class="@((IsGroundCoverShape(s) && (!string.IsNullOrWhiteSpace(s.TextureKey) || !string.IsNullOrWhiteSpace(s.TextureImageId))) ? "ground-cover-textured" : string.Empty)" cx="@F(s.X + s.W / 2)" cy="@F(s.Y + s.H / 2)"
                                          rx="@F(s.W / 2)" ry="@F(s.H / 2)"
                                          fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
                                          stroke="@EffectiveStroke(s)" stroke-width="0.06" />
@@ -820,7 +904,7 @@ else
                                 @if (IsGroundCoverShape(s))
                                 {
                                     var polyClipId = $"poly-clip-{s.Id:N}";
-                                    <polygon points="@PointsString(s.Points)"
+                                    <polygon class="@((!string.IsNullOrWhiteSpace(s.TextureKey) || !string.IsNullOrWhiteSpace(s.TextureImageId)) ? "ground-cover-textured" : string.Empty)" points="@PointsString(s.Points)"
                                              fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
                                              stroke="@EffectiveStroke(s)" stroke-width="0.08"
                                              stroke-linejoin="round" />
@@ -923,7 +1007,7 @@ else
                                 @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, EffectiveFill(s), EffectiveStroke(s)))
                                 break;
                         }
-                        @if (IsSelected(s.Id))
+                        @if (!IsConceptMode && IsSelected(s.Id))
                         {
                             <rect x="@F(sb.x - 0.05)" y="@F(sb.y - 0.05)"
                                   width="@F(sb.w + 0.1)" height="@F(sb.h + 0.1)"
@@ -933,7 +1017,7 @@ else
                     </g>
                 }
 
-                @if (library.Ui.ShowClipHatch)
+                @if (!IsConceptMode && library.Ui.ShowClipHatch)
                 {
                     <g class="clip-hatch-layer" pointer-events="none">
                         @foreach (var clippedShape in currentPlot.Shapes)
@@ -949,7 +1033,7 @@ else
                     </g>
                 }
 
-                @if (drafting is not null)
+                @if (!IsConceptMode && drafting is not null)
                 {
                     @switch (drafting.Kind)
                     {
@@ -1021,7 +1105,7 @@ else
                             break;
                     }
                 }
-                @if (currentTool == Tool.Select && isBoxSelecting)
+                @if (!IsConceptMode && currentTool == Tool.Select && isBoxSelecting)
                 {
                     var bx = Math.Min(boxSelectStartX, boxSelectCurrentX);
                     var by = Math.Min(boxSelectStartY, boxSelectCurrentY);
@@ -1032,7 +1116,7 @@ else
                           stroke-dasharray="0.15,0.1" pointer-events="none" />
                 }
 
-                @if (currentTool == Tool.Select && isPasteMode && pasteHoverX is { } phx && pasteHoverY is { } phy && clipboard.Count > 0)
+                @if (!IsConceptMode && currentTool == Tool.Select && isPasteMode && pasteHoverX is { } phx && pasteHoverY is { } phy && clipboard.Count > 0)
                 {
                     var previewShapes = BuildClipboardShapesAt(phx, phy, assignNewIds: false);
                     <g pointer-events="none" opacity="0.45">
@@ -1109,7 +1193,7 @@ else
                     </g>
                 }
 
-                @if (currentTool == Tool.Stamp && selectedItem is { } gk && ghostX is { } gx && ghostY is { } gy)
+                @if (!IsConceptMode && currentTool == Tool.Stamp && selectedItem is { } gk && ghostX is { } gx && ghostY is { } gy)
                 {
                     var previewPattern = ActiveDropPattern(pointerShiftDown, pointerCtrlDown, pointerAltDown);
                     var previewPlacement = BuildStampPlacement(gk, gx, gy, previewPattern, assignNewIds: false);
@@ -1153,62 +1237,65 @@ else
                 }
             </div>
         </div>
-            <div class="plot-status-bar" role="status" aria-live="polite">
-                <span class="status-item status-pos"><strong>X:</strong> @(lastCanvasX is double statusX ? F(statusX) : "--")</span>
-                <span class="status-item status-pos"><strong>Y:</strong> @(lastCanvasY is double statusY ? F(statusY) : "--")</span>
-                <span class="status-item"><strong>Action:</strong> @CurrentMouseActionLabel()</span>
-                <span class="status-item ms-auto d-inline-flex align-items-center gap-3">
-                    <label class="clip-hatch-toggle">
-                        <input type="checkbox" checked="@library.Ui.ShowClipHatch" @onchange="OnClipHatchPreferenceChanged" />
-                        Clip hatch
-                    </label>
-                    <button class="btn btn-sm btn-link p-0 takeoff-toggle-btn"
-                            @onclick="ToggleTakeoffPanel">
-                        @(showTakeoffPanel ? "Hide Takeoff" : "Show Takeoff")
-                    </button>
-                </span>
-            </div>
-            <div class="view-scale-controls">
-                <button class="btn btn-sm scale-icon-btn"
-                        @onclick="BeginCanvasScaleCalibration"
-                        disabled="@string.IsNullOrWhiteSpace(currentPlot.BackgroundImageFileName)"
-                        title="Scale the current drawing"
-                        aria-label="Scale the current drawing">📐</button>
+            @if (!IsConceptMode)
+            {
+                <div class="plot-status-bar" role="status" aria-live="polite">
+                    <span class="status-item status-pos"><strong>X:</strong> @(lastCanvasX is double statusX ? F(statusX) : "--")</span>
+                    <span class="status-item status-pos"><strong>Y:</strong> @(lastCanvasY is double statusY ? F(statusY) : "--")</span>
+                    <span class="status-item"><strong>Action:</strong> @CurrentMouseActionLabel()</span>
+                    <span class="status-item ms-auto d-inline-flex align-items-center gap-3">
+                        <label class="clip-hatch-toggle">
+                            <input type="checkbox" checked="@library.Ui.ShowClipHatch" @onchange="OnClipHatchPreferenceChanged" />
+                            Clip hatch
+                        </label>
+                        <button class="btn btn-sm btn-link p-0 takeoff-toggle-btn"
+                                @onclick="ToggleTakeoffPanel">
+                            @(showTakeoffPanel ? "Hide Takeoff" : "Show Takeoff")
+                        </button>
+                    </span>
+                </div>
+                <div class="view-scale-controls">
+                    <button class="btn btn-sm scale-icon-btn"
+                            @onclick="BeginCanvasScaleCalibration"
+                            disabled="@string.IsNullOrWhiteSpace(currentPlot.BackgroundImageFileName)"
+                            title="Scale the current drawing"
+                            aria-label="Scale the current drawing">📐</button>
 
-                @if (currentPlot.ShowScaleDisplay)
-                {
-                    var pxPerFtNow = PxPerFt * zoom;
-                    var scaleLenFt = NiceScaleLengthFt(pxPerFtNow, maxPx: 180);
-                    var scaleLenPx = scaleLenFt * pxPerFtNow;
-                    var overlayWidth = scaleLenPx + 24;
-                    <div class="scale-indicator-overlay" style="width:@(F(overlayWidth))px;">
-                        <svg viewBox="@($"0 0 {F(overlayWidth)} 30")" preserveAspectRatio="none" aria-label="Scale indicator">
-                            <rect x="0.5" y="0.5" width="@F(overlayWidth - 1)" height="29" rx="4" ry="4" fill="rgba(255,255,255,0.92)" stroke="#b8c8a3" />
-                            <line x1="12" y1="20" x2="@F(12 + scaleLenPx)" y2="20" stroke="#2f5a3a" stroke-width="1.6" />
-                            @{
-                                var tickStep = NiceTickStepFt(scaleLenFt);
-                                var tickCount = (int)Math.Round(scaleLenFt / tickStep);
-                            }
-                            @for (var tick = 0; tick <= tickCount; tick++)
-                            {
-                                var ftAtTick = tick * tickStep;
-                                var x = 12 + (ftAtTick * pxPerFtNow);
-                                var major = tick == 0 || tick == tickCount || (tick % 5 == 0);
-                                <line x1="@F(x)" y1="@(major ? "9" : "13")" x2="@F(x)" y2="21" stroke="#2f5a3a" stroke-width="1" />
-                                if (major)
-                                {
-                                    @SvgOverlayScaleText(x, 8, ftAtTick.ToString(tickStep < 1 ? "0.##" : "0", CultureInfo.InvariantCulture))
+                    @if (currentPlot.ShowScaleDisplay)
+                    {
+                        var pxPerFtNow = PxPerFt * zoom;
+                        var scaleLenFt = NiceScaleLengthFt(pxPerFtNow, maxPx: 180);
+                        var scaleLenPx = scaleLenFt * pxPerFtNow;
+                        var overlayWidth = scaleLenPx + 24;
+                        <div class="scale-indicator-overlay" style="width:@(F(overlayWidth))px;">
+                            <svg viewBox="@($"0 0 {F(overlayWidth)} 30")" preserveAspectRatio="none" aria-label="Scale indicator">
+                                <rect x="0.5" y="0.5" width="@F(overlayWidth - 1)" height="29" rx="4" ry="4" fill="rgba(255,255,255,0.92)" stroke="#b8c8a3" />
+                                <line x1="12" y1="20" x2="@F(12 + scaleLenPx)" y2="20" stroke="#2f5a3a" stroke-width="1.6" />
+                                @{
+                                    var tickStep = NiceTickStepFt(scaleLenFt);
+                                    var tickCount = (int)Math.Round(scaleLenFt / tickStep);
                                 }
-                            }
-                            @SvgOverlayScaleText(overlayWidth / 2, 28, $"Scale ({CurrentScaleUnitLabel()})")
-                        </svg>
-                    </div>
-                }
-            </div>
+                                @for (var tick = 0; tick <= tickCount; tick++)
+                                {
+                                    var ftAtTick = tick * tickStep;
+                                    var x = 12 + (ftAtTick * pxPerFtNow);
+                                    var major = tick == 0 || tick == tickCount || (tick % 5 == 0);
+                                    <line x1="@F(x)" y1="@(major ? "9" : "13")" x2="@F(x)" y2="21" stroke="#2f5a3a" stroke-width="1" />
+                                    if (major)
+                                    {
+                                        @SvgOverlayScaleText(x, 8, ftAtTick.ToString(tickStep < 1 ? "0.##" : "0", CultureInfo.InvariantCulture))
+                                    }
+                                }
+                                @SvgOverlayScaleText(overlayWidth / 2, 28, $"Scale ({CurrentScaleUnitLabel()})")
+                            </svg>
+                        </div>
+                    }
+                </div>
+            }
         </div>
     </div>
 
-    @if (showShapeContextMenu)
+    @if (!IsConceptMode && showShapeContextMenu)
     {
         <div class="shape-context-menu" style="left:@F(shapeContextMenuX)px;top:@F(shapeContextMenuY)px;"
              @onpointerdown:stopPropagation="true">
@@ -1221,7 +1308,7 @@ else
         </div>
     }
 
-@if (showCanvasScalePanel && currentPlot is not null)
+@if (!IsConceptMode && showCanvasScalePanel && currentPlot is not null)
 {
     var positioned = library.Ui.CalibrationPanelX is double && library.Ui.CalibrationPanelY is double;
 
@@ -1294,7 +1381,7 @@ else
     var itemInternalColumnCount = 10 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
     var summaryInternalColumnCount = 5 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
 
-    @if (showTakeoffPanel)
+    @if (!IsConceptMode && showTakeoffPanel)
     {
         var positioned = library.Ui.TakeoffPanelX is double && library.Ui.TakeoffPanelY is double;
         <div class="floating-panel takeoff-floating @(positioned ? "" : "default-takeoff-pos")"
@@ -1807,7 +1894,7 @@ else
         : null;
 }
 
-@if ((selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null) || infoRuler is not null) && currentPlot is not null)
+@if (!IsConceptMode && (selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null) || infoRuler is not null) && currentPlot is not null)
 {
     var forceRulerMode = infoRuler is not null && (drafting is not null || selectedIds.Count <= 1);
     var stampPreview = (!forceRulerMode && selectedIds.Count == 0 && currentTool == Tool.Stamp && selectedItem is not null)

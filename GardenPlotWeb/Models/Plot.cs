@@ -68,6 +68,10 @@ public class PlotData
     public bool ShowScaleDisplay { get; set; }
 
     public Dictionary<string, LayerState> LayerStates { get; set; } = LayerResolver.CreateDefaultStates();
+
+    /// <summary>Per-plot UI preferences such as the active view mode and viewport.</summary>
+    public UiPreferences Ui { get; set; } = new();
+
     public List<Shape> Shapes { get; set; } = new();
     public List<DropGroup> DropGroups { get; set; } = new();
     public List<GardenTask> Tasks { get; set; } = new();

@@ -4,6 +4,13 @@
 
 namespace GardenPlotWeb.Models;
 
+/// <summary>Saved view modes for the plot canvas.</summary>
+public enum ViewMode
+{
+    Design,
+    Concept,
+}
+
 /// <summary>Persisted UI state (panel positions, etc.). Stored alongside <see cref="PlotLibrary"/>.</summary>
 public class UiPreferences
 {
@@ -42,6 +49,7 @@ public class UiPreferences
 
     public DateTime? CustomerCutDate { get; set; }
 
+    public ViewMode LastViewMode { get; set; } = ViewMode.Design;
     public double? Zoom { get; set; }
     public double? ViewCenterXFt { get; set; }
     public double? ViewCenterYFt { get; set; }

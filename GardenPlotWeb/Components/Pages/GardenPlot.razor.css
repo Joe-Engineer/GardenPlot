@@ -1380,6 +1380,44 @@
 
 .gc-depth-toolbar { width: 4.5rem; }
 
+.view-mode-toggle .btn {
+    min-width: 5.5rem;
+}
+
+.header-export-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.concept-info-line {
+    color: #6b6252 !important;
+}
+
+.plot-workspace.concept-workspace {
+    gap: 0;
+}
+
+.plot-viewport-frame.concept-mode-frame {
+    height: calc(100vh - 180px);
+    max-height: calc(100vh - 180px);
+}
+
+.plot-scroll-view.concept-scroll-view {
+    background: #eee7d8;
+    border-color: #d6c7b2;
+    padding: 0.85rem;
+}
+
+.plot-canvas-wrap.concept-canvas-wrap {
+    background: transparent;
+    border-color: #d6c7b2;
+    padding: 0.25rem;
+}
+
+.plot-canvas.concept-mode {
+    cursor: default;
+}
 
 /* Takeoff row selection + context menu */
 .takeoff-table tbody tr:hover { background-color: rgba(90, 138, 74, 0.08); }
