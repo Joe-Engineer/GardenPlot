@@ -1125,6 +1125,8 @@ public partial class GardenPlot
         return row.ShapeId is Guid shapeId && IsSelected(shapeId);
     }
 
+    private static readonly double[] QuickRotationDegrees = [0, 45, 90, 180, 270];
+
     private static readonly string[] GroundCoverTextureKeys =
     [
         "gravel-fine",
@@ -7707,6 +7709,96 @@ public partial class GardenPlot
             group.SpacingFtOverride = Math.Clamp(spacingFt, 0.1, 200);
             await ReflowDropGroup(group);
         }
+    }
+
+    /// <summary>
+    /// Parses a rotation value (degrees) entered in the Selected Items panel and applies it
+    /// to all <paramref name="shapes"/>. Records one undo entry, normalises to [0, 360), and
+    /// saves. Silently ignores blank or non-numeric input so the field reverts on blur.
+    /// </summary>
+    private async Task OnShapeRotationInputChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            StateHasChanged();
+            return;
+        }
+
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double degrees))
+        {
+            StateHasChanged();
+            return;
+        }
+
+        await SetShapeRotationAsync(shapes, NormalizeDegrees(degrees));
+    }
+
+    /// <summary>Quick-set button handler: jumps every shape in <paramref name="shapes"/> to <paramref name="degrees"/>.</summary>
+    private Task QuickSetShapeRotationAsync(IReadOnlyList<Shape> shapes, double degrees)
+        => SetShapeRotationAsync(shapes, NormalizeDegrees(degrees));
+
+    private async Task SetShapeRotationAsync(IReadOnlyList<Shape> shapes, double normalizedDegrees)
+    {
+        if (shapes.Count == 0)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            shape.Rotation = normalizedDegrees;
+        }
+
+        ReconcileTakeoff();
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Parses a degrees input for an array's orientation and applies it to the
+    /// <see cref="DropGroup.Rotation"/> field. Reflows the array so member positions follow.
+    /// </summary>
+    private async Task OnDropGroupRotationInputChanged(DropGroup group, ChangeEventArgs e)
+    {
+        ArgumentNullException.ThrowIfNull(group);
+
+        string? raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw) ||
+            !double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double degrees))
+        {
+            StateHasChanged();
+            return;
+        }
+
+        await SetDropGroupRotationAsync(group, NormalizeDegrees(degrees));
+    }
+
+    /// <summary>Quick-set button handler for a drop group's orientation.</summary>
+    private Task QuickSetDropGroupRotationAsync(DropGroup group, double degrees)
+        => SetDropGroupRotationAsync(group, NormalizeDegrees(degrees));
+
+    private async Task SetDropGroupRotationAsync(DropGroup group, double normalizedDegrees)
+    {
+        RecordUndoState();
+        group.Rotation = normalizedDegrees;
+        await ReflowDropGroup(group);
+    }
+
+    private static double NormalizeDegrees(double degrees)
+    {
+        double normalized = degrees % 360.0;
+        if (normalized < 0)
+        {
+            normalized += 360.0;
+        }
+
+        return normalized;
     }
 
     private async Task OnAlongPathOffsetChanged(ChangeEventArgs e)

@@ -1511,3 +1511,20 @@
     }
 }
 
+
+::deep .rotation-edit-row {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    flex-wrap: wrap;
+    margin-top: .25rem;
+}
+
+::deep .rotation-edit-row .rotation-input {
+    width: 5.5rem;
+}
+
+::deep .rotation-edit-row .rotation-quickset .btn {
+    padding: .15rem .4rem;
+    line-height: 1.1;
+}
