@@ -19,12 +19,9 @@ public enum TakeoffViewMode
 /// <summary>
 /// One row in the takeoff list. Carries a link to a <see cref="CatalogItem"/> (the "what is it"
 /// answer) plus optional per-instance overrides (the "how much / how it gets done" answers).
+/// Derived display fields are also populated for shape-backed rows so assembly layers and area
+/// takeoffs can render without discarding the richer mainline item model.
 /// </summary>
-/// <remarks>
-/// <see cref="Id"/> is monotonic per plot via <see cref="TakeoffSequence"/> and is never reused
-/// even when items are deleted. <see cref="ShapeId"/> is null for virtual items (planned but
-/// not drawn).
-/// </remarks>
 public sealed class TakeoffItem
 {
     public int Id { get; set; }
@@ -69,6 +66,33 @@ public sealed class TakeoffItem
     public double WastePercent { get; set; }
 
     public double? DefaultThicknessIn { get; set; }
+
+    /// <summary>Derived display kind for shape-backed rows.</summary>
+    public string Kind { get; set; } = string.Empty;
+
+    /// <summary>Derived display name for shape-backed rows.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Aggregate count represented by this row.</summary>
+    public int Count { get; set; } = 1;
+
+    /// <summary>Derived quantity unit for shape-backed rows.</summary>
+    public string? QuantityUnit { get; set; }
+
+    /// <summary>Derived source area for area-based takeoffs.</summary>
+    public double? AreaFt2 { get; set; }
+
+    /// <summary>Derived thickness for volumetric takeoffs.</summary>
+    public double? ThicknessIn { get; set; }
+
+    /// <summary>Assembly layer multiplier applied to the base area/volume.</summary>
+    public double QuantityMultiplier { get; set; } = 1.0;
+
+    /// <summary>Assembly code when this row is emitted from a catalog assembly.</summary>
+    public string? AssemblyCode { get; set; }
+
+    /// <summary>Zero-based assembly layer index when <see cref="AssemblyCode"/> is populated.</summary>
+    public int? AssemblyLayerIndex { get; set; }
 }
 
 /// <summary>Represents a single takeoff summary row shown in the plot designer.</summary>
@@ -121,7 +145,22 @@ public static class TakeoffMath
             return item.NameOverride!;
         }
 
+        if (!string.IsNullOrWhiteSpace(item.Name))
+        {
+            return item.Name;
+        }
+
         return catalog?.DisplayName ?? item.CatalogCode;
+    }
+
+    public static string Kind(TakeoffItem item, CatalogItem? catalog)
+    {
+        if (!string.IsNullOrWhiteSpace(item.Kind))
+        {
+            return item.Kind;
+        }
+
+        return Kind(catalog);
     }
 
     public static string Kind(CatalogItem? catalog)
@@ -136,6 +175,11 @@ public static class TakeoffMath
             return item.UnitOverride!;
         }
 
+        if (!string.IsNullOrWhiteSpace(item.QuantityUnit))
+        {
+            return item.QuantityUnit!;
+        }
+
         if (!string.IsNullOrWhiteSpace(catalog?.Unit))
         {
             return catalog.Unit!;
@@ -146,7 +190,7 @@ public static class TakeoffMath
 
     public static double? EffectiveDepthIn(TakeoffItem item, CatalogItem? catalog)
     {
-        return item.DepthInOverride ?? catalog?.DefaultDepthIn;
+        return item.DepthInOverride ?? item.ThicknessIn ?? catalog?.DefaultDepthIn ?? item.DefaultThicknessIn;
     }
 
     public static double EffectiveWastePercent(TakeoffItem item, CatalogItem? catalog)
@@ -522,5 +566,245 @@ public static class TakeoffMath
         double dx = a.X - b.X;
         double dy = a.Y - b.Y;
         return Math.Sqrt((dx * dx) + (dy * dy));
+    }
+}
+
+/// <summary>
+/// Reconciles plot shapes into derived takeoff items used by assembly-aware UI and persistence
+/// synchronization.
+/// </summary>
+public static class TakeoffReconciler
+{
+    public static IReadOnlyList<TakeoffItem> Reconcile(
+        IEnumerable<Shape> shapes,
+        Func<CatalogSource, string?, string, CatalogAssembly?> getAssembly)
+    {
+        ArgumentNullException.ThrowIfNull(shapes);
+        ArgumentNullException.ThrowIfNull(getAssembly);
+
+        List<TakeoffItem> items = new();
+        foreach (Shape shape in shapes)
+        {
+            if (!string.IsNullOrWhiteSpace(shape.AssemblyCode)
+                && shape.AssemblySource is CatalogSource assemblySource)
+            {
+                CatalogAssembly? assembly = getAssembly(assemblySource, shape.AssemblyPackId, shape.AssemblyCode);
+                if (assembly is not null)
+                {
+                    AddAssemblyItems(items, shape, assembly);
+                    continue;
+                }
+            }
+
+            if (IsGroundCoverShape(shape))
+            {
+                double areaFt2 = GroundCoverMath.AreaFt2(shape);
+                double? depthIn = shape.GroundCoverDepthIn;
+                bool isVolumetric = !shape.IsGroundCoverSurface && depthIn is double depthValue && depthValue > 0;
+                string catalogCode = !string.IsNullOrWhiteSpace(shape.GroundCoverCode)
+                    ? shape.GroundCoverCode!
+                    : (!string.IsNullOrWhiteSpace(shape.Label) ? shape.Label! : "Ground cover");
+                items.Add(new TakeoffItem
+                {
+                    ShapeId = shape.Id,
+                    Kind = shape.IsGroundCoverSurface ? "Ground Cover ΓÇö Surface" : "Ground Cover",
+                    Name = catalogCode,
+                    Count = 1,
+                    Quantity = isVolumetric ? GroundCoverMath.VolumeYd3(areaFt2, depthIn!.Value) : areaFt2,
+                    QuantityUnit = isVolumetric ? "yd┬│" : "ft┬▓",
+                    AreaFt2 = areaFt2,
+                    ThicknessIn = isVolumetric ? depthIn : null,
+                    CatalogSource = CatalogSource.Base,
+                    CatalogCode = catalogCode,
+                });
+
+                continue;
+            }
+
+            if (shape.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
+            {
+                string name = !string.IsNullOrWhiteSpace(shape.Label)
+                    ? shape.Label
+                    : shape.Kind switch
+                    {
+                        ShapeKind.Rectangle => $"{shape.W:0.##}'├ù{shape.H:0.##}'",
+                        ShapeKind.Oval => $"{shape.W:0.##}'├ù{shape.H:0.##}'",
+                        ShapeKind.FreeDraw => "(unnamed)",
+                        ShapeKind.BedKit => "(unnamed)",
+                        ShapeKind.Tree => "(unnamed)",
+                        ShapeKind.Bush => "(unnamed)",
+                        ShapeKind.Plant => "(unnamed)",
+                        ShapeKind.Edge => shape.Takeoff?.CatalogCode ?? shape.Label ?? "(unnamed edge)",
+                        ShapeKind.Ruler => "(measurement)",
+                        ShapeKind.CircleRuler => "(measurement)",
+                        ShapeKind.RectRuler => "(measurement)",
+                        ShapeKind.SoilMarker => shape.Label ?? "Soil marker",
+                        _ => "(unnamed)",
+                    };
+                items.Add(new TakeoffItem
+                {
+                    ShapeId = shape.Id,
+                    Kind = shape.Kind switch
+                    {
+                        ShapeKind.BedKit => "Bed Kit",
+                        ShapeKind.Tree => "Tree",
+                        ShapeKind.Bush => "Bush",
+                        ShapeKind.Plant => "Plant",
+                        ShapeKind.Rectangle => "Rectangle",
+                        ShapeKind.Oval => "Oval",
+                        ShapeKind.FreeDraw => "Freehand",
+                        ShapeKind.Edge => "Edging",
+                        ShapeKind.Ruler => "Ruler",
+                        ShapeKind.CircleRuler => "Circle Ruler",
+                        ShapeKind.RectRuler => "Rectangle Ruler",
+                        ShapeKind.SoilMarker => "Soil Marker",
+                        _ => shape.Kind.ToString(),
+                    },
+                    Name = name,
+                    Count = 1,
+                    Quantity = 1,
+                    CatalogSource = CatalogSource.Base,
+                    CatalogCode = !string.IsNullOrWhiteSpace(shape.Label) ? shape.Label! : shape.Kind.ToString(),
+                });
+            }
+        }
+
+        return items;
+    }
+
+    public static string? FormatQuantity(TakeoffItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        if (string.IsNullOrWhiteSpace(item.QuantityUnit))
+        {
+            return null;
+        }
+
+        if (string.Equals(item.QuantityUnit, "yd┬│", StringComparison.Ordinal))
+        {
+            string suffix = item.AreaFt2 is double area && item.ThicknessIn is double thickness
+                ? $" ({area:0.#} ft┬▓ ├ù {thickness:0.#}\")"
+                : string.Empty;
+            return $"{item.Quantity:0.##} yd┬│{suffix}";
+        }
+
+        if (string.Equals(item.QuantityUnit, "ft┬▓", StringComparison.Ordinal))
+        {
+            return item.QuantityMultiplier > 1.0001 || item.QuantityMultiplier < 0.9999
+                ? $"{item.Quantity:0.#} ft┬▓ ({item.QuantityMultiplier:0.##}├ù)"
+                : $"{item.Quantity:0.#} ft┬▓";
+        }
+
+        return $"{item.Quantity:0.##} {item.QuantityUnit}";
+    }
+
+    private static void AddAssemblyItems(List<TakeoffItem> items, Shape shape, CatalogAssembly assembly)
+    {
+        if (string.Equals(assembly.TargetKind, "Area", StringComparison.OrdinalIgnoreCase))
+        {
+            AddAreaAssemblyItems(items, shape, assembly);
+            return;
+        }
+
+        if (shape.Kind == ShapeKind.Edge && string.Equals(assembly.TargetKind, "Edge", StringComparison.OrdinalIgnoreCase))
+        {
+            AddEdgeAssemblyItems(items, shape, assembly);
+        }
+    }
+
+    private static void AddAreaAssemblyItems(List<TakeoffItem> items, Shape shape, CatalogAssembly assembly)
+    {
+        double areaFt2 = GroundCoverMath.AreaFt2(shape);
+        for (int i = 0; i < assembly.Layers.Count; i++)
+        {
+            CatalogAssemblyLayer layer = assembly.Layers[i];
+            bool isVolumetric = layer.ThicknessIn is double thicknessIn && thicknessIn > 0;
+            double multiplier = layer.QuantityMultiplier <= 0 ? 1.0 : layer.QuantityMultiplier;
+            items.Add(new TakeoffItem
+            {
+                ShapeId = shape.Id,
+                Kind = "Assembly Layer",
+                Name = FormatAssemblyLayerName(layer),
+                Count = 1,
+                Quantity = isVolumetric
+                    ? GroundCoverMath.VolumeYd3(areaFt2, layer.ThicknessIn!.Value) * multiplier
+                    : areaFt2 * multiplier,
+                QuantityUnit = isVolumetric ? "yd┬│" : "ft┬▓",
+                AreaFt2 = areaFt2,
+                ThicknessIn = layer.ThicknessIn,
+                CatalogSource = layer.Source,
+                CatalogPackId = layer.PackId,
+                CatalogCode = layer.CatalogCode,
+                WastePercentOverride = layer.WastePercentOverride,
+                QuantityMultiplier = multiplier,
+                AssemblyCode = assembly.Code,
+                AssemblyLayerIndex = i,
+            });
+        }
+    }
+
+    private static void AddEdgeAssemblyItems(List<TakeoffItem> items, Shape shape, CatalogAssembly assembly)
+    {
+        double lengthFt = TakeoffMath.EffectiveLengthFt(shape);
+        double widthIn = ResolveEdgeAssemblyVisualCatalog(assembly)?.DefaultThicknessIn
+            ?? shape.Takeoff?.DefaultThicknessIn
+            ?? 0.125;
+        double stripAreaFt2 = lengthFt * (widthIn / 12.0);
+
+        for (int i = 0; i < assembly.Layers.Count; i++)
+        {
+            CatalogAssemblyLayer layer = assembly.Layers[i];
+            CatalogItem? layerCatalog = Catalog.Find(layer.CatalogCode);
+            bool isVolumetric = layer.ThicknessIn is double thicknessIn && thicknessIn > 0;
+            double multiplier = layer.QuantityMultiplier <= 0 ? 1.0 : layer.QuantityMultiplier;
+            items.Add(new TakeoffItem
+            {
+                ShapeId = shape.Id,
+                Kind = "Assembly Layer",
+                Name = FormatAssemblyLayerName(layer),
+                Count = 1,
+                Quantity = isVolumetric
+                    ? GroundCoverMath.VolumeYd3(stripAreaFt2, layer.ThicknessIn!.Value) * multiplier
+                    : lengthFt * multiplier,
+                QuantityUnit = isVolumetric ? "yd┬│" : "lf",
+                AreaFt2 = isVolumetric ? stripAreaFt2 : null,
+                ThicknessIn = layer.ThicknessIn,
+                CatalogSource = layer.Source,
+                CatalogPackId = layer.PackId,
+                CatalogCode = layer.CatalogCode,
+                WastePercentOverride = layer.WastePercentOverride ?? layerCatalog?.DefaultWastePercent,
+                LaborTypeOverride = layerCatalog?.LaborType,
+                LaborHoursPerUnitOverride = layerCatalog?.LaborHoursPerUnit,
+                DefaultThicknessIn = layerCatalog?.DefaultThicknessIn,
+                QuantityMultiplier = multiplier,
+                AssemblyCode = assembly.Code,
+                AssemblyLayerIndex = i,
+            });
+        }
+    }
+
+    private static string FormatAssemblyLayerName(CatalogAssemblyLayer layer)
+        => string.IsNullOrWhiteSpace(layer.Label) ? layer.CatalogCode : $"{layer.Label} ΓÇö {layer.CatalogCode}";
+
+    private static CatalogItem? ResolveEdgeAssemblyVisualCatalog(CatalogAssembly assembly)
+    {
+        foreach (CatalogAssemblyLayer layer in assembly.Layers.AsEnumerable().Reverse())
+        {
+            CatalogItem? item = Catalog.Find(layer.CatalogCode);
+            if (item is not null)
+            {
+                return item;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsGroundCoverShape(Shape shape)
+    {
+        return string.Equals(shape.Trait, "ground-cover", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(shape.Trait, "ground-cover-assembly", StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrWhiteSpace(shape.GroundCoverCode);
     }
 }

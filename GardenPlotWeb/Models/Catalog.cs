@@ -2,9 +2,12 @@
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
+using System.Text.Json.Serialization;
+
 namespace GardenPlotWeb.Models;
 
 /// <summary>Origin of a <see cref="CatalogItem"/>.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum CatalogSource
 {
     /// <summary>Ships with the app (projected from <see cref="PaletteCatalog"/>).</summary>
@@ -72,6 +75,44 @@ public sealed class CatalogItem
     public string? Notes { get; set; }
 }
 
+/// <summary>
+/// One material layer within a catalog assembly.
+/// </summary>
+public sealed class CatalogAssemblyLayer
+{
+    public CatalogSource Source { get; set; }
+
+    public string? PackId { get; set; }
+
+    public string CatalogCode { get; set; } = string.Empty;
+
+    public double? ThicknessIn { get; set; }
+
+    public double? WastePercentOverride { get; set; }
+
+    public double QuantityMultiplier { get; set; } = 1.0;
+
+    public string? Label { get; set; }
+}
+
+/// <summary>
+/// A reusable multi-layer assembly that can be stamped onto a plot shape.
+/// </summary>
+public sealed class CatalogAssembly
+{
+    public string Code { get; set; } = string.Empty;
+
+    public CatalogSource Source { get; set; }
+
+    public string? PackId { get; set; }
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public string TargetKind { get; set; } = string.Empty;
+
+    public List<CatalogAssemblyLayer> Layers { get; set; } = new();
+}
+
 /// <summary>Stable triple that identifies a <see cref="CatalogItem"/> across catalog sources.</summary>
 /// <param name="Source">The catalog source.</param>
 /// <param name="PackId">Pack identifier when <paramref name="Source"/> is <see cref="CatalogSource.Pack"/>.</param>
@@ -94,6 +135,12 @@ public static class Catalog
 
     public static readonly CatalogItem[] Base = [.. Edging];
 
+    private static readonly Dictionary<string, string> EdgeAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Brick Edge"] = "Brick on edge",
+        ["Steel Edge"] = "Steel Edging (4\")",
+    };
+
     public static CatalogItem? Find(string? code)
     {
         if (string.IsNullOrWhiteSpace(code))
@@ -101,7 +148,11 @@ public static class Catalog
             return null;
         }
 
-        return Array.Find(Base, item => string.Equals(item.Code, code, StringComparison.OrdinalIgnoreCase));
+        string lookupCode = EdgeAliases.TryGetValue(code, out string? alias)
+            ? alias
+            : code;
+
+        return Array.Find(Base, item => string.Equals(item.Code, lookupCode, StringComparison.OrdinalIgnoreCase));
     }
 
     public static TakeoffItem CreateTakeoff(string? code)

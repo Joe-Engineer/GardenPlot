@@ -80,6 +80,15 @@ public class Shape
 
     /// <summary>Per-marker soil readings. Used only when <see cref="Kind"/> is <see cref="ShapeKind.SoilMarker"/>.</summary>
     public List<SoilReading> Readings { get; set; } = new();
+
+    /// <summary>Optional assembly source for multi-layer area/line takeoff bindings.</summary>
+    public CatalogSource? AssemblySource { get; set; }
+
+    /// <summary>Optional assembly pack id for external assembly catalogs.</summary>
+    public string? AssemblyPackId { get; set; }
+
+    /// <summary>Optional assembly code for multi-layer takeoff bindings.</summary>
+    public string? AssemblyCode { get; set; }
 }
 
 public enum AlongPathAnchor

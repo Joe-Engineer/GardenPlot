@@ -80,6 +80,7 @@ public enum PaletteCategory
     PollinatorNatives,
     CoverCrops,
     CustomTiles,
+    GroundCoverAssemblies,
 }
 
 public enum DropPattern

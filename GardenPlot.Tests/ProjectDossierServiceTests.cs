@@ -1,4 +1,4 @@
-﻿// <copyright file="ProjectDossierServiceTests.cs" company="Garden Plot">
+// <copyright file="ProjectDossierServiceTests.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -23,7 +23,7 @@ public sealed class ProjectDossierServiceTests : IDisposable
         Environment.SetEnvironmentVariable(DataRootProvider.DataDirectoryEnvironmentVariable, testRoot);
 
         DataRootProvider dataRoot = new(new FakeWebHostEnvironment { ContentRootPath = testRoot });
-        service = new ProjectDossierService(dataRoot, new CatalogService());
+        service = new ProjectDossierService(dataRoot, new CatalogService(new FakeWebHostEnvironment { WebRootPath = System.IO.Path.GetTempPath(), ContentRootPath = System.IO.Path.GetTempPath() }, Microsoft.Extensions.Logging.Abstractions.NullLogger<CatalogService>.Instance));
     }
 
     public void Dispose()
