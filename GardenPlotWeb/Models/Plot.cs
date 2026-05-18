@@ -22,6 +22,12 @@ public enum BackgroundFit
 
 public class PlotData
 {
+    /// <summary>
+    /// Persisted per-plot schema version. Plot JSON written before this property existed is treated
+    /// as the legacy version during load and upgraded by the library loader.
+    /// </summary>
+    public int SchemaVersion { get; set; } = PlotSchema.Current;
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "Garden";
     public PhaseKind Phase { get; set; } = PhaseKind.Design;
