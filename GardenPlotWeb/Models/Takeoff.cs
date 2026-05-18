@@ -243,6 +243,24 @@ public static class TakeoffMath
         return hours * EffectiveLaborRatePerHour(item, catalog, uiPreferences);
     }
 
+    public static void ApplyCatalogSwap(TakeoffItem item, CatalogItemRef catalogReference)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentException.ThrowIfNullOrWhiteSpace(catalogReference.Code);
+
+        item.CatalogSource = catalogReference.Source;
+        item.CatalogPackId = catalogReference.PackId;
+        item.CatalogCode = catalogReference.Code;
+        item.NameOverride = null;
+        item.QuantityOverride = null;
+        item.UnitOverride = null;
+        item.DepthInOverride = null;
+        item.WastePercentOverride = null;
+        item.LaborTypeOverride = null;
+        item.LaborHoursPerUnitOverride = null;
+        item.MarkupPercentOverride = null;
+    }
+
     public static double EffectiveMarkupPercent(TakeoffItem item, PlotData? plot)
     {
         return item.MarkupPercentOverride ?? plot?.DefaultMarkupPercent ?? 25.0;

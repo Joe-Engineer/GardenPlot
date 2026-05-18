@@ -1,4 +1,4 @@
-﻿// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
+// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -20,6 +20,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using GardenPlotWeb.Models;
 using GardenPlotWeb.Services;
+using GardenPlotWeb.Services.Catalog;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
@@ -158,6 +159,13 @@ public partial class GardenPlot
     private bool showShapeContextMenu;
     private double shapeContextMenuX;
     private double shapeContextMenuY;
+    private readonly HashSet<Guid> recentMaterialChangeShapeIds = new();
+    private bool showMaterialPicker;
+    private readonly List<Guid> materialPickerShapeIds = new();
+    private PaletteKind? materialPickerPreferredKind;
+    private string materialPickerSearch = string.Empty;
+    private bool materialPickerShowAll;
+    private string? materialPickerSelectedCode;
     private bool isDisposingOrDisposed;
 
     // === Takeoff row selection / context menu / inline edit ===
@@ -1056,7 +1064,8 @@ public partial class GardenPlot
     private static bool IsGroundCoverShape(Shape s)
     {
         return string.Equals(s.Trait, "ground-cover", StringComparison.OrdinalIgnoreCase)
-            || !string.IsNullOrWhiteSpace(GroundCoverMath.MaterialCode(s));
+            || !string.IsNullOrWhiteSpace(GroundCoverMath.MaterialCode(s))
+            || !string.IsNullOrWhiteSpace(CatalogService.MaterialCodeForShape(s));
     }
 
     private static bool CanShapeBeClipped(Shape shape) => GroundCoverMath.IsAreaShape(shape);
@@ -1321,8 +1330,7 @@ public partial class GardenPlot
         if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double depth) && depth >= 0)
         {
             RecordUndoState();
-            s.DepthIn = depth;
-            s.GroundCoverDepthIn = depth;
+            CatalogService.SetDepthIn(s, depth);
             _ = SaveAsync();
         }
     }
@@ -1526,6 +1534,15 @@ public partial class GardenPlot
         await SaveAsync();
     }
 
+    private void ApplyMaterialSwap(Shape shape, PaletteItem item)
+    {
+        CatalogService.ApplyMaterialSwap(shape, item);
+
+        if (currentPlot?.Takeoff.FirstOrDefault(t => t.ShapeId == shape.Id) is TakeoffItem takeoffItem)
+        {
+            TakeoffMath.ApplyCatalogSwap(takeoffItem, new CatalogItemRef(CatalogSource.Base, null, item.Code));
+        }
+    }
     private static string TakeoffKind(Shape s)
     {
         if (IsGroundCoverShape(s))
@@ -2584,6 +2601,186 @@ public partial class GardenPlot
     private void HideShapeContextMenu()
     {
         showShapeContextMenu = false;
+    }
+
+    private List<TakeoffItem> SelectedTakeoffItems()
+    {
+        if (currentPlot is null)
+        {
+            return [];
+        }
+
+        var selected = selectedTakeoffIds.ToHashSet();
+        return currentPlot.Takeoff
+            .Where(item => selected.Contains(item.Id))
+            .ToList();
+    }
+
+    private List<Shape> ShapesForSelectedTakeoffItems()
+    {
+        if (currentPlot is null)
+        {
+            return [];
+        }
+
+        var ids = SelectedTakeoffItems()
+            .Select(item => item.ShapeId)
+            .OfType<Guid>()
+            .Distinct()
+            .ToHashSet();
+
+        return currentPlot.Shapes
+            .Where(shape => ids.Contains(shape.Id))
+            .ToList();
+    }
+
+    private bool CanChangeSelectedTakeoffMaterials()
+    {
+        if (currentPlot is null)
+        {
+            return false;
+        }
+
+        var items = SelectedTakeoffItems();
+        if (items.Count == 0)
+        {
+            return false;
+        }
+
+        return items.All(item =>
+            item.ShapeId is Guid shapeId
+            && currentPlot.Shapes.FirstOrDefault(shape => shape.Id == shapeId) is Shape shape
+            && IsGroundCoverShape(shape));
+    }
+
+    private void ShowMaterialPickerForSelection()
+    {
+        OpenMaterialPicker(SelectedShapes().Where(IsGroundCoverShape).ToList());
+    }
+
+    private void ShowMaterialPickerForTakeoffSelection()
+    {
+        OpenMaterialPicker(ShapesForSelectedTakeoffItems());
+        CloseTakeoffContextMenu();
+    }
+
+    private void OpenMaterialPicker(IReadOnlyList<Shape> shapes)
+    {
+        if (shapes.Count == 0)
+        {
+            return;
+        }
+
+        materialPickerShapeIds.Clear();
+        materialPickerShapeIds.AddRange(shapes.Select(shape => shape.Id));
+        materialPickerPreferredKind = CatalogService.PreferredMaterialKind(shapes);
+        materialPickerSearch = string.Empty;
+        materialPickerShowAll = false;
+        materialPickerSelectedCode = shapes
+            .Select(CatalogService.MaterialCodeForShape)
+            .FirstOrDefault(code => !string.IsNullOrWhiteSpace(code));
+        recentMaterialChangeShapeIds.Clear();
+        EnsureMaterialPickerSelection();
+        showMaterialPicker = true;
+    }
+
+    private void CloseMaterialPicker()
+    {
+        showMaterialPicker = false;
+        materialPickerShapeIds.Clear();
+    }
+
+    private void OnMaterialPickerSearchChanged(ChangeEventArgs e)
+    {
+        materialPickerSearch = e.Value?.ToString() ?? string.Empty;
+        EnsureMaterialPickerSelection();
+    }
+
+    private void OnMaterialPickerShowAllChanged(ChangeEventArgs e)
+    {
+        materialPickerShowAll = e.Value is bool value && value;
+        EnsureMaterialPickerSelection();
+    }
+
+    private IReadOnlyList<PaletteItem> MaterialPickerItems()
+    {
+        return CatalogService.FilterMaterialItems(materialPickerPreferredKind, materialPickerSearch, materialPickerShowAll);
+    }
+
+    private void EnsureMaterialPickerSelection()
+    {
+        var items = MaterialPickerItems();
+        if (items.Count == 0)
+        {
+            materialPickerSelectedCode = null;
+            return;
+        }
+
+        if (!items.Any(item => string.Equals(item.Code, materialPickerSelectedCode, StringComparison.OrdinalIgnoreCase)))
+        {
+            materialPickerSelectedCode = items[0].Code;
+        }
+    }
+
+    private async Task ConfirmMaterialPickerAsync()
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        var selectedItemCode = materialPickerSelectedCode;
+        var item = PaletteCatalog.FindMaterial(selectedItemCode);
+        if (item is null)
+        {
+            return;
+        }
+
+        var targetIds = materialPickerShapeIds.ToHashSet();
+        var targetShapes = currentPlot.Shapes.Where(shape => targetIds.Contains(shape.Id)).ToList();
+        if (targetShapes.Count == 0)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        recentMaterialChangeShapeIds.Clear();
+        selectedIds.Clear();
+        foreach (var shape in targetShapes)
+        {
+            ApplyMaterialSwap(shape, item);
+            recentMaterialChangeShapeIds.Add(shape.Id);
+            selectedIds.Add(shape.Id);
+        }
+
+        CloseMaterialPicker();
+        await SaveAsync();
+    }
+
+    private static string MaterialPickerDetails(PaletteItem item)
+    {
+        var parts = new List<string> { CatalogService.MaterialUnitLabel(item) };
+        if (item.Kind == PaletteKind.GroundCover && item.DefaultDepthIn is double depth)
+        {
+            parts.Add($"{depth:0.#}\" default depth");
+        }
+
+        if (CatalogService.DefaultWastePercent(item) is double waste && waste > 0)
+        {
+            parts.Add($"{waste:0.#}% waste");
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.Trait))
+        {
+            parts.Add(item.Trait);
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    private static string MaterialPickerSwatchStyle(PaletteItem item)
+    {
+        return $"background:{item.FillColor ?? "#8a8276"};border-color:{item.StrokeColor ?? "#3f3a30"};";
     }
 
     private async Task BringSelectionToFront()
