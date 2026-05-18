@@ -128,4 +128,32 @@ public sealed partial class PaletteCatalogTests
         Assert.NotEmpty(items);
         Assert.All(items, item => Assert.Equal(PaletteKind.GroundCoverSurface, item.Kind));
     }
+
+    [Fact]
+    public void MaterialCatalog_Items_HaveMaterialMetadata()
+    {
+        Assert.All(PaletteCatalog.GroundCoverMaterials, item =>
+        {
+            Assert.NotNull(item.MaterialCategory);
+            Assert.Equal(MaterialSoldBy.Volume, item.MaterialSoldBy);
+        });
+
+        // GroundCoverSurfaceCovers also includes legacy entries (grasses + ground-cover
+        // plants moved from Plants by #43) that predate the narrowed Material model.
+        // Only assert metadata where MaterialCategory has been intentionally set.
+        Assert.All(
+            PaletteCatalog.GroundCoverSurfaceCovers.Where(i => i.MaterialCategory is not null),
+            item => Assert.Equal(MaterialSoldBy.Area, item.MaterialSoldBy));
+        Assert.Contains(PaletteCatalog.GroundCoverSurfaceCovers, i => i.MaterialCategory is not null);
+    }
+
+    [Fact]
+    public void MaterialCatalog_FindMaterial_IsCaseInsensitive()
+    {
+        var item = PaletteCatalog.FindMaterial("pea gravel");
+
+        Assert.NotNull(item);
+        Assert.Equal("Pea Gravel", item!.Code);
+        Assert.Equal(MaterialCategory.Gravel, item.MaterialCategory);
+    }
 }

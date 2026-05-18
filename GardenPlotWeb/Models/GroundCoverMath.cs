@@ -85,6 +85,33 @@ public static class GroundCoverMath
         return polygon.Select(p => RotateAround(p, center, radians)).ToList();
     }
 
+    /// <summary>Gets the current material code, preferring the new field and falling back to the legacy field.</summary>
+    public static string? MaterialCode(Shape s)
+    {
+        return string.IsNullOrWhiteSpace(s.MaterialCode) ? s.GroundCoverCode : s.MaterialCode;
+    }
+
+    /// <summary>Resolves how a shape's material is sold.</summary>
+    public static MaterialSoldBy ResolveSoldBy(Shape s, PaletteItem? catalogItem = null)
+    {
+        catalogItem ??= PaletteCatalog.FindMaterial(MaterialCode(s));
+        return catalogItem?.MaterialSoldBy ?? (s.IsGroundCoverSurface ? MaterialSoldBy.Area : MaterialSoldBy.Volume);
+    }
+
+    /// <summary>Resolves the effective depth, preferring the new override and then the catalog default.</summary>
+    public static double ResolveDepthIn(Shape s, PaletteItem? catalogItem = null)
+    {
+        catalogItem ??= PaletteCatalog.FindMaterial(MaterialCode(s));
+        return s.DepthIn ?? catalogItem?.DefaultDepthIn ?? s.GroundCoverDepthIn ?? 0;
+    }
+
+    /// <summary>Resolves the effective waste percentage, preferring the new override and then the catalog default.</summary>
+    public static double ResolveWastePercent(Shape s, PaletteItem? catalogItem = null)
+    {
+        catalogItem ??= PaletteCatalog.FindMaterial(MaterialCode(s));
+        return s.WastePercent ?? catalogItem?.DefaultWastePercent ?? 0;
+    }
+
     /// <summary>Shoelace formula on a closed polygon. Ignores ordering (returns absolute value).</summary>
     public static double PolygonArea(IReadOnlyList<Point> pts)
     {
@@ -108,6 +135,22 @@ public static class GroundCoverMath
         }
 
         return sum / 2.0;
+    }
+
+    /// <summary>Applies waste percentage to a quantity.</summary>
+    public static double QuantityWithWaste(double quantity, double wastePercent)
+    {
+        if (quantity <= 0)
+        {
+            return 0;
+        }
+
+        if (wastePercent <= 0)
+        {
+            return quantity;
+        }
+
+        return quantity * (1 + (wastePercent / 100.0));
     }
 
     /// <summary>Converts an area (ft²) and depth (inches) to a volume in cubic yards.</summary>
