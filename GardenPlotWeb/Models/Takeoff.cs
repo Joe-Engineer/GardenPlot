@@ -71,6 +71,21 @@ public sealed class TakeoffItem
     public double? DefaultThicknessIn { get; set; }
 }
 
+/// <summary>Represents a single takeoff summary row shown in the plot designer.</summary>
+/// <param name="Kind">Display kind for the row.</param>
+/// <param name="Name">Display name for the row.</param>
+/// <param name="Count">Shape or item count represented by the row.</param>
+/// <param name="Quantity">Optional quantity text, such as area or volume.</param>
+/// <param name="ShapeId">Optional primary shape backing the row.</param>
+/// <param name="ParentShapeId">Optional linked parent shape id used to select related rows together.</param>
+public sealed record TakeoffSummaryRow(
+    string Kind,
+    string Name,
+    int Count,
+    string? Quantity = null,
+    Guid? ShapeId = null,
+    Guid? ParentShapeId = null);
+
 /// <summary>Monotonic, never-decremented integer source for <see cref="TakeoffItem.Id"/>.</summary>
 public sealed class TakeoffSequence
 {

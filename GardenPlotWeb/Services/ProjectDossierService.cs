@@ -544,15 +544,19 @@ public sealed class ProjectDossierService
         return sb.ToString();
     }
 
-    private static void AppendPolyline(StringBuilder sb, List<Point> points, string stroke, double strokeWidth)
+    private static void AppendPolyline(StringBuilder sb, List<Point> points, string stroke, double strokeWidth, bool close = false)
     {
         if (points.Count == 0)
         {
             return;
         }
 
+        IEnumerable<Point> renderPoints = close && points.Count > 1
+            ? points.Concat([points[0]])
+            : points;
+
         _ = sb.Append("<polyline points=\"")
-            .Append(string.Join(' ', points.Select(point => $"{F(point.X)},{F(point.Y)}")))
+            .Append(string.Join(' ', renderPoints.Select(point => $"{F(point.X)},{F(point.Y)}")))
             .Append("\" fill=\"none\" stroke=\"")
             .Append(stroke)
             .Append("\" stroke-width=\"")

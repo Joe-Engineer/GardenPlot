@@ -5,12 +5,13 @@
 namespace GardenPlotWeb.Models;
 
 /// <summary>
-/// Area/volume math for ground-cover shapes. Areas are in square feet (plot units).
+/// Area/volume math for ground-cover and filled-area shapes. Areas are in square feet (plot units).
 /// Volumes are converted to cubic yards using yd³ = ft² × depth_in / 324.
 /// </summary>
 public static class GroundCoverMath
 {
     private const int DefaultOvalSegments = 48;
+    private const double BoundaryTolerance = 1e-9;
 
     /// <summary>Computes the area (ft²) of a shape based on its kind and points.</summary>
     public static double AreaFt2(Shape s)
@@ -121,16 +122,17 @@ public static class GroundCoverMath
     /// <summary>Signed shoelace area for winding-sensitive geometry operations.</summary>
     public static double SignedPolygonArea(IReadOnlyList<Point> pts)
     {
-        if (pts is null || pts.Count < 3)
+        var polygon = NormalizePolygon(pts);
+        if (polygon.Count < 3)
         {
             return 0;
         }
 
         double sum = 0;
-        for (int i = 0; i < pts.Count; i++)
+        for (int i = 0; i < polygon.Count; i++)
         {
-            Point a = pts[i];
-            Point b = pts[(i + 1) % pts.Count];
+            Point a = polygon[i];
+            Point b = polygon[(i + 1) % polygon.Count];
             sum += (a.X * b.Y) - (b.X * a.Y);
         }
 
@@ -186,6 +188,83 @@ public static class GroundCoverMath
         }
 
         return normalized.Count >= 3 ? normalized : new List<Point>();
+    }
+
+    /// <summary>Returns a polygon outline for an area-capable shape.</summary>
+#pragma warning disable IDE0072
+    public static IReadOnlyList<Point> AreaPolygon(Shape shape, int ovalSegments = 72)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+
+        return shape.Kind switch
+        {
+            ShapeKind.Rectangle => RectanglePolygon(shape),
+            ShapeKind.Oval => OvalPolygon(shape, ovalSegments),
+            ShapeKind.FreeDraw => NormalizePolygon(shape.Points),
+            _ => Array.Empty<Point>(),
+        };
+    }
+#pragma warning restore IDE0072
+
+    /// <summary>Returns the polygon's bounding box.</summary>
+    public static (double MinX, double MinY, double MaxX, double MaxY) PolygonBounds(IReadOnlyList<Point> pts)
+    {
+        var polygon = NormalizePolygon(pts);
+        if (polygon.Count == 0)
+        {
+            return (0, 0, 0, 0);
+        }
+
+        double minX = polygon[0].X;
+        double minY = polygon[0].Y;
+        double maxX = polygon[0].X;
+        double maxY = polygon[0].Y;
+
+        for (int i = 1; i < polygon.Count; i++)
+        {
+            var pt = polygon[i];
+            minX = Math.Min(minX, pt.X);
+            minY = Math.Min(minY, pt.Y);
+            maxX = Math.Max(maxX, pt.X);
+            maxY = Math.Max(maxY, pt.Y);
+        }
+
+        return (minX, minY, maxX, maxY);
+    }
+
+    /// <summary>Determines whether a point lies inside or on the boundary of a polygon.</summary>
+    public static bool PointInPolygon(IReadOnlyList<Point> pts, Point point)
+    {
+        var polygon = NormalizePolygon(pts);
+        if (polygon.Count < 3)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < polygon.Count; i++)
+        {
+            var a = polygon[i];
+            var b = polygon[(i + 1) % polygon.Count];
+            if (PointOnSegment(point, a, b))
+            {
+                return true;
+            }
+        }
+
+        var inside = false;
+        for (int i = 0, j = polygon.Count - 1; i < polygon.Count; j = i++)
+        {
+            var a = polygon[i];
+            var b = polygon[j];
+            var intersects = ((a.Y > point.Y) != (b.Y > point.Y))
+                && (point.X < (((b.X - a.X) * (point.Y - a.Y)) / ((b.Y - a.Y) + BoundaryTolerance)) + a.X);
+            if (intersects)
+            {
+                inside = !inside;
+            }
+        }
+
+        return inside;
     }
 
     private static List<Point> RectanglePolygon(Shape s)
@@ -262,5 +341,62 @@ public static class GroundCoverMath
     }
 
     private static double DegreesToRadians(double degrees) => degrees * Math.PI / 180.0;
+
+    private static bool PointOnSegment(Point point, Point a, Point b)
+    {
+        var cross = ((point.Y - a.Y) * (b.X - a.X)) - ((point.X - a.X) * (b.Y - a.Y));
+        if (Math.Abs(cross) > BoundaryTolerance)
+        {
+            return false;
+        }
+
+        var dot = ((point.X - a.X) * (b.X - a.X)) + ((point.Y - a.Y) * (b.Y - a.Y));
+        if (dot < -BoundaryTolerance)
+        {
+            return false;
+        }
+
+        var lenSq = Math.Pow(b.X - a.X, 2) + Math.Pow(b.Y - a.Y, 2);
+        return dot <= lenSq + BoundaryTolerance;
+    }
+}
+
+/// <summary>Samples planting centers on a triangulated grid and keeps only the points inside the polygon.</summary>
+public static class TriangulatedFill
+{
+    /// <summary>Samples planting centers inside the supplied polygon.</summary>
+    public static IReadOnlyList<Point> SampleInside(IReadOnlyList<Point> polygon, double onCenterFt)
+    {
+        var normalized = GroundCoverMath.NormalizePolygon(polygon);
+        if (normalized.Count < 3 || onCenterFt <= 0)
+        {
+            return Array.Empty<Point>();
+        }
+
+        var bounds = GroundCoverMath.PolygonBounds(normalized);
+        var rowSpacing = DropGroupGeometry.ResolveArrayRowSpacing(onCenterFt, 0, triangulated: true, defaultSpacingY: onCenterFt);
+        if (rowSpacing <= 0)
+        {
+            return Array.Empty<Point>();
+        }
+
+        var samples = new List<Point>();
+        const double epsilon = 1e-9;
+        var row = 0;
+        for (var y = bounds.MinY; y <= bounds.MaxY + epsilon; y += rowSpacing, row++)
+        {
+            var offset = (row % 2 == 0) ? 0 : onCenterFt / 2.0;
+            for (var x = bounds.MinX + offset; x <= bounds.MaxX + epsilon; x += onCenterFt)
+            {
+                var sample = new Point(x, y);
+                if (GroundCoverMath.PointInPolygon(normalized, sample))
+                {
+                    samples.Add(sample);
+                }
+            }
+        }
+
+        return samples;
+    }
 }
 

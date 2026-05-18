@@ -266,7 +266,6 @@ public sealed class PlotUndoSnapshot
             CenterSpacingXFt = source.CenterSpacingXFt,
             CenterSpacingYFt = source.CenterSpacingYFt,
             Triangulated = source.Triangulated,
-            StaggerHalf = source.StaggerHalf,
             Rotation = source.Rotation,
             AnchorCenterX = source.AnchorCenterX,
             AnchorCenterY = source.AnchorCenterY,
