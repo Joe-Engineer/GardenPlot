@@ -2,6 +2,7 @@
 using System.Text.RegularExpressions;
 using GardenPlotWeb.Models;
 using GardenPlotWeb.Services.Catalog;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace GardenPlot.Tests;
 
@@ -95,7 +96,12 @@ public sealed partial class PaletteCatalogTests
             Assert.StartsWith("focal-point-", item.Trait, StringComparison.OrdinalIgnoreCase);
         });
 
-        var catalog = new CatalogService();
+        var env = new FakeWebHostEnvironment
+        {
+            WebRootPath = GetProjectWebRootPath(),
+            ContentRootPath = GetProjectRootPath(),
+        };
+        var catalog = new CatalogService(env, NullLogger<CatalogService>.Instance);
         foreach (string code in expectedCodes)
         {
             CatalogItem? item = catalog.GetBase(code);
@@ -156,4 +162,10 @@ public sealed partial class PaletteCatalogTests
         Assert.Equal("Pea Gravel", item!.Code);
         Assert.Equal(MaterialCategory.Gravel, item.MaterialCategory);
     }
+
+    private static string GetProjectWebRootPath()
+        => Path.Combine(GetProjectRootPath(), "GardenPlotWeb", "wwwroot");
+
+    private static string GetProjectRootPath()
+        => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
 }

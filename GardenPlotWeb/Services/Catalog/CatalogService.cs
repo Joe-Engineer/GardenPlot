@@ -1,16 +1,18 @@
-﻿// <copyright file="CatalogService.cs" company="Garden Plot">
+// <copyright file="CatalogService.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using GardenPlotWeb.Models;
 
 namespace GardenPlotWeb.Services.Catalog;
 
 /// <summary>
-/// Merged read-only view of available <see cref="CatalogItem"/>s across catalog sources.
-/// Base entries are projected from <see cref="PaletteCatalog"/>; pack entries are reserved for
-/// a future JSON-pack loader; custom entries are supplied per-library by the page calling
-/// <see cref="SetCustomCatalogItems"/> after loading.
+/// Merged read-only view of available <see cref="CatalogItem"/>s and seeded <see cref="CatalogAssembly"/>s.
+/// Base entries are projected from <see cref="PaletteCatalog"/>; custom entries are supplied per-library by
+/// the page calling <see cref="SetCustomCatalogItems"/>; assembly packs are loaded from JSON files under
+/// wwwroot/data/catalog/assemblies.
 /// </summary>
 public interface ICatalogService
 {
@@ -30,14 +32,69 @@ public interface ICatalogService
 /// <summary>Default <see cref="ICatalogService"/> implementation.</summary>
 public sealed class CatalogService : ICatalogService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true,
+        Converters = { new JsonStringEnumConverter() },
+    };
+
     private readonly Dictionary<string, CatalogItem> baseByCode;
     private readonly List<CatalogItem> baseItems;
+    private readonly List<CatalogAssembly> allAssemblies = new();
     private List<CatalogItem> customItems = new();
 
-    public CatalogService()
+    public CatalogService(IWebHostEnvironment env, ILogger<CatalogService> logger)
     {
+        ArgumentNullException.ThrowIfNull(env);
+        ArgumentNullException.ThrowIfNull(logger);
+
         baseItems = BuildBaseFromPalette();
-        baseByCode = baseItems.ToDictionary(c => c.Code, StringComparer.OrdinalIgnoreCase);
+        baseByCode = new Dictionary<string, CatalogItem>(StringComparer.OrdinalIgnoreCase);
+        foreach (CatalogItem item in baseItems)
+        {
+            baseByCode.TryAdd(item.Code, item);
+        }
+
+        string root = Path.Combine(env.WebRootPath, "data", "catalog", "assemblies");
+        if (!Directory.Exists(root))
+        {
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                logger.LogInformation("Assembly catalog directory not found at {Path}; running without seeded assemblies.", root);
+            }
+
+            return;
+        }
+
+        foreach (string path in Directory.GetFiles(root, "*.json", SearchOption.AllDirectories).OrderBy(static p => p, StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                using FileStream stream = File.OpenRead(path);
+                List<CatalogAssembly> loaded = LoadAssemblies(stream);
+                foreach (CatalogAssembly assembly in loaded)
+                {
+                    Normalize(assembly);
+                    if (string.IsNullOrWhiteSpace(assembly.Code) || assembly.Layers.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    allAssemblies.Add(assembly);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to load assembly catalog from {Path}.", path);
+            }
+        }
+
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation("Loaded {Count} catalog assemblies.", allAssemblies.Count);
+        }
     }
 
     public IReadOnlyList<CatalogItem> All
@@ -51,14 +108,15 @@ public sealed class CatalogService : ICatalogService
         }
     }
 
+    public IReadOnlyList<CatalogAssembly> AllAssemblies => allAssemblies;
+
     public CatalogItem? Get(CatalogItemRef reference)
     {
         return reference.Source switch
         {
             CatalogSource.Base => baseByCode.TryGetValue(reference.Code, out CatalogItem? b) ? b : null,
-            CatalogSource.Custom => customItems.FirstOrDefault(c =>
-                string.Equals(c.Code, reference.Code, StringComparison.OrdinalIgnoreCase)),
-            CatalogSource.Pack => null, // reserved for a future JSON-pack loader
+            CatalogSource.Custom => customItems.FirstOrDefault(c => string.Equals(c.Code, reference.Code, StringComparison.OrdinalIgnoreCase)),
+            CatalogSource.Pack => null,
             _ => null,
         };
     }
@@ -70,10 +128,57 @@ public sealed class CatalogService : ICatalogService
             : baseByCode.TryGetValue(code, out CatalogItem? b) ? b : null;
     }
 
+    public CatalogAssembly? GetAssembly(CatalogSource source, string? packId, string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return null;
+        }
+
+        return allAssemblies.FirstOrDefault(assembly =>
+            assembly.Source == source
+            && string.Equals(NormalizePackId(assembly.PackId), NormalizePackId(packId), StringComparison.OrdinalIgnoreCase)
+            && string.Equals(assembly.Code, code, StringComparison.OrdinalIgnoreCase));
+    }
+
     public void SetCustomCatalogItems(IEnumerable<CatalogItem> customItems)
     {
         this.customItems = customItems?.ToList() ?? new List<CatalogItem>();
     }
+
+    private static List<CatalogAssembly> LoadAssemblies(Stream stream)
+    {
+        CatalogAssemblyFile? doc = JsonSerializer.Deserialize<CatalogAssemblyFile>(stream, JsonOptions);
+        if (doc?.Assemblies is { Count: > 0 } wrapped)
+        {
+            return wrapped;
+        }
+
+        stream.Position = 0;
+        return JsonSerializer.Deserialize<List<CatalogAssembly>>(stream, JsonOptions) ?? new List<CatalogAssembly>();
+    }
+
+    private static void Normalize(CatalogAssembly assembly)
+    {
+        assembly.Code = assembly.Code?.Trim() ?? string.Empty;
+        assembly.DisplayName = assembly.DisplayName?.Trim() ?? assembly.Code;
+        assembly.TargetKind = assembly.TargetKind?.Trim() ?? string.Empty;
+        assembly.Layers ??= new List<CatalogAssemblyLayer>();
+
+        foreach (CatalogAssemblyLayer layer in assembly.Layers)
+        {
+            layer.CatalogCode = layer.CatalogCode?.Trim() ?? string.Empty;
+            layer.PackId = string.IsNullOrWhiteSpace(layer.PackId) ? null : layer.PackId.Trim();
+            layer.Label = string.IsNullOrWhiteSpace(layer.Label) ? null : layer.Label.Trim();
+            if (layer.QuantityMultiplier <= 0)
+            {
+                layer.QuantityMultiplier = 1.0;
+            }
+        }
+    }
+
+    private static string? NormalizePackId(string? packId)
+        => string.IsNullOrWhiteSpace(packId) ? null : packId.Trim();
 
     private static List<CatalogItem> BuildBaseFromPalette()
     {
@@ -82,8 +187,6 @@ public sealed class CatalogService : ICatalogService
         AddRange(items, PaletteCatalog.Trees, "Tree", "ea", LaborType.Planting, hoursPerUnit: 1.0);
         AddRange(items, PaletteCatalog.Bushes, "Bush", "ea", LaborType.Planting, hoursPerUnit: 0.4);
 
-        // Plants/ground-covers/etc. are large groups in PaletteCatalog; reflect-iterate to keep
-        // this seed inclusive without naming every collection here.
         foreach (System.Reflection.FieldInfo field in typeof(PaletteCatalog).GetFields(
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
         {
@@ -94,7 +197,7 @@ public sealed class CatalogService : ICatalogService
 
             if (field.Name is "BedKits" or "Trees" or "Bushes" or "MaterialItems")
             {
-                continue; // already added above with calibrated labor defaults or is a synthetic aggregate
+                continue;
             }
 
             PaletteItem[] arr = (PaletteItem[])field.GetValue(null)!;
@@ -168,5 +271,10 @@ public sealed class CatalogService : ICatalogService
         return item.Kind == PaletteKind.Edging
             ? GardenPlotWeb.Models.Catalog.Find(item.Code)?.DefaultThicknessIn
             : null;
+    }
+
+    private sealed class CatalogAssemblyFile
+    {
+        public List<CatalogAssembly>? Assemblies { get; set; }
     }
 }

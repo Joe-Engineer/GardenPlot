@@ -517,6 +517,7 @@ public static class PaletteCatalog
             PaletteCategory.PollinatorNatives => [.. Plants.Where(p => string.Equals(p.Trait, "pollinator-native", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.CoverCrops => [.. Plants.Where(p => string.Equals(p.Trait, "cover-crop", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.CustomTiles => [],
+            PaletteCategory.GroundCoverAssemblies => [],
             _ => [],
         };
     }

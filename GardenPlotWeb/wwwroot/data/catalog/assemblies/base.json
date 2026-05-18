@@ -1,0 +1,100 @@
+{
+  "assemblies": [
+    {
+      "code": "gravel-flagstone-path",
+      "source": "Base",
+      "displayName": "Gravel + Flagstone Path",
+      "targetKind": "Area",
+      "layers": [
+        {
+          "source": "Base",
+          "catalogCode": "3/4\" Gravel",
+          "thicknessIn": 4,
+          "label": "Base"
+        },
+        {
+          "source": "Base",
+          "catalogCode": "Flagstone Paver",
+          "label": "Surface"
+        }
+      ]
+    },
+    {
+      "code": "crushed-stone-permeable-paver",
+      "source": "Base",
+      "displayName": "Crushed Stone + Permeable Paver",
+      "targetKind": "Area",
+      "layers": [
+        {
+          "source": "Base",
+          "catalogCode": "Crushed Limestone",
+          "thicknessIn": 4,
+          "label": "Base"
+        },
+        {
+          "source": "Base",
+          "catalogCode": "Permeable Paver",
+          "label": "Surface"
+        }
+      ]
+    },
+    {
+      "code": "drainage-rock-bark-surface",
+      "source": "Base",
+      "displayName": "Drainage Rock + Bark Surface",
+      "targetKind": "Area",
+      "layers": [
+        {
+          "source": "Base",
+          "catalogCode": "Drainage Rock (#57)",
+          "thicknessIn": 4,
+          "label": "Base"
+        },
+        {
+          "source": "Base",
+          "catalogCode": "Pine Bark (Large)",
+          "thicknessIn": 2,
+          "label": "Surface"
+        }
+      ]
+    },
+    {
+      "code": "sand-base-brick-edge",
+      "source": "Base",
+      "displayName": "Sand Base + Brick Edge",
+      "targetKind": "Edge",
+      "layers": [
+        {
+          "source": "Base",
+          "catalogCode": "Sand (Mason)",
+          "thicknessIn": 1,
+          "label": "Base"
+        },
+        {
+          "source": "Base",
+          "catalogCode": "Brick Edge",
+          "label": "Edge restraint"
+        }
+      ]
+    },
+    {
+      "code": "steel-edge-concrete-footing",
+      "source": "Base",
+      "displayName": "Steel Edge over Concrete Footing",
+      "targetKind": "Edge",
+      "layers": [
+        {
+          "source": "Base",
+          "catalogCode": "Concrete Footing",
+          "thicknessIn": 6,
+          "label": "Footing"
+        },
+        {
+          "source": "Base",
+          "catalogCode": "Steel Edge",
+          "label": "Edge restraint"
+        }
+      ]
+    }
+  ]
+}
