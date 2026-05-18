@@ -92,6 +92,17 @@ public sealed class TakeoffSequence
     public int Next { get; set; } = 1;
 }
 
+/// <summary>Binding helpers for a <see cref="TakeoffItem"/>.</summary>
+public static class TakeoffItemBindingState
+{
+    /// <summary>Returns <see langword="true"/> when the catalog reference resolves to a known item.</summary>
+    public static bool IsBound(TakeoffItem item, CatalogItem? catalog)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        return catalog is not null;
+    }
+}
+
 /// <summary>
 /// Override-then-catalog resolution helpers for a <see cref="TakeoffItem"/> plus net-area helpers
 /// for clipped shapes.
