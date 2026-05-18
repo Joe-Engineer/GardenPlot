@@ -2,6 +2,7 @@
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using GardenPlotWeb.Models;
@@ -39,6 +40,12 @@ public sealed class CatalogService : ICatalogService
         AllowTrailingCommas = true,
         Converters = { new JsonStringEnumConverter() },
     };
+
+    private static readonly IReadOnlyList<PaletteItem> MaterialCatalogItems =
+    [
+        .. PaletteCatalog.GroundCoverMaterials,
+        .. PaletteCatalog.GroundCoverSurfaceCovers,
+    ];
 
     private readonly Dictionary<string, CatalogItem> baseByCode;
     private readonly List<CatalogItem> baseItems;
@@ -96,6 +103,8 @@ public sealed class CatalogService : ICatalogService
             logger.LogInformation("Loaded {Count} catalog assemblies.", allAssemblies.Count);
         }
     }
+
+    public static IReadOnlyList<PaletteItem> MaterialItems => MaterialCatalogItems;
 
     public IReadOnlyList<CatalogItem> All
     {
@@ -180,6 +189,136 @@ public sealed class CatalogService : ICatalogService
     private static string? NormalizePackId(string? packId)
         => string.IsNullOrWhiteSpace(packId) ? null : packId.Trim();
 
+    /// <summary>Gets the preferred picker kind when the source shapes all share one material kind.</summary>
+    public static PaletteKind? PreferredMaterialKind(IEnumerable<Shape> shapes)
+    {
+        List<PaletteKind> kinds = shapes
+            .Select(GetMaterialKindForShape)
+            .Where(kind => kind is not null)
+            .Cast<PaletteKind>()
+            .Distinct()
+            .ToList();
+
+        return kinds.Count == 1 ? kinds[0] : null;
+    }
+
+    /// <summary>Filters material choices for the picker by kind and search text.</summary>
+    public static IReadOnlyList<PaletteItem> FilterMaterialItems(PaletteKind? preferredKind, string? search, bool showAll)
+    {
+        IEnumerable<PaletteItem> items = MaterialCatalogItems;
+
+        if (!showAll && preferredKind is PaletteKind.GroundCover or PaletteKind.GroundCoverSurface)
+        {
+            items = items.Where(item => item.Kind == preferredKind);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            string trimmed = search.Trim();
+            items = items.Where(item =>
+                item.Code.Contains(trimmed, StringComparison.OrdinalIgnoreCase)
+                || item.Trait.Contains(trimmed, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return items
+            .OrderBy(item => MaterialKindLabel(item.Kind), StringComparer.Ordinal)
+            .ThenBy(item => item.Code, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>Returns the bound material code, preferring the newer overlap property when present.</summary>
+    public static string? MaterialCodeForShape(Shape shape)
+    {
+        return !string.IsNullOrWhiteSpace(shape.MaterialCode) ? shape.MaterialCode : shape.GroundCoverCode;
+    }
+
+    /// <summary>Returns the effective ground-cover depth, preferring the newer overlap property when present.</summary>
+    public static double? DepthInForShape(Shape shape)
+    {
+        return shape.DepthIn ?? shape.GroundCoverDepthIn;
+    }
+
+    /// <summary>Returns the optional waste override.</summary>
+    public static double? WastePercentForShape(Shape shape)
+    {
+        return shape.WastePercent;
+    }
+
+    /// <summary>Returns the default waste percentage from the palette item.</summary>
+    public static double? DefaultWastePercent(PaletteItem item)
+    {
+        return item.DefaultWastePercent;
+    }
+
+    /// <summary>Gets the material kind for a bound shape.</summary>
+    public static PaletteKind? GetMaterialKindForShape(Shape shape)
+    {
+        PaletteItem? item = PaletteCatalog.FindMaterial(MaterialCodeForShape(shape));
+        if (item is not null)
+        {
+            return item.Kind;
+        }
+
+        return !string.IsNullOrWhiteSpace(shape.GroundCoverCode)
+            ? (shape.IsGroundCoverSurface ? PaletteKind.GroundCoverSurface : PaletteKind.GroundCover)
+            : null;
+    }
+
+    /// <summary>Gets the display name for a shape's bound material.</summary>
+    public static string MaterialDisplayName(Shape shape)
+    {
+        return PaletteCatalog.FindMaterial(MaterialCodeForShape(shape))?.Code
+            ?? MaterialCodeForShape(shape)
+            ?? shape.Label
+            ?? "(unnamed)";
+    }
+
+    /// <summary>Applies a material swap and clears any overlap-era override fields.</summary>
+    public static void ApplyMaterialSwap(Shape shape, PaletteItem item)
+    {
+        shape.Label = item.Code;
+        shape.Trait = item.Trait;
+        shape.Stroke = item.StrokeColor;
+        shape.Fill = item.FillColor;
+        shape.TextureKey = item.TextureKey;
+        shape.TextureImageId = null;
+        shape.GroundCoverCode = item.Code;
+        shape.IsGroundCoverSurface = item.Kind == PaletteKind.GroundCoverSurface;
+        shape.GroundCoverDepthIn = item.Kind == PaletteKind.GroundCover ? item.DefaultDepthIn : null;
+        shape.MaterialCode = item.Code;
+        shape.DepthIn = null;
+        shape.WastePercent = null;
+    }
+
+    /// <summary>Updates the effective depth across legacy and overlap fields.</summary>
+    public static void SetDepthIn(Shape shape, double? depthIn)
+    {
+        shape.GroundCoverDepthIn = depthIn;
+        shape.DepthIn = depthIn;
+    }
+
+    /// <summary>Material unit label used by picker and takeoff displays.</summary>
+    public static string MaterialUnitLabel(PaletteItem item)
+    {
+        return item.Kind == PaletteKind.GroundCoverSurface ? "ft²" : "yd³";
+    }
+
+    /// <summary>Friendly group header for material picker results.</summary>
+    public static string MaterialKindLabel(PaletteKind kind)
+    {
+        if (kind == PaletteKind.GroundCover)
+        {
+            return "Ground Cover";
+        }
+
+        if (kind == PaletteKind.GroundCoverSurface)
+        {
+            return "Ground Cover — Surface";
+        }
+
+        return kind.ToString();
+    }
+
     private static List<CatalogItem> BuildBaseFromPalette()
     {
         List<CatalogItem> items = new();
@@ -187,8 +326,7 @@ public sealed class CatalogService : ICatalogService
         AddRange(items, PaletteCatalog.Trees, "Tree", "ea", LaborType.Planting, hoursPerUnit: 1.0);
         AddRange(items, PaletteCatalog.Bushes, "Bush", "ea", LaborType.Planting, hoursPerUnit: 0.4);
 
-        foreach (System.Reflection.FieldInfo field in typeof(PaletteCatalog).GetFields(
-            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
+        foreach (FieldInfo field in typeof(PaletteCatalog).GetFields(BindingFlags.Public | BindingFlags.Static))
         {
             if (field.FieldType != typeof(PaletteItem[]))
             {

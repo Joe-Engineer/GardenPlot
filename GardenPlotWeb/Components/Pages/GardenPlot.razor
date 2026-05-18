@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @page "/plot"
 @rendermode InteractiveServer
 @implements IAsyncDisposable
@@ -11,6 +11,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using GardenPlotWeb.Models
 @using GardenPlotWeb.Services
+@using GardenPlotWeb.Services.Catalog
 @inject IJSRuntime JS
 @inject IHttpClientFactory HttpFactory
 @inject IWebHostEnvironment Env
@@ -1437,11 +1438,17 @@ else
                 else
                 {
                     <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">
-                        <button class="btn btn-sm btn-outline-success"
-                                @onclick="AddVirtualTakeoffItem"
-                                title="Add a takeoff line that is not yet drawn">
-                            + Add item
-                        </button>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-outline-success"
+                                    @onclick="AddVirtualTakeoffItem"
+                                    title="Add a takeoff line that is not yet drawn">
+                                + Add item
+                            </button>
+                            @if (viewMode == TakeoffViewMode.Item)
+                            {
+                                <div class="x-small text-muted">Ctrl+click rows to multi-select.</div>
+                            }
+                        </div>
                         <div class="d-flex align-items-center gap-2">
                             <button class="btn btn-sm btn-outline-secondary" @onclick="ExportTakeoffCsv" title="Download as CSV">
                                 Download CSV
@@ -1570,7 +1577,8 @@ else
                                     {
                                         var sourceItem = currentPlot.Takeoff.First(t => t.Id == row.Id);
                                         var rowSelected = IsTakeoffRowSelected(sourceItem);
-                                        <tr class="@(row.Unbound ? "table-warning" : "") @(rowSelected ? "takeoff-row-selected" : "")"
+                                        var rowPulse = sourceItem.ShapeId is Guid pulseShapeId && recentMaterialChangeShapeIds.Contains(pulseShapeId);
+                                        <tr class="@(row.Unbound ? "table-warning" : "") @(rowSelected ? "takeoff-row-selected" : "") @(rowPulse ? "takeoff-row-pulse" : "")"
                                             @onclick="(e) => OnTakeoffRowClick(sourceItem, e)"
                                             @oncontextmenu="(e) => OnTakeoffRowContextMenu(sourceItem, e)"
                                             @oncontextmenu:preventDefault="true"
@@ -1790,6 +1798,9 @@ else
         </button>
         <button class="dropdown-item" type="button" @onclick="() => DuplicateTakeoffItem(ctxId)">
             <span class="me-2">⎘</span> Duplicate
+        </button>
+        <button class="dropdown-item" type="button" @onclick="ShowMaterialPickerForTakeoffSelection" disabled="@(!CanChangeSelectedTakeoffMaterials())">
+            <span class="me-2">⇄</span> Change material
         </button>
         <div class="dropdown-divider"></div>
         <button class="dropdown-item text-danger" type="button" @onclick="() => DeleteTakeoffItem(ctxId)">
@@ -2056,6 +2067,7 @@ else
                             {
                                 <span class="badge text-bg-secondary">surface</span>
                             }
+                            <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="ShowMaterialPickerForSelection">Change…</button>
                         </div>
                         <div class="d-flex align-items-center gap-1 mb-1">
                             <label class="small text-muted mb-0">Material:</label>
@@ -2417,6 +2429,18 @@ else
 
                 var rotationValues = selShapes.Select(s => Math.Round(s.Rotation, 3)).Distinct().ToList();
                 <div class="small mt-1"><span class="text-muted">Rotation:</span> <strong>@(rotationValues.Count == 1 ? $"{F(rotationValues[0])}°" : "(mixed)")</strong></div>
+                @if (selShapes.All(IsGroundCoverShape))
+                {
+                    var materialNames = selShapes.Select(CatalogService.MaterialDisplayName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Ground cover</div>
+                        <div class="small d-flex align-items-center gap-2 flex-wrap">
+                            <span class="text-muted">Material:</span>
+                            <strong>@(materialNames.Count == 1 ? materialNames[0] : "(mixed)")</strong>
+                            <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="ShowMaterialPickerForSelection">Change…</button>
+                        </div>
+                    </div>
+                }
             }
 
             @if (!isPreview && selectedDropGroup is null && singleDropGroup is not null)
@@ -3110,6 +3134,78 @@ else
                 <div class="modal-footer">
                     <button class="btn btn-sm btn-secondary" @onclick="CancelAddCustomTile">Cancel</button>
                     <button class="btn btn-sm btn-primary" @onclick="AddCustomTileAsync">@(IsEditingCustomTile ? "Save" : "Add Item")</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showMaterialPicker)
+{
+    var pickerItems = MaterialPickerItems();
+    var pickerGroups = pickerItems.GroupBy(item => item.Kind)
+        .OrderBy(group => CatalogService.MaterialKindLabel(group.Key), StringComparer.Ordinal);
+
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Change material</h5>
+                    <button type="button" class="btn-close" @onclick="CloseMaterialPicker"></button>
+                </div>
+                <div class="modal-body material-picker-body">
+                    <div class="row g-2 mb-2">
+                        <div class="col-sm-8">
+                            <label class="form-label small">Search</label>
+                            <input class="form-control form-control-sm"
+                                   value="@materialPickerSearch"
+                                   @oninput="OnMaterialPickerSearchChanged"
+                                   placeholder="Search materials" />
+                        </div>
+                        <div class="col-sm-4 d-flex align-items-end">
+                            <label class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" checked="@materialPickerShowAll" @onchange="OnMaterialPickerShowAllChanged" />
+                                <span class="form-check-label small">Show all</span>
+                            </label>
+                        </div>
+                    </div>
+                    @if (materialPickerPreferredKind is PaletteKind preferredKind && !materialPickerShowAll)
+                    {
+                        <div class="x-small text-muted mb-2">Showing @CatalogService.MaterialKindLabel(preferredKind) items by default.</div>
+                    }
+                    @if (pickerItems.Count == 0)
+                    {
+                        <div class="small text-muted">No catalog items match that filter.</div>
+                    }
+                    else
+                    {
+                        @foreach (var group in pickerGroups)
+                        {
+                            <div class="material-picker-group">
+                                <div class="small fw-semibold text-muted mb-1">@CatalogService.MaterialKindLabel(group.Key)</div>
+                                @foreach (var item in group)
+                                {
+                                    var isSelectedMaterial = string.Equals(materialPickerSelectedCode, item.Code, StringComparison.OrdinalIgnoreCase);
+                                    <label class="material-picker-row @(isSelectedMaterial ? "selected" : string.Empty)">
+                                        <input type="radio"
+                                               name="material-picker"
+                                               checked="@isSelectedMaterial"
+                                               @onchange="(() => materialPickerSelectedCode = item.Code)" />
+                                        <span class="gc-swatch material-picker-swatch" style="@MaterialPickerSwatchStyle(item)"></span>
+                                        <span class="material-picker-copy">
+                                            <span class="material-picker-name">@item.Code</span>
+                                            <span class="material-picker-meta">@MaterialPickerDetails(item)</span>
+                                        </span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-secondary" @onclick="CloseMaterialPicker">Cancel</button>
+                    <button class="btn btn-sm btn-primary" @onclick="ConfirmMaterialPickerAsync" disabled="@(string.IsNullOrWhiteSpace(materialPickerSelectedCode))">Apply</button>
                 </div>
             </div>
         </div>

@@ -1079,6 +1079,86 @@
     gap: 0.15rem;
 }
 
+.takeoff-table tbody tr {
+    cursor: pointer;
+}
+
+.takeoff-row-selected {
+    background: #eef3e6;
+}
+
+.takeoff-row-material td:nth-child(2) {
+    font-weight: 600;
+}
+
+.takeoff-row-pulse {
+    animation: takeoff-row-pulse 1.25s ease-out;
+}
+
+.takeoff-context-menu {
+    z-index: 1300;
+}
+
+.material-picker-body {
+    max-height: min(70vh, 620px);
+    overflow-y: auto;
+}
+
+.material-picker-group + .material-picker-group {
+    margin-top: 0.75rem;
+}
+
+.material-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.45rem 0.5rem;
+    border: 1px solid #d8d3c2;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.material-picker-row + .material-picker-row {
+    margin-top: 0.35rem;
+}
+
+.material-picker-row.selected {
+    border-color: #6b8b3a;
+    background: #eef3e6;
+}
+
+.material-picker-swatch {
+    flex: 0 0 auto;
+}
+
+.material-picker-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.material-picker-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #2f3b27;
+}
+
+.material-picker-meta {
+    font-size: 0.78rem;
+    color: #6c757d;
+}
+
+@keyframes takeoff-row-pulse {
+    0% {
+        background: #d8e4c8;
+    }
+
+    100% {
+        background: transparent;
+    }
+}
+
 .keybind-modal-body {
     max-height: min(70vh, 640px);
     overflow: auto;
