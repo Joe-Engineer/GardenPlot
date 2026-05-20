@@ -2481,7 +2481,23 @@ else
                 </ul>
 
                 var rotationValues = selShapes.Select(s => Math.Round(s.Rotation, 3)).Distinct().ToList();
-                <div class="small mt-1"><span class="text-muted">Rotation:</span> <strong>@(rotationValues.Count == 1 ? $"{F(rotationValues[0])}°" : "(mixed)")</strong></div>
+                var rotationSingleValue = rotationValues.Count == 1 ? rotationValues[0] : (double?)null;
+                <div class="rotation-edit-row mt-1">
+                    <span class="text-muted small">Rotation:</span>
+                    <input type="number" class="form-control form-control-sm rotation-input"
+                           min="0" max="360" step="1"
+                           value="@(rotationSingleValue is double rv ? F(rv) : string.Empty)"
+                           placeholder="@(rotationSingleValue is null ? "(mixed)" : string.Empty)"
+                           @onchange="(e) => OnShapeRotationInputChanged(selShapes, e)" />
+                    <span class="small text-muted">°</span>
+                    <div class="rotation-quickset btn-group btn-group-sm" role="group" aria-label="Quick rotation values">
+                        @foreach (double q in QuickRotationDegrees)
+                        {
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                    @onclick="() => QuickSetShapeRotationAsync(selShapes, q)">@F(q)°</button>
+                        }
+                    </div>
+                </div>
                 @if (selShapes.All(IsGroundCoverShape))
                 {
                     var materialNames = selShapes.Select(CatalogService.MaterialDisplayName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -2512,7 +2528,27 @@ else
                     @if (selectedDropGroup.Pattern == DropPattern.AlongPath)
                     {
                         <label>Rotation</label>
-                        <div><strong>@(selectedDropGroup.AlignToTangent ? "Path tangent" : $"{F(selectedDropGroup.Rotation)}°")</strong></div>
+                        <div class="rotation-edit-row">
+                            @if (selectedDropGroup.AlignToTangent)
+                            {
+                                <strong class="small">Path tangent</strong>
+                            }
+                            else
+                            {
+                                <input type="number" class="form-control form-control-sm rotation-input"
+                                       min="0" max="360" step="1"
+                                       value="@F(selectedDropGroup.Rotation)"
+                                       @onchange="(e) => OnDropGroupRotationInputChanged(selectedDropGroup, e)" />
+                                <span class="small text-muted">°</span>
+                                <div class="rotation-quickset btn-group btn-group-sm" role="group" aria-label="Quick orientation values">
+                                    @foreach (double q in QuickRotationDegrees)
+                                    {
+                                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                                @onclick="() => QuickSetDropGroupRotationAsync(selectedDropGroup, q)">@F(q)°</button>
+                                    }
+                                </div>
+                            }
+                        </div>
 
                         <label>Source path</label>
                         <div>
@@ -2540,7 +2576,20 @@ else
                     else
                     {
                         <label>Orientation</label>
-                        <div><strong>@F(selectedDropGroup.Rotation)°</strong></div>
+                        <div class="rotation-edit-row">
+                            <input type="number" class="form-control form-control-sm rotation-input"
+                                   min="0" max="360" step="1"
+                                   value="@F(selectedDropGroup.Rotation)"
+                                   @onchange="(e) => OnDropGroupRotationInputChanged(selectedDropGroup, e)" />
+                            <span class="small text-muted">°</span>
+                            <div class="rotation-quickset btn-group btn-group-sm" role="group" aria-label="Quick orientation values">
+                                @foreach (double q in QuickRotationDegrees)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                                            @onclick="() => QuickSetDropGroupRotationAsync(selectedDropGroup, q)">@F(q)°</button>
+                                }
+                            </div>
+                        </div>
 
                         <label>Length (ft)</label>
                         <input type="number" min="0" max="500" step="0.1" value="@F(groupLength)" @onchange="OnGroupLengthChanged" />
