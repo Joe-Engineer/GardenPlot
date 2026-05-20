@@ -1,4 +1,4 @@
-// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
+﻿// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -65,12 +65,15 @@ public partial class GardenPlot
     private const string StorageKeyLegacy = "gardenplot.library.v1";
     private const string FileStoreSourceKey = "file-index";
 
-    // Free tier: server-side file store is disabled so each visitor's plots
-    // live entirely in their own browser (IndexedDB / localStorage). Flip
-    // this to true to re-enable shared server persistence. Declared as static
-    // readonly (not const) so the compiler does not const-fold gated branches
-    // into CS0162 unreachable-code errors.
-    private static readonly bool FileStoreEnabled = false;
+    // Local-file persistence is the authoritative store: plots are written
+    // to the per-user data root resolved by DataRootProvider (defaults to
+    // %LocalAppData%\GardenPlot on Windows, ~/.local/share/GardenPlot on
+    // Linux/macOS, overridable via the GARDENPLOT_DATA_DIR env var). Browser
+    // IndexedDB / localStorage are kept as a secondary cache + offline
+    // fallback so the same user/browser still works without disk access.
+    // Declared as static readonly (not const) so the compiler does not
+    // const-fold gated branches into CS0162 unreachable-code errors.
+    private static readonly bool FileStoreEnabled = true;
     private const double PxPerFt = 16.0; // also used by ToFt()
     private const double DefaultPlotWidthFt = 40.0;
     private const double DefaultPlotHeightFt = 30.0;
@@ -111,7 +114,9 @@ public partial class GardenPlot
         ["Ruler"] = Tool.Ruler,
         ["Circle Ruler"] = Tool.CircleRuler,
         ["Rectangle Ruler"] = Tool.RectRuler,
-        ["Ground Cover"] = Tool.GroundCover,
+        // Ground Cover is not exposed as a top-level tool button: users pick a
+        // ground-cover material/surface from the palette and the page switches
+        // into Tool.GroundCover automatically (see SelectItem).
     };
 
     private static readonly BedKit[] BedKits =
@@ -144,10 +149,11 @@ public partial class GardenPlot
     private ElementReference wrapRef;
     private ElementReference rulerPanelRef = default;
     private ElementReference infoPanelRef;
+    private ElementReference layersPanelRef;
     private ElementReference takeoffPanelRef;
     private ElementReference calibrationPanelRef;
     private bool showTakeoffPanel;
-    private bool showLayersPanel = true;
+    private bool showLayersPanel = false;
     private readonly List<Shape> clipboard = new();
     private readonly Stack<PlotUndoSnapshot> undoStack = new();
     private double? pasteAnchorX;
@@ -3201,6 +3207,34 @@ public partial class GardenPlot
 
         if (jsModule is not null)
         {
+            // Defensive: re-attach wheel and gesture handlers if they failed to attach
+            // during firstRender (e.g., JS module import timed out, or canvas remounted
+            // due to layout changes). Idempotent because we only attach when handle is null.
+            if (wheelHandle is null && !isDisposingOrDisposed)
+            {
+                try
+                {
+                    dotnetRef ??= DotNetObjectReference.Create(this);
+                    wheelHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachWheel", canvasRef, dotnetRef);
+                }
+                catch
+                {
+                    // ignore; will retry next render
+                }
+            }
+            if (gestureHandle is null && !isDisposingOrDisposed)
+            {
+                try
+                {
+                    dotnetRef ??= DotNetObjectReference.Create(this);
+                    gestureHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachTouchGestures", canvasRef, wrapRef, dotnetRef);
+                }
+                catch
+                {
+                    // ignore; will retry next render
+                }
+            }
+
             bool loadedPlotBackgroundDimensions =
                 await EnsurePlotBackgroundImageDimensionsAsync(currentPlot?.BackgroundImageFileName) |
                 await EnsurePlotBackgroundImageDimensionsAsync(newPlotBackgroundImageFileName);
@@ -9037,6 +9071,9 @@ public partial class GardenPlot
     private Task StartInfoPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("info", e);
     private Task StartTakeoffPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("takeoff", e);
     private Task StartCalibrationPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("calibration", e);
+    private Task StartLayersPanelDrag(Microsoft.AspNetCore.Components.Web.PointerEventArgs e) => StartPanelDrag("layers", e);
+
+    private void ToggleLayersPanel() => showLayersPanel = !showLayersPanel;
 
     private async Task StartPanelDrag(string name, Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
@@ -9047,6 +9084,7 @@ public partial class GardenPlot
             "info" => infoPanelRef,
             "takeoff" => takeoffPanelRef,
             "calibration" => calibrationPanelRef,
+            "layers" => layersPanelRef,
             _ => infoPanelRef,
         };
         var (curX, curY) = await GetPanelClientPositionAsync(panelElement, name);
@@ -9082,6 +9120,11 @@ public partial class GardenPlot
         {
             library.Ui.CalibrationPanelX = curX;
             library.Ui.CalibrationPanelY = curY;
+        }
+        else if (name == "layers")
+        {
+            library.Ui.LayersPanelX = curX;
+            library.Ui.LayersPanelY = curY;
         }
         else
         {
@@ -9133,6 +9176,11 @@ public partial class GardenPlot
             library.Ui.CalibrationPanelX = x;
             library.Ui.CalibrationPanelY = y;
         }
+        else if (draggingPanel == "layers")
+        {
+            library.Ui.LayersPanelX = x;
+            library.Ui.LayersPanelY = y;
+        }
     }
 
     private async Task OnPanelDragEnd()
@@ -9169,6 +9217,7 @@ public partial class GardenPlot
         if (name == "info" && prefs.InfoPanelX is double ix && prefs.InfoPanelY is double iy) return (ix, iy);
         if (name == "takeoff" && prefs.TakeoffPanelX is double tx && prefs.TakeoffPanelY is double ty) return (tx, ty);
         if (name == "calibration" && prefs.CalibrationPanelX is double cx && prefs.CalibrationPanelY is double cy) return (cx, cy);
+        if (name == "layers" && prefs.LayersPanelX is double lx && prefs.LayersPanelY is double ly) return (lx, ly);
         try
         {
             if (jsModule is not null)
@@ -9179,6 +9228,7 @@ public partial class GardenPlot
                 if (name == "ruler") return (width - 280 - 40, 40);
                 if (name == "takeoff") return (width - 300 - 40, 90);
                 if (name == "calibration") return (width - 320 - 46, height - 180 - 84);
+                if (name == "layers") return (260, 120);
                 return (width - 320 - 40, height - 220 - 40);
             }
         }
