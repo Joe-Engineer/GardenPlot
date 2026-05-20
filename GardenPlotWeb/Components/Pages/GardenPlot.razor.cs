@@ -137,6 +137,7 @@ public partial class GardenPlot
     private Shape? drafting;
     private Tool currentTool = Tool.Select;
     private PaletteItem? selectedItem;
+    private CatalogAssembly? selectedAssembly;
     private PaletteCategory currentCategory = DefaultPaletteCategory;
 
     private static readonly PaletteCategory DefaultPaletteCategory =
@@ -646,15 +647,6 @@ public partial class GardenPlot
             _ = presentShapeIds.Add(s.Id);
         }
 
-        HashSet<Guid> boundShapeIds = new();
-        foreach (TakeoffItem t in currentPlot.Takeoff)
-        {
-            if (t.ShapeId is Guid g)
-            {
-                _ = boundShapeIds.Add(g);
-            }
-        }
-
         int nextId = currentPlot.TakeoffIds.Next;
         foreach (TakeoffItem t in currentPlot.Takeoff)
         {
@@ -664,9 +656,48 @@ public partial class GardenPlot
             }
         }
 
+        // Phase 1: reconcile assembly-bound shapes. Each shape maps to N TakeoffItems (one per
+        // layer). We key existing items by (layer code + occurrence) so layer reorders or layer
+        // inserts don't silently move user overrides to the wrong material.
+        HashSet<int> usedTakeoffIds = new();
         foreach (Shape shape in currentPlot.Shapes)
         {
-            if (boundShapeIds.Contains(shape.Id))
+            if (!IsAssemblyShape(shape))
+            {
+                continue;
+            }
+
+            CatalogAssembly? assembly = Catalog.GetAssembly(
+                shape.AssemblySource!.Value,
+                shape.AssemblyPackId,
+                shape.AssemblyCode!);
+            if (assembly is null)
+            {
+                // Assembly missing (pack unloaded). Leave existing items intact for the next load.
+                foreach (TakeoffItem orphan in currentPlot.Takeoff.Where(t => t.ShapeId == shape.Id))
+                {
+                    _ = usedTakeoffIds.Add(orphan.Id);
+                }
+
+                continue;
+            }
+
+            ReconcileAssemblyShape(shape, assembly, ref nextId, usedTakeoffIds);
+        }
+
+        // Phase 2: non-assembly shapes use the existing 1:1 binding by ShapeId.
+        HashSet<Guid> boundShapeIds = new();
+        foreach (TakeoffItem t in currentPlot.Takeoff)
+        {
+            if (t.ShapeId is Guid g && string.IsNullOrEmpty(t.AssemblyCode))
+            {
+                _ = boundShapeIds.Add(g);
+            }
+        }
+
+        foreach (Shape shape in currentPlot.Shapes)
+        {
+            if (IsAssemblyShape(shape) || boundShapeIds.Contains(shape.Id))
             {
                 continue;
             }
@@ -683,11 +714,17 @@ public partial class GardenPlot
             });
         }
 
+        // Phase 3: cleanup. An item is orphaned if its shape no longer exists, OR if its shape
+        // exists but no longer references this assembly layer (handled by phase 1's usedTakeoffIds).
         bool autoDelete = library.Ui.AutoDeleteTakeoffOnShapeDelete;
         for (int i = currentPlot.Takeoff.Count - 1; i >= 0; i--)
         {
             TakeoffItem t = currentPlot.Takeoff[i];
-            if (t.ShapeId is Guid sid && !presentShapeIds.Contains(sid))
+            bool isAssemblyLayerRow = !string.IsNullOrEmpty(t.AssemblyCode) && t.ShapeId.HasValue;
+            bool shapeMissing = t.ShapeId is Guid sid && !presentShapeIds.Contains(sid);
+            bool layerNoLongerUsed = isAssemblyLayerRow && !usedTakeoffIds.Contains(t.Id) && !shapeMissing;
+
+            if (shapeMissing || layerNoLongerUsed)
             {
                 if (autoDelete)
                 {
@@ -696,11 +733,85 @@ public partial class GardenPlot
                 else
                 {
                     t.ShapeId = null;
+                    t.AssemblyCode = null;
+                    t.AssemblyLayerIndex = null;
                 }
             }
         }
 
         currentPlot.TakeoffIds.Next = nextId;
+    }
+
+    /// <summary>
+    /// Mints or updates one <see cref="TakeoffItem"/> per layer of <paramref name="assembly"/>
+    /// bound to <paramref name="shape"/>. Existing items are matched by a stable layer key
+    /// (layer catalog code + occurrence index among siblings with the same code) so layer
+    /// reorders or inserts don't migrate user overrides to the wrong material.
+    /// </summary>
+    private void ReconcileAssemblyShape(
+        Shape shape,
+        CatalogAssembly assembly,
+        ref int nextId,
+        HashSet<int> usedTakeoffIds)
+    {
+        List<TakeoffItem> existingForShape = currentPlot!.Takeoff
+            .Where(t => t.ShapeId == shape.Id && string.Equals(t.AssemblyCode, assembly.Code, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        // Build a lookup over existing items keyed by (catalog-code, occurrence-index).
+        Dictionary<string, Queue<TakeoffItem>> existingByLayerKey = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> existingOccurrenceByCode = new(StringComparer.OrdinalIgnoreCase);
+        foreach (TakeoffItem item in existingForShape.OrderBy(t => t.AssemblyLayerIndex ?? int.MaxValue).ThenBy(t => t.Id))
+        {
+            string code = item.CatalogCode ?? string.Empty;
+            int occurrence = existingOccurrenceByCode.GetValueOrDefault(code, 0);
+            existingOccurrenceByCode[code] = occurrence + 1;
+            string key = $"{code}#{occurrence}";
+            if (!existingByLayerKey.TryGetValue(key, out Queue<TakeoffItem>? queue))
+            {
+                queue = new Queue<TakeoffItem>();
+                existingByLayerKey[key] = queue;
+            }
+
+            queue.Enqueue(item);
+        }
+
+        // Walk each desired layer in order, claim an existing item if one matches by key.
+        Dictionary<string, int> desiredOccurrenceByCode = new(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < assembly.Layers.Count; i++)
+        {
+            CatalogAssemblyLayer layer = assembly.Layers[i];
+            int occurrence = desiredOccurrenceByCode.GetValueOrDefault(layer.CatalogCode, 0);
+            desiredOccurrenceByCode[layer.CatalogCode] = occurrence + 1;
+            string key = $"{layer.CatalogCode}#{occurrence}";
+
+            TakeoffItem? bound;
+            if (existingByLayerKey.TryGetValue(key, out Queue<TakeoffItem>? queue) && queue.Count > 0)
+            {
+                bound = queue.Dequeue();
+                // Update derived fields; preserve every per-instance override on the existing row.
+                bound.AssemblyLayerIndex = i;
+                bound.CatalogSource = layer.Source;
+                bound.CatalogPackId = layer.PackId;
+            }
+            else
+            {
+                bound = new TakeoffItem
+                {
+                    Id = nextId++,
+                    ShapeId = shape.Id,
+                    CatalogSource = layer.Source,
+                    CatalogPackId = layer.PackId,
+                    CatalogCode = layer.CatalogCode,
+                    Quantity = 1,
+                    AssemblyCode = assembly.Code,
+                    AssemblyLayerIndex = i,
+                };
+                currentPlot.Takeoff.Add(bound);
+            }
+
+            _ = usedTakeoffIds.Add(bound.Id);
+        }
     }
 
     private (CatalogSource Source, string? PackId, string Code) ResolveCatalogRefForShape(Shape shape)
@@ -1070,8 +1181,10 @@ public partial class GardenPlot
     private static bool IsGroundCoverShape(Shape s)
     {
         return string.Equals(s.Trait, "ground-cover", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(s.Trait, "ground-cover-assembly", StringComparison.OrdinalIgnoreCase)
             || !string.IsNullOrWhiteSpace(GroundCoverMath.MaterialCode(s))
-            || !string.IsNullOrWhiteSpace(CatalogService.MaterialCodeForShape(s));
+            || !string.IsNullOrWhiteSpace(CatalogService.MaterialCodeForShape(s))
+            || (s.Kind != ShapeKind.Edge && !string.IsNullOrWhiteSpace(s.AssemblyCode));
     }
 
     private static bool CanShapeBeClipped(Shape shape) => GroundCoverMath.IsAreaShape(shape);
@@ -1130,6 +1243,8 @@ public partial class GardenPlot
 
         return row.ShapeId is Guid shapeId && IsSelected(shapeId);
     }
+
+    private static readonly double[] QuickRotationDegrees = [0, 45, 90, 180, 270];
 
     private static readonly string[] GroundCoverTextureKeys =
     [
@@ -1477,6 +1592,46 @@ public partial class GardenPlot
             Trait = string.IsNullOrWhiteSpace(item.Trait) ? "edge" : item.Trait,
             Stroke = item.StrokeColor,
             Takeoff = GardenPlotWeb.Models.Catalog.CreateTakeoff(item.Code),
+        };
+    }
+
+    /// <summary>
+    /// Creates a fresh <see cref="ShapeKind.Edge"/> draft bound to a multi-layer edge assembly.
+    /// The visual stroke uses the assembly's preview layer; the assembly source/pack/code are
+    /// stamped on the shape so the reconciler can mint one takeoff item per layer.
+    /// </summary>
+    private static Shape CreateEdgeAssemblyDraft(CatalogAssembly assembly, PaletteItem? previewItem)
+    {
+        return new Shape
+        {
+            Kind = ShapeKind.Edge,
+            Label = assembly.DisplayName,
+            Trait = "edge-assembly",
+            Stroke = previewItem?.StrokeColor,
+            AssemblySource = assembly.Source,
+            AssemblyPackId = assembly.PackId,
+            AssemblyCode = assembly.Code,
+        };
+    }
+
+    /// <summary>
+    /// Creates a fresh area-shape draft bound to a multi-layer area assembly. The visual
+    /// fill/stroke use the assembly's preview layer (typically the surface layer) so the
+    /// canvas doesn't show a featureless grey rectangle.
+    /// </summary>
+    private static Shape CreateAreaAssemblyDraft(CatalogAssembly assembly, PaletteItem? previewItem, ShapeKind kind)
+    {
+        return new Shape
+        {
+            Kind = kind,
+            Label = assembly.DisplayName,
+            Trait = "ground-cover-assembly",
+            Stroke = previewItem?.StrokeColor,
+            Fill = previewItem?.FillColor,
+            TextureKey = previewItem?.TextureKey,
+            AssemblySource = assembly.Source,
+            AssemblyPackId = assembly.PackId,
+            AssemblyCode = assembly.Code,
         };
     }
 
@@ -4495,6 +4650,7 @@ public partial class GardenPlot
         PaletteCategory.PollinatorNatives => "Pollinator Natives",
         PaletteCategory.CoverCrops => "Cover Crops",
         PaletteCategory.CustomTiles => "Custom Tiles",
+        PaletteCategory.GroundCoverAssemblies => "Materials — Assemblies",
         _ => k.ToString(),
     };
 
@@ -5112,15 +5268,18 @@ public partial class GardenPlot
 
         HideShapeContextMenu();
         selectedItem = item;
+        selectedAssembly = null;
+        _ = ApplySelectItemSideEffects(item);
+    }
 
+    private Task ApplySelectItemSideEffects(PaletteItem item)
+    {
         // Ground cover materials and surface seeds are drawn as area shapes,
         // not stamped. Pick the area-drawing tool automatically so the user
         // doesn't need a second click; preserves the prior sub-mode choice.
         if (item.Kind == PaletteKind.GroundCover || item.Kind == PaletteKind.GroundCoverSurface)
         {
             currentTool = Tool.GroundCover;
-            // Seed the toolbar depth control from the palette default; the user can
-            // tweak it on-the-fly before drawing each shape.
             currentGroundCoverDepthIn = item.Kind == PaletteKind.GroundCover
                 ? (item.DefaultDepthIn ?? 3.0)
                 : null;
@@ -5146,8 +5305,83 @@ public partial class GardenPlot
             stampOrientation = stampRotation;
         }
 
+        return canvasRef.FocusAsync(preventScroll: true).AsTask();
+    }
+
+    /// <summary>
+    /// Selects a catalog assembly for the next draw operation. Mirrors <see cref="SelectItem"/>
+    /// for single palette items: clears any active palette-item selection, routes the active
+    /// tool based on <c>TargetKind</c>, and gives the canvas focus so keystrokes work.
+    /// </summary>
+    private void SelectAssembly(CatalogAssembly assembly)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+
+        ClearSelection();
+        HideShapeContextMenu();
+        selectedItem = null;
+        selectedAssembly = assembly;
+
+        if (string.Equals(assembly.TargetKind, "Edge", StringComparison.OrdinalIgnoreCase))
+        {
+            CancelEdgeDraftInProgress();
+            currentTool = Tool.Edge;
+        }
+        else
+        {
+            // Default: area assembly. Use the same tool the ground-cover palette uses.
+            currentTool = Tool.GroundCover;
+            currentGroundCoverDepthIn = null;
+        }
+
         _ = canvasRef.FocusAsync(preventScroll: true).AsTask();
     }
+
+    /// <summary>Returns assemblies whose <c>TargetKind</c> is "Area" (rendered in the Ground Cover Assemblies palette).</summary>
+    private IReadOnlyList<CatalogAssembly> GroundCoverAssemblyPaletteItems()
+        => Catalog.AllAssemblies
+            .Where(a => string.Equals(a.TargetKind, "Area", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(a => a.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>Returns assemblies whose <c>TargetKind</c> is "Edge" (rendered at the top of the Edging palette).</summary>
+    private IReadOnlyList<CatalogAssembly> EdgeAssemblyPaletteItems()
+        => Catalog.AllAssemblies
+            .Where(a => string.Equals(a.TargetKind, "Edge", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(a => a.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>
+    /// Returns the dominant visual layer for an assembly preview (last surface layer, fall back
+    /// to the last layer with a resolvable catalog item). Used to colour palette swatches and
+    /// freshly-drafted assembly shapes so the canvas isn't a featureless grey rectangle.
+    /// </summary>
+    private PaletteItem? ResolveAssemblyPreviewItem(CatalogAssembly assembly)
+    {
+        if (assembly is null || assembly.Layers.Count == 0)
+        {
+            return null;
+        }
+
+        foreach (CatalogAssemblyLayer layer in assembly.Layers.AsEnumerable().Reverse())
+        {
+            PaletteItem? material = PaletteCatalog.FindMaterial(layer.CatalogCode);
+            if (material is not null)
+            {
+                return material;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Formats an assembly's layer stack as a single tooltip line (e.g. "Pea Gravel + Flagstone Paver").</summary>
+    private static string FormatAssemblyTooltip(CatalogAssembly assembly)
+        => string.Join(" + ", assembly.Layers.Select(l => string.IsNullOrWhiteSpace(l.Label) ? l.CatalogCode : l.Label));
+
+    /// <summary>True when the shape carries an assembly binding (multi-layer takeoff).</summary>
+    private static bool IsAssemblyShape(Shape shape)
+        => !string.IsNullOrWhiteSpace(shape.AssemblyCode) && shape.AssemblySource.HasValue;
 
     private void ApplyDefaultDropSpacing(PaletteItem item)
     {
@@ -6112,6 +6346,36 @@ public partial class GardenPlot
                 drafting = new Shape { Kind = ShapeKind.FreeDraw };
                 drafting.Points.Add(new Point(x, y));
                 break;
+            case Tool.Edge when selectedAssembly is { } edgeAssembly && string.Equals(edgeAssembly.TargetKind, "Edge", StringComparison.OrdinalIgnoreCase):
+                {
+                    PaletteItem? previewItem = ResolveAssemblyPreviewItem(edgeAssembly);
+                    if (edgeSubMode == EdgeSubMode.StraightSegments)
+                    {
+                        if (drafting is null || drafting.Kind != ShapeKind.Edge || !buildingPolygon)
+                        {
+                            drafting = CreateEdgeAssemblyDraft(edgeAssembly, previewItem);
+                            drafting.Points.Add(new Point(x, y));
+                            drafting.Points.Add(new Point(x, y));
+                            buildingPolygon = true;
+                        }
+                        else
+                        {
+                            drafting.Points[^1] = new Point(x, y);
+                            drafting.Points.Add(new Point(x, y));
+                        }
+                    }
+                    else
+                    {
+                        if (drafting is null || drafting.Kind != ShapeKind.Edge || buildingPolygon || !string.Equals(drafting.AssemblyCode, edgeAssembly.Code, StringComparison.OrdinalIgnoreCase))
+                        {
+                            drafting = CreateEdgeAssemblyDraft(edgeAssembly, previewItem);
+                        }
+
+                        buildingPolygon = false;
+                        AppendEdgePoint(drafting, new Point(x, y), 0.01);
+                    }
+                }
+                break;
             case Tool.Edge when selectedItem is { } edgeItem && edgeItem.Kind == PaletteKind.Edging:
                 {
                     if (edgeSubMode == EdgeSubMode.StraightSegments)
@@ -6158,6 +6422,44 @@ public partial class GardenPlot
                 drafting = new Shape { Kind = ShapeKind.RectRuler, X = x, Y = y, W = 0, H = 0 };
                 dragStartX = x;
                 dragStartY = y;
+                break;
+            case Tool.GroundCover when selectedAssembly is { } areaAssembly && !string.Equals(areaAssembly.TargetKind, "Edge", StringComparison.OrdinalIgnoreCase):
+                {
+                    PaletteItem? previewItem = ResolveAssemblyPreviewItem(areaAssembly);
+                    if (groundCoverSubMode == GroundCoverSubMode.Polygon)
+                    {
+                        if (drafting is null || !buildingPolygon)
+                        {
+                            drafting = CreateAreaAssemblyDraft(areaAssembly, previewItem, ShapeKind.FreeDraw);
+                            drafting.Points.Add(new Point(x, y));
+                            drafting.Points.Add(new Point(x, y));
+                            buildingPolygon = true;
+                        }
+                        else
+                        {
+                            drafting.Points[^1] = new Point(x, y);
+                            drafting.Points.Add(new Point(x, y));
+                        }
+                    }
+                    else if (groundCoverSubMode == GroundCoverSubMode.FreehandArea)
+                    {
+                        drafting = CreateAreaAssemblyDraft(areaAssembly, previewItem, ShapeKind.FreeDraw);
+                        drafting.Points.Add(new Point(x, y));
+                    }
+                    else
+                    {
+                        drafting = CreateAreaAssemblyDraft(
+                            areaAssembly,
+                            previewItem,
+                            groundCoverSubMode == GroundCoverSubMode.Oval ? ShapeKind.Oval : ShapeKind.Rectangle);
+                        drafting.X = x;
+                        drafting.Y = y;
+                        drafting.W = 0;
+                        drafting.H = 0;
+                        dragStartX = x;
+                        dragStartY = y;
+                    }
+                }
                 break;
             case Tool.GroundCover when selectedItem is { } gcItem && (gcItem.Kind == PaletteKind.GroundCover || gcItem.Kind == PaletteKind.GroundCoverSurface):
                 {
@@ -7741,6 +8043,96 @@ public partial class GardenPlot
             group.SpacingFtOverride = Math.Clamp(spacingFt, 0.1, 200);
             await ReflowDropGroup(group);
         }
+    }
+
+    /// <summary>
+    /// Parses a rotation value (degrees) entered in the Selected Items panel and applies it
+    /// to all <paramref name="shapes"/>. Records one undo entry, normalises to [0, 360), and
+    /// saves. Silently ignores blank or non-numeric input so the field reverts on blur.
+    /// </summary>
+    private async Task OnShapeRotationInputChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            StateHasChanged();
+            return;
+        }
+
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double degrees))
+        {
+            StateHasChanged();
+            return;
+        }
+
+        await SetShapeRotationAsync(shapes, NormalizeDegrees(degrees));
+    }
+
+    /// <summary>Quick-set button handler: jumps every shape in <paramref name="shapes"/> to <paramref name="degrees"/>.</summary>
+    private Task QuickSetShapeRotationAsync(IReadOnlyList<Shape> shapes, double degrees)
+        => SetShapeRotationAsync(shapes, NormalizeDegrees(degrees));
+
+    private async Task SetShapeRotationAsync(IReadOnlyList<Shape> shapes, double normalizedDegrees)
+    {
+        if (shapes.Count == 0)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            shape.Rotation = normalizedDegrees;
+        }
+
+        ReconcileTakeoff();
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Parses a degrees input for an array's orientation and applies it to the
+    /// <see cref="DropGroup.Rotation"/> field. Reflows the array so member positions follow.
+    /// </summary>
+    private async Task OnDropGroupRotationInputChanged(DropGroup group, ChangeEventArgs e)
+    {
+        ArgumentNullException.ThrowIfNull(group);
+
+        string? raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw) ||
+            !double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double degrees))
+        {
+            StateHasChanged();
+            return;
+        }
+
+        await SetDropGroupRotationAsync(group, NormalizeDegrees(degrees));
+    }
+
+    /// <summary>Quick-set button handler for a drop group's orientation.</summary>
+    private Task QuickSetDropGroupRotationAsync(DropGroup group, double degrees)
+        => SetDropGroupRotationAsync(group, NormalizeDegrees(degrees));
+
+    private async Task SetDropGroupRotationAsync(DropGroup group, double normalizedDegrees)
+    {
+        RecordUndoState();
+        group.Rotation = normalizedDegrees;
+        await ReflowDropGroup(group);
+    }
+
+    private static double NormalizeDegrees(double degrees)
+    {
+        double normalized = degrees % 360.0;
+        if (normalized < 0)
+        {
+            normalized += 360.0;
+        }
+
+        return normalized;
     }
 
     private async Task OnAlongPathOffsetChanged(ChangeEventArgs e)

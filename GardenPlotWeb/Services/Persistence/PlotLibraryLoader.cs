@@ -19,14 +19,27 @@ namespace GardenPlotWeb.Services.Persistence;
 /// </summary>
 /// <remarks>
 /// <para>
+/// Every <c>LoadFromVersionN</c> ends with a call to <c>FinalizeLoadedLibrary</c>, the single
+/// shared finalize pipeline. It ensures per-plot layer state, task collections, background
+/// fit, linear unit, recent-plot-size lists, and the StaggerHalf -> Triangulated upgrade,
+/// regardless of entry version. Per-version methods only do what is unique to that version
+/// (e.g. the v1 takeoff synthesis, the v1/v2 surface rebind).
+/// </para>
+/// <para>
+/// <c>PlotLibraryLoaderChainConvergenceTests</c> exercises every loader with the same
+/// conceptual plot and asserts byte-identical post-finalize output. Any new
+/// <c>LoadFromVersionN</c> that diverges (e.g. forgets the finalize pipeline) will fail it.
+/// </para>
+/// <para>
 /// Adding a new schema version:
 /// </para>
 /// <list type="number">
 ///   <item>Bump <see cref="PlotSchema.Current"/>.</item>
-///   <item>Add a new <c>LoadFromVersion&lt;newCurrent&gt;</c> method that does the direct typed deserialize.</item>
+///   <item>Add a new <c>LoadFromVersion&lt;newCurrent&gt;</c> method that does the direct typed deserialize and calls <c>FinalizeLoadedLibrary</c>.</item>
 ///   <item>Update the previous <c>LoadFromVersion&lt;N-1&gt;</c> method so it reads the old shape (e.g. via a
 ///   private DTO) and returns a current-shaped <see cref="PlotLibrary"/> with any new defaults applied.</item>
 ///   <item>Wire the new version into the switch in <see cref="Load(string?, string, JsonSerializerOptions?)"/>.</item>
+///   <item>Extend the convergence test fixture in <c>PlotLibraryLoaderChainConvergenceTests</c> with a v&lt;newCurrent&gt; JSON variant.</item>
 /// </list>
 /// <para>
 /// Metrics emitted on the <c>GardenPlotWeb.Persistence</c> meter (visible in the Aspire dashboard):
@@ -228,12 +241,9 @@ public sealed class PlotLibraryLoader
         foreach (PlotData plot in library.Plots)
         {
             BackfillTakeoffItemsForLegacyPlot(plot);
-            LayerResolver.EnsureLayerStates(plot);
         }
 
         RebindMovedGroundCoverSurfaceShapes(library);
-        EnsureTaskCollections(library);
-        library = BackfillBackgroundFit(library);
         return FinalizeLoadedLibrary(library, root);
     }
 
@@ -247,9 +257,8 @@ public sealed class PlotLibraryLoader
     /// deserialization is sufficient because the newer members carry safe model defaults
     /// (markup 25%, labor rate 75, internal view on, line total on, default rotation for
     /// shapes/drop groups, empty soil-reading + clip lists, empty task collections, and
-    /// <c>Fit</c> for background image rendering); we then rebind moved surface palette items,
-    /// normalize missing layer state and task collections, project legacy triangulation, and
-    /// stamp a valid background-fit value before the document is rewritten as the current schema.
+    /// <c>Fit</c> for background image rendering); we then rebind moved surface palette items
+    /// and let the finalize pipeline normalize everything else.
     /// </summary>
     private static PlotLibrary? LoadFromVersion2(JsonObject root, JsonSerializerOptions? options)
     {
@@ -263,9 +272,6 @@ public sealed class PlotLibraryLoader
 
         library = NormalizeLibrary(library);
         RebindMovedGroundCoverSurfaceShapes(library);
-        EnsureLayerStates(library);
-        EnsureTaskCollections(library);
-        library = BackfillBackgroundFit(library);
         return FinalizeLoadedLibrary(library, root);
     }
 
@@ -284,27 +290,26 @@ public sealed class PlotLibraryLoader
             return null;
         }
 
-        EnsureLayerStates(library);
-        EnsureTaskCollections(library);
-        library = BackfillBackgroundFit(library);
         return FinalizeLoadedLibrary(library, root);
     }
 
     /// <summary>
     /// Loader for schema v4 — the current shape. Direct typed deserialization onto
-    /// <see cref="PlotLibrary"/> plus normalization of per-plot layer state, task entries,
-    /// and unit/recent-size defaults.
+    /// <see cref="PlotLibrary"/> plus the finalize pipeline. Defensively migrates legacy
+    /// material fields so a v4 document that only set <c>GroundCoverCode</c> (e.g. from a
+    /// build that wrote v4 but hadn't been updated to populate <see cref="Shape.MaterialCode"/>)
+    /// converges with the v1/v2/v3 paths.
     /// </summary>
     private static PlotLibrary? LoadFromVersion4(JsonObject root, JsonSerializerOptions? options)
     {
+        MigrateLegacyMaterialFields(root);
+
         PlotLibrary? library = root.Deserialize<PlotLibrary>(options ?? SerializerOptions);
         if (library is null)
         {
             return null;
         }
 
-        EnsureLayerStates(library);
-        EnsureTaskCollections(library);
         return FinalizeLoadedLibrary(library, root);
     }
 
@@ -325,6 +330,13 @@ public sealed class PlotLibraryLoader
         }
     }
 
+    /// <summary>
+    /// Single shared finalize pipeline that every <c>LoadFromVersionN</c> method funnels
+    /// through. Centralizes the cross-version invariants so a newer loader cannot drift from
+    /// the others: ensures per-plot layer state, task collections, background fit, linear
+    /// unit, recent-plot-size lists, and the StaggerHalf -> Triangulated upgrade. Idempotent
+    /// for already-current documents.
+    /// </summary>
     private static PlotLibrary? FinalizeLoadedLibrary(PlotLibrary? library, JsonObject root)
     {
         if (library is null)
@@ -337,6 +349,10 @@ public sealed class PlotLibraryLoader
         library.Plots ??= new List<PlotData>();
         library.CustomPaletteItems ??= new List<PaletteItem>();
         library.CustomCatalogItems ??= new List<CatalogItem>();
+
+        EnsureLayerStates(library);
+        EnsureTaskCollections(library);
+        _ = BackfillBackgroundFit(library);
 
         JsonArray? plotNodes = root["Plots"] as JsonArray;
         for (int i = 0; i < library.Plots.Count; i++)
@@ -470,6 +486,7 @@ public sealed class PlotLibraryLoader
             }
 
             (CatalogSource source, string? packId, string code) = ResolveLegacyShapeCatalogRef(shape);
+            string unit = ResolveLegacyShapeTakeoffUnit(shape);
 
             plot.Takeoff.Add(new TakeoffItem
             {
@@ -478,11 +495,31 @@ public sealed class PlotLibraryLoader
                 CatalogPackId = packId,
                 CatalogCode = code,
                 Quantity = 1,
+                Unit = unit,
                 ShapeId = shape.Id,
             });
         }
 
         plot.TakeoffIds.Next = nextId;
+    }
+
+    private static string ResolveLegacyShapeTakeoffUnit(Shape shape)
+    {
+        // Mirror the units the v2+ catalog projection writes: ground-cover surfaces are sold
+        // by area (ft²), volumetric ground covers by yd³, edging by lf, everything else by ea.
+        if (!string.IsNullOrWhiteSpace(shape.GroundCoverCode))
+        {
+            return shape.IsGroundCoverSurface ? "ft²" : "yd³";
+        }
+
+        return shape.Kind switch
+        {
+            ShapeKind.Edge => "lf",
+            ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.SoilMarker => "ea",
+            ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw => "ea",
+            ShapeKind.Ruler or ShapeKind.CircleRuler or ShapeKind.RectRuler => "ea",
+            _ => "ea",
+        };
     }
 
     private static (CatalogSource Source, string? PackId, string Code) ResolveLegacyShapeCatalogRef(Shape shape)
