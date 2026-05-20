@@ -25,6 +25,8 @@ public class UiPreferences
     public double? TakeoffPanelY { get; set; }
     public double? CalibrationPanelX { get; set; }
     public double? CalibrationPanelY { get; set; }
+    public double? LayersPanelX { get; set; }
+    public double? LayersPanelY { get; set; }
     public bool? TakeoffPanelVisible { get; set; }
 
     /// <summary>Selected takeoff view mode (Item vs. Summary). Default is Item.</summary>

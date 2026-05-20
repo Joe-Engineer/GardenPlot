@@ -380,46 +380,20 @@
     overflow: hidden;
 }
 
-.layers-dock {
+.floating-panel.layers-panel {
+    width: 240px;
+    max-height: 70vh;
     display: flex;
     flex-direction: column;
-    flex: 0 0 210px;
-    width: 210px;
-    min-width: 210px;
-    background: #fafaf5;
-    border: 1px solid #d8d3c2;
-    border-radius: 4px;
-    height: calc(100vh - 225px);
-    min-height: 200px;
-    max-height: calc(100vh - 225px);
-    overflow: hidden;
+    border-color: #6b8b3a;
 }
 
-.layers-dock-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.35rem;
-    padding: 0.45rem 0.55rem;
-    border: 0;
-    border-bottom: 1px solid #d8d3c2;
-    background: #eef3e6;
-    color: #2f5a3a;
-    font-size: 0.9rem;
-    font-weight: 600;
+.floating-panel.default-layers-pos {
+    top: 120px;
+    left: 260px;
 }
 
-.layers-dock-toggle svg {
-    width: 18px;
-    height: 18px;
-    transition: transform 0.15s ease-in-out;
-}
-
-.layers-dock-toggle svg.expanded {
-    transform: rotate(180deg);
-}
-
-.layers-dock-list {
+.layers-panel-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
@@ -427,6 +401,26 @@
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+}
+
+.panel-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.panel-close-btn {
+    border: 0;
+    background: transparent;
+    color: #555;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0 0.3rem;
+    cursor: pointer;
+}
+
+.panel-close-btn:hover {
+    color: #000;
 }
 
 .layer-row {
@@ -683,8 +677,7 @@
         flex-direction: column;
     }
 
-    .plot-palette,
-    .layers-dock {
+    .plot-palette {
         width: 100%;
         min-width: 0;
         height: 260px;
