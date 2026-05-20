@@ -485,6 +485,59 @@ else
                     }
                 </div>
                 <div class="palette-grid">
+                    @if (currentCategory == PaletteCategory.GroundCoverAssemblies)
+                    {
+                        @foreach (var assembly in GroundCoverAssemblyPaletteItems())
+                        {
+                            var isAsmActive = selectedAssembly is not null
+                                && selectedAssembly.Code == assembly.Code
+                                && selectedAssembly.Source == assembly.Source
+                                && selectedAssembly.PackId == assembly.PackId;
+                            var preview = ResolveAssemblyPreviewItem(assembly);
+                            var detail = $"{assembly.Layers.Count} layers · {FormatAssemblyTooltip(assembly)}";
+                            <button class="palette-item @(isAsmActive ? "active" : "")"
+                                    @onclick="() => SelectAssembly(assembly)"
+                                    title="@assembly.DisplayName — @detail">
+                                <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet">
+                                    <rect x="0.18" y="0.18" width="0.56" height="0.56" rx="0.05"
+                                          fill="@(preview?.FillColor ?? "#8a8276")"
+                                          stroke="@(preview?.StrokeColor ?? "#3f3a30")" stroke-width="0.05" />
+                                    <rect x="0.08" y="0.08" width="0.56" height="0.56" rx="0.05"
+                                          fill="none" stroke="#4b6b52" stroke-width="0.05" opacity="0.85" />
+                                    <rect x="0.28" y="0.28" width="0.56" height="0.56" rx="0.05"
+                                          fill="none" stroke="#2f5a3a" stroke-width="0.05" opacity="0.75" />
+                                </svg>
+                                <div class="small palette-item-name">@assembly.DisplayName</div>
+                                <div class="x-small text-muted">@detail</div>
+                            </button>
+                        }
+                    }
+                    @if (currentCategory == PaletteCategory.Edging)
+                    {
+                        @foreach (var assembly in EdgeAssemblyPaletteItems())
+                        {
+                            var isAsmActive = selectedAssembly is not null
+                                && selectedAssembly.Code == assembly.Code
+                                && selectedAssembly.Source == assembly.Source
+                                && selectedAssembly.PackId == assembly.PackId;
+                            var preview = ResolveAssemblyPreviewItem(assembly);
+                            var detail = $"{assembly.Layers.Count} layers · {FormatAssemblyTooltip(assembly)}";
+                            <button class="palette-item @(isAsmActive ? "active" : "")"
+                                    @onclick="() => SelectAssembly(assembly)"
+                                    title="@assembly.DisplayName — @detail">
+                                <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet">
+                                    <line x1="0.14" y1="0.5" x2="0.86" y2="0.5"
+                                          stroke="@(preview?.StrokeColor ?? "#4b5258")"
+                                          stroke-width="0.12" stroke-linecap="round" />
+                                    <line x1="0.12" y1="0.66" x2="0.88" y2="0.66"
+                                          stroke="#8a8276" stroke-width="0.05"
+                                          stroke-linecap="round" opacity="0.65" />
+                                </svg>
+                                <div class="small palette-item-name">@assembly.DisplayName</div>
+                                <div class="x-small text-muted">@detail</div>
+                            </button>
+                        }
+                    }
                     @foreach (var item in PaletteItemsForCurrentCategory())
                     {
                         var isActive = selectedItem?.Code == item.Code;
