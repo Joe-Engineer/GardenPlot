@@ -17,12 +17,18 @@ public readonly record struct AlongPathRowSpec(double WidthFt, double GapFt, dou
 /// <param name="Pos">Final position in plot feet, including the row's perpendicular offset.</param>
 /// <param name="AngleDeg">Local tangent angle in degrees (0 along +X).</param>
 /// <param name="WasSlid">True if the sample was slid forward past its on-grid position to clear a collision.</param>
+/// <param name="ArcLengthFt">Canonical arc-length position (ft) along the row's sample path (post-slide).</param>
+/// <param name="OffsetFt">Signed perpendicular offset (ft) applied for this sample's row.</param>
+/// <param name="SlideFt">Slide-forward distance (ft) added by the collision pass (0 = no slide).</param>
 public readonly record struct AlongPathSample(
     int RowIndex,
     int IndexInRow,
     Point Pos,
     double AngleDeg,
-    bool WasSlid);
+    bool WasSlid,
+    double ArcLengthFt,
+    double OffsetFt,
+    double SlideFt);
 
 /// <summary>
 /// Stamps a directed path (open polyline or closed perimeter) with one or more parallel rows
@@ -118,6 +124,7 @@ public static class AlongPathBuilder
 
             while (t <= rowEnd + 1e-9 && iterations++ < safetyLimit)
             {
+                double tBeforeSlide = t;
                 if (TryPlaceCandidate(rowPath, rowClosed, rowTotalFt, t, radius, placedCircles, subdivision, out var placedPos, out var placedAngleDeg, out double slidTo, out bool slid))
                 {
                     samples.Add(new AlongPathSample(
@@ -125,7 +132,10 @@ public static class AlongPathBuilder
                         indexInRow,
                         placedPos,
                         alignToTangent ? placedAngleDeg : 0,
-                        slid));
+                        slid,
+                        slidTo,
+                        row.OffsetFt,
+                        slidTo - tBeforeSlide));
                     placedCircles.Add((placedPos, radius));
                     indexInRow++;
                     t = slidTo + stride;

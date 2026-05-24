@@ -704,9 +704,13 @@ else
                                 </button>
                             }
                         }
-                        <button class="btn btn-sm btn-outline-secondary w-100"
+                        <button class="btn btn-sm btn-outline-secondary w-100 mb-1"
                                 @onclick="ShowEditSelectedCustomTileDialog"
                                 disabled="@(!CanEditSelectedCustomPaletteItem)">Edit Item</button>
+                        <button class="btn btn-sm btn-outline-danger w-100"
+                                @onclick="DeleteSelectedCustomPaletteItemAsync"
+                                disabled="@(!CanEditSelectedCustomPaletteItem)"
+                                title="Permanently remove the selected custom item from this library.">Delete Item</button>
                     </div>
                 }
                 </aside>

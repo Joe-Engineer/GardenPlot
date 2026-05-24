@@ -4677,6 +4677,36 @@ public partial class GardenPlot
         }
     }
 
+    private async Task DeleteSelectedCustomPaletteItemAsync()
+    {
+        if (selectedItem is null || !CanEditSelectedCustomPaletteItem)
+        {
+            return;
+        }
+
+        var kind = selectedItem.Kind;
+        var code = selectedItem.Code;
+
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Delete custom item \"{code}\"? This cannot be undone.");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        int removed = library.CustomPaletteItems.RemoveAll(i =>
+            i.Kind == kind && string.Equals(i.Code, code, StringComparison.OrdinalIgnoreCase));
+        if (removed == 0)
+        {
+            return;
+        }
+
+        selectedItem = null;
+        RefreshCustomCatalogItems();
+        await SaveAsync();
+    }
+
     private void ShowEditCustomTileDialog(PaletteItem item)
     {
         customPaletteItemKind = item.Kind;
@@ -6507,6 +6537,10 @@ public partial class GardenPlot
             {
                 shape.Id = Guid.Empty;
             }
+            shape.AlongPathRowIndex = s.RowIndex;
+            shape.AlongPathArcLengthFt = s.ArcLengthFt;
+            shape.AlongPathOffsetFt = s.OffsetFt;
+            shape.AlongPathSlideFt = s.SlideFt;
             shapes.Add(shape);
             if (index == 0)
             {
@@ -6539,6 +6573,78 @@ public partial class GardenPlot
             sourcePath,
             template.W,
             (position, rotation, index) => CloneStampTemplateAt(template, position.X, position.Y, rotation, group.Id, index, assignNewId: true));
+    }
+
+    /// <summary>
+    /// Resamples each anchored shape in <paramref name="members"/> against the (possibly modified)
+    /// <paramref name="sourcePath"/> using its persisted <see cref="Shape.AlongPathArcLengthFt"/>
+    /// and <see cref="Shape.AlongPathOffsetFt"/>. Returns true if all members were anchored and
+    /// got repositioned in place; false if any member lacks anchors (caller should fall back to
+    /// the legacy template-based rebuild).
+    /// </summary>
+    private bool TryReflowAlongPathFromAnchors(DropGroup group, Shape sourcePath, IReadOnlyList<Shape> members)
+    {
+        if (members.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var m in members)
+        {
+            if (m.AlongPathArcLengthFt is null || m.AlongPathOffsetFt is null)
+            {
+                return false;
+            }
+        }
+
+        var (points, closed) = ResolvePathPoints(sourcePath);
+        if (points.Count < 2)
+        {
+            return false;
+        }
+
+        // Group members by their persisted offset so we build each offset polyline only once.
+        var byOffset = members
+            .GroupBy(m => Math.Round(m.AlongPathOffsetFt!.Value, 6))
+            .ToList();
+
+        foreach (var grp in byOffset)
+        {
+            double offsetFt = grp.Key;
+            IReadOnlyList<Point> rowPath = Math.Abs(offsetFt) > 1e-9
+                ? AlongPathBuilder.BuildOffsetPolyline(points, closed, offsetFt)
+                : points;
+            double rowTotal = PolylineSampler.TotalLengthFt(rowPath, closed);
+            if (rowTotal <= 0)
+            {
+                return false;
+            }
+
+            foreach (var shape in grp)
+            {
+                double s = shape.AlongPathArcLengthFt!.Value;
+                double wrapped = closed && rowTotal > 0
+                    ? ((s % rowTotal) + rowTotal) % rowTotal
+                    : Math.Clamp(s, 0, rowTotal);
+                var (pos, tangent) = PolylineSampler.SampleAt(rowPath, wrapped, closed);
+                shape.X = pos.X;
+                shape.Y = pos.Y;
+                if (group.AlignToTangent)
+                {
+                    shape.Rotation = Math.Atan2(tangent.Y, tangent.X) * 180.0 / Math.PI;
+                }
+            }
+        }
+
+        // Refresh group anchor to the first member's new position so subsequent UI ops stay aligned.
+        if (members.Count > 0)
+        {
+            var first = members.OrderBy(m => m.GroupIndex ?? 0).First();
+            group.AnchorCenterX = first.X;
+            group.AnchorCenterY = first.Y;
+        }
+
+        return true;
     }
 
     private StampPlacement BuildStampPlacement(PaletteItem item, double centerX, double centerY, DropPattern pattern, bool assignNewIds)
@@ -7428,13 +7534,29 @@ public partial class GardenPlot
         if (isDragging)
         {
             isDragging = false;
+            var snapsById = dragSnaps.ToDictionary(s => s.Id);
             var movedSourceShapeIds = SelectedShapes()
                 .Where(IsPathShape)
+                .Where(shape =>
+                {
+                    if (!snapsById.TryGetValue(shape.Id, out var snap)) return false;
+                    if (IsPointBased(shape))
+                    {
+                        if (snap.OrigPoints is null || snap.OrigPoints.Length == 0) return false;
+                        var orig = snap.OrigPoints[0];
+                        var cur = shape.Points.Count > 0 ? shape.Points[0] : orig;
+                        return Math.Abs(cur.X - orig.X) > 1e-6 || Math.Abs(cur.Y - orig.Y) > 1e-6;
+                    }
+                    return Math.Abs(shape.X - snap.X) > 1e-6 || Math.Abs(shape.Y - snap.Y) > 1e-6;
+                })
                 .Select(shape => shape.Id)
                 .ToList();
-            await ReflowAlongPathGroupsForSourceShapes(movedSourceShapeIds, save: false);
-            SyncDropGroupsFromCurrentShapes();
-            await SaveAsync();
+            if (movedSourceShapeIds.Count > 0)
+            {
+                await ReflowAlongPathGroupsForSourceShapes(movedSourceShapeIds, save: false);
+                SyncDropGroupsFromCurrentShapes();
+                await SaveAsync();
+            }
             return;
         }
 
@@ -8853,6 +8975,20 @@ public partial class GardenPlot
             var sourcePath = GetAlongPathSourceShape(group);
             if (sourcePath is not null)
             {
+                // Preferred path: per-shape anchored reflow. Keeps every plant pinned to its
+                // original arc-length position so a path edit produces only the local shift
+                // it actually warrants -- no cascading, no template-driven scatter.
+                if (TryReflowAlongPathFromAnchors(group, sourcePath, members))
+                {
+                    if (save)
+                    {
+                        await SaveAsync();
+                    }
+
+                    return;
+                }
+
+                // Fallback (legacy / pre-anchor data): regenerate from the first member as template.
                 var hadSelection = members.Any(member => selectedIds.Contains(member.Id));
                 var template = members[0];
                 currentPlot.Shapes.RemoveAll(shape => shape.GroupId == group.Id);

@@ -300,4 +300,59 @@ public sealed class AlongPathBuilderTests
         double maxDeviation = offsetPolyline.Max(p => Math.Abs(p.Y - offsetFt));
         Assert.True(maxDeviation < 1.6, $"Offset polyline drift {maxDeviation:F3} ft exceeds 10% of {offsetFt} ft offset.");
     }
+
+    [Fact]
+    public void Samples_CarryArcLengthAndOffset_SoAnchorsReproducePositionExactly()
+    {
+        // Tight pinning invariant: a placed sample's (ArcLengthFt, OffsetFt) must be enough
+        // to recover its position by resampling the row's offset polyline. This is the
+        // contract that the in-app anchored reflow relies on.
+        var path = new List<Point> { new(0, 0), new(10, 0), new(10, 10) };
+        var rows = new[]
+        {
+            new AlongPathRowSpec(WidthFt: 1.5, GapFt: 0.5, OffsetFt: 2.0, PhaseAlongFt: 0),
+        };
+
+        var samples = AlongPathBuilder.BuildSamples(path, closed: false, rows, alignToTangent: false);
+
+        Assert.NotEmpty(samples);
+        var offsetPolyline = AlongPathBuilder.BuildOffsetPolyline(path, closed: false, 2.0);
+        double rowTotal = PolylineSampler.TotalLengthFt(offsetPolyline, closed: false);
+
+        foreach (var s in samples)
+        {
+            Assert.Equal(2.0, s.OffsetFt, 6);
+            Assert.InRange(s.ArcLengthFt, 0, rowTotal + 1e-6);
+            var (pos, _) = PolylineSampler.SampleAt(offsetPolyline, Math.Min(s.ArcLengthFt, rowTotal), closed: false);
+            Assert.Equal(s.Pos.X, pos.X, 6);
+            Assert.Equal(s.Pos.Y, pos.Y, 6);
+        }
+    }
+
+    [Fact]
+    public void Anchors_SurviveSmallPathEdit_WithBoundedLocalShiftOnly()
+    {
+        // Verifies the "no cascading scatter" property: when a path is nudged slightly,
+        // resampling each placed shape at its persisted ArcLength produces a position
+        // shift bounded by the local path shift -- not amplified by collision slide or
+        // template differences.
+        var pathBefore = new List<Point> { new(0, 0), new(20, 0) };
+        var rows = new[] { new AlongPathRowSpec(WidthFt: 1, GapFt: 0, OffsetFt: 0, PhaseAlongFt: 0) };
+        var samples = AlongPathBuilder.BuildSamples(pathBefore, closed: false, rows, alignToTangent: false);
+        Assert.NotEmpty(samples);
+
+        // Move the end of the path up by 0.25 ft. Each shape's new position should differ
+        // from its original by at most a fraction of that nudge (proportional to its
+        // distance along the path), with no surprise jumps anywhere.
+        var pathAfter = new List<Point> { new(0, 0), new(20, 0.25) };
+
+        foreach (var s in samples)
+        {
+            var (newPos, _) = PolylineSampler.SampleAt(pathAfter, s.ArcLengthFt, closed: false);
+            double dx = newPos.X - s.Pos.X;
+            double dy = newPos.Y - s.Pos.Y;
+            double shift = Math.Sqrt((dx * dx) + (dy * dy));
+            Assert.True(shift <= 0.3, $"Shape at s={s.ArcLengthFt:F2} ft shifted {shift:F3} ft (>0.3 ft) after a 0.25 ft path nudge -- anchors are not pinning tightly.");
+        }
+    }
 }
