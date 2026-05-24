@@ -4869,6 +4869,25 @@ public partial class GardenPlot
 
     private PaletteItem? ResolveLayerCatalogItem(Shape shape)
     {
+        // PaletteCatalog.* lists are static, so once we resolve a (Kind, Label, GroundCoverCode,
+        // IsGroundCoverSurface) tuple to a PaletteItem we can reuse it forever. Hot paths like
+        // IsShapeVisible / CanSelectShape call this per shape per render, so the linear FirstOrDefault
+        // scans below dominate render cost when a plot has many plants.
+        var cacheKey = (shape.Kind, shape.Label, shape.GroundCoverCode, shape.IsGroundCoverSurface);
+        if (layerCatalogItemCache.TryGetValue(cacheKey, out var cached))
+        {
+            return cached;
+        }
+
+        PaletteItem? resolved = ResolveLayerCatalogItemUncached(shape);
+        layerCatalogItemCache[cacheKey] = resolved;
+        return resolved;
+    }
+
+    private readonly Dictionary<(ShapeKind kind, string? label, string? gcCode, bool isGcSurface), PaletteItem?> layerCatalogItemCache = new();
+
+    private PaletteItem? ResolveLayerCatalogItemUncached(Shape shape)
+    {
         if (!string.IsNullOrWhiteSpace(shape.GroundCoverCode))
         {
             PaletteItem? groundCoverItem = shape.IsGroundCoverSurface

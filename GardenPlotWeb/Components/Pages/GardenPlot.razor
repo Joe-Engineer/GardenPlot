@@ -1320,7 +1320,8 @@ else
                                     case ShapeKind.Plant:
                                         @if (!IsFocalPointTrait(s.Trait))
                                         {
-                                            @((MarkupString)PlantRendering.SpacingRingsSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, "good"))
+                                            var ghostStatus = ComputeSpacingStatus(s, plantList);
+                                            @((MarkupString)PlantRendering.SpacingRingsSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, ghostStatus))
                                         }
                                         @((MarkupString)PlantRendering.PlantSpriteSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, s.Trait))
                                         break;
