@@ -774,6 +774,63 @@
     margin: 0;
 }
 
+.fill-enclosed-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    color: #35523c;
+    cursor: pointer;
+}
+
+.fill-enclosed-toggle input {
+    margin: 0;
+}
+
+.fill-anchor-radio {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.35rem;
+}
+
+.fill-anchor-svg {
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+}
+
+.fill-anchor-svg .anchor-cell {
+    fill: #f5f1e8;
+    stroke: #35523c;
+    stroke-width: 1;
+    cursor: pointer;
+}
+
+.fill-anchor-svg .anchor-cell:hover {
+    fill: #e2ddc9;
+}
+
+.fill-anchor-svg .anchor-cell.active {
+    fill: #4a7c59;
+    stroke: #2f5a3a;
+}
+
+.fill-anchor-svg .anchor-center {
+    fill: #f5f1e8;
+    stroke: #35523c;
+    stroke-width: 1;
+    cursor: pointer;
+}
+
+.fill-anchor-svg .anchor-center:hover {
+    fill: #e2ddc9;
+}
+
+.fill-anchor-svg .anchor-center.active {
+    fill: #4a7c59;
+    stroke: #2f5a3a;
+}
+
 .floating-panel.default-ruler-pos {
     top: 40px;
     right: 40px;

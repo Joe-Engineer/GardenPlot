@@ -14,6 +14,29 @@ public enum ViewMode
     Concept,
 }
 
+/// <summary>Boundary behavior for <c>Fill with plants</c>.</summary>
+public enum FillEnclosureMode
+{
+    /// <summary>Plant centers may sit on the shape edge; circles may extend past the boundary.</summary>
+    DrawOnEdges,
+
+    /// <summary>Only place plants whose bounding circle lies fully inside the shape.</summary>
+    FullyEnclosed,
+}
+
+/// <summary>Anchor location for the <c>Fill with plants</c> lattice.</summary>
+public enum FillAnchorMode
+{
+    Center,
+    UpperLeft,
+    UpperRight,
+    LowerLeft,
+    LowerRight,
+
+    /// <summary>The user picks the anchor with a canvas click (armed via Ctrl + Fill with plants).</summary>
+    Custom,
+}
+
 /// <summary>Persisted UI state (panel positions, etc.). Stored alongside <see cref="PlotLibrary"/>.</summary>
 public class UiPreferences
 {
@@ -82,6 +105,13 @@ public class UiPreferences
     /// overlay runs polygon-clipping per affected shape on every render, so we leave it as an
     /// opt-in control (toggleable from the canvas status bar).</summary>
     public bool ShowClipHatch { get; set; }
+
+    /// <summary>How <c>Fill with plants</c> treats the polygon boundary. Default is
+    /// <see cref="FillEnclosureMode.FullyEnclosed"/> so plant footprints never cross the shape edge.</summary>
+    public FillEnclosureMode FillEnclosureMode { get; set; } = FillEnclosureMode.FullyEnclosed;
+
+    /// <summary>Anchor location for the <c>Fill with plants</c> lattice. Default is the shape's center.</summary>
+    public FillAnchorMode FillAnchorMode { get; set; } = FillAnchorMode.Center;
 
     /// <summary>Last-used plot sizes, stored in feet and shown as quick-picks in the new-plot flow.</summary>
     [JsonConverter(typeof(RecentPlotSizesJsonConverter))]
