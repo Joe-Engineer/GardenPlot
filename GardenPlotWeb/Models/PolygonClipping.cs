@@ -1,4 +1,4 @@
-// <copyright file="PolygonClipping.cs" company="Garden Plot">
+﻿// <copyright file="PolygonClipping.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -148,6 +148,35 @@ public static class PolygonClipping
         Geometry unioned = UnaryUnionOp.Union(geometries);
         List<IReadOnlyList<Point>> result = new();
         CollectPolygons(unioned, result);
+        return result;
+    }
+
+    /// <summary>
+    /// Computes the boolean difference subject - clipper. Returns one or more outer rings of the
+    /// resulting geometry. Holes are dropped because the Shape model only supports a single ring.
+    /// </summary>
+    public static List<IReadOnlyList<Point>> Difference(IReadOnlyList<Point> subject, IReadOnlyList<Point> clipper)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentNullException.ThrowIfNull(clipper);
+
+        List<Point> normalizedSubject = GroundCoverMath.NormalizePolygon(subject);
+        List<Point> normalizedClipper = GroundCoverMath.NormalizePolygon(clipper);
+        if (normalizedSubject.Count < 3)
+        {
+            return new List<IReadOnlyList<Point>>();
+        }
+
+        if (normalizedClipper.Count < 3)
+        {
+            return new List<IReadOnlyList<Point>> { normalizedSubject };
+        }
+
+        Geometry subjectGeometry = CreatePolygonGeometry(normalizedSubject);
+        Geometry clipperGeometry = CreatePolygonGeometry(normalizedClipper);
+        Geometry difference = subjectGeometry.Difference(clipperGeometry);
+        List<IReadOnlyList<Point>> result = new();
+        CollectPolygons(difference, result);
         return result;
     }
 

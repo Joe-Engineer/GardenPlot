@@ -5722,20 +5722,76 @@ public partial class GardenPlot
                 return "Clip A by B";
             }
 
-            string verb = clippee.ClippedBy.Contains(clipper.Id) ? "Unclip" : "Clip";
-            return $"{verb} {TakeoffName(clippee)} by {TakeoffName(clipper)}";
+            return $"Clip {TakeoffName(clippee)} by {TakeoffName(clipper)}";
         }
     }
 
     private async Task ToggleSelectedClipRelationship()
     {
-        if (!TryGetClipSelectionPair(out Shape clippee, out Shape clipper))
+        if (currentPlot is null || !TryGetClipSelectionPair(out Shape clippee, out Shape clipper))
         {
             return;
         }
 
-        bool shouldClip = !clippee.ClippedBy.Contains(clipper.Id);
-        await SetShapeClipStateAsync(clippee, clipper.Id, shouldClip);
+        List<Point> subjectPolygon = GroundCoverMath.ToPolygon(clippee);
+        List<Point> clipperPolygon = GroundCoverMath.ToPolygon(clipper);
+        if (subjectPolygon.Count < 3 || clipperPolygon.Count < 3)
+        {
+            return;
+        }
+
+        List<IReadOnlyList<Point>> pieces = PolygonClipping.Difference(subjectPolygon, clipperPolygon);
+        if (pieces.Count == 0)
+        {
+            return;
+        }
+
+        // Keep the largest resulting ring; holes and minor slivers are dropped because the Shape
+        // model only supports a single outer ring per shape.
+        IReadOnlyList<Point> largest = pieces
+            .OrderByDescending(GroundCoverMath.PolygonArea)
+            .First();
+        if (largest.Count < 3)
+        {
+            return;
+        }
+
+        // Avoid a no-op rewrite when the clipper doesn't actually overlap the clippee.
+        double originalArea = GroundCoverMath.PolygonArea(subjectPolygon);
+        double newArea = GroundCoverMath.PolygonArea(largest);
+        if (Math.Abs(originalArea - newArea) <= PolygonClipping.Epsilon)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        ApplyDestructiveClip(clippee, largest);
+        await SaveAsync();
+    }
+
+    private static void ApplyDestructiveClip(Shape clippee, IReadOnlyList<Point> resultPolygon)
+    {
+        double minX = double.PositiveInfinity, minY = double.PositiveInfinity;
+        double maxX = double.NegativeInfinity, maxY = double.NegativeInfinity;
+        var points = new List<Point>(resultPolygon.Count);
+        foreach (Point p in resultPolygon)
+        {
+            points.Add(p);
+            if (p.X < minX) minX = p.X;
+            if (p.Y < minY) minY = p.Y;
+            if (p.X > maxX) maxX = p.X;
+            if (p.Y > maxY) maxY = p.Y;
+        }
+
+        clippee.Kind = ShapeKind.FreeDraw;
+        clippee.Points = points;
+        clippee.X = minX;
+        clippee.Y = minY;
+        clippee.W = Math.Max(0, maxX - minX);
+        clippee.H = Math.Max(0, maxY - minY);
+        clippee.Rotation = 0;
+        // The clip is baked into the geometry, so the legacy reference list no longer applies.
+        clippee.ClippedBy?.Clear();
     }
 
     private bool TryGetClipSelectionPair(out Shape clippee, out Shape clipper)
