@@ -1,4 +1,4 @@
-// <copyright file="GroundCoverMath.cs" company="Garden Plot">
+﻿// <copyright file="GroundCoverMath.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -359,6 +359,49 @@ public static class GroundCoverMath
         var lenSq = Math.Pow(b.X - a.X, 2) + Math.Pow(b.Y - a.Y, 2);
         return dot <= lenSq + BoundaryTolerance;
     }
+
+    /// <summary>Returns the squared distance from <paramref name="point"/> to the nearest edge of the polygon.</summary>
+    public static double DistanceSquaredToPolygonBoundary(IReadOnlyList<Point> polygon, Point point)
+    {
+        var pts = NormalizePolygon(polygon);
+        if (pts.Count < 2)
+        {
+            return double.PositiveInfinity;
+        }
+
+        double best = double.PositiveInfinity;
+        for (int i = 0; i < pts.Count; i++)
+        {
+            var a = pts[i];
+            var b = pts[(i + 1) % pts.Count];
+            double d = DistanceSquaredToSegment(point, a, b);
+            if (d < best) best = d;
+        }
+
+        return best;
+    }
+
+    private static double DistanceSquaredToSegment(Point p, Point a, Point b)
+    {
+        double dx = b.X - a.X;
+        double dy = b.Y - a.Y;
+        double lenSq = (dx * dx) + (dy * dy);
+        if (lenSq <= double.Epsilon)
+        {
+            double ax = p.X - a.X;
+            double ay = p.Y - a.Y;
+            return (ax * ax) + (ay * ay);
+        }
+
+        double t = (((p.X - a.X) * dx) + ((p.Y - a.Y) * dy)) / lenSq;
+        if (t < 0) t = 0;
+        else if (t > 1) t = 1;
+        double projX = a.X + (t * dx);
+        double projY = a.Y + (t * dy);
+        double rx = p.X - projX;
+        double ry = p.Y - projY;
+        return (rx * rx) + (ry * ry);
+    }
 }
 
 /// <summary>Samples planting centers on a triangulated grid and keeps only the points inside the polygon.</summary>
@@ -366,6 +409,19 @@ public static class TriangulatedFill
 {
     /// <summary>Samples planting centers inside the supplied polygon.</summary>
     public static IReadOnlyList<Point> SampleInside(IReadOnlyList<Point> polygon, double onCenterFt)
+        => SampleInside(polygon, onCenterFt, anchor: null, insetRadiusFt: 0);
+
+    /// <summary>
+    /// Samples planting centers inside the polygon on a triangulated lattice passing through
+    /// <paramref name="anchor"/>. When <paramref name="insetRadiusFt"/> is positive, samples whose
+    /// distance to the polygon boundary is less than the inset are rejected so the plant footprint
+    /// stays strictly inside the shape.
+    /// </summary>
+    public static IReadOnlyList<Point> SampleInside(
+        IReadOnlyList<Point> polygon,
+        double onCenterFt,
+        Point? anchor,
+        double insetRadiusFt)
     {
         var normalized = GroundCoverMath.NormalizePolygon(polygon);
         if (normalized.Count < 3 || onCenterFt <= 0)
@@ -380,19 +436,50 @@ public static class TriangulatedFill
             return Array.Empty<Point>();
         }
 
+        // Anchor the lattice on the requested point (default: bounds min corner — preserves prior behavior).
+        double anchorX = anchor?.X ?? bounds.MinX;
+        double anchorY = anchor?.Y ?? bounds.MinY;
+
+        // Walk row indices outward from the anchor so the row containing the anchor itself
+        // (rowIndex == 0) gets the "even" zero column offset and passes through anchorX.
+        int firstRow = (int)Math.Floor((bounds.MinY - anchorY) / rowSpacing) - 1;
+        int lastRow = (int)Math.Ceiling((bounds.MaxY - anchorY) / rowSpacing) + 1;
+        int firstCol = (int)Math.Floor((bounds.MinX - anchorX) / onCenterFt) - 1;
+        int lastCol = (int)Math.Ceiling((bounds.MaxX - anchorX) / onCenterFt) + 1;
+
+        double insetSq = insetRadiusFt > 0 ? insetRadiusFt * insetRadiusFt : 0;
         var samples = new List<Point>();
         const double epsilon = 1e-9;
-        var row = 0;
-        for (var y = bounds.MinY; y <= bounds.MaxY + epsilon; y += rowSpacing, row++)
+        for (int row = firstRow; row <= lastRow; row++)
         {
-            var offset = (row % 2 == 0) ? 0 : onCenterFt / 2.0;
-            for (var x = bounds.MinX + offset; x <= bounds.MaxX + epsilon; x += onCenterFt)
+            double y = anchorY + (row * rowSpacing);
+            if (y < bounds.MinY - epsilon || y > bounds.MaxY + epsilon)
             {
-                var sample = new Point(x, y);
-                if (GroundCoverMath.PointInPolygon(normalized, sample))
+                continue;
+            }
+
+            double rowOffset = (row & 1) == 0 ? 0 : onCenterFt / 2.0;
+            for (int col = firstCol; col <= lastCol; col++)
+            {
+                double x = anchorX + rowOffset + (col * onCenterFt);
+                if (x < bounds.MinX - epsilon || x > bounds.MaxX + epsilon)
                 {
-                    samples.Add(sample);
+                    continue;
                 }
+
+                var sample = new Point(x, y);
+                if (!GroundCoverMath.PointInPolygon(normalized, sample))
+                {
+                    continue;
+                }
+
+                if (insetRadiusFt > 0 &&
+                    GroundCoverMath.DistanceSquaredToPolygonBoundary(normalized, sample) < insetSq - epsilon)
+                {
+                    continue;
+                }
+
+                samples.Add(sample);
             }
         }
 

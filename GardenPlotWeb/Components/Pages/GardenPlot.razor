@@ -210,9 +210,30 @@ else
                         title="First-selected area is clippee; second-selected area is clipper.">
                     @ClipToolbarLabel
                 </button>
-                <button class="btn btn-sm btn-outline-success ms-2" @onclick="FillSelectedAreaWithPlantsAsync" disabled="@(!CanFillSelectedArea)" title="Fill the selected area (rectangle, oval, or polygon) with copies of the plant currently picked in the palette, using the Drop spacing settings.">
+                <button class="btn btn-sm btn-outline-success ms-2" @onclick="(e) => FillSelectedAreaWithPlantsAsync(e)" disabled="@(!CanFillSelectedArea)" title="Fill the selected area (rectangle, oval, or polygon) with copies of the plant currently picked in the palette, using the Drop spacing settings. Hold Ctrl to place the anchor plant on the canvas.">
                     Fill with plants
                 </button>
+                <label class="fill-enclosed-toggle ms-2" title="When checked, no plant is placed such that its bounding circle would cross the shape edge.">
+                    <input type="checkbox" checked="@(library.Ui.FillEnclosureMode == FillEnclosureMode.FullyEnclosed)" @onchange="OnFillEnclosurePreferenceChanged" />
+                    Enclosed
+                </label>
+                <div class="fill-anchor-radio" role="radiogroup" aria-label="Fill anchor position" title="Anchor plant position for the fill pattern. Hold Ctrl while clicking 'Fill with plants' to place the anchor on the canvas.">
+                    @{
+                        var anchor = library.Ui.FillAnchorMode;
+                        bool isUL = anchor == FillAnchorMode.UpperLeft;
+                        bool isUR = anchor == FillAnchorMode.UpperRight;
+                        bool isLL = anchor == FillAnchorMode.LowerLeft;
+                        bool isLR = anchor == FillAnchorMode.LowerRight;
+                        bool isC = anchor == FillAnchorMode.Center;
+                    }
+                    <svg viewBox="0 0 24 24" class="fill-anchor-svg" aria-hidden="true">
+                        <rect class="@(isUL ? "anchor-cell active" : "anchor-cell")" x="1" y="1" width="11" height="11" @onclick="() => OnFillAnchorModeChanged(FillAnchorMode.UpperLeft)" />
+                        <rect class="@(isUR ? "anchor-cell active" : "anchor-cell")" x="12" y="1" width="11" height="11" @onclick="() => OnFillAnchorModeChanged(FillAnchorMode.UpperRight)" />
+                        <rect class="@(isLL ? "anchor-cell active" : "anchor-cell")" x="1" y="12" width="11" height="11" @onclick="() => OnFillAnchorModeChanged(FillAnchorMode.LowerLeft)" />
+                        <rect class="@(isLR ? "anchor-cell active" : "anchor-cell")" x="12" y="12" width="11" height="11" @onclick="() => OnFillAnchorModeChanged(FillAnchorMode.LowerRight)" />
+                        <circle class="@(isC ? "anchor-center active" : "anchor-center")" cx="12" cy="12" r="5.5" @onclick="() => OnFillAnchorModeChanged(FillAnchorMode.Center)" />
+                    </svg>
+                </div>
             </div>
 
             <div class="align-toolbar align-toolbar-inline" role="toolbar" aria-label="Position controls">
