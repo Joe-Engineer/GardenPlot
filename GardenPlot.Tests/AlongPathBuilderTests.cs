@@ -242,4 +242,31 @@ public sealed class AlongPathBuilderTests
         var row1 = samples.Where(s => s.RowIndex == 1).ToList();
         Assert.NotEmpty(row1);
     }
+
+    [Fact]
+    public void BuildOffsetPolyline_OnFreehandJittery_SmoothsPerpendicularDrift()
+    {
+        // Simulate a freehand-drawn near-straight path with many short segments and small
+        // up/down vertex jitter. Without tangent smoothing the per-segment tangent would
+        // swing by ~45° at every vertex, producing offset points that wobble in Y by up to
+        // (offsetFt * sin(45°)) -- i.e. 14 ft of wobble on a 20 ft offset. With smoothing the
+        // wobble must be a small fraction of the offset.
+        var rnd = new Random(1234);
+        var path = new List<Point>();
+        for (double x = 0; x <= 30.0; x += 0.5)
+        {
+            double y = (rnd.NextDouble() - 0.5) * 0.1; // ±0.05 ft vertex jitter
+            path.Add(new Point(x, y));
+        }
+
+        const double offsetFt = 16.0;
+        var offsetPolyline = AlongPathBuilder.BuildOffsetPolyline(path, closed: false, offsetFt);
+
+        Assert.NotEmpty(offsetPolyline);
+        // Every offset point should sit close to y = +offsetFt; the maximum perpendicular
+        // deviation from the ideal must stay below ~10% of the offset distance. A naive
+        // segment-tangent implementation would blow this assertion past 5+ ft.
+        double maxDeviation = offsetPolyline.Max(p => Math.Abs(p.Y - offsetFt));
+        Assert.True(maxDeviation < 1.6, $"Offset polyline drift {maxDeviation:F3} ft exceeds 10% of {offsetFt} ft offset.");
+    }
 }

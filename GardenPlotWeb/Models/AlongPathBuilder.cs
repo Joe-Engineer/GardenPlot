@@ -34,6 +34,16 @@ public static class AlongPathBuilder
 {
     private const int SlideSubdivisions = 16;
 
+    // Fineness of the offset-polyline resampling. Half a foot is a good trade-off between
+    // smoothness on freehand paths and cost on long paths -- it produces ~40 vertices for a
+    // 20 ft path, which keeps perpendicular-direction wobble well below a plant footprint.
+    private const double OffsetPolylineSampleSpacingFt = 0.25;
+
+    // Symmetric window (each side) used when smoothing the tangent along the original path.
+    // 0.5 ft each side averages out single-segment jitter on freehand paths without smearing
+    // genuine curvature on plot-scale arcs.
+    private const double TangentSmoothHalfWindowFt = 0.5;
+
     public static IReadOnlyList<AlongPathSample> BuildSamples(
         IReadOnlyList<Point> pathPoints,
         bool closed,
@@ -69,18 +79,41 @@ public static class AlongPathBuilder
             double radius = row.WidthFt / 2.0;
             double subdivision = stride / SlideSubdivisions;
 
-            // Walk the path starting at PhaseAlong; stop after one full traversal.
-            double rowEnd = closed
-                ? row.PhaseAlongFt + totalLengthFt
-                : totalLengthFt;
+            // Build the per-row sample path. When the row has a non-zero offset we use a
+            // *resampled offset polyline* derived from the original path so plants walk along
+            // a smooth offset curve, not along the original tangent (which would wobble with
+            // every freehand vertex). For offset == 0 we use the original points directly.
+            IReadOnlyList<Point> rowPath;
+            bool rowClosed;
+            if (Math.Abs(row.OffsetFt) > 1e-9)
+            {
+                rowPath = BuildOffsetPolyline(pathPoints, closed, row.OffsetFt);
+                rowClosed = closed;
+            }
+            else
+            {
+                rowPath = pathPoints;
+                rowClosed = closed;
+            }
+
+            double rowTotalFt = PolylineSampler.TotalLengthFt(rowPath, rowClosed);
+            if (rowTotalFt <= 0)
+            {
+                continue;
+            }
+
+            // Walk the row's sample path starting at PhaseAlong.
+            double rowEnd = rowClosed
+                ? row.PhaseAlongFt + rowTotalFt
+                : rowTotalFt;
             double t = row.PhaseAlongFt;
             int indexInRow = 0;
-            int safetyLimit = (int)Math.Ceiling(totalLengthFt / Math.Max(subdivision, 1e-6)) + 4;
+            int safetyLimit = (int)Math.Ceiling(rowTotalFt / Math.Max(subdivision, 1e-6)) + 4;
             int iterations = 0;
 
             while (t <= rowEnd + 1e-9 && iterations++ < safetyLimit)
             {
-                if (TryPlaceCandidate(pathPoints, closed, totalLengthFt, t, row, radius, placedCircles, subdivision, stride, out var placedPos, out var placedAngleDeg, out double slidTo, out bool slid))
+                if (TryPlaceCandidate(rowPath, rowClosed, rowTotalFt, t, radius, placedCircles, subdivision, out var placedPos, out var placedAngleDeg, out double slidTo, out bool slid))
                 {
                     samples.Add(new AlongPathSample(
                         rowIndex,
@@ -104,15 +137,13 @@ public static class AlongPathBuilder
     }
 
     private static bool TryPlaceCandidate(
-        IReadOnlyList<Point> pathPoints,
+        IReadOnlyList<Point> rowPath,
         bool closed,
         double totalLengthFt,
         double t0,
-        AlongPathRowSpec row,
         double radius,
         IReadOnlyList<(Point Pos, double Radius)> placed,
         double subdivision,
-        double stride,
         out Point pos,
         out double angleDeg,
         out double slidTo,
@@ -132,12 +163,13 @@ public static class AlongPathBuilder
                 ? ((t % totalLengthFt) + totalLengthFt) % totalLengthFt
                 : Math.Clamp(t, 0, totalLengthFt);
 
-            var (samplePos, tangent) = PolylineSampler.SampleAt(pathPoints, wrapped, closed);
-            var candidate = ApplyPerpendicularOffset(samplePos, tangent, row.OffsetFt);
+            // Position and tangent are read directly from the row's sample path -- if it was
+            // an offset polyline, the perpendicular shift is already baked in.
+            var (samplePos, tangent) = PolylineSampler.SampleAt(rowPath, wrapped, closed);
 
-            if (!Collides(candidate, radius, placed))
+            if (!Collides(samplePos, radius, placed))
             {
-                pos = candidate;
+                pos = samplePos;
                 angleDeg = Math.Atan2(tangent.Y, tangent.X) * 180.0 / Math.PI;
                 slidTo = t;
                 slid = step > 0;
@@ -150,6 +182,53 @@ public static class AlongPathBuilder
         slidTo = t0;
         slid = false;
         return false;
+    }
+
+    /// <summary>
+    /// Builds a discrete offset polyline of <paramref name="pathPoints"/> shifted by
+    /// <paramref name="offsetFt"/> perpendicular to the smoothed local tangent. The result is
+    /// sampled at a fixed arc-length spacing so subsequent stride walking along this polyline
+    /// produces evenly-spaced samples in screen space (rather than in original-path arc-length).
+    /// </summary>
+    public static List<Point> BuildOffsetPolyline(IReadOnlyList<Point> pathPoints, bool closed, double offsetFt)
+    {
+        ArgumentNullException.ThrowIfNull(pathPoints);
+        if (pathPoints.Count < 2 || Math.Abs(offsetFt) <= 1e-9)
+        {
+            return new List<Point>(pathPoints);
+        }
+
+        double total = PolylineSampler.TotalLengthFt(pathPoints, closed);
+        if (total <= 0)
+        {
+            return new List<Point>(pathPoints);
+        }
+
+        int count = Math.Max(3, (int)Math.Ceiling(total / OffsetPolylineSampleSpacingFt));
+        // For open paths we emit count+1 samples (including both endpoints); for closed paths we
+        // emit `count` samples spanning [0, total) and rely on the caller's `closed` flag to
+        // walk the closing segment.
+        int totalSamples = closed ? count : count + 1;
+        var offsetPoints = new List<Point>(totalSamples);
+
+        for (int i = 0; i < totalSamples; i++)
+        {
+            double t = closed
+                ? (i * total) / count
+                : (i * total) / count;
+            offsetPoints.Add(OffsetPointAt(pathPoints, closed, t, offsetFt));
+        }
+
+        return offsetPoints;
+    }
+
+    private static Point OffsetPointAt(IReadOnlyList<Point> pathPoints, bool closed, double t, double offsetFt)
+    {
+        var (centerPos, _) = PolylineSampler.SampleAt(pathPoints, t, closed);
+        var (beforePos, _) = PolylineSampler.SampleAt(pathPoints, t - TangentSmoothHalfWindowFt, closed);
+        var (afterPos, _) = PolylineSampler.SampleAt(pathPoints, t + TangentSmoothHalfWindowFt, closed);
+        var smoothedTangent = new Point(afterPos.X - beforePos.X, afterPos.Y - beforePos.Y);
+        return ApplyPerpendicularOffset(centerPos, smoothedTangent, offsetFt);
     }
 
     private static Point ApplyPerpendicularOffset(Point pos, Point tangent, double offsetFt)
