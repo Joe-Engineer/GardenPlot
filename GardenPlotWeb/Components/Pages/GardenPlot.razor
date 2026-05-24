@@ -722,9 +722,9 @@ else
                     <div class="drawing-set-editor-rows">
                         <div class="drawing-set-editor-row drawing-set-editor-row-head">
                             <span>Item</span>
-                            <span title="Gap between footprint edges along the path (0 = adjacent)">Gap (ft)</span>
-                            <span title="Signed perpendicular offset from the path (- = Left of draw direction, + = Right)">Offset (ft)</span>
-                            <span title="Initial shift along the path; half a stride triangulates against an adjacent row">Phase (ft)</span>
+                            <span title="Gap between footprint edges along the path between this row's repeating plants (0 = adjacent).">Gap (ft)</span>
+                            <span title="Sideways distance from the path. Negative places this row on the Left of the draw direction, positive on the Right, zero on the centerline.">Side (ft)</span>
+                            <span title="How far along the path this row's first plant lands, measured from the start of the path.">Start (ft)</span>
                             <span></span>
                         </div>
                         @for (int i = 0; i < editingDrawingSet.Rows.Count; i++)
