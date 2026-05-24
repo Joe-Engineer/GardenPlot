@@ -302,4 +302,41 @@ public sealed class FileSystemPlotRepositoryTests : IDisposable
             m.Tags.TryGetValue("op", out var op) && (op as string) == "save-library" &&
             m.Tags.TryGetValue("outcome", out var oc) && (oc as string) == "saved");
     }
+
+    [Fact]
+    public async Task SaveLibrary_RoundTripsDrawingSets()
+    {
+        var set = new AlongPathDrawingSet
+        {
+            Name = "Bush Line 1",
+            Rows = new List<AlongPathDrawingSetRow>
+            {
+                new() { PaletteItemCode = "Cranberry (Highbush)", PaletteItemKind = PaletteKind.Bush, GapFt = 0, OffsetFt = 0, PhaseAlongFt = 0, CapturedWidthFt = 6, CapturedHeightFt = 6 },
+                new() { PaletteItemCode = "Blackberry", PaletteItemKind = PaletteKind.Bush, GapFt = 0.25, OffsetFt = -1.5, PhaseAlongFt = 1.0, CapturedWidthFt = 4, CapturedHeightFt = 4 },
+            },
+        };
+
+        var library = new PlotLibrary
+        {
+            DrawingSets = new List<AlongPathDrawingSet> { set },
+        };
+
+        await repo.SaveLibraryAsync(library);
+
+        var reloaded = await repo.LoadLibraryAsync();
+
+        Assert.NotNull(reloaded);
+        Assert.Single(reloaded!.DrawingSets);
+        var restored = reloaded.DrawingSets[0];
+        Assert.Equal(set.Id, restored.Id);
+        Assert.Equal("Bush Line 1", restored.Name);
+        Assert.Equal(2, restored.Rows.Count);
+        Assert.Equal("Cranberry (Highbush)", restored.Rows[0].PaletteItemCode);
+        Assert.Equal(PaletteKind.Bush, restored.Rows[0].PaletteItemKind);
+        Assert.Equal(6, restored.Rows[0].CapturedWidthFt);
+        Assert.Equal("Blackberry", restored.Rows[1].PaletteItemCode);
+        Assert.Equal(0.25, restored.Rows[1].GapFt);
+        Assert.Equal(-1.5, restored.Rows[1].OffsetFt);
+        Assert.Equal(1.0, restored.Rows[1].PhaseAlongFt);
+    }
 }

@@ -94,6 +94,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                     Ui = index.Ui ?? new UiPreferences(),
                     CustomPaletteItems = index.CustomPaletteItems ?? new List<PaletteItem>(),
                     CustomCatalogItems = index.CustomCatalogItems ?? new List<CatalogItem>(),
+                    DrawingSets = index.DrawingSets ?? new List<AlongPathDrawingSet>(),
                     Plots = new List<PlotData>(),
                 };
                 lib.Ui.RecentPlotSizes ??= new List<(double WidthFt, double HeightFt)>();
@@ -164,6 +165,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
                 Ui = library.Ui,
                 CustomPaletteItems = library.CustomPaletteItems,
                 CustomCatalogItems = library.CustomCatalogItems,
+                DrawingSets = library.DrawingSets,
                 Plots = new List<PlotStoreIndexEntry>(),
             };
 
@@ -391,6 +393,7 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
         index.Ui ??= new UiPreferences();
         index.Ui.RecentPlotSizes ??= new List<(double WidthFt, double HeightFt)>();
         index.CustomPaletteItems ??= new List<PaletteItem>();
+        index.DrawingSets ??= new List<AlongPathDrawingSet>();
         index.Plots ??= new List<PlotStoreIndexEntry>();
         return index;
     }
@@ -463,6 +466,8 @@ public sealed class FileSystemPlotRepository : IPlotRepository, IDisposable
         public List<PaletteItem> CustomPaletteItems { get; set; } = new();
 
         public List<CatalogItem> CustomCatalogItems { get; set; } = new();
+
+        public List<AlongPathDrawingSet> DrawingSets { get; set; } = new();
 
         public List<PlotStoreIndexEntry> Plots { get; set; } = new();
     }
