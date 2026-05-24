@@ -161,6 +161,10 @@ public partial class GardenPlot
     private bool isPasteMode;
     private double? pasteHoverX;
     private double? pasteHoverY;
+    // Set when the user Ctrl-clicks "Fill with plants"; the next canvas pointer-down
+    // places the anchor and runs the fill instead of starting a box-select.
+    private Shape? pendingFillAnchorArea;
+    private PaletteItem? pendingFillAnchorPlant;
     private double? lastCanvasX;
     private double? lastCanvasY;
     private bool showShapeContextMenu;
@@ -6157,6 +6161,16 @@ public partial class GardenPlot
 
     private async Task FillSelectedAreaWithPlantsAsync()
     {
+        await FillSelectedAreaWithPlantsAsync(ctrlForCustomAnchor: false);
+    }
+
+    private async Task FillSelectedAreaWithPlantsAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
+    {
+        await FillSelectedAreaWithPlantsAsync(ctrlForCustomAnchor: e.CtrlKey);
+    }
+
+    private async Task FillSelectedAreaWithPlantsAsync(bool ctrlForCustomAnchor)
+    {
         if (currentPlot is null || selectedItem is not { Kind: PaletteKind.Plant } plantItem)
         {
             return;
@@ -6168,16 +6182,27 @@ public partial class GardenPlot
             return;
         }
 
-        await FillAreaWithPlantAsync(area, plantItem, confirmReplacement: true, recordUndoState: true);
+        if (ctrlForCustomAnchor)
+        {
+            // Arm a one-shot canvas-click handler. The next pointer-down will set the anchor.
+            pendingFillAnchorArea = area;
+            pendingFillAnchorPlant = plantItem;
+            return;
+        }
+
+        await FillAreaWithPlantAsync(area, plantItem, confirmReplacement: true, recordUndoState: true, anchorOverride: null);
     }
 
     private async Task FillSelectedAreaWithPlantsFromMenu()
     {
-        await FillSelectedAreaWithPlantsAsync();
+        await FillSelectedAreaWithPlantsAsync(ctrlForCustomAnchor: false);
         HideShapeContextMenu();
     }
 
     private async Task<bool> FillAreaWithPlantAsync(Shape area, PaletteItem item, bool confirmReplacement, bool recordUndoState)
+        => await FillAreaWithPlantAsync(area, item, confirmReplacement, recordUndoState, anchorOverride: null);
+
+    private async Task<bool> FillAreaWithPlantAsync(Shape area, PaletteItem item, bool confirmReplacement, bool recordUndoState, Point? anchorOverride)
     {
         if (currentPlot is null)
         {
@@ -6198,7 +6223,11 @@ public partial class GardenPlot
             return false;
         }
 
-        var samplePoints = TriangulatedFill.SampleInside(polygon, item.WidthFt);
+        Point anchor = anchorOverride ?? ResolveFillAnchor(polygon, library.Ui.FillAnchorMode);
+        double insetRadius = library.Ui.FillEnclosureMode == FillEnclosureMode.FullyEnclosed
+            ? item.WidthFt / 2.0
+            : 0;
+        var samplePoints = TriangulatedFill.SampleInside(polygon, item.WidthFt, anchor, insetRadius);
         if (existingPlants.Count == 0 && samplePoints.Count == 0)
         {
             return false;
@@ -6221,6 +6250,20 @@ public partial class GardenPlot
         SelectFilledAreaRegion(area.Id);
         await SaveAsync();
         return true;
+    }
+
+    private static Point ResolveFillAnchor(IReadOnlyList<Point> polygon, FillAnchorMode mode)
+    {
+        var bounds = GroundCoverMath.PolygonBounds(polygon);
+        return mode switch
+        {
+            FillAnchorMode.UpperLeft => new Point(bounds.MinX, bounds.MinY),
+            FillAnchorMode.UpperRight => new Point(bounds.MaxX, bounds.MinY),
+            FillAnchorMode.LowerLeft => new Point(bounds.MinX, bounds.MaxY),
+            FillAnchorMode.LowerRight => new Point(bounds.MaxX, bounds.MaxY),
+            // Custom falls back to center when no override is supplied (e.g. user cancelled before clicking).
+            _ => new Point((bounds.MinX + bounds.MaxX) / 2.0, (bounds.MinY + bounds.MaxY) / 2.0),
+        };
     }
 
     private async Task<bool> ConfirmFillReplacementAsync(int existingCount)
@@ -6384,6 +6427,15 @@ public partial class GardenPlot
         switch (currentTool)
         {
             case Tool.Select:
+                if (pendingFillAnchorArea is { } pendingArea && pendingFillAnchorPlant is { } pendingPlant)
+                {
+                    var anchor = new Point(x, y);
+                    pendingFillAnchorArea = null;
+                    pendingFillAnchorPlant = null;
+                    _ = FillAreaWithPlantAsync(pendingArea, pendingPlant, confirmReplacement: true, recordUndoState: true, anchorOverride: anchor);
+                    break;
+                }
+
                 if (isPasteMode)
                 {
                     _ = PasteClipboardAt(x, y);
@@ -9256,6 +9308,24 @@ public partial class GardenPlot
     private async Task OnClipHatchPreferenceChanged(ChangeEventArgs e)
     {
         library.Ui.ShowClipHatch = e.Value is bool enabled && enabled;
+        await SaveAsync();
+    }
+
+    private async Task OnFillEnclosurePreferenceChanged(ChangeEventArgs e)
+    {
+        bool enclosed = e.Value is bool enabled && enabled;
+        library.Ui.FillEnclosureMode = enclosed ? FillEnclosureMode.FullyEnclosed : FillEnclosureMode.DrawOnEdges;
+        await SaveAsync();
+    }
+
+    private async Task OnFillAnchorModeChanged(FillAnchorMode mode)
+    {
+        if (library.Ui.FillAnchorMode == mode)
+        {
+            return;
+        }
+
+        library.Ui.FillAnchorMode = mode;
         await SaveAsync();
     }
 
