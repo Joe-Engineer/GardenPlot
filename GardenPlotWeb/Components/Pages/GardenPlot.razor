@@ -1117,13 +1117,25 @@ else
                                      stroke-dasharray="0.2,0.1" pointer-events="none" />
                             break;
                         case ShapeKind.FreeDraw:
-                            @if (buildingPolygon)
+                            @if (buildingPolygon && IsGroundCoverShape(drafting))
                             {
                                 <polygon points="@PointsString(drafting.Points)"
                                          fill="@(drafting.Fill ?? "rgba(74,124,89,0.25)")" fill-opacity="0.35"
                                          stroke="@(drafting.Stroke ?? "#2f5a3a")" stroke-width="0.08"
                                          stroke-dasharray="0.2,0.1" pointer-events="none" />
                                 @foreach (var p in drafting.Points.Take(drafting.Points.Count - 1))
+                                {
+                                    <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.08"
+                                            fill="#fff" stroke="#2f5a3a" stroke-width="0.04" pointer-events="none" />
+                                }
+                            }
+                            else if (buildingPolygon)
+                            {
+                                <polyline points="@PointsString(drafting.Points)"
+                                          fill="none" stroke="#2f5a3a" stroke-width="0.08"
+                                          stroke-linecap="round" stroke-linejoin="round"
+                                          stroke-dasharray="0.2,0.1" pointer-events="none" />
+                                @foreach (var p in drafting.Points.Take(Math.Max(0, drafting.Points.Count - 1)))
                                 {
                                     <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.08"
                                             fill="#fff" stroke="#2f5a3a" stroke-width="0.04" pointer-events="none" />
