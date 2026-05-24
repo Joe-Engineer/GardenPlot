@@ -5590,7 +5590,7 @@ public partial class GardenPlot
             return null;
         }
 
-        return row.PaletteItemKind switch
+        PaletteItem? FromBuiltins() => row.PaletteItemKind switch
         {
             PaletteKind.Tree => PaletteCatalog.Trees.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.Bush => PaletteCatalog.Bushes.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
@@ -5604,6 +5604,20 @@ public partial class GardenPlot
             PaletteKind.CustomTile => null,
             _ => null,
         };
+
+        // Fall back to library-scoped custom palette items (user-defined plants, trees, etc.).
+        // Without this, a Drawing Set captured from a selection of custom plants would silently
+        // drop the corresponding row at apply time.
+        PaletteItem? FromCustom() => library.CustomPaletteItems
+            .FirstOrDefault(p => p.Kind == row.PaletteItemKind
+                && string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase));
+
+        // Last-ditch: match by code alone (kind-agnostic) so a Plant captured from a custom item
+        // that was later re-typed as e.g. Bush still resolves rather than silently disappearing.
+        PaletteItem? FromCustomByCodeOnly() => library.CustomPaletteItems
+            .FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase));
+
+        return FromBuiltins() ?? FromCustom() ?? FromCustomByCodeOnly();
     }
 
     private async Task GroupSelectedItems()
