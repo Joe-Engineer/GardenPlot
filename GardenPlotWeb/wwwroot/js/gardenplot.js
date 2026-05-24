@@ -35,6 +35,43 @@ export function setViewCenterFt(wrapEl, svgEl, pxPerFt, zoom, xFt, yFt) {
     wrapEl.scrollTop += ((yFt - current.y) * scale);
 }
 
+// Pushes the visible scroll window of the canvas back to Blazor so the render
+// path can cull off-screen shapes. Reports raw px values; C# applies its own
+// zoom + viewBox offset to convert to plot-feet.
+export function attachViewport(wrapEl, dotnetRef) {
+    if (!wrapEl) return { dispose: () => { } };
+
+    let pending = false;
+    const push = () => {
+        pending = false;
+        dotnetRef.invokeMethodAsync(
+            'OnViewportFromJs',
+            wrapEl.scrollLeft,
+            wrapEl.scrollTop,
+            wrapEl.clientWidth,
+            wrapEl.clientHeight);
+    };
+    const schedule = () => {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(push);
+    };
+
+    // Initial sync so culling kicks in before the user pans.
+    schedule();
+
+    wrapEl.addEventListener('scroll', schedule, { passive: true });
+    const resizeObserver = new ResizeObserver(schedule);
+    resizeObserver.observe(wrapEl);
+
+    return {
+        dispose: () => {
+            wrapEl.removeEventListener('scroll', schedule);
+            resizeObserver.disconnect();
+        },
+    };
+}
+
 // Captures the pointer to el so subsequent pointermove/up events fire on el
 // regardless of where the cursor moves. Used for floating-panel dragging.
 export function capturePointer(el, pointerId) {

@@ -921,10 +921,11 @@ else
                 }
                 @if (!IsConceptMode && plantList.Count > 0)
                 {
+                    var spacingStatuses = GetPlantSpacingStatuses(plantList);
                     <g pointer-events="none">
                         @foreach (var p in plantList)
                         {
-                            var status = ComputeSpacingStatus(p, plantList);
+                            var status = spacingStatuses.TryGetValue(p.Id, out var st) ? st : "good";
                             var pcx = p.X + p.W / 2;
                             var pcy = p.Y + p.H / 2;
                             @((MarkupString)PlantRendering.SpacingRingsSvg(pcx, pcy, p.W, status))
@@ -1319,7 +1320,8 @@ else
                                     case ShapeKind.Plant:
                                         @if (!IsFocalPointTrait(s.Trait))
                                         {
-                                            @((MarkupString)PlantRendering.SpacingRingsSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, "good"))
+                                            var ghostStatus = ComputeSpacingStatus(s, plantList);
+                                            @((MarkupString)PlantRendering.SpacingRingsSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, ghostStatus))
                                         }
                                         @((MarkupString)PlantRendering.PlantSpriteSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, s.Trait))
                                         break;

@@ -266,7 +266,88 @@ public partial class GardenPlot
 
     private bool IsShapeVisible(Shape shape)
     {
-        return currentPlot is not null && LayerResolver.IsVisible(currentPlot, shape, ResolveLayerCatalogItem(shape));
+        if (currentPlot is null)
+        {
+            return false;
+        }
+
+        if (!LayerResolver.IsVisible(currentPlot, shape, ResolveLayerCatalogItem(shape)))
+        {
+            return false;
+        }
+
+        // Viewport culling: skip shapes whose AABB is fully outside the visible scroll window.
+        // While the in-progress draft is on screen we always include it.
+        return IsShapeInViewport(shape);
+    }
+
+    private bool IsShapeInViewport(Shape shape)
+    {
+        if (viewportScrollLeftPx is not double scrollLeft
+            || viewportScrollTopPx is not double scrollTop
+            || viewportClientWidthPx is not double clientWidth
+            || viewportClientHeightPx is not double clientHeight
+            || clientWidth <= 0 || clientHeight <= 0)
+        {
+            return true;
+        }
+
+        double scale = PxPerFt * zoom;
+        if (scale <= 0)
+        {
+            return true;
+        }
+
+        double minXFt = (scrollLeft / scale) + CanvasViewBoxXFt;
+        double minYFt = (scrollTop / scale) + CanvasViewBoxYFt;
+        double maxXFt = ((scrollLeft + clientWidth) / scale) + CanvasViewBoxXFt;
+        double maxYFt = ((scrollTop + clientHeight) / scale) + CanvasViewBoxYFt;
+
+        // Expand by one tile-width so labels, halos and stroke widths near the edge aren't clipped.
+        const double marginFt = 5;
+        minXFt -= marginFt; minYFt -= marginFt;
+        maxXFt += marginFt; maxYFt += marginFt;
+
+        var (sMinX, sMinY, sMaxX, sMaxY) = ShapeAabb(shape);
+        return sMinX <= maxXFt && sMaxX >= minXFt && sMinY <= maxYFt && sMaxY >= minYFt;
+    }
+
+    private static (double minX, double minY, double maxX, double maxY) ShapeAabb(Shape shape)
+    {
+        if (shape.Points is { Count: > 0 } pts)
+        {
+            double minX = double.PositiveInfinity, minY = double.PositiveInfinity;
+            double maxX = double.NegativeInfinity, maxY = double.NegativeInfinity;
+            for (int i = 0; i < pts.Count; i++)
+            {
+                var p = pts[i];
+                if (p.X < minX) minX = p.X;
+                if (p.Y < minY) minY = p.Y;
+                if (p.X > maxX) maxX = p.X;
+                if (p.Y > maxY) maxY = p.Y;
+            }
+            if (double.IsFinite(minX))
+            {
+                return (minX, minY, maxX, maxY);
+            }
+        }
+
+        double x1 = Math.Min(shape.X, shape.X + shape.W);
+        double y1 = Math.Min(shape.Y, shape.Y + shape.H);
+        double x2 = Math.Max(shape.X, shape.X + shape.W);
+        double y2 = Math.Max(shape.Y, shape.Y + shape.H);
+        return (x1, y1, x2, y2);
+    }
+
+    [JSInvokable]
+    public Task OnViewportFromJs(double scrollLeft, double scrollTop, double clientWidth, double clientHeight)
+    {
+        viewportScrollLeftPx = scrollLeft;
+        viewportScrollTopPx = scrollTop;
+        viewportClientWidthPx = clientWidth;
+        viewportClientHeightPx = clientHeight;
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private bool CanSelectShape(Shape shape)
@@ -2239,6 +2320,14 @@ public partial class GardenPlot
     private DotNetObjectReference<GardenPlot>? dotnetRef;
     private IJSObjectReference? wheelHandle;
     private IJSObjectReference? gestureHandle;
+    private IJSObjectReference? viewportHandle;
+
+    // Latest scroll-window dimensions pushed from JS (in CSS px on the wrapEl).
+    // Null until the first attachViewport callback fires; null disables culling.
+    private double? viewportScrollLeftPx;
+    private double? viewportScrollTopPx;
+    private double? viewportClientWidthPx;
+    private double? viewportClientHeightPx;
 
     // Floating-panel drag state
     private string? draggingPanel;
@@ -3156,6 +3245,7 @@ public partial class GardenPlot
                         {
                             wheelHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachWheel", canvasRef, dotnetRef);
                             gestureHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachTouchGestures", canvasRef, wrapRef, dotnetRef);
+                            viewportHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachViewport", wrapRef, dotnetRef);
                         }
 
                         // If startup load was non-authoritative due a transient circuit disconnect,
@@ -3232,6 +3322,18 @@ public partial class GardenPlot
                 {
                     dotnetRef ??= DotNetObjectReference.Create(this);
                     gestureHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachTouchGestures", canvasRef, wrapRef, dotnetRef);
+                }
+                catch
+                {
+                    // ignore; will retry next render
+                }
+            }
+            if (viewportHandle is null && !isDisposingOrDisposed)
+            {
+                try
+                {
+                    dotnetRef ??= DotNetObjectReference.Create(this);
+                    viewportHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachViewport", wrapRef, dotnetRef);
                 }
                 catch
                 {
@@ -3662,6 +3764,8 @@ public partial class GardenPlot
         try { if (wheelHandle is not null) await wheelHandle.DisposeAsync(); } catch { }
         try { if (gestureHandle is not null) await gestureHandle.InvokeVoidAsync("dispose"); } catch { }
         try { if (gestureHandle is not null) await gestureHandle.DisposeAsync(); } catch { }
+        try { if (viewportHandle is not null) await viewportHandle.InvokeVoidAsync("dispose"); } catch { }
+        try { if (viewportHandle is not null) await viewportHandle.DisposeAsync(); } catch { }
         try { if (jsModule is not null) await jsModule.DisposeAsync(); } catch { }
         rotationShiftHintCts?.Cancel();
         rotationShiftHintCts?.Dispose();
@@ -4868,6 +4972,25 @@ public partial class GardenPlot
         || string.Equals(s.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase);
 
     private PaletteItem? ResolveLayerCatalogItem(Shape shape)
+    {
+        // PaletteCatalog.* lists are static, so once we resolve a (Kind, Label, GroundCoverCode,
+        // IsGroundCoverSurface) tuple to a PaletteItem we can reuse it forever. Hot paths like
+        // IsShapeVisible / CanSelectShape call this per shape per render, so the linear FirstOrDefault
+        // scans below dominate render cost when a plot has many plants.
+        var cacheKey = (shape.Kind, shape.Label, shape.GroundCoverCode, shape.IsGroundCoverSurface);
+        if (layerCatalogItemCache.TryGetValue(cacheKey, out var cached))
+        {
+            return cached;
+        }
+
+        PaletteItem? resolved = ResolveLayerCatalogItemUncached(shape);
+        layerCatalogItemCache[cacheKey] = resolved;
+        return resolved;
+    }
+
+    private readonly Dictionary<(ShapeKind kind, string? label, string? gcCode, bool isGcSurface), PaletteItem?> layerCatalogItemCache = new();
+
+    private PaletteItem? ResolveLayerCatalogItemUncached(Shape shape)
     {
         if (!string.IsNullOrWhiteSpace(shape.GroundCoverCode))
         {
@@ -9015,6 +9138,43 @@ public partial class GardenPlot
         if (worst <= 0.0001) return "good";
         if (worst < 0.5)     return "partial";
         return "crowded";
+    }
+
+    // Plant spacing statuses depend only on the plant set, not on cursor/zoom/etc. The render path
+    // runs on every pointer-move; recomputing this O(N^2) overlay each time makes the ghost lag
+    // behind the mouse on densely-planted beds. Cache the result and only rebuild when the plant
+    // set's fingerprint changes (count + per-plant Id/X/Y/W hash).
+    private Dictionary<Guid, string>? plantSpacingStatusesCache;
+    private long plantSpacingStatusesCacheKey;
+
+    private Dictionary<Guid, string> GetPlantSpacingStatuses(IReadOnlyList<Shape> plants)
+    {
+        long key = 17;
+        for (int i = 0; i < plants.Count; i++)
+        {
+            var p = plants[i];
+            key = unchecked((key * 31) ^ p.Id.GetHashCode());
+            key = unchecked((key * 31) ^ BitConverter.DoubleToInt64Bits(p.X));
+            key = unchecked((key * 31) ^ BitConverter.DoubleToInt64Bits(p.Y));
+            key = unchecked((key * 31) ^ BitConverter.DoubleToInt64Bits(p.W));
+        }
+
+        if (plantSpacingStatusesCache is { } cached
+            && plantSpacingStatusesCacheKey == key
+            && cached.Count == plants.Count)
+        {
+            return cached;
+        }
+
+        var result = new Dictionary<Guid, string>(plants.Count);
+        foreach (var p in plants)
+        {
+            result[p.Id] = ComputeSpacingStatus(p, plants);
+        }
+
+        plantSpacingStatusesCache = result;
+        plantSpacingStatusesCacheKey = key;
+        return result;
     }
 
     /// <summary>Plants within 2x the selected plant's spacing distance, sorted by distance.</summary>
