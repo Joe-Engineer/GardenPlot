@@ -82,7 +82,7 @@ public partial class GardenPlot
     private double PlotWidthFt => currentPlot?.WidthFt ?? DefaultPlotWidthFt;
     private double PlotHeightFt => currentPlot?.HeightFt ?? DefaultPlotHeightFt;
 
-    private enum Tool { Select, FreeDraw, Edge, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover }
+    private enum Tool { Select, FreeDraw, Edge, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover, Polyline }
     private enum NewPlotDialogStep { ImageFirst, Configure }
     private enum DropActivationMode { ClickToggle, HoldKey }
     private enum DropModifierKey { Shift, Ctrl, Alt }
@@ -107,8 +107,8 @@ public partial class GardenPlot
     private readonly Dictionary<string, Tool> tools = new()
     {
         ["Select"] = Tool.Select,
+        ["Polyline"] = Tool.Polyline,
         ["Free Draw"] = Tool.FreeDraw,
-        ["Edge"] = Tool.Edge,
         ["Rectangle"] = Tool.Rectangle,
         ["Oval"] = Tool.Oval,
         ["Ruler"] = Tool.Ruler,
@@ -4509,6 +4509,12 @@ public partial class GardenPlot
             buildingPolygon = false;
         }
 
+        if (t != Tool.Polyline && buildingPolygon && drafting?.Kind == ShapeKind.FreeDraw && !IsGroundCoverShape(drafting))
+        {
+            drafting = null;
+            buildingPolygon = false;
+        }
+
         if (t != Tool.Select)
         {
             isPasteMode = false;
@@ -6454,6 +6460,23 @@ public partial class GardenPlot
                 drafting = new Shape { Kind = ShapeKind.FreeDraw };
                 drafting.Points.Add(new Point(x, y));
                 break;
+            case Tool.Polyline:
+                // Click-by-vertex open path. First click anchors the start AND a trailing
+                // cursor-tracking endpoint; later clicks commit the previous endpoint and
+                // append a new tracker. Double-click finalizes (see OnCanvasDoubleClick).
+                if (drafting is null || drafting.Kind != ShapeKind.FreeDraw || !buildingPolygon)
+                {
+                    drafting = new Shape { Kind = ShapeKind.FreeDraw };
+                    drafting.Points.Add(new Point(x, y));
+                    drafting.Points.Add(new Point(x, y));
+                    buildingPolygon = true;
+                }
+                else
+                {
+                    drafting.Points[^1] = new Point(x, y);
+                    drafting.Points.Add(new Point(x, y));
+                }
+                break;
             case Tool.Edge when selectedAssembly is { } edgeAssembly && string.Equals(edgeAssembly.TargetKind, "Edge", StringComparison.OrdinalIgnoreCase):
                 {
                     PaletteItem? previewItem = ResolveAssemblyPreviewItem(edgeAssembly);
@@ -7673,7 +7696,7 @@ public partial class GardenPlot
             }
         }
 
-        if (drafting.Points.Count >= 3)
+        if (drafting.Points.Count >= 3 || (drafting.Points.Count >= 2 && !IsGroundCoverShape(drafting)))
         {
             RecordUndoState();
             currentPlot.Shapes.Add(drafting);
