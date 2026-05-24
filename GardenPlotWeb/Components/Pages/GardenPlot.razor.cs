@@ -158,6 +158,13 @@ public partial class GardenPlot
     private readonly Stack<PlotUndoSnapshot> undoStack = new();
     private double? pasteAnchorX;
     private double? pasteAnchorY;
+
+    // When set, the next Along-path application uses this Drawing Set (multi-row) instead of
+    // the currently picked single PaletteItem. Cleared when a regular palette item is picked.
+    private Guid? selectedDrawingSetId;
+    // Per-row edit state for the Drawing Set editor dialog (null when dialog is closed).
+    private AlongPathDrawingSet? editingDrawingSet;
+    private string editingDrawingSetName = string.Empty;
     private bool isPasteMode;
     private double? pasteHoverX;
     private double? pasteHoverY;
@@ -5525,7 +5532,7 @@ public partial class GardenPlot
 
     private async Task PlaceSelectedItemAlongPath()
     {
-        if (currentPlot is null || selectedItem is not { } item || !IsStampablePaletteItem(item))
+        if (currentPlot is null)
         {
             return;
         }
@@ -5536,19 +5543,67 @@ public partial class GardenPlot
             return;
         }
 
-        var placement = BuildAlongPathPlacement(item, sourcePath, assignNewIds: true);
-        if (placement.Group is null || placement.Shapes.Count == 0)
+        StampPlacement placement;
+        var drawingSet = GetSelectedDrawingSet();
+        if (drawingSet is not null && drawingSet.Rows.Count > 0)
+        {
+            var resolved = new List<(PaletteItem Item, AlongPathRowSpec Spec)>(drawingSet.Rows.Count);
+            foreach (var row in drawingSet.Rows)
+            {
+                var item = ResolvePaletteItemForRow(row);
+                if (item is null) continue;
+                resolved.Add((item, new AlongPathRowSpec(item.WidthFt, row.GapFt, row.OffsetFt, row.PhaseAlongFt)));
+            }
+            if (resolved.Count == 0) return;
+            placement = BuildAlongPathPlacementForRows(resolved, sourcePath, assignNewIds: true);
+        }
+        else if (selectedItem is { } item && IsStampablePaletteItem(item))
+        {
+            placement = BuildAlongPathPlacement(item, sourcePath, assignNewIds: true);
+        }
+        else
+        {
+            return;
+        }
+
+        if (placement.Groups.Count == 0 || placement.Shapes.Count == 0)
         {
             return;
         }
 
         RecordUndoState();
         currentPlot.Shapes.AddRange(placement.Shapes);
-        currentPlot.DropGroups.RemoveAll(g => g.Id == placement.Group.Id);
-        currentPlot.DropGroups.Add(placement.Group);
+        foreach (var group in placement.Groups)
+        {
+            currentPlot.DropGroups.RemoveAll(g => g.Id == group.Id);
+            currentPlot.DropGroups.Add(group);
+        }
         selectedIds.Clear();
         selectedIds.AddRange(placement.Shapes.Select(shape => shape.Id));
         await SaveAsync();
+    }
+
+    private PaletteItem? ResolvePaletteItemForRow(AlongPathDrawingSetRow row)
+    {
+        if (string.IsNullOrWhiteSpace(row.PaletteItemCode))
+        {
+            return null;
+        }
+
+        return row.PaletteItemKind switch
+        {
+            PaletteKind.Tree => PaletteCatalog.Trees.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.Bush => PaletteCatalog.Bushes.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.Plant => PaletteCatalog.Plants.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.FocalPoint => PaletteCatalog.FocalPoints.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.SoilMarker => PaletteCatalog.SoilMarkers.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.BedKit => null,
+            PaletteKind.Edging => null,
+            PaletteKind.GroundCover => null,
+            PaletteKind.GroundCoverSurface => null,
+            PaletteKind.CustomTile => null,
+            _ => null,
+        };
     }
 
     private async Task GroupSelectedItems()
@@ -6002,15 +6057,208 @@ public partial class GardenPlot
         => selectedItem?.Kind == PaletteKind.FocalPoint ? DropPattern.One : IsMultiDropActive(shift, ctrl, alt) ? dropPattern : DropPattern.One;
 
     private bool CanPlaceAlongPath
-        => selectedItem is not null
-           && IsStampablePaletteItem(selectedItem)
-           && GetSelectedAlongPathSourceShape() is not null;
+        => (selectedItem is not null && IsStampablePaletteItem(selectedItem) && GetSelectedAlongPathSourceShape() is not null)
+           || (GetSelectedDrawingSet() is not null && GetSelectedAlongPathSourceShape() is not null);
+
+    private AlongPathDrawingSet? GetSelectedDrawingSet()
+        => selectedDrawingSetId is { } id
+            ? library.DrawingSets.FirstOrDefault(s => s.Id == id)
+            : null;
+
+    private bool CanCreateDrawingSetFromSelection
+        => currentPlot is not null
+           && selectedIds.Count >= 1
+           && currentPlot.Shapes.Any(s => selectedIds.Contains(s.Id) && IsCapturableAsDrawingSetRow(s));
+
+    private static bool IsCapturableAsDrawingSetRow(Shape s)
+        => s.Kind is ShapeKind.Plant or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.SoilMarker
+           && !string.IsNullOrWhiteSpace(s.Label);
+
+    private static PaletteKind ResolveCaptureKind(ShapeKind kind) => kind switch
+    {
+        ShapeKind.Tree => PaletteKind.Tree,
+        ShapeKind.Bush => PaletteKind.Bush,
+        ShapeKind.Plant => PaletteKind.Plant,
+        ShapeKind.SoilMarker => PaletteKind.SoilMarker,
+        _ => PaletteKind.Plant,
+    };
+
+    /// <summary>
+    /// Captures the currently selected shapes as a new Drawing Set. The longest principal axis of
+    /// the selection's bounding box is treated as the seed-path; per-item perpendicular distance
+    /// from that axis becomes each row's offset, with the sign convention matching the toolbar
+    /// (- = Left, + = Right). Items are ordered along the path by their projection.
+    /// </summary>
+    private async Task CreateDrawingSetFromSelectionAsync()
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        var captured = currentPlot.Shapes
+            .Where(s => selectedIds.Contains(s.Id) && IsCapturableAsDrawingSetRow(s))
+            .ToList();
+        if (captured.Count == 0)
+        {
+            return;
+        }
+
+        // Pick the longest of width vs height as the seed axis. If width >= height the seed-path
+        // direction is +X; otherwise +Y. The perpendicular sign convention (Left=-, Right=+)
+        // matches the directed-tangent rotation in AlongPathBuilder.
+        double minX = captured.Min(s => s.X);
+        double maxX = captured.Max(s => s.X + s.W);
+        double minY = captured.Min(s => s.Y);
+        double maxY = captured.Max(s => s.Y + s.H);
+        double extentX = maxX - minX;
+        double extentY = maxY - minY;
+        bool axisX = extentX >= extentY;
+        double axisCenter = axisX ? (minY + maxY) / 2.0 : (minX + maxX) / 2.0;
+        double axisStart = axisX ? minX : minY;
+
+        // Order along the path by projection onto the seed axis.
+        var ordered = captured
+            .Select(s => new
+            {
+                Shape = s,
+                CenterX = s.X + (s.W / 2.0),
+                CenterY = s.Y + (s.H / 2.0),
+            })
+            .Select(t => new
+            {
+                t.Shape,
+                t.CenterX,
+                t.CenterY,
+                Along = axisX ? t.CenterX - axisStart : t.CenterY - axisStart,
+                Perp = axisX ? t.CenterY - axisCenter : t.CenterX - axisCenter,
+            })
+            .OrderBy(t => t.Along)
+            .ToList();
+
+        var rows = new List<AlongPathDrawingSetRow>(ordered.Count);
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            var t = ordered[i];
+            var phaseAlong = t.Along - ordered[0].Along;
+            rows.Add(new AlongPathDrawingSetRow
+            {
+                PaletteItemCode = t.Shape.Label ?? string.Empty,
+                PaletteItemKind = ResolveCaptureKind(t.Shape.Kind),
+                GapFt = 0,
+                OffsetFt = Math.Round(t.Perp, 3),
+                PhaseAlongFt = Math.Round(phaseAlong, 3),
+            });
+        }
+
+        var set = new AlongPathDrawingSet
+        {
+            Name = $"Drawing set {library.DrawingSets.Count + 1}",
+            Rows = rows,
+        };
+        RecordUndoState();
+        library.DrawingSets.Add(set);
+        selectedDrawingSetId = set.Id;
+        library.Ui.LastAlongPathDrawingSetId = set.Id;
+        // Picking a Drawing Set replaces any currently picked single-item; clear so the next
+        // Along-path uses the set.
+        selectedItem = null;
+        OpenDrawingSetEditor(set);
+        await SaveAsync();
+    }
+
+    private void OpenDrawingSetEditor(AlongPathDrawingSet set)
+    {
+        editingDrawingSet = set;
+        editingDrawingSetName = set.Name;
+    }
+
+    private void CloseDrawingSetEditor()
+    {
+        editingDrawingSet = null;
+        editingDrawingSetName = string.Empty;
+    }
+
+    private async Task SaveDrawingSetEditorAsync()
+    {
+        if (editingDrawingSet is null)
+        {
+            return;
+        }
+
+        editingDrawingSet.Name = string.IsNullOrWhiteSpace(editingDrawingSetName)
+            ? editingDrawingSet.Name
+            : editingDrawingSetName.Trim();
+        CloseDrawingSetEditor();
+        await SaveAsync();
+    }
+
+    private async Task DeleteEditingDrawingSetAsync()
+    {
+        if (editingDrawingSet is null)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        var id = editingDrawingSet.Id;
+        library.DrawingSets.RemoveAll(s => s.Id == id);
+        if (selectedDrawingSetId == id) selectedDrawingSetId = null;
+        if (library.Ui.LastAlongPathDrawingSetId == id) library.Ui.LastAlongPathDrawingSetId = null;
+        CloseDrawingSetEditor();
+        await SaveAsync();
+    }
+
+    private void SelectDrawingSet(AlongPathDrawingSet set)
+    {
+        selectedDrawingSetId = set.Id;
+        library.Ui.LastAlongPathDrawingSetId = set.Id;
+        selectedItem = null;
+    }
+
+    private async Task OnDrawingSetRowFieldChangedAsync()
+    {
+        await SaveAsync();
+    }
+
+    private async Task RemoveDrawingSetRowAsync(int index)
+    {
+        if (editingDrawingSet is null || index < 0 || index >= editingDrawingSet.Rows.Count)
+        {
+            return;
+        }
+        editingDrawingSet.Rows.RemoveAt(index);
+        await SaveAsync();
+    }
 
     private static bool IsStampablePaletteItem(PaletteItem item)
         => item.Kind is not PaletteKind.GroundCover and not PaletteKind.GroundCoverSurface;
 
     private static bool IsPathShape(Shape shape)
-        => shape.Kind == ShapeKind.Ruler || (shape.Kind == ShapeKind.FreeDraw && !IsGroundCoverShape(shape));
+    {
+        if (shape is null)
+        {
+            return false;
+        }
+
+        return shape.Kind switch
+        {
+            ShapeKind.Ruler => shape.Points is { Count: >= 2 },
+            ShapeKind.FreeDraw => !IsGroundCoverShape(shape) && shape.Points is { Count: >= 2 },
+            ShapeKind.Rectangle => !IsGroundCoverShape(shape) && shape.W > 0 && shape.H > 0,
+            ShapeKind.Oval => !IsGroundCoverShape(shape) && shape.W > 0 && shape.H > 0,
+            _ => false,
+        };
+    }
+
+    private static (IReadOnlyList<Point> Points, bool Closed) ResolvePathPoints(Shape shape)
+        => PathGeometry.ResolvePath(shape);
+
+    private static double TotalPathLengthFt(Shape shape)
+    {
+        var (points, closed) = ResolvePathPoints(shape);
+        return PolylineSampler.TotalLengthFt(points, closed);
+    }
 
     private Shape? GetSelectedAlongPathSourceShape()
     {
@@ -6020,7 +6268,7 @@ public partial class GardenPlot
         }
 
         var shape = currentPlot.Shapes.FirstOrDefault(s => s.Id == selectedIds[0]);
-        return shape is not null && IsPathShape(shape) && PolylineSampler.TotalLengthFt(shape.Points) > 0
+        return shape is not null && IsPathShape(shape) && TotalPathLengthFt(shape) > 0
             ? shape
             : null;
     }
@@ -6040,7 +6288,7 @@ public partial class GardenPlot
 
     private double GetAlongPathSourceLengthFt(DropGroup group)
         => GetAlongPathSourceShape(group) is { } source
-            ? PolylineSampler.TotalLengthFt(source.Points)
+            ? TotalPathLengthFt(source)
             : 0;
 
     private static ShapeKind ShapeKindFromPalette(PaletteItem item) => item.Kind switch
@@ -6079,7 +6327,19 @@ public partial class GardenPlot
     private sealed class StampPlacement
     {
         public List<Shape> Shapes { get; init; } = new();
-        public DropGroup? Group { get; init; }
+
+        /// <summary>
+        /// The legacy single-group accessor. Most stamp patterns produce exactly one DropGroup;
+        /// the Along-path drawing-set path produces one per row -- those are stored in <see cref="Groups"/>.
+        /// </summary>
+        public DropGroup? Group
+        {
+            get => Groups.Count > 0 ? Groups[0] : null;
+            init { if (value is not null) { Groups.Add(value); } }
+        }
+
+        /// <summary>All DropGroups produced by this placement (one for single-group patterns; N for multi-row).</summary>
+        public List<DropGroup> Groups { get; init; } = new();
     }
 
     private static double EffectiveAlongPathSpacingFt(DropGroup group, double defaultSpacingFt)
@@ -6134,31 +6394,89 @@ public partial class GardenPlot
 
     private StampPlacement BuildAlongPathPlacement(PaletteItem item, Shape sourcePath, bool assignNewIds)
     {
-        var group = new DropGroup
-        {
-            Pattern = DropPattern.AlongPath,
-            Rotation = stampRotation,
-            SourcePathShapeId = sourcePath.Id,
-            Anchor = AlongPathAnchor.Start,
-            AlignToTangent = true,
-            CenterSpacingYFt = item.HeightFt,
-        };
-
-        var shapes = BuildAlongPathShapes(
-            group,
+        var spec = new AlongPathRowSpec(
+            WidthFt: item.WidthFt,
+            GapFt: 0,
+            OffsetFt: library.Ui.AlongPathOffsetFt,
+            PhaseAlongFt: 0);
+        return BuildAlongPathPlacementForRows(
+            new (PaletteItem Item, AlongPathRowSpec Spec)[] { (item, spec) },
             sourcePath,
-            item.WidthFt,
-            (position, rotation, index) =>
-            {
-                var shape = BuildStampShapeAt(item, position.X, position.Y, rotation, group.Id, index);
-                if (!assignNewIds)
-                {
-                    shape.Id = Guid.Empty;
-                }
+            assignNewIds);
+    }
 
-                return shape;
-            });
-        return new StampPlacement { Shapes = shapes, Group = group };
+    private StampPlacement BuildAlongPathPlacementForRows(
+        IReadOnlyList<(PaletteItem Item, AlongPathRowSpec Spec)> rows,
+        Shape sourcePath,
+        bool assignNewIds)
+    {
+        var (points, closed) = ResolvePathPoints(sourcePath);
+        if (points.Count < 2 || rows.Count == 0)
+        {
+            return new StampPlacement();
+        }
+
+        var specs = new AlongPathRowSpec[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+        {
+            specs[i] = rows[i].Spec;
+        }
+
+        var samples = AlongPathBuilder.BuildSamples(points, closed, specs, alignToTangent: true);
+        if (samples.Count == 0)
+        {
+            return new StampPlacement();
+        }
+
+        // One DropGroup per row, anchored at the row's first placed sample. Existing along-path
+        // tools work group-by-group (move / resize / reflow), so per-row grouping keeps those
+        // operations intact for layered borders.
+        var groups = new DropGroup[rows.Count];
+        var groupIndices = new int[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+        {
+            groups[i] = new DropGroup
+            {
+                Pattern = DropPattern.AlongPath,
+                Rotation = stampRotation,
+                SourcePathShapeId = sourcePath.Id,
+                Anchor = AlongPathAnchor.Start,
+                AlignToTangent = true,
+                CenterSpacingYFt = rows[i].Item.HeightFt,
+                CenterSpacingXFt = rows[i].Spec.WidthFt + rows[i].Spec.GapFt,
+                OffsetIn = rows[i].Spec.OffsetFt * 12.0,
+            };
+        }
+
+        var shapes = new List<Shape>(samples.Count);
+        foreach (var s in samples)
+        {
+            var (item, _) = rows[s.RowIndex];
+            var group = groups[s.RowIndex];
+            int index = groupIndices[s.RowIndex]++;
+            var shape = BuildStampShapeAt(item, s.Pos.X, s.Pos.Y, s.AngleDeg, group.Id, index);
+            if (!assignNewIds)
+            {
+                shape.Id = Guid.Empty;
+            }
+            shapes.Add(shape);
+            if (index == 0)
+            {
+                group.AnchorCenterX = s.Pos.X;
+                group.AnchorCenterY = s.Pos.Y;
+            }
+            group.ItemCount = index + 1;
+        }
+
+        var placement = new StampPlacement { Shapes = shapes };
+        for (int i = 0; i < groups.Length; i++)
+        {
+            if (groupIndices[i] > 0)
+            {
+                placement.Groups.Add(groups[i]);
+            }
+        }
+        return placement;
     }
 
     private List<Shape> RebuildAlongPathShapes(DropGroup group, Shape sourcePath, Shape template)
@@ -6844,10 +7162,13 @@ public partial class GardenPlot
                     currentPlot.Shapes.Add(shape);
                 }
 
-                if (placement.Group is not null)
+                if (placement.Groups.Count > 0)
                 {
-                    currentPlot.DropGroups.RemoveAll(g => g.Id == placement.Group.Id);
-                    currentPlot.DropGroups.Add(placement.Group);
+                    foreach (var group in placement.Groups)
+                    {
+                        currentPlot.DropGroups.RemoveAll(g => g.Id == group.Id);
+                        currentPlot.DropGroups.Add(group);
+                    }
                     selectedIds.Clear();
                     selectedIds.AddRange(placement.Shapes.Select(z => z.Id));
                     DropIneligibleSelection();
@@ -9498,6 +9819,40 @@ public partial class GardenPlot
     {
         bool enclosed = e.Value is bool enabled && enabled;
         library.Ui.FillEnclosureMode = enclosed ? FillEnclosureMode.FullyEnclosed : FillEnclosureMode.DrawOnEdges;
+        await SaveAsync();
+    }
+
+    private async Task OnAlongPathSideChanged(ChangeEventArgs e)
+    {
+        if (e.Value is not string raw || !Enum.TryParse<AlongPathSide>(raw, ignoreCase: true, out var side))
+        {
+            return;
+        }
+
+        library.Ui.AlongPathSide = side;
+        // Side drives the sign of the persisted Offset; magnitude stays the same.
+        double magnitude = Math.Abs(library.Ui.AlongPathOffsetFt);
+        library.Ui.AlongPathOffsetFt = side switch
+        {
+            AlongPathSide.Left => -magnitude,
+            AlongPathSide.Right => magnitude,
+            _ => 0,
+        };
+        await SaveAsync();
+    }
+
+    private async Task OnAlongPathToolbarOffsetChanged(ChangeEventArgs e)
+    {
+        if (!double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var ft))
+        {
+            return;
+        }
+
+        library.Ui.AlongPathOffsetFt = ft;
+        // Keep Side in sync with the entered sign so the dropdown reflects reality.
+        library.Ui.AlongPathSide = ft < 0
+            ? AlongPathSide.Left
+            : ft > 0 ? AlongPathSide.Right : AlongPathSide.Center;
         await SaveAsync();
     }
 

@@ -127,5 +127,11 @@ public class PlotLibrary
 
     /// <summary>User-defined catalog items that round-trip with the library.</summary>
     public List<CatalogItem> CustomCatalogItems { get; set; } = new();
+
+    /// <summary>
+    /// User-defined Along-path drawing sets (named, ordered row lists). Authored either via the
+    /// Rows editor or by capturing a multi-shape selection from the canvas.
+    /// </summary>
+    public List<AlongPathDrawingSet> DrawingSets { get; set; } = new();
 }
 

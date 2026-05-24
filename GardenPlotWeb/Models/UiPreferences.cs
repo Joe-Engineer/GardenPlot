@@ -14,6 +14,18 @@ public enum ViewMode
     Concept,
 }
 
+/// <summary>
+/// Side selector for the Along-path Phase 1 controls. A UI affordance over a signed
+/// <see cref="UiPreferences.AlongPathOffsetFt"/>: <c>Left</c> persists a negative number,
+/// <c>Right</c> a positive number, <c>Center</c> a zero.
+/// </summary>
+public enum AlongPathSide
+{
+    Center,
+    Left,
+    Right,
+}
+
 /// <summary>Boundary behavior for <c>Fill with plants</c>.</summary>
 public enum FillEnclosureMode
 {
@@ -105,6 +117,18 @@ public class UiPreferences
     /// overlay runs polygon-clipping per affected shape on every render, so we leave it as an
     /// opt-in control (toggleable from the canvas status bar).</summary>
     public bool ShowClipHatch { get; set; }
+
+    /// <summary>
+    /// Signed perpendicular offset for the Along-path Phase 1 controls (feet). Negative places
+    /// the row on the left of the directed tangent, positive on the right, zero on the centerline.
+    /// </summary>
+    public double AlongPathOffsetFt { get; set; }
+
+    /// <summary>Side affordance for the Along-path controls. Drives the sign of <see cref="AlongPathOffsetFt"/>.</summary>
+    public AlongPathSide AlongPathSide { get; set; } = AlongPathSide.Center;
+
+    /// <summary>Last-selected Along-path drawing set (by Id), if any.</summary>
+    public Guid? LastAlongPathDrawingSetId { get; set; }
 
     /// <summary>How <c>Fill with plants</c> treats the polygon boundary. Default is
     /// <see cref="FillEnclosureMode.FullyEnclosed"/> so plant footprints never cross the shape edge.</summary>

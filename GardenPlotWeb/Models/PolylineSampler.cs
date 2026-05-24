@@ -1,4 +1,4 @@
-// <copyright file="PolylineSampler.cs" company="Garden Plot">
+﻿// <copyright file="PolylineSampler.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -10,6 +10,9 @@ namespace GardenPlotWeb.Models;
 public static class PolylineSampler
 {
     public static double TotalLengthFt(IReadOnlyList<Point> points)
+        => TotalLengthFt(points, closed: false);
+
+    public static double TotalLengthFt(IReadOnlyList<Point> points, bool closed)
     {
         if (points is null || points.Count < 2)
         {
@@ -22,7 +25,53 @@ public static class PolylineSampler
             total += Distance(points[i - 1], points[i]);
         }
 
+        if (closed)
+        {
+            total += Distance(points[^1], points[0]);
+        }
+
         return total;
+    }
+
+    /// <summary>
+    /// Returns the position and tangent at the given arc-length along the polyline.
+    /// When <paramref name="closed"/> is true the closing segment between the last and first point
+    /// is included and arc-length wraps modulo the total length.
+    /// </summary>
+    public static (Point Pos, Point Tangent) SampleAt(
+        IReadOnlyList<Point> points,
+        double arcLengthFt,
+        bool closed)
+    {
+        if (points is null || points.Count == 0)
+        {
+            return (new Point(0, 0), new Point(1, 0));
+        }
+
+        if (points.Count == 1)
+        {
+            return (points[0], new Point(1, 0));
+        }
+
+        var segments = BuildSegments(points, closed);
+        if (segments.Count == 0)
+        {
+            return (points[0], new Point(1, 0));
+        }
+
+        var total = segments[^1].EndDistanceFt;
+        if (closed && total > 0)
+        {
+            // Wrap.
+            arcLengthFt %= total;
+            if (arcLengthFt < 0) arcLengthFt += total;
+        }
+        else
+        {
+            arcLengthFt = Math.Clamp(arcLengthFt, 0, total);
+        }
+
+        return SampleAtDistance(segments, arcLengthFt);
     }
 
     public static IReadOnlyList<(Point Pos, double AngleDeg)> SamplePoints(
@@ -87,8 +136,11 @@ public static class PolylineSampler
     }
 
     private static List<PolylineSegment> BuildSegments(IReadOnlyList<Point> points)
+        => BuildSegments(points, closed: false);
+
+    private static List<PolylineSegment> BuildSegments(IReadOnlyList<Point> points, bool closed)
     {
-        var segments = new List<PolylineSegment>(Math.Max(0, points.Count - 1));
+        var segments = new List<PolylineSegment>(Math.Max(0, points.Count - 1) + (closed ? 1 : 0));
         double startDistanceFt = 0;
         for (var i = 1; i < points.Count; i++)
         {
@@ -102,6 +154,17 @@ public static class PolylineSampler
 
             segments.Add(new PolylineSegment(start, end, startDistanceFt, startDistanceFt + lengthFt));
             startDistanceFt += lengthFt;
+        }
+
+        if (closed && points.Count >= 2)
+        {
+            var start = points[^1];
+            var end = points[0];
+            var lengthFt = Distance(start, end);
+            if (lengthFt > 0)
+            {
+                segments.Add(new PolylineSegment(start, end, startDistanceFt, startDistanceFt + lengthFt));
+            }
         }
 
         return segments;
