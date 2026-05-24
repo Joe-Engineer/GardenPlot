@@ -982,16 +982,23 @@ else
 
                 @{
                     var visibleShapes = currentPlot.Shapes.Where(IsShapeVisible).ToList();
+                    var interacting = IsInteractingWithCanvas;
+                    var stampGhosting = IsStampGhostActive;
 
                     // Plant spacing overlay (under shapes): one set of rings per plant, color-coded by overlap.
-                    var plantList = visibleShapes.Where(z => z.Kind == ShapeKind.Plant && !IsFocalPointTrait(z.Trait)).ToList();
+                    // Suppressed during pan/drag/draft to keep per-pointer-move frames light on big plots,
+                    // but kept on during stamp-ghost so the user has placement guidance.
+                    var plantList = interacting
+                        ? new List<Shape>()
+                        : visibleShapes.Where(z => z.Kind == ShapeKind.Plant && !IsFocalPointTrait(z.Trait)).ToList();
                     // Build the clip-hatch overlay only when (a) the toggle is on AND (b) at least one
                     // shape has a non-empty ClippedBy list. Polygon clipping is O(N²) per render, and
                     // wheel-zoom triggers re-renders, so the early-out keeps interactive zoom snappy
-                    // on plots that don't use clipping.
+                    // on plots that don't use clipping. Also skipped during any active interaction
+                    // OR while a stamp-ghost is following the cursor.
                     Dictionary<Guid, Shape>? allShapesById = null;
                     Dictionary<Guid, IReadOnlyList<IReadOnlyList<Point>>> clipHatches;
-                    if (library.Ui.ShowClipHatch && currentPlot.Shapes.Any(z => z.ClippedBy.Count > 0))
+                    if (!interacting && !stampGhosting && library.Ui.ShowClipHatch && currentPlot.Shapes.Any(z => z.ClippedBy.Count > 0))
                     {
                         allShapesById = currentPlot.Shapes.ToDictionary(z => z.Id);
                         clipHatches = currentPlot.Shapes

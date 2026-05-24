@@ -2304,6 +2304,37 @@ public partial class GardenPlot
     private int panButton;
     private bool suppressContextMenuOnce;
 
+    /// <summary>
+    /// True while the user is actively pointer-interacting with the canvas in a way that
+    /// mutates shape positions or rubber-band geometry (pan, drag-move, handle-drag,
+    /// box-select, polygon draft). Heavy overlays (plant spacing rings, clip-hatch) skip
+    /// rendering while this is true so per-pointer-move frames stay light on big plots;
+    /// they reappear on pointer-up.
+    /// </summary>
+    private bool IsInteractingWithCanvas =>
+        panActive
+        || isDragging
+        || isHandleDragging
+        || isBoxSelecting
+        || drafting is not null;
+
+    /// <summary>
+    /// True while a stamp-ghost preview is following the cursor. The cheaper spacing-rings
+    /// overlay stays visible for placement guidance, but the O(N²) clip-hatch is suppressed
+    /// so cursor follow stays smooth on big plots.
+    /// </summary>
+    private bool IsStampGhostActive =>
+        currentTool == Tool.Stamp && selectedItem is not null;
+
+    /// <summary>
+    /// Suppresses Blazor re-renders during an active pan. Pan scrolls the SVG via JS interop
+    /// (<c>panBy</c>) so no Blazor-driven render is required while the pointer moves; skipping
+    /// the implicit StateHasChanged after each OnPointerMove keeps panning smooth on big plots.
+    /// Drag, draft, and box-select still need per-move renders to update their visuals, so they
+    /// are NOT suppressed here.
+    /// </summary>
+    protected override bool ShouldRender() => !panActive;
+
     private void OnCanvasContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
     {
         if (suppressContextMenuOnce)
@@ -6956,6 +6987,16 @@ public partial class GardenPlot
             return;
         }
 
+        // Right-mouse is reserved for pan and must never disturb selection state.
+        // Handle it BEFORE any focus / context-menu / pointer-capture side effects so a
+        // right-drag never reflows the selection-driven render path.
+        if (e.Button == 2)
+        {
+            TryCaptureCanvasPointer(e.PointerId);
+            BeginPan(e, 2);
+            return;
+        }
+
         pointerShiftDown = e.ShiftKey;
         pointerCtrlDown = e.CtrlKey;
         pointerAltDown = e.AltKey;
@@ -6965,13 +7006,6 @@ public partial class GardenPlot
         // Ensure the canvas has keyboard focus so Delete/Backspace work.
         _ = canvasRef.FocusAsync(preventScroll: true).AsTask();
         TryCaptureCanvasPointer(e.PointerId);
-
-        var isRightButtonPan = e.Button == 2;
-        if (isRightButtonPan)
-        {
-            BeginPan(e, 2);
-            return;
-        }
 
         if (e.Button != 0)
         {
@@ -7647,6 +7681,16 @@ public partial class GardenPlot
 
     private void OnShapePointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, Shape s)
     {
+        // Right-mouse is reserved for pan and must never disturb selection state.
+        // Handle it BEFORE the tool / selectability gates so a right-drag that starts
+        // on a shape behaves identically to one that starts on empty canvas.
+        if (e.Button == 2)
+        {
+            TryCaptureCanvasPointer(e.PointerId);
+            BeginPan(e, 2);
+            return;
+        }
+
         if (IsConceptMode) return;
         if (currentTool != Tool.Select || !CanSelectShape(s))
         {
@@ -7654,12 +7698,6 @@ public partial class GardenPlot
         }
 
         TryCaptureCanvasPointer(e.PointerId);
-
-        if (e.Button == 2)
-        {
-            BeginPan(e, 2);
-            return;
-        }
 
         if (e.Button != 0) return;
 
