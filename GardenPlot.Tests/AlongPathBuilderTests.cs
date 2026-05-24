@@ -15,7 +15,7 @@ public sealed class AlongPathBuilderTests
 {
     private const double Tolerance = 1e-6;
 
-    private static IReadOnlyList<Point> HorizontalLine(double x0, double x1, double y)
+    private static List<Point> HorizontalLine(double x0, double x1, double y)
         => new List<Point> { new(x0, y), new(x1, y) };
 
     [Fact]
