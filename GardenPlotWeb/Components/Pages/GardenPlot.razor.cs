@@ -6170,14 +6170,15 @@ public partial class GardenPlot
             .OrderBy(t => t.Along)
             .ToList();
 
-        var rawPerps = ordered.Select(t => t.Perp).ToList();
-        var snappedPerps = SnapCapturedOffsets(rawPerps);
-
-        // Phase along the seed-axis: distance from the first item's center to each item's
-        // center. This makes the captured drawing set behave like a stamp pattern -- the first
-        // item lands at the start of the path, the second appears at its captured along-distance,
-        // and so on. The designer can dial individual phases in the editor afterwards.
-        double phaseOrigin = ordered[0].Along;
+        // The captured selection represents the *perpendicular profile* of a future Along-path
+        // application: the longest extent of the selection's bounding box becomes the depth
+        // away from the path, and each captured plant becomes its own row at that depth.
+        // So the captured along-axis distance from the first item lands in OffsetFt (which
+        // controls perpendicular distance during apply) -- not in PhaseAlongFt.
+        //
+        // Captured perpendicular wobble (snappedPerps) is treated as drawing imprecision and
+        // ignored at capture time; Phase defaults to 0 so every row starts at the path's start.
+        double alongOrigin = ordered[0].Along;
 
         var rows = new List<AlongPathDrawingSetRow>(ordered.Count);
         for (int i = 0; i < ordered.Count; i++)
@@ -6188,8 +6189,8 @@ public partial class GardenPlot
                 PaletteItemCode = t.Shape.Label ?? string.Empty,
                 PaletteItemKind = ResolveCaptureKind(t.Shape.Kind),
                 GapFt = 0,
-                OffsetFt = snappedPerps[i],
-                PhaseAlongFt = Math.Round(t.Along - phaseOrigin, 3),
+                OffsetFt = Math.Round(t.Along - alongOrigin, 3),
+                PhaseAlongFt = 0,
                 CapturedWidthFt = t.Shape.W,
                 CapturedHeightFt = t.Shape.H,
                 CapturedTrait = t.Shape.Trait,
