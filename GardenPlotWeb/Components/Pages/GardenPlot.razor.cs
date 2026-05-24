@@ -6173,6 +6173,12 @@ public partial class GardenPlot
         var rawPerps = ordered.Select(t => t.Perp).ToList();
         var snappedPerps = SnapCapturedOffsets(rawPerps);
 
+        // Phase along the seed-axis: distance from the first item's center to each item's
+        // center. This makes the captured drawing set behave like a stamp pattern -- the first
+        // item lands at the start of the path, the second appears at its captured along-distance,
+        // and so on. The designer can dial individual phases in the editor afterwards.
+        double phaseOrigin = ordered[0].Along;
+
         var rows = new List<AlongPathDrawingSetRow>(ordered.Count);
         for (int i = 0; i < ordered.Count; i++)
         {
@@ -6183,10 +6189,7 @@ public partial class GardenPlot
                 PaletteItemKind = ResolveCaptureKind(t.Shape.Kind),
                 GapFt = 0,
                 OffsetFt = snappedPerps[i],
-                // Phase along path defaults to zero so each row starts at the path's beginning.
-                // The captured along-axis position of the original shape doesn't translate to a
-                // useful default phase -- the path the user applies the set to could be anywhere.
-                PhaseAlongFt = 0,
+                PhaseAlongFt = Math.Round(t.Along - phaseOrigin, 3),
                 CapturedWidthFt = t.Shape.W,
                 CapturedHeightFt = t.Shape.H,
                 CapturedTrait = t.Shape.Trait,
