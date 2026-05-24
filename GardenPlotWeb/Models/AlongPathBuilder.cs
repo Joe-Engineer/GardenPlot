@@ -64,8 +64,6 @@ public static class AlongPathBuilder
         }
 
         var samples = new List<AlongPathSample>();
-        // (position, radius) of every already-placed sample, used for the collision test.
-        var placedCircles = new List<(Point Pos, double Radius)>();
 
         for (int rowIndex = 0; rowIndex < rows.Count; rowIndex++)
         {
@@ -78,6 +76,13 @@ public static class AlongPathBuilder
 
             double radius = row.WidthFt / 2.0;
             double subdivision = stride / SlideSubdivisions;
+
+            // Collision is checked PER ROW only. Rows at different perpendicular offsets
+            // represent different garden layers -- a tall shrub canopy above a low ground
+            // cover, for instance -- and the designer's intent is for them to share screen
+            // space freely. Within a row we still keep the slide-forward-then-skip rule so
+            // same-row plants don't pile onto each other.
+            var placedCircles = new List<(Point Pos, double Radius)>();
 
             // Build the per-row sample path. When the row has a non-zero offset we use a
             // *resampled offset polyline* derived from the original path so plants walk along

@@ -223,13 +223,13 @@ public sealed class AlongPathBuilderTests
     }
 
     [Fact]
-    public void TwoRows_OffsetGap_BelowSumOfRadii_RowOnePlaces_RowTwoUsesSlideOrSkips()
+    public void TwoRows_DifferentOffsets_DoNotInterfereWithEachOther()
     {
-        // 30 ft path. Cauliflower (W=1.8) at offset +1 ft, Strawberry (W=1.5) at offset -0.5 ft.
-        // Perpendicular gap = 1.5 ft. Sum of radii = 0.9 + 0.75 = 1.65 ft -> 1.5 < 1.65, so every
-        // same-arc-length strawberry would collide with a cauliflower. Slide-forward must place
-        // strawberries in the gaps between cauliflowers. The row MUST produce some samples; the
-        // failure mode that prompted #80 was the row producing ZERO samples.
+        // Rows at different perpendicular offsets represent different garden layers (e.g. a
+        // tall canopy above a low ground cover) and are allowed to overlap freely in screen
+        // space. Even when their footprints would collide bbox-to-bbox, both rows must place
+        // every sample on grid. The earlier semantics of cross-row collision (#79's original
+        // spec) was relaxed because layered plantings need the freedom to nest.
         var path = HorizontalLine(0, 30, 0);
         var rows = new[]
         {
@@ -239,8 +239,39 @@ public sealed class AlongPathBuilderTests
 
         var samples = AlongPathBuilder.BuildSamples(path, closed: false, rows, alignToTangent: true);
 
+        var row0 = samples.Where(s => s.RowIndex == 0).ToList();
         var row1 = samples.Where(s => s.RowIndex == 1).ToList();
+        Assert.NotEmpty(row0);
         Assert.NotEmpty(row1);
+        // Approx 30 / 1.8 = 16-17 row-0; 30 / 1.5 = 20-21 row-1. Both rows now fill independently.
+        Assert.InRange(row0.Count, 15, 18);
+        Assert.InRange(row1.Count, 19, 22);
+        // No sample slid -- because cross-row collision is disabled, each row's on-grid sample
+        // sits at its nominal arc-length.
+        Assert.All(samples, s => Assert.False(s.WasSlid, $"Sample {s} unexpectedly slid; cross-row collision is supposed to be disabled."));
+    }
+
+    [Fact]
+    public void SameRow_TightlyPacked_StillSlidesAndSkipsToAvoidSelfOverlap()
+    {
+        // Within a single row, the slide-forward-then-skip rule still applies so two
+        // same-row plants never overlap each other.
+        var path = HorizontalLine(0, 2.5, 0);
+        var rows = new[] { new AlongPathRowSpec(WidthFt: 2, GapFt: 0, OffsetFt: 0, PhaseAlongFt: 0) };
+
+        var samples = AlongPathBuilder.BuildSamples(path, closed: false, rows, alignToTangent: true);
+
+        Assert.InRange(samples.Count, 1, 2);
+        for (int i = 0; i < samples.Count; i++)
+        {
+            for (int j = i + 1; j < samples.Count; j++)
+            {
+                double dx = samples[i].Pos.X - samples[j].Pos.X;
+                double dy = samples[i].Pos.Y - samples[j].Pos.Y;
+                double dist = Math.Sqrt((dx * dx) + (dy * dy));
+                Assert.True(dist >= 2.0 - 1e-3, $"Same-row samples {i} and {j} overlap (dist={dist}).");
+            }
+        }
     }
 
     [Fact]
