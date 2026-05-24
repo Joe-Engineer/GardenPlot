@@ -9017,6 +9017,43 @@ public partial class GardenPlot
         return "crowded";
     }
 
+    // Plant spacing statuses depend only on the plant set, not on cursor/zoom/etc. The render path
+    // runs on every pointer-move; recomputing this O(N^2) overlay each time makes the ghost lag
+    // behind the mouse on densely-planted beds. Cache the result and only rebuild when the plant
+    // set's fingerprint changes (count + per-plant Id/X/Y/W hash).
+    private Dictionary<Guid, string>? plantSpacingStatusesCache;
+    private long plantSpacingStatusesCacheKey;
+
+    private Dictionary<Guid, string> GetPlantSpacingStatuses(IReadOnlyList<Shape> plants)
+    {
+        long key = 17;
+        for (int i = 0; i < plants.Count; i++)
+        {
+            var p = plants[i];
+            key = unchecked((key * 31) ^ p.Id.GetHashCode());
+            key = unchecked((key * 31) ^ BitConverter.DoubleToInt64Bits(p.X));
+            key = unchecked((key * 31) ^ BitConverter.DoubleToInt64Bits(p.Y));
+            key = unchecked((key * 31) ^ BitConverter.DoubleToInt64Bits(p.W));
+        }
+
+        if (plantSpacingStatusesCache is { } cached
+            && plantSpacingStatusesCacheKey == key
+            && cached.Count == plants.Count)
+        {
+            return cached;
+        }
+
+        var result = new Dictionary<Guid, string>(plants.Count);
+        foreach (var p in plants)
+        {
+            result[p.Id] = ComputeSpacingStatus(p, plants);
+        }
+
+        plantSpacingStatusesCache = result;
+        plantSpacingStatusesCacheKey = key;
+        return result;
+    }
+
     /// <summary>Plants within 2x the selected plant's spacing distance, sorted by distance.</summary>
     private static List<(Shape other, double distFt)> NearbyPlants(Shape sel, IEnumerable<Shape> all)
     {
