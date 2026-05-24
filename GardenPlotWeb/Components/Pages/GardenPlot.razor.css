@@ -787,6 +787,125 @@
     margin: 0;
 }
 
+.along-path-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.25rem;
+}
+
+.along-path-controls .along-path-side {
+    width: auto;
+    padding: 0.15rem 1.4rem 0.15rem 0.4rem;
+    font-size: 0.78rem;
+}
+
+.along-path-controls .along-path-offset {
+    width: 5.5rem;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.78rem;
+}
+
+.drawing-set-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.4rem 0.5rem 0 0.5rem;
+}
+
+.drawing-set-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid #cdd2c8;
+    background: #fff;
+    border-radius: 0.25rem;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.78rem;
+    color: #35523c;
+    cursor: pointer;
+}
+
+.drawing-set-item:hover {
+    background: #f5f1e8;
+}
+
+.drawing-set-item.active {
+    background: #4a7c59;
+    color: #fff;
+    border-color: #2f5a3a;
+}
+
+.drawing-set-item .drawing-set-rows {
+    font-size: 0.7rem;
+    opacity: 0.75;
+}
+
+.drawing-set-editor-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 900;
+}
+
+.drawing-set-editor {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(680px, 92vw);
+    max-height: 80vh;
+    background: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    z-index: 910;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    gap: 0.6rem;
+}
+
+.drawing-set-editor-header input {
+    font-weight: 600;
+}
+
+.drawing-set-editor-rows {
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.drawing-set-editor-row {
+    display: grid;
+    grid-template-columns: minmax(8rem, 1fr) 5rem 5rem 5rem 2rem;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.drawing-set-editor-row-head {
+    font-size: 0.72rem;
+    color: #6c6857;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.drawing-set-editor-item-code {
+    font-size: 0.85rem;
+    color: #35523c;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.drawing-set-editor-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid #e5e2d8;
+}
+
 .fill-anchor-radio {
     display: inline-flex;
     align-items: center;

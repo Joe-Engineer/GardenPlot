@@ -1,4 +1,4 @@
-// <copyright file="Shape.cs" company="Garden Plot">
+﻿// <copyright file="Shape.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -89,6 +89,18 @@ public class Shape
 
     /// <summary>Optional assembly code for multi-layer takeoff bindings.</summary>
     public string? AssemblyCode { get; set; }
+
+    /// <summary>Row index within an Along-Path drop group (0-based). Null when not anchored to a path.</summary>
+    public int? AlongPathRowIndex { get; set; }
+
+    /// <summary>Canonical arc-length position (ft) along the source path at which this shape was placed.</summary>
+    public double? AlongPathArcLengthFt { get; set; }
+
+    /// <summary>Signed perpendicular offset (ft) from the source path at apply time. + = right of tangent, - = left.</summary>
+    public double? AlongPathOffsetFt { get; set; }
+
+    /// <summary>Extra slide-forward (ft) applied by the collision pass at apply time. Diagnostic / replay aid.</summary>
+    public double? AlongPathSlideFt { get; set; }
 }
 
 public enum AlongPathAnchor
