@@ -20,11 +20,17 @@ public interface ICatalogService
     /// <summary>Every catalog item currently available (Base + Packs + Custom).</summary>
     IReadOnlyList<CatalogItem> All { get; }
 
+    /// <summary>Every seeded multi-layer assembly available across loaded packs.</summary>
+    IReadOnlyList<CatalogAssembly> AllAssemblies { get; }
+
     /// <summary>Returns the catalog item matching <paramref name="reference"/>, or <see langword="null"/>.</summary>
     CatalogItem? Get(CatalogItemRef reference);
 
     /// <summary>Tries to find a Base catalog item by its <see cref="CatalogItem.Code"/>.</summary>
     CatalogItem? GetBase(string code);
+
+    /// <summary>Looks up an assembly by source/pack/code triple. Returns <see langword="null"/> if unresolved.</summary>
+    CatalogAssembly? GetAssembly(CatalogSource source, string? packId, string code);
 
     /// <summary>Replaces the cached user-custom catalog items (call after loading a plot library).</summary>
     void SetCustomCatalogItems(IEnumerable<CatalogItem> customItems);
