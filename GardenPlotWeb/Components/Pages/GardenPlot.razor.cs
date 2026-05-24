@@ -6171,14 +6171,16 @@ public partial class GardenPlot
         for (int i = 0; i < ordered.Count; i++)
         {
             var t = ordered[i];
-            var phaseAlong = t.Along - ordered[0].Along;
             rows.Add(new AlongPathDrawingSetRow
             {
                 PaletteItemCode = t.Shape.Label ?? string.Empty,
                 PaletteItemKind = ResolveCaptureKind(t.Shape.Kind),
                 GapFt = 0,
                 OffsetFt = Math.Round(t.Perp, 3),
-                PhaseAlongFt = Math.Round(phaseAlong, 3),
+                // Phase along path defaults to zero so each row starts at the path's beginning.
+                // The captured along-axis position of the original shape doesn't translate to a
+                // useful default phase -- the path the user applies the set to could be anywhere.
+                PhaseAlongFt = 0,
                 CapturedWidthFt = t.Shape.W,
                 CapturedHeightFt = t.Shape.H,
                 CapturedTrait = t.Shape.Trait,
