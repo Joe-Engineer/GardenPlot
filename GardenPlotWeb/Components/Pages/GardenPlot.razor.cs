@@ -6114,6 +6114,9 @@ public partial class GardenPlot
         _ => PaletteKind.Plant,
     };
 
+    private static double[] SnapCapturedOffsets(IReadOnlyList<double> rawOffsets)
+        => CapturedOffsetSnapping.Snap(rawOffsets);
+
     /// <summary>
     /// Captures the currently selected shapes as a new Drawing Set. The longest principal axis of
     /// the selection's bounding box is treated as the seed-path; per-item perpendicular distance
@@ -6167,6 +6170,9 @@ public partial class GardenPlot
             .OrderBy(t => t.Along)
             .ToList();
 
+        var rawPerps = ordered.Select(t => t.Perp).ToList();
+        var snappedPerps = SnapCapturedOffsets(rawPerps);
+
         var rows = new List<AlongPathDrawingSetRow>(ordered.Count);
         for (int i = 0; i < ordered.Count; i++)
         {
@@ -6176,7 +6182,7 @@ public partial class GardenPlot
                 PaletteItemCode = t.Shape.Label ?? string.Empty,
                 PaletteItemKind = ResolveCaptureKind(t.Shape.Kind),
                 GapFt = 0,
-                OffsetFt = Math.Round(t.Perp, 3),
+                OffsetFt = snappedPerps[i],
                 // Phase along path defaults to zero so each row starts at the path's beginning.
                 // The captured along-axis position of the original shape doesn't translate to a
                 // useful default phase -- the path the user applies the set to could be anywhere.
