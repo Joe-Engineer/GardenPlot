@@ -722,9 +722,9 @@ else
                     <div class="drawing-set-editor-rows">
                         <div class="drawing-set-editor-row drawing-set-editor-row-head">
                             <span>Item</span>
-                            <span title="Gap between footprint edges along the path between this row's repeating plants (0 = adjacent).">Gap (ft)</span>
-                            <span title="Sideways distance from the path. Negative places this row on the Left of the draw direction, positive on the Right, zero on the centerline.">Side (ft)</span>
-                            <span title="How far along the path this row's first plant lands, measured from the start of the path.">Start (ft)</span>
+                            <span title="Spacing between adjacent copies of this row's plant when the row fills along the path. 0 = footprints touching, positive widens the spacing, negative overlaps (after which the slide-forward collision rule may skip samples).">Gap (ft)</span>
+                            <span title="Perpendicular distance from the path when the row is drawn along it. Negative places the row on the LEFT of the path's draw direction, positive on the RIGHT, zero sits on the path centerline. Multiple rows with different offsets represent different garden layers and may overlap freely in screen space.">Offset (ft)</span>
+                            <span title="Distance along the path where this row's first plant lands, measured from the start of the path. 0 = first plant at the path's start. A captured set populates this from each item's along-axis position so the original arrangement reproduces when applied to a straight path.">Phase (ft)</span>
                             <span></span>
                         </div>
                         @for (int i = 0; i < editingDrawingSet.Rows.Count; i++)
