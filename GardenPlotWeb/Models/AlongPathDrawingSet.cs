@@ -46,4 +46,20 @@ public sealed class AlongPathDrawingSetRow
     /// adjacent rows. Default 0.
     /// </summary>
     public double PhaseAlongFt { get; set; }
+
+    /// <summary>Captured footprint width at create time (feet). Drives stride and collision radius
+    /// when the palette item can't be resolved at apply time (e.g. custom items pruned from the library).</summary>
+    public double CapturedWidthFt { get; set; }
+
+    /// <summary>Captured footprint height at create time (feet).</summary>
+    public double CapturedHeightFt { get; set; }
+
+    /// <summary>Captured trait at create time (used to render the fallback synthetic palette item).</summary>
+    public string? CapturedTrait { get; set; }
+
+    /// <summary>Captured fill color at create time.</summary>
+    public string? CapturedFill { get; set; }
+
+    /// <summary>Captured stroke color at create time.</summary>
+    public string? CapturedStroke { get; set; }
 }

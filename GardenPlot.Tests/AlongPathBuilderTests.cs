@@ -197,4 +197,49 @@ public sealed class AlongPathBuilderTests
         double len = PolylineSampler.TotalLengthFt(pts, closed: true);
         Assert.True(len > 0);
     }
+
+    [Fact]
+    public void TwoRows_OffsetGap_AboveSumOfRadii_BothRowsPlaceAllSamples()
+    {
+        // 30 ft path, two rows. Cauliflower (W=1.8) at offset +1 ft, Strawberry (W=1.0) at offset -0.5 ft.
+        // Perpendicular gap = 1.5 ft. Sum of radii = 0.9 + 0.5 = 1.4 ft. 1.5 > 1.4 -> both rows should
+        // place every sample on grid without sliding.
+        var path = HorizontalLine(0, 30, 0);
+        var rows = new[]
+        {
+            new AlongPathRowSpec(WidthFt: 1.8, GapFt: 0, OffsetFt: 1.0, PhaseAlongFt: 0),
+            new AlongPathRowSpec(WidthFt: 1.0, GapFt: 0, OffsetFt: -0.5, PhaseAlongFt: 0),
+        };
+
+        var samples = AlongPathBuilder.BuildSamples(path, closed: false, rows, alignToTangent: true);
+
+        var row0 = samples.Where(s => s.RowIndex == 0).ToList();
+        var row1 = samples.Where(s => s.RowIndex == 1).ToList();
+        Assert.NotEmpty(row0);
+        Assert.NotEmpty(row1);
+        // Approx 30 / 1.8 = 16-17 cauliflowers; 30 / 1.0 = 30-31 strawberries.
+        Assert.InRange(row0.Count, 15, 18);
+        Assert.InRange(row1.Count, 28, 31);
+    }
+
+    [Fact]
+    public void TwoRows_OffsetGap_BelowSumOfRadii_RowOnePlaces_RowTwoUsesSlideOrSkips()
+    {
+        // 30 ft path. Cauliflower (W=1.8) at offset +1 ft, Strawberry (W=1.5) at offset -0.5 ft.
+        // Perpendicular gap = 1.5 ft. Sum of radii = 0.9 + 0.75 = 1.65 ft -> 1.5 < 1.65, so every
+        // same-arc-length strawberry would collide with a cauliflower. Slide-forward must place
+        // strawberries in the gaps between cauliflowers. The row MUST produce some samples; the
+        // failure mode that prompted #80 was the row producing ZERO samples.
+        var path = HorizontalLine(0, 30, 0);
+        var rows = new[]
+        {
+            new AlongPathRowSpec(WidthFt: 1.8, GapFt: 0, OffsetFt: 1.0, PhaseAlongFt: 0),
+            new AlongPathRowSpec(WidthFt: 1.5, GapFt: 0, OffsetFt: -0.5, PhaseAlongFt: 0),
+        };
+
+        var samples = AlongPathBuilder.BuildSamples(path, closed: false, rows, alignToTangent: true);
+
+        var row1 = samples.Where(s => s.RowIndex == 1).ToList();
+        Assert.NotEmpty(row1);
+    }
 }

@@ -5587,7 +5587,7 @@ public partial class GardenPlot
     {
         if (string.IsNullOrWhiteSpace(row.PaletteItemCode))
         {
-            return null;
+            return BuildSyntheticPaletteItemForRow(row);
         }
 
         PaletteItem? FromBuiltins() => row.PaletteItemKind switch
@@ -5606,18 +5606,35 @@ public partial class GardenPlot
         };
 
         // Fall back to library-scoped custom palette items (user-defined plants, trees, etc.).
-        // Without this, a Drawing Set captured from a selection of custom plants would silently
-        // drop the corresponding row at apply time.
         PaletteItem? FromCustom() => library.CustomPaletteItems
             .FirstOrDefault(p => p.Kind == row.PaletteItemKind
                 && string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase));
 
-        // Last-ditch: match by code alone (kind-agnostic) so a Plant captured from a custom item
-        // that was later re-typed as e.g. Bush still resolves rather than silently disappearing.
+        // Last-ditch: match by code alone (kind-agnostic) for resilience to Kind retyping.
         PaletteItem? FromCustomByCodeOnly() => library.CustomPaletteItems
             .FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase));
 
-        return FromBuiltins() ?? FromCustom() ?? FromCustomByCodeOnly();
+        // Final fallback: synthesize an item from the captured dimensions/trait so the row still
+        // draws even if its source palette item was deleted, renamed, or never lived on the
+        // library palette (e.g. a custom plant published via a different mechanism).
+        return FromBuiltins()
+            ?? FromCustom()
+            ?? FromCustomByCodeOnly()
+            ?? BuildSyntheticPaletteItemForRow(row);
+    }
+
+    private static PaletteItem? BuildSyntheticPaletteItemForRow(AlongPathDrawingSetRow row)
+    {
+        double widthFt = row.CapturedWidthFt > 0 ? row.CapturedWidthFt : 1.0;
+        double heightFt = row.CapturedHeightFt > 0 ? row.CapturedHeightFt : widthFt;
+        return new PaletteItem(
+            Code: string.IsNullOrWhiteSpace(row.PaletteItemCode) ? "Custom" : row.PaletteItemCode,
+            Kind: row.PaletteItemKind,
+            WidthFt: widthFt,
+            HeightFt: heightFt,
+            Trait: row.CapturedTrait ?? string.Empty,
+            StrokeColor: row.CapturedStroke,
+            FillColor: row.CapturedFill);
     }
 
     private async Task GroupSelectedItems()
@@ -6162,6 +6179,11 @@ public partial class GardenPlot
                 GapFt = 0,
                 OffsetFt = Math.Round(t.Perp, 3),
                 PhaseAlongFt = Math.Round(phaseAlong, 3),
+                CapturedWidthFt = t.Shape.W,
+                CapturedHeightFt = t.Shape.H,
+                CapturedTrait = t.Shape.Trait,
+                CapturedFill = t.Shape.Fill,
+                CapturedStroke = t.Shape.Stroke,
             });
         }
 
