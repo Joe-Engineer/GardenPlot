@@ -5439,6 +5439,9 @@ public partial class GardenPlot
         HideShapeContextMenu();
         selectedItem = item;
         selectedAssembly = null;
+        // Picking a single palette item replaces any active Drawing Set so the next
+        // Along-path placement uses this item rather than the previously-active set.
+        selectedDrawingSetId = null;
         _ = ApplySelectItemSideEffects(item);
     }
 
@@ -5608,8 +5611,11 @@ public partial class GardenPlot
             currentPlot.DropGroups.RemoveAll(g => g.Id == group.Id);
             currentPlot.DropGroups.Add(group);
         }
+        // Restore the source path as the active selection so the user can immediately
+        // pick a new palette item or Drawing Set and run Along-path again without
+        // re-selecting the path.
         selectedIds.Clear();
-        selectedIds.AddRange(placement.Shapes.Select(shape => shape.Id));
+        selectedIds.Add(sourcePath.Id);
         await SaveAsync();
     }
 
