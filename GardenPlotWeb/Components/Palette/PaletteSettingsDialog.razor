@@ -1,0 +1,127 @@
+﻿@* Copyright (c) Garden Plot. All rights reserved. *@
+@using GardenPlotWeb.Models
+
+@if (Visible)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="palette-settings-title"
+         @onkeydown="OnKeyDown">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="palette-settings-title">Palette settings</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="OnCloseAsync" @ref="closeButton"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted">
+                        Choose which palette categories appear in the category combobox. Disabled
+                        categories are hidden from the picker and their items are never sent to the
+                        browser.
+                    </p>
+                    <div class="d-flex gap-2 mb-3">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="SelectDefaults">Defaults</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="SelectAll">Select all</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="SelectNone">Select none</button>
+                    </div>
+                    @foreach (var group in PaletteCategoryDefaults.Groups)
+                    {
+                        <fieldset class="mb-3">
+                            <legend class="h6">@group.Group</legend>
+                            <div class="row g-2">
+                                @foreach (var cat in group.Categories)
+                                {
+                                    var enabled = working.Contains(cat);
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-check small">
+                                            <input class="form-check-input" type="checkbox"
+                                                   checked="@enabled"
+                                                   @onchange="@(e => Toggle(cat, e))" />
+                                            @LabelFor(cat)
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+                        </fieldset>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="OnCloseAsync">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="OnSaveAsync">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public HashSet<PaletteCategory>? Initial { get; set; }
+    [Parameter] public Func<string, string>? CategoryLabelLookup { get; set; }
+    [Parameter] public EventCallback<HashSet<PaletteCategory>> OnSave { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private HashSet<PaletteCategory> working = new(PaletteCategoryDefaults.Essentials);
+    private ElementReference closeButton;
+    private bool focusOnNextRender;
+
+    protected override void OnParametersSet()
+    {
+        if (Visible)
+        {
+            working = Initial is null ? new(PaletteCategoryDefaults.Essentials) : new(Initial);
+            focusOnNextRender = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusOnNextRender && Visible)
+        {
+            focusOnNextRender = false;
+            try
+            {
+                await closeButton.FocusAsync();
+            }
+            catch (System.Exception)
+            {
+                // Element may not be in the DOM yet on prerender; ignore.
+            }
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (string.Equals(e.Key, "Escape", System.StringComparison.Ordinal))
+        {
+            await OnCloseAsync();
+        }
+    }
+
+    private void Toggle(PaletteCategory cat, ChangeEventArgs e)
+    {
+        bool on = e.Value is bool b && b;
+        if (on)
+        {
+            _ = working.Add(cat);
+        }
+        else
+        {
+            _ = working.Remove(cat);
+        }
+    }
+
+    private void SelectDefaults() => working = new(PaletteCategoryDefaults.Essentials);
+
+    private void SelectAll() => working = new(System.Enum.GetValues<PaletteCategory>());
+
+    private void SelectNone() => working = new();
+
+    private string LabelFor(PaletteCategory cat)
+    {
+        return CategoryLabelLookup?.Invoke(cat.ToString()) ?? cat.ToString();
+    }
+
+    private Task OnSaveAsync() => OnSave.InvokeAsync(new HashSet<PaletteCategory>(working));
+
+    private Task OnCloseAsync() => OnClose.InvokeAsync();
+}

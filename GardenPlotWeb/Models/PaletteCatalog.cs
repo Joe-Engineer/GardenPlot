@@ -82,24 +82,53 @@ public static class PaletteCatalog
         new("Arborvitae",            PaletteKind.Tree, 12, 12, "evergreen"),
         new("Douglas Fir",           PaletteKind.Tree, 25, 25, "evergreen"),
         new("Hemlock",               PaletteKind.Tree, 25, 25, "evergreen"),
+        // Additional fruit
+        new("Jujube",                PaletteKind.Tree, 20, 20, "fruit"),
+        new("Loquat",                PaletteKind.Tree, 20, 20, "fruit"),
+        new("Quince",                PaletteKind.Tree, 15, 15, "fruit"),
+        new("Medlar",                PaletteKind.Tree, 15, 15, "fruit"),
+        new("Asian Pear",            PaletteKind.Tree, 20, 20, "fruit"),
+        new("Persimmon (Asian)",     PaletteKind.Tree, 25, 25, "fruit"),
+        new("Mulberry (Dwarf)",      PaletteKind.Tree, 12, 12, "fruit"),
+        new("Banana (Cold-Hardy)",   PaletteKind.Tree, 10, 10, "fruit"),
+        // Ornamental form (weeping / columnar / topiary / espalier)
+        new("Weeping Cherry",            PaletteKind.Tree, 20, 20, PlantTraits.OrnamentalForm),
+        new("Weeping Japanese Maple",    PaletteKind.Tree, 10, 10, PlantTraits.OrnamentalForm),
+        new("Columnar Hornbeam",         PaletteKind.Tree, 8,  8,  PlantTraits.OrnamentalForm),
+        new("Columnar Oak",              PaletteKind.Tree, 12, 12, PlantTraits.OrnamentalForm),
+        new("Columnar European Beech",   PaletteKind.Tree, 10, 10, PlantTraits.OrnamentalForm),
+        new("Topiary Boxwood",           PaletteKind.Tree, 6,  6,  PlantTraits.OrnamentalForm),
+        new("Espalier Apple",            PaletteKind.Tree, 10, 4,  PlantTraits.OrnamentalForm),
+        new("Weeping Birch",             PaletteKind.Tree, 25, 25, PlantTraits.OrnamentalForm),
+        new("Contorted Filbert",         PaletteKind.Tree, 10, 10, PlantTraits.OrnamentalForm),
+        new("Katsura (Weeping)",         PaletteKind.Tree, 20, 20, PlantTraits.OrnamentalForm),
     ];
 
     public static readonly PaletteItem[] Bushes =
     [
-        // Edible
-        new("Blueberry (Highbush)",  PaletteKind.Bush, 6, 6, "fruit"),
-        new("Blueberry (Lowbush)",   PaletteKind.Bush, 2, 2, "fruit"),
-        new("Raspberry",             PaletteKind.Bush, 4, 4, "fruit"),
-        new("Blackberry",            PaletteKind.Bush, 5, 5, "fruit"),
-        new("Currant (Black)",       PaletteKind.Bush, 4, 4, "fruit"),
-        new("Gooseberry",            PaletteKind.Bush, 4, 4, "fruit"),
-        new("Elderberry",            PaletteKind.Bush, 8, 8, "fruit"),
-        new("Honeyberry",            PaletteKind.Bush, 5, 5, "fruit"),
-        new("Aronia",                PaletteKind.Bush, 6, 6, "fruit"),
-        new("Serviceberry",          PaletteKind.Bush, 10, 10, "fruit"),
-        new("Goji",                  PaletteKind.Bush, 6, 6, "fruit"),
-        new("Sea Buckthorn",         PaletteKind.Bush, 8, 8, "fruit"),
-        new("Cranberry (Highbush)",  PaletteKind.Bush, 8, 8, "fruit"),
+        // Edible — bush berries
+        new("Blueberry (Highbush)",  PaletteKind.Bush, 6, 6, PlantTraits.BerryBush),
+        new("Blueberry (Lowbush)",   PaletteKind.Bush, 2, 2, PlantTraits.BerryBush),
+        new("Currant (Black)",       PaletteKind.Bush, 4, 4, PlantTraits.BerryBush),
+        new("Currant (Red)",         PaletteKind.Bush, 4, 4, PlantTraits.BerryBush),
+        new("Gooseberry",            PaletteKind.Bush, 4, 4, PlantTraits.BerryBush),
+        new("Elderberry",            PaletteKind.Bush, 8, 8, PlantTraits.BerryBush),
+        new("Honeyberry",            PaletteKind.Bush, 5, 5, PlantTraits.BerryBush),
+        new("Aronia",                PaletteKind.Bush, 6, 6, PlantTraits.BerryBush),
+        new("Serviceberry",          PaletteKind.Bush, 10, 10, PlantTraits.BerryBush),
+        new("Cranberry (Highbush)",  PaletteKind.Bush, 8, 8, PlantTraits.BerryBush),
+        // Edible — cane berries
+        new("Raspberry",             PaletteKind.Bush, 4, 4, PlantTraits.BerryCane),
+        new("Blackberry",            PaletteKind.Bush, 5, 5, PlantTraits.BerryCane),
+        new("Boysenberry",           PaletteKind.Bush, 5, 5, PlantTraits.BerryCane),
+        new("Loganberry",            PaletteKind.Bush, 5, 5, PlantTraits.BerryCane),
+        new("Tayberry",              PaletteKind.Bush, 5, 5, PlantTraits.BerryCane),
+        new("Marionberry",           PaletteKind.Bush, 5, 5, PlantTraits.BerryCane),
+        // Edible — unusual / underused
+        new("Goji",                  PaletteKind.Bush, 6, 6, PlantTraits.BerryUnusual),
+        new("Sea Buckthorn",         PaletteKind.Bush, 8, 8, PlantTraits.BerryUnusual),
+        new("Lingonberry",           PaletteKind.Bush, 1.5, 1.5, PlantTraits.BerryUnusual),
+        new("Schisandra",            PaletteKind.Bush, 8, 8, PlantTraits.BerryUnusual),
         // Ornamental flowering
         new("Hydrangea",             PaletteKind.Bush, 5, 5, "flower"),
         new("Rose (Shrub)",          PaletteKind.Bush, 5, 5, "flower"),
@@ -119,6 +148,24 @@ public static class PaletteCatalog
         new("Juniper",               PaletteKind.Bush, 6, 6, "evergreen"),
         new("Rosemary",              PaletteKind.Bush, 3, 3, "foliage"),
         new("Hosta (Large)",         PaletteKind.Bush, 4, 4, "foliage"),
+        // Deciduous shrubs (foliage / fall color / bark interest)
+        new("Smokebush",             PaletteKind.Bush, 10, 10, PlantTraits.DeciduousShrub),
+        new("Ninebark",              PaletteKind.Bush, 8, 8, PlantTraits.DeciduousShrub),
+        new("Weigela",               PaletteKind.Bush, 6, 6, PlantTraits.DeciduousShrub),
+        new("Witch Hazel",           PaletteKind.Bush, 12, 12, PlantTraits.DeciduousShrub),
+        new("Beautyberry",           PaletteKind.Bush, 6, 6, PlantTraits.DeciduousShrub),
+        new("Mock Orange",           PaletteKind.Bush, 8, 8, PlantTraits.DeciduousShrub),
+        new("Fothergilla",           PaletteKind.Bush, 5, 5, PlantTraits.DeciduousShrub),
+        new("Oakleaf Hydrangea",     PaletteKind.Bush, 8, 8, PlantTraits.DeciduousShrub),
+        new("Red-Twig Dogwood",      PaletteKind.Bush, 8, 8, PlantTraits.DeciduousShrub),
+        new("Spicebush",             PaletteKind.Bush, 10, 10, PlantTraits.DeciduousShrub),
+        // Dwarf conifers
+        new("Mugo Pine (Dwarf)",        PaletteKind.Bush, 4, 4, PlantTraits.DwarfConifer),
+        new("Alberta Spruce (Dwarf)",   PaletteKind.Bush, 3, 3, PlantTraits.DwarfConifer),
+        new("Hinoki Cypress (Dwarf)",   PaletteKind.Bush, 4, 4, PlantTraits.DwarfConifer),
+        new("Boulevard Cypress",        PaletteKind.Bush, 4, 4, PlantTraits.DwarfConifer),
+        new("Blue Spruce (Dwarf)",      PaletteKind.Bush, 4, 4, PlantTraits.DwarfConifer),
+        new("Russian Cypress",          PaletteKind.Bush, 6, 6, PlantTraits.DwarfConifer),
     ];
 
     public static readonly PaletteItem[] FocalPoints =
@@ -250,23 +297,30 @@ public static class PaletteCatalog
         new("Aster (New England)",PaletteKind.Plant, 2.5,  2.5,  "flower-perennial", 0, "full",    "medium", 365),
         new("Chrysanthemum",      PaletteKind.Plant, 2.0,  2.0,  "flower-perennial", 0, "full",    "medium", 365),
 
-        // Bulbs
-        new("Tulip",              PaletteKind.Plant, 0.5,  0.5,  "bulb", 0, "full",    "low",    180),
-        new("Daffodil",           PaletteKind.Plant, 0.5,  0.5,  "bulb", 0, "full",    "low",    180),
-        new("Hyacinth",           PaletteKind.Plant, 0.4,  0.4,  "bulb", 0, "full",    "low",    180),
-        new("Crocus",             PaletteKind.Plant, 0.3,  0.3,  "bulb", 0, "full",    "low",    120),
-        new("Snowdrop",           PaletteKind.Plant, 0.3,  0.3,  "bulb", 0, "partial", "low",    120),
-        new("Allium (Giant)",     PaletteKind.Plant, 1.0,  1.0,  "bulb", 0, "full",    "low",    180),
-        new("Lily (Asiatic)",     PaletteKind.Plant, 1.0,  1.0,  "bulb", 0, "full",    "medium", 180),
-        new("Lily (Oriental)",    PaletteKind.Plant, 1.5,  1.5,  "bulb", 0, "full",    "medium", 180),
-        new("Dahlia",             PaletteKind.Plant, 2.0,  2.0,  "bulb", 0, "full",    "medium", 120),
-        new("Gladiolus",          PaletteKind.Plant, 0.5,  0.5,  "bulb", 0, "full",    "medium", 90),
-        new("Iris (Dutch)",       PaletteKind.Plant, 0.5,  0.5,  "bulb", 0, "full",    "low",    120),
-        new("Anemone",            PaletteKind.Plant, 0.5,  0.5,  "bulb", 0, "partial", "medium", 90),
-        new("Ranunculus",         PaletteKind.Plant, 0.5,  0.5,  "bulb", 0, "full",    "medium", 120),
-        new("Grape Hyacinth",     PaletteKind.Plant, 0.3,  0.3,  "bulb", 0, "full",    "low",    120),
-        new("Fritillaria",        PaletteKind.Plant, 1.0,  1.0,  "bulb", 0, "full",    "medium", 180),
-        new("Caladium",           PaletteKind.Plant, 1.0,  1.0,  "bulb", 0, "shade",   "medium", 120),
+        // Bulbs — fall-planted (spring-blooming)
+        new("Tulip",              PaletteKind.Plant, 0.5,  0.5,  PlantTraits.BulbFallPlanted, 0, "full",    "low",    180),
+        new("Daffodil",           PaletteKind.Plant, 0.5,  0.5,  PlantTraits.BulbFallPlanted, 0, "full",    "low",    180),
+        new("Hyacinth",           PaletteKind.Plant, 0.4,  0.4,  PlantTraits.BulbFallPlanted, 0, "full",    "low",    180),
+        new("Crocus",             PaletteKind.Plant, 0.3,  0.3,  PlantTraits.BulbFallPlanted, 0, "full",    "low",    120),
+        new("Snowdrop",           PaletteKind.Plant, 0.3,  0.3,  PlantTraits.BulbFallPlanted, 0, "partial", "low",    120),
+        new("Allium (Giant)",     PaletteKind.Plant, 1.0,  1.0,  PlantTraits.BulbFallPlanted, 0, "full",    "low",    180),
+        new("Iris (Dutch)",       PaletteKind.Plant, 0.5,  0.5,  PlantTraits.BulbFallPlanted, 0, "full",    "low",    120),
+        new("Grape Hyacinth",     PaletteKind.Plant, 0.3,  0.3,  PlantTraits.BulbFallPlanted, 0, "full",    "low",    120),
+        new("Fritillaria",        PaletteKind.Plant, 1.0,  1.0,  PlantTraits.BulbFallPlanted, 0, "full",    "medium", 180),
+        new("Muscari",            PaletteKind.Plant, 0.3,  0.3,  PlantTraits.BulbFallPlanted, 0, "full",    "low",    120),
+        new("Camas",              PaletteKind.Plant, 0.5,  0.5,  PlantTraits.BulbFallPlanted, 0, "full",    "medium", 180),
+        // Bulbs — spring-planted (summer-blooming)
+        new("Lily (Asiatic)",     PaletteKind.Plant, 1.0,  1.0,  PlantTraits.BulbSpringPlanted, 0, "full",    "medium", 180),
+        new("Lily (Oriental)",    PaletteKind.Plant, 1.5,  1.5,  PlantTraits.BulbSpringPlanted, 0, "full",    "medium", 180),
+        new("Dahlia",             PaletteKind.Plant, 2.0,  2.0,  PlantTraits.BulbSpringPlanted, 0, "full",    "medium", 120),
+        new("Gladiolus",          PaletteKind.Plant, 0.5,  0.5,  PlantTraits.BulbSpringPlanted, 0, "full",    "medium", 90),
+        new("Anemone",            PaletteKind.Plant, 0.5,  0.5,  PlantTraits.BulbSpringPlanted, 0, "partial", "medium", 90),
+        new("Ranunculus",         PaletteKind.Plant, 0.5,  0.5,  PlantTraits.BulbSpringPlanted, 0, "full",    "medium", 120),
+        new("Caladium",           PaletteKind.Plant, 1.0,  1.0,  PlantTraits.BulbSpringPlanted, 0, "shade",   "medium", 120),
+        new("Freesia",            PaletteKind.Plant, 0.4,  0.4,  PlantTraits.BulbSpringPlanted, 0, "full",    "medium", 110),
+        new("Canna",              PaletteKind.Plant, 2.0,  2.0,  PlantTraits.BulbSpringPlanted, 0, "full",    "high",   120),
+        new("Calla Lily",         PaletteKind.Plant, 1.5,  1.5,  PlantTraits.BulbSpringPlanted, 0, "partial", "high",   120),
+        new("Crocosmia",          PaletteKind.Plant, 1.5,  1.5,  PlantTraits.BulbSpringPlanted, 0, "full",    "medium", 120),
 
         // Pollinator natives (broadly North-American; mid-latitudes)
         new("Milkweed (Common)",      PaletteKind.Plant, 2.0,  2.0,  "pollinator-native", 0, "full",    "low",    365),
@@ -300,6 +354,130 @@ public static class PaletteCatalog
         new("Saguaro (Young)",    PaletteKind.Plant, 2.0,  2.0,  "succulent", 0, "full",    "low", 365),
         new("Hedgehog Cactus",    PaletteKind.Plant, 1.0,  1.0,  "succulent", 0, "full",    "low", 365),
         new("Christmas Cactus",   PaletteKind.Plant, 1.0,  1.0,  "succulent", 0, "partial", "low", 365),
+
+        // Vines — edible
+        new("Grape",                 PaletteKind.Plant, 8.0,  8.0,  PlantTraits.VineEdible, 0, "full",    "medium", 730),
+        new("Hardy Kiwi",            PaletteKind.Plant, 10.0, 10.0, PlantTraits.VineEdible, 0, "full",    "medium", 1095),
+        new("Kiwi (Fuzzy)",          PaletteKind.Plant, 15.0, 15.0, PlantTraits.VineEdible, 0, "full",    "medium", 1095),
+        new("Hops",                  PaletteKind.Plant, 6.0,  6.0,  PlantTraits.VineEdible, 0, "full",    "medium", 120),
+        new("Passionfruit",          PaletteKind.Plant, 8.0,  8.0,  PlantTraits.VineEdible, 0, "full",    "medium", 365),
+        new("Maypop",                PaletteKind.Plant, 6.0,  6.0,  PlantTraits.VineEdible, 0, "full",    "medium", 365),
+        new("Akebia",                PaletteKind.Plant, 10.0, 10.0, PlantTraits.VineEdible, 0, "partial", "medium", 365),
+        new("Malabar Spinach",       PaletteKind.Plant, 3.0,  3.0,  PlantTraits.VineEdible, 0, "full",    "medium", 70),
+        new("Chayote",               PaletteKind.Plant, 10.0, 10.0, PlantTraits.VineEdible, 0, "full",    "medium", 150),
+
+        // Vines — ornamental
+        new("Clematis",              PaletteKind.Plant, 4.0,  4.0,  PlantTraits.VineOrnamental, 0, "full",    "medium", 365),
+        new("Climbing Rose",         PaletteKind.Plant, 6.0,  6.0,  PlantTraits.VineOrnamental, 0, "full",    "medium", 365),
+        new("Wisteria",              PaletteKind.Plant, 15.0, 15.0, PlantTraits.VineOrnamental, 0, "full",    "medium", 365),
+        new("Honeysuckle",           PaletteKind.Plant, 8.0,  8.0,  PlantTraits.VineOrnamental, 0, "full",    "medium", 365),
+        new("Climbing Hydrangea",    PaletteKind.Plant, 30.0, 30.0, PlantTraits.VineOrnamental, 0, "partial", "medium", 365),
+        new("Jasmine",               PaletteKind.Plant, 10.0, 10.0, PlantTraits.VineOrnamental, 0, "full",    "medium", 365),
+        new("Morning Glory",         PaletteKind.Plant, 10.0, 10.0, PlantTraits.VineOrnamental, 0, "full",    "medium", 75),
+        new("Hyacinth Bean",         PaletteKind.Plant, 8.0,  8.0,  PlantTraits.VineOrnamental, 0, "full",    "medium", 90),
+        new("Sweet Pea (Vine)",      PaletteKind.Plant, 5.0,  5.0,  PlantTraits.VineOrnamental, 0, "full",    "medium", 75),
+        new("Mandevilla",            PaletteKind.Plant, 6.0,  6.0,  PlantTraits.VineOrnamental, 0, "full",    "medium", 365),
+        new("Trumpet Vine",          PaletteKind.Plant, 25.0, 25.0, PlantTraits.VineOrnamental, 0, "full",    "low",    365),
+        new("Virginia Creeper",      PaletteKind.Plant, 30.0, 30.0, PlantTraits.VineOrnamental, 0, "partial", "medium", 365),
+
+        // Vegetables — brassicas
+        new("Brussels Sprouts",      PaletteKind.Plant, 2.0,  2.0,  "vegetable", 0, "full",    "medium", 100),
+        new("Collards",              PaletteKind.Plant, 2.0,  2.0,  "vegetable", 0, "full",    "medium", 75),
+        new("Kohlrabi",              PaletteKind.Plant, 0.8,  0.8,  "vegetable", 0, "full",    "medium", 55),
+        new("Bok Choy",              PaletteKind.Plant, 0.8,  0.8,  "vegetable", 0, "partial", "medium", 50),
+        new("Arugula",               PaletteKind.Plant, 0.5,  0.5,  "vegetable", 0, "partial", "medium", 40),
+        new("Mustard Greens",        PaletteKind.Plant, 0.8,  0.8,  "vegetable", 0, "full",    "medium", 45),
+        new("Mizuna",                PaletteKind.Plant, 0.6,  0.6,  "vegetable", 0, "partial", "medium", 40),
+        // Vegetables — roots
+        new("Parsnip",               PaletteKind.Plant, 0.4,  0.4,  "vegetable", 0, "full",    "medium", 120),
+        new("Turnip",                PaletteKind.Plant, 0.4,  0.4,  "vegetable", 0, "full",    "medium", 55),
+        new("Rutabaga",              PaletteKind.Plant, 0.5,  0.5,  "vegetable", 0, "full",    "medium", 90),
+        new("Celeriac",              PaletteKind.Plant, 0.8,  0.8,  "vegetable", 0, "full",    "high",   110),
+        new("Salsify",               PaletteKind.Plant, 0.5,  0.5,  "vegetable", 0, "full",    "medium", 120),
+        // Vegetables — alliums
+        new("Leek",                  PaletteKind.Plant, 0.5,  0.5,  "vegetable", 0, "full",    "medium", 110),
+        new("Shallot",               PaletteKind.Plant, 0.4,  0.4,  "vegetable", 0, "full",    "medium", 90),
+        new("Scallion",              PaletteKind.Plant, 0.25, 0.25, "vegetable", 0, "full",    "medium", 60),
+        new("Walking Onion",         PaletteKind.Plant, 0.5,  0.5,  "vegetable", 0, "full",    "medium", 365),
+        // Vegetables — cucurbits
+        new("Melon",                 PaletteKind.Plant, 4.0,  4.0,  "vegetable", 0, "full",    "medium", 85),
+        new("Watermelon",            PaletteKind.Plant, 5.0,  5.0,  "vegetable", 0, "full",    "medium", 90),
+        new("Gourd",                 PaletteKind.Plant, 5.0,  5.0,  "vegetable", 0, "full",    "medium", 110),
+        // Vegetables — nightshade
+        new("Tomatillo",             PaletteKind.Plant, 2.5,  2.5,  "vegetable", 0, "full",    "medium", 80),
+        new("Ground Cherry",         PaletteKind.Plant, 2.0,  2.0,  "vegetable", 0, "full",    "medium", 75),
+        // Vegetables — greens
+        new("Swiss Chard",           PaletteKind.Plant, 1.0,  1.0,  "vegetable", 0, "full",    "medium", 55),
+        new("Sorrel",                PaletteKind.Plant, 1.0,  1.0,  "vegetable", 0, "partial", "medium", 60),
+        new("Endive",                PaletteKind.Plant, 1.0,  1.0,  "vegetable", 0, "partial", "medium", 85),
+        new("Radicchio",             PaletteKind.Plant, 1.0,  1.0,  "vegetable", 0, "full",    "medium", 80),
+        new("Claytonia (Miner's)",   PaletteKind.Plant, 0.5,  0.5,  "vegetable", 0, "partial", "medium", 50),
+        // Vegetables — stalks
+        new("Rhubarb",               PaletteKind.Plant, 3.0,  3.0,  "vegetable", 0, "full",    "medium", 730),
+        new("Fennel (Bulb)",         PaletteKind.Plant, 1.0,  1.0,  "vegetable", 0, "full",    "medium", 80),
+        new("Celery",                PaletteKind.Plant, 0.8,  0.8,  "vegetable", 0, "partial", "high",   100),
+        new("Artichoke",             PaletteKind.Plant, 4.0,  4.0,  "vegetable", 0, "full",    "medium", 365),
+        new("Cardoon",               PaletteKind.Plant, 4.0,  4.0,  "vegetable", 0, "full",    "medium", 365),
+        // Vegetables — grains / pseudo-grains
+        new("Quinoa",                PaletteKind.Plant, 1.5,  1.5,  "vegetable", 0, "full",    "low",    100),
+        new("Amaranth (Grain)",      PaletteKind.Plant, 2.0,  2.0,  "vegetable", 0, "full",    "low",    100),
+
+        // Herbs — culinary (expanded)
+        new("Marjoram",              PaletteKind.Plant, 1.0,  1.0,  PlantTraits.HerbCulinary, 0, "full",    "low",    80),
+        new("Tarragon",              PaletteKind.Plant, 2.0,  2.0,  PlantTraits.HerbCulinary, 0, "full",    "low",    365),
+        new("Savory (Summer)",       PaletteKind.Plant, 1.0,  1.0,  PlantTraits.HerbCulinary, 0, "full",    "low",    60),
+        new("Savory (Winter)",       PaletteKind.Plant, 1.5,  1.5,  PlantTraits.HerbCulinary, 0, "full",    "low",    365),
+        new("Lemongrass",            PaletteKind.Plant, 3.0,  3.0,  PlantTraits.HerbCulinary, 0, "full",    "medium", 120),
+        new("Lemon Verbena",         PaletteKind.Plant, 4.0,  4.0,  PlantTraits.HerbCulinary, 0, "full",    "medium", 365),
+        new("Bay Laurel",            PaletteKind.Plant, 5.0,  5.0,  PlantTraits.HerbCulinary, 0, "full",    "low",    365),
+        new("Lovage",                PaletteKind.Plant, 3.0,  3.0,  PlantTraits.HerbCulinary, 0, "partial", "medium", 365),
+        new("Hyssop",                PaletteKind.Plant, 1.5,  1.5,  PlantTraits.HerbCulinary, 0, "full",    "low",    365),
+        new("Stevia",                PaletteKind.Plant, 1.5,  1.5,  PlantTraits.HerbCulinary, 0, "full",    "medium", 100),
+        new("Fennel (Herb)",         PaletteKind.Plant, 2.0,  2.0,  PlantTraits.HerbCulinary, 0, "full",    "low",    365),
+        new("Anise Hyssop (Culinary)", PaletteKind.Plant, 1.5,  1.5, PlantTraits.HerbCulinary, 0, "full",    "low",    365),
+        new("Cumin",                 PaletteKind.Plant, 0.8,  0.8,  PlantTraits.HerbCulinary, 0, "full",    "low",    120),
+
+        // Flowers — annual (expanded)
+        new("Petunia",               PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerAnnual, 0, "full",    "medium", 70),
+        new("Snapdragon",            PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerAnnual, 0, "full",    "medium", 80),
+        new("Cosmos",                PaletteKind.Plant, 1.5,  1.5,  PlantTraits.FlowerAnnual, 0, "full",    "low",    70),
+        new("Pansy",                 PaletteKind.Plant, 0.7,  0.7,  PlantTraits.FlowerAnnual, 0, "partial", "medium", 65),
+        new("Viola",                 PaletteKind.Plant, 0.6,  0.6,  PlantTraits.FlowerAnnual, 0, "partial", "medium", 60),
+        new("Larkspur",              PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerAnnual, 0, "full",    "medium", 70),
+        new("Stock",                 PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerAnnual, 0, "full",    "medium", 70),
+        new("Sweet Alyssum",         PaletteKind.Plant, 0.7,  0.7,  PlantTraits.FlowerAnnual, 0, "full",    "low",    60),
+        new("Celosia",               PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerAnnual, 0, "full",    "medium", 80),
+        new("Strawflower",           PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerAnnual, 0, "full",    "low",    85),
+        new("Scabiosa",              PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerAnnual, 0, "full",    "medium", 80),
+        new("Nigella (Love-in-a-Mist)", PaletteKind.Plant, 1.0, 1.0, PlantTraits.FlowerAnnual, 0, "full",   "low",    70),
+        new("Ageratum",              PaletteKind.Plant, 0.8,  0.8,  PlantTraits.FlowerAnnual, 0, "full",    "medium", 70),
+        new("Gomphrena",             PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerAnnual, 0, "full",    "low",    85),
+        new("Cleome",                PaletteKind.Plant, 1.5,  1.5,  PlantTraits.FlowerAnnual, 0, "full",    "low",    80),
+        new("Salvia (Annual)",       PaletteKind.Plant, 1.2,  1.2,  PlantTraits.FlowerAnnual, 0, "full",    "low",    80),
+        new("Bachelor Button",       PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerAnnual, 0, "full",    "low",    65),
+        new("Cleome (Spider)",       PaletteKind.Plant, 1.5,  1.5,  PlantTraits.FlowerAnnual, 0, "full",    "low",    80),
+        new("Poppy (California)",    PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerAnnual, 0, "full",    "low",    60),
+        new("Impatiens",             PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerAnnual, 0, "shade",   "high",   70),
+
+        // Flowers — perennial (expanded)
+        new("Hellebore",             PaletteKind.Plant, 1.5,  1.5,  PlantTraits.FlowerPerennial, 0, "shade",   "medium", 365),
+        new("Blanket Flower",        PaletteKind.Plant, 1.5,  1.5,  PlantTraits.FlowerPerennial, 0, "full",    "low",    365),
+        new("Sedum (Autumn Joy)",    PaletteKind.Plant, 2.0,  2.0,  PlantTraits.FlowerPerennial, 0, "full",    "low",    365),
+        new("Hardy Geranium",        PaletteKind.Plant, 1.5,  1.5,  PlantTraits.FlowerPerennial, 0, "partial", "medium", 365),
+        new("Foxglove",              PaletteKind.Plant, 1.5,  1.5,  PlantTraits.FlowerPerennial, 0, "partial", "medium", 365),
+        new("Monkshood",             PaletteKind.Plant, 1.5,  1.5,  PlantTraits.FlowerPerennial, 0, "partial", "medium", 365),
+        new("Yarrow (Ornamental)",   PaletteKind.Plant, 2.0,  2.0,  PlantTraits.FlowerPerennial, 0, "full",    "low",    365),
+        new("Liatris",               PaletteKind.Plant, 1.0,  1.0,  PlantTraits.FlowerPerennial, 0, "full",    "low",    365),
+        new("Heuchera",              PaletteKind.Plant, 1.5,  1.5,  PlantTraits.FlowerPerennial, 0, "partial", "medium", 365),
+        new("Tiarella",              PaletteKind.Plant, 1.2,  1.2,  PlantTraits.FlowerPerennial, 0, "shade",   "medium", 365),
+        new("Baptisia",              PaletteKind.Plant, 3.0,  3.0,  PlantTraits.FlowerPerennial, 0, "full",    "low",    365),
+        new("Catmint",               PaletteKind.Plant, 2.5,  2.5,  PlantTraits.FlowerPerennial, 0, "full",    "low",    365),
+        new("Lamb's Ear (Stachys)",  PaletteKind.Plant, 1.5,  1.5,  PlantTraits.FlowerPerennial, 0, "full",    "low",    365),
+
+        // Berries — groundcover (reclassified strawberries)
+        new("Strawberry (June-bearing)", PaletteKind.Plant, 1.0, 1.0, PlantTraits.BerryGroundcover, 0, "full", "medium", 365),
+        new("Strawberry (Day-neutral)",  PaletteKind.Plant, 1.0, 1.0, PlantTraits.BerryGroundcover, 0, "full", "medium", 365),
+        new("Alpine Strawberry",         PaletteKind.Plant, 0.8, 0.8, PlantTraits.BerryGroundcover, 0, "partial", "medium", 365),
 
         // Cover crops are broadcast over an area, not stamped individually. Treat them as
         // surface ground covers so selecting one activates the area-drawing tool.
@@ -494,9 +672,16 @@ public static class PaletteCatalog
             PaletteCategory.TreesOrnamentalFlowering => [.. Trees.Where(t => string.Equals(t.Trait, "flower", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.TreesShade => [.. Trees.Where(t => string.Equals(t.Trait, "shade", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.TreesEvergreen => [.. Trees.Where(t => string.Equals(t.Trait, "evergreen", StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.TreesOrnamentalForm => [.. Trees.Where(t => string.Equals(t.Trait, PlantTraits.OrnamentalForm, StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.ShrubsBerry => [.. Bushes.Where(IsEdibleBush)],
-            PaletteCategory.ShrubsFlowering => [.. Bushes.Where(b => !IsEdibleBush(b) && !string.Equals(b.Trait, "evergreen", StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.ShrubsFlowering => [.. Bushes.Where(b => !IsEdibleBush(b) && !string.Equals(b.Trait, "evergreen", StringComparison.OrdinalIgnoreCase) && !IsDeciduousShrub(b) && !IsDwarfConifer(b))],
             PaletteCategory.ShrubsEvergreen => [.. Bushes.Where(b => string.Equals(b.Trait, "evergreen", StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.ShrubsDeciduous => [.. Bushes.Where(IsDeciduousShrub)],
+            PaletteCategory.ShrubsDwarfConifer => [.. Bushes.Where(IsDwarfConifer)],
+            PaletteCategory.BerriesCane => [.. Bushes.Where(b => string.Equals(b.Trait, PlantTraits.BerryCane, StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.BerriesBush => [.. Bushes.Where(b => string.Equals(b.Trait, PlantTraits.BerryBush, StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.BerriesGroundcover => [.. Plants.Where(p => string.Equals(p.Trait, PlantTraits.BerryGroundcover, StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.BerriesUnusual => [.. Bushes.Where(b => string.Equals(b.Trait, PlantTraits.BerryUnusual, StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.VinesEdible => [.. Plants.Where(p => string.Equals(p.Trait, "vine-edible", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.VinesOrnamental => [.. Plants.Where(p => string.Equals(p.Trait, "vine-ornamental", StringComparison.OrdinalIgnoreCase))],
             PaletteCategory.Vegetables => [.. Plants.Where(p => string.Equals(p.Trait, "vegetable", StringComparison.OrdinalIgnoreCase))],
@@ -508,7 +693,13 @@ public static class PaletteCatalog
             PaletteCategory.GroundCoverMaterials => GroundCoverMaterials,
             PaletteCategory.GroundCoverSurface => GroundCoverSurfaceCovers,
             PaletteCategory.Edging => Edging,
-            PaletteCategory.Bulbs => [.. Plants.Where(p => string.Equals(p.Trait, "bulb", StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.Bulbs => [.. Plants.Where(p => string.Equals(p.Trait, "bulb", StringComparison.OrdinalIgnoreCase) || string.Equals(p.Trait, PlantTraits.BulbSpringPlanted, StringComparison.OrdinalIgnoreCase) || string.Equals(p.Trait, PlantTraits.BulbFallPlanted, StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.BulbsSpringPlanted => [.. Plants.Where(p => string.Equals(p.Trait, PlantTraits.BulbSpringPlanted, StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.BulbsFallPlanted => [.. Plants.Where(p => string.Equals(p.Trait, PlantTraits.BulbFallPlanted, StringComparison.OrdinalIgnoreCase))],
+            PaletteCategory.CoverCropsLegume => [.. Plants.Where(p => string.Equals(p.Trait, PlantTraits.CoverCropLegume, StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(g => string.Equals(g.Trait, PlantTraits.CoverCropLegume, StringComparison.OrdinalIgnoreCase)))],
+            PaletteCategory.CoverCropsGrass => [.. Plants.Where(p => string.Equals(p.Trait, PlantTraits.CoverCropGrass, StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(g => string.Equals(g.Trait, PlantTraits.CoverCropGrass, StringComparison.OrdinalIgnoreCase)))],
+            PaletteCategory.CoverCropsBrassica => [.. Plants.Where(p => string.Equals(p.Trait, PlantTraits.CoverCropBrassica, StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(g => string.Equals(g.Trait, PlantTraits.CoverCropBrassica, StringComparison.OrdinalIgnoreCase)))],
+            PaletteCategory.CoverCropsForb => [.. Plants.Where(p => string.Equals(p.Trait, PlantTraits.CoverCropForb, StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(g => string.Equals(g.Trait, PlantTraits.CoverCropForb, StringComparison.OrdinalIgnoreCase)))],
             PaletteCategory.GroundCoverPlants => [.. GroundCoverSurfaceCovers.Where(IsGroundCoverPlantSurfaceItem)],
             PaletteCategory.SoilMarkers => SoilMarkers,
             PaletteCategory.GrassesTurf => [.. Grasses.Where(g => g.Kind == PaletteKind.GroundCoverSurface)],
@@ -534,12 +725,18 @@ public static class PaletteCatalog
                 "flower" => PaletteCategory.TreesOrnamentalFlowering,
                 "shade" => PaletteCategory.TreesShade,
                 "evergreen" => PaletteCategory.TreesEvergreen,
+                PlantTraits.OrnamentalForm => PaletteCategory.TreesOrnamentalForm,
                 _ => PaletteCategory.TreesOrnamentalFlowering,
             },
             PaletteKind.Bush => item.Trait?.ToLowerInvariant() switch
             {
                 "fruit" => PaletteCategory.ShrubsBerry,
                 "evergreen" => PaletteCategory.ShrubsEvergreen,
+                PlantTraits.DeciduousShrub => PaletteCategory.ShrubsDeciduous,
+                PlantTraits.DwarfConifer => PaletteCategory.ShrubsDwarfConifer,
+                PlantTraits.BerryCane => PaletteCategory.BerriesCane,
+                PlantTraits.BerryBush => PaletteCategory.BerriesBush,
+                PlantTraits.BerryUnusual => PaletteCategory.BerriesUnusual,
                 _ => PaletteCategory.ShrubsFlowering,
             },
             PaletteKind.Plant => item.Trait?.ToLowerInvariant() switch
@@ -550,10 +747,17 @@ public static class PaletteCatalog
                 "flower" or "flower-annual" => PaletteCategory.FlowersAnnual,
                 "flower-perennial" => PaletteCategory.FlowersPerennial,
                 "bulb" => PaletteCategory.Bulbs,
+                PlantTraits.BulbSpringPlanted => PaletteCategory.BulbsSpringPlanted,
+                PlantTraits.BulbFallPlanted => PaletteCategory.BulbsFallPlanted,
+                PlantTraits.BerryGroundcover => PaletteCategory.BerriesGroundcover,
                 "groundcover" or "ground-cover" => PaletteCategory.GroundCoverPlants,
                 "succulent" => PaletteCategory.Succulents,
                 "pollinator-native" => PaletteCategory.PollinatorNatives,
                 "cover-crop" => PaletteCategory.CoverCrops,
+                PlantTraits.CoverCropLegume => PaletteCategory.CoverCropsLegume,
+                PlantTraits.CoverCropGrass => PaletteCategory.CoverCropsGrass,
+                PlantTraits.CoverCropBrassica => PaletteCategory.CoverCropsBrassica,
+                PlantTraits.CoverCropForb => PaletteCategory.CoverCropsForb,
                 "vine-edible" => PaletteCategory.VinesEdible,
                 "vine-ornamental" => PaletteCategory.VinesOrnamental,
                 _ => PaletteCategory.Vegetables,
@@ -592,7 +796,20 @@ public static class PaletteCatalog
 
     private static bool IsEdibleBush(PaletteItem b)
     {
-        return string.Equals(b.Trait, "fruit", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(b.Trait, "fruit", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(b.Trait, PlantTraits.BerryCane, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(b.Trait, PlantTraits.BerryBush, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(b.Trait, PlantTraits.BerryUnusual, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDeciduousShrub(PaletteItem b)
+    {
+        return string.Equals(b.Trait, PlantTraits.DeciduousShrub, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDwarfConifer(PaletteItem b)
+    {
+        return string.Equals(b.Trait, PlantTraits.DwarfConifer, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsGroundCoverPlantSurfaceItem(PaletteItem item)

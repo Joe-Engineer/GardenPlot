@@ -266,6 +266,56 @@ internal static class DiscoveryCategories
             "Aucuba", "Mahonia", "Skimmia", "Arctostaphylos", "Gaultheria",
             "Leucothoe",
         ],
+        ["shrubs-deciduous"] =
+        [
+            "Cotinus", "Physocarpus", "Weigela", "Hamamelis", "Callicarpa",
+            "Philadelphus", "Fothergilla", "Itea", "Clethra", "Sambucus",
+            "Cornus", "Lindera", "Aronia", "Calycanthus",
+        ],
+        ["shrubs-dwarf-conifer"] =
+        [
+            "Pinus", "Picea", "Chamaecyparis", "Juniperus", "Thuja",
+            "Cryptomeria", "Microbiota", "Tsuga", "Taxus", "Cedrus",
+        ],
+        ["trees-ornamental-form"] =
+        [
+            "Acer", "Prunus", "Carpinus", "Fagus", "Salix", "Cercidiphyllum",
+            "Betula", "Buxus", "Malus",
+        ],
+        ["berries-cane"] =
+        [
+            "Rubus",
+        ],
+        ["berries-bush"] =
+        [
+            "Vaccinium", "Ribes", "Sambucus", "Lonicera", "Aronia",
+            "Amelanchier",
+        ],
+        ["berries-groundcover"] =
+        [
+            "Fragaria", "Vaccinium", "Gaultheria",
+        ],
+        ["berries-unusual"] =
+        [
+            "Lycium", "Hippophae", "Asimina", "Diospyros", "Cornus",
+            "Elaeagnus", "Schisandra",
+        ],
+        ["cover-crops-legume"] =
+        [
+            "Trifolium", "Vicia", "Pisum", "Medicago", "Lupinus", "Lablab",
+        ],
+        ["cover-crops-grass"] =
+        [
+            "Secale", "Triticum", "Avena", "Hordeum", "Sorghum", "Lolium",
+        ],
+        ["cover-crops-brassica"] =
+        [
+            "Raphanus", "Sinapis", "Brassica",
+        ],
+        ["cover-crops-forb"] =
+        [
+            "Fagopyrum", "Phacelia", "Helianthus",
+        ],
         ["vines-edible"] =
         [
             "Vitis", "Actinidia", "Passiflora", "Humulus",

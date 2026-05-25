@@ -203,6 +203,12 @@ Dictionary<string, PlantProfile> merged = seed.Profiles is null
 
 int updated = 0;
 int added = 0;
+Dictionary<string, PaletteItem> codeToItem = new(StringComparer.OrdinalIgnoreCase);
+foreach (PaletteItem item in PaletteCatalog.Trees.Concat(PaletteCatalog.Bushes).Concat(PaletteCatalog.Plants).Concat(PaletteCatalog.Grasses))
+{
+    codeToItem[item.Code] = item;
+}
+
 foreach (string code in codes)
 {
     string? sciName = codeToSciName[code];
@@ -213,10 +219,11 @@ foreach (string code in codes)
 
     UsdaPlant? usdaRecord = usdaCache.TryGetValue(sciName, out UsdaPlant? u) ? u : null;
     WikidataTaxon? wikiRecord = wikidataResults.TryGetValue(sciName, out WikidataTaxon? w) ? w : null;
+    PaletteItem? paletteItem = codeToItem.TryGetValue(code, out PaletteItem? pi) ? pi : null;
 
     bool isNew = !merged.ContainsKey(code);
     PlantProfile? existing = isNew ? null : merged[code];
-    PlantProfile newProfile = ProfileMerger.Merge(existing, usdaRecord, wikiRecord, sciName, retrievedOn);
+    PlantProfile newProfile = ProfileMerger.Merge(existing, usdaRecord, wikiRecord, sciName, retrievedOn, paletteItem);
     merged[code] = newProfile;
 
     if (isNew)

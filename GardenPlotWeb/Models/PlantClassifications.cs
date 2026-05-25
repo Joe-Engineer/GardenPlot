@@ -1,4 +1,4 @@
-// <copyright file="PlantClassifications.cs" company="Garden Plot">
+﻿// <copyright file="PlantClassifications.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -33,5 +33,14 @@ public enum ToxicityLevel
     Mild,
     Moderate,
     Severe,
+}
+
+/// <summary>Plant lifecycle classification used by the palette filter.</summary>
+public enum Lifecycle
+{
+    Annual,
+    Biennial,
+    Perennial,
+    TenderPerennial,
 }
 

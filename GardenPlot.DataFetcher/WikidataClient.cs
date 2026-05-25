@@ -132,7 +132,7 @@ internal sealed class WikidataClient
         }
 
         string query = $$"""
-            SELECT ?taxon ?taxonName ?familyLabel ?genusLabel ?image ?wikipediaArticle ?commonNameLabel ?nativeRangeLabel WHERE {
+            SELECT ?taxon ?taxonName ?familyLabel ?genusLabel ?image ?wikipediaArticle ?commonNameLabel ?nativeRangeLabel ?instanceOf WHERE {
               VALUES ?taxonName { {{values}} }
               ?taxon wdt:P225 ?taxonName .
               OPTIONAL { ?taxon wdt:P171 ?genus . ?genus wdt:P105 wd:Q34740 . }
@@ -140,6 +140,7 @@ internal sealed class WikidataClient
               OPTIONAL { ?taxon wdt:P18 ?image . }
               OPTIONAL { ?taxon wdt:P1843 ?commonName . FILTER(LANG(?commonName) = "en") }
               OPTIONAL { ?taxon wdt:P183 ?nativeRange . }
+              OPTIONAL { ?taxon wdt:P31 ?instanceOf . }
               OPTIONAL {
                 ?wikipediaArticle schema:about ?taxon ;
                                   schema:isPartOf <https://en.wikipedia.org/> .
@@ -199,6 +200,17 @@ internal sealed class WikidataClient
             {
                 existing.NativeRange.Add(range);
             }
+
+            string? instanceOfUri = GetBindingValue(binding, "instanceOf");
+            if (!string.IsNullOrWhiteSpace(instanceOfUri))
+            {
+                int slash = instanceOfUri.LastIndexOf('/');
+                string qid = slash >= 0 ? instanceOfUri[(slash + 1)..] : instanceOfUri;
+                if (qid.Length > 0 && !existing.InstanceOfQids.Contains(qid, StringComparer.Ordinal))
+                {
+                    existing.InstanceOfQids.Add(qid);
+                }
+            }
         }
     }
 
@@ -235,4 +247,7 @@ internal sealed class WikidataTaxon
     public List<string> CommonNames { get; } = [];
 
     public List<string> NativeRange { get; } = [];
+
+    /// <summary>Wikidata QIDs from <c>wdt:P31</c> (instance of), e.g. <c>Q166713</c> = annual plant.</summary>
+    public List<string> InstanceOfQids { get; } = [];
 }

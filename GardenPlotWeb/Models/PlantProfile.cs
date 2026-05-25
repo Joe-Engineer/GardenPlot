@@ -1,4 +1,4 @@
-// <copyright file="PlantProfile.cs" company="Garden Plot">
+﻿// <copyright file="PlantProfile.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -96,5 +96,11 @@ public sealed record PlantProfile(
     string? DescriptionLicense = null,
     string? ImageLicense = null,
     string? VersionDate = null,
-    SourceProvenance[]? Sources = null);
+    SourceProvenance[]? Sources = null,
+
+    // Lifecycle & use flags (additive; populated heuristically or via overrides)
+    Lifecycle? Lifecycle = null,
+    bool ContainerFriendly = false,
+    bool CutFlower = false,
+    bool Edible = false);
 

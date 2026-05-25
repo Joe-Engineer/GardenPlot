@@ -4809,9 +4809,16 @@ public partial class GardenPlot
         PaletteCategory.TreesOrnamentalFlowering => "Trees — Flowering",
         PaletteCategory.TreesShade => "Trees — Shade",
         PaletteCategory.TreesEvergreen => "Trees — Evergreen",
+        PaletteCategory.TreesOrnamentalForm => "Trees — Ornamental Form",
         PaletteCategory.ShrubsBerry => "Shrubs — Berry",
         PaletteCategory.ShrubsFlowering => "Shrubs — Flowering",
         PaletteCategory.ShrubsEvergreen => "Shrubs — Evergreen",
+        PaletteCategory.ShrubsDeciduous => "Shrubs — Deciduous",
+        PaletteCategory.ShrubsDwarfConifer => "Shrubs — Dwarf Conifer",
+        PaletteCategory.BerriesCane => "Berries — Cane",
+        PaletteCategory.BerriesBush => "Berries — Bush",
+        PaletteCategory.BerriesGroundcover => "Berries — Groundcover",
+        PaletteCategory.BerriesUnusual => "Berries — Unusual",
         PaletteCategory.VinesEdible => "Vines — Edible",
         PaletteCategory.VinesOrnamental => "Vines — Ornamental",
         PaletteCategory.Vegetables => "Vegetables",
@@ -4820,6 +4827,8 @@ public partial class GardenPlot
         PaletteCategory.FlowersAnnual => "Flowers — Annual",
         PaletteCategory.FlowersPerennial => "Flowers — Perennial",
         PaletteCategory.Bulbs => "Bulbs",
+        PaletteCategory.BulbsSpringPlanted => "Bulbs — Spring-planted",
+        PaletteCategory.BulbsFallPlanted => "Bulbs — Fall-planted",
         PaletteCategory.FocalPoint => "Focal Points",
         PaletteCategory.GroundCoverPlants => "Ground Cover Plants",
         PaletteCategory.GroundCoverMaterials => "Materials — Ground Cover",
@@ -4831,6 +4840,10 @@ public partial class GardenPlot
         PaletteCategory.Succulents => "Succulents & Cacti",
         PaletteCategory.PollinatorNatives => "Pollinator Natives",
         PaletteCategory.CoverCrops => "Cover Crops",
+        PaletteCategory.CoverCropsLegume => "Cover Crops — Legume",
+        PaletteCategory.CoverCropsGrass => "Cover Crops — Grass",
+        PaletteCategory.CoverCropsBrassica => "Cover Crops — Brassica",
+        PaletteCategory.CoverCropsForb => "Cover Crops — Forb",
         PaletteCategory.CustomTiles => "Custom Tiles",
         PaletteCategory.GroundCoverAssemblies => "Materials — Assemblies",
         _ => k.ToString(),
@@ -4866,7 +4879,8 @@ public partial class GardenPlot
 
         if (currentCategory == PaletteCategory.SoilMarkers || (region is null && !nativeOnly))
         {
-            return [.. source.OrderBy(i => i.Code, StringComparer.OrdinalIgnoreCase)];
+            IReadOnlyList<PaletteItem> chipped = ApplyChipFilters(source);
+            return [.. chipped.OrderBy(i => i.Code, StringComparer.OrdinalIgnoreCase)];
         }
 
         List<PaletteItem> filtered = new();
@@ -4911,7 +4925,7 @@ public partial class GardenPlot
         }
 
         filtered.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Code, b.Code));
-        return filtered;
+        return ApplyChipFilters(filtered);
     }
 
     private ClimateRegion? PaletteRegionFilter
@@ -4936,6 +4950,243 @@ public partial class GardenPlot
         library.Ui.PaletteNativeOnly = e.Value is bool b && b;
         await SaveAsync();
         StateHasChanged();
+    }
+
+    // ===== Phase 3: palette enablement, filter chips, item-details dialog =====
+
+    private bool paletteSettingsVisible;
+    private bool plantDetailsVisible;
+    private PaletteItem? plantDetailsItem;
+
+    /// <summary>Categories the user has enabled (subset of <see cref="PaletteCategory"/>).</summary>
+    private IEnumerable<PaletteCategory> EnabledCategories()
+    {
+        return System.Enum.GetValues<PaletteCategory>().Where(c => library.Ui.IsPaletteCategoryEnabled(c));
+    }
+
+    private bool IsPaletteCategoryEnabled(PaletteCategory category) => library.Ui.IsPaletteCategoryEnabled(category);
+
+    private void ShowPaletteSettings()
+    {
+        paletteSettingsVisible = true;
+        StateHasChanged();
+    }
+
+    private async Task SavePaletteSettingsAsync(HashSet<PaletteCategory> enabled)
+    {
+        library.Ui.EnabledPaletteCategories = enabled;
+        if (!enabled.Contains(currentCategory) && enabled.Count > 0)
+        {
+            SetCategory(enabled.First());
+        }
+
+        paletteSettingsVisible = false;
+        await SaveAsync();
+        StateHasChanged();
+    }
+
+    private void ClosePaletteSettings()
+    {
+        paletteSettingsVisible = false;
+        StateHasChanged();
+    }
+
+    private void ShowPlantDetails(PaletteItem item)
+    {
+        plantDetailsItem = item;
+        plantDetailsVisible = true;
+        StateHasChanged();
+    }
+
+    private void ClosePlantDetails()
+    {
+        plantDetailsVisible = false;
+        StateHasChanged();
+    }
+
+    private string GetPlantNotes(PaletteItem? item)
+    {
+        if (item is null)
+        {
+            return string.Empty;
+        }
+
+        return library.Ui.PaletteItemNotes.TryGetValue(item.Code, out string? n) ? n : string.Empty;
+    }
+
+    private async Task SavePlantNotesAsync(string notes)
+    {
+        if (plantDetailsItem is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            _ = library.Ui.PaletteItemNotes.Remove(plantDetailsItem.Code);
+        }
+        else
+        {
+            library.Ui.PaletteItemNotes[plantDetailsItem.Code] = notes;
+        }
+
+        await SaveAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnPaletteLifecycleChanged(Lifecycle? lifecycle)
+    {
+        library.Ui.PaletteLifecycleFilter = lifecycle;
+        await SaveAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnPaletteContainerOnlyChanged(bool value)
+    {
+        library.Ui.PaletteContainerOnly = value;
+        await SaveAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnPalettePollinatorOnlyChanged(bool value)
+    {
+        library.Ui.PalettePollinatorOnly = value;
+        await SaveAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnPaletteCutFlowerOnlyChanged(bool value)
+    {
+        library.Ui.PaletteCutFlowerOnly = value;
+        await SaveAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnPaletteDeciduousOnlyChanged(bool value)
+    {
+        library.Ui.PaletteDeciduousOnly = value;
+        await SaveAsync();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Apply the chip-row filters (lifecycle, container, pollinator, cut-flower, deciduous) on
+    /// top of any region/native filter already applied. Items with no profile data are excluded
+    /// when a narrowing filter is active and we cannot otherwise infer the attribute.
+    /// </summary>
+    private IReadOnlyList<PaletteItem> ApplyChipFilters(IReadOnlyList<PaletteItem> source)
+    {
+        Lifecycle? lifecycle = library.Ui.PaletteLifecycleFilter;
+        bool container = library.Ui.PaletteContainerOnly;
+        bool pollinator = library.Ui.PalettePollinatorOnly;
+        bool cutFlower = library.Ui.PaletteCutFlowerOnly;
+        bool deciduous = library.Ui.PaletteDeciduousOnly;
+
+        if (lifecycle is null && !container && !pollinator && !cutFlower && !deciduous)
+        {
+            return source;
+        }
+
+        List<PaletteItem> result = new(source.Count);
+        foreach (PaletteItem item in source)
+        {
+            PlantProfile? profile = PlantProfiles.GetProfile(item);
+
+            if (lifecycle is { } lc && InferLifecycle(item, profile) != lc)
+            {
+                continue;
+            }
+
+            if (container && !IsContainerFriendly(item, profile))
+            {
+                continue;
+            }
+
+            if (pollinator && !IsPollinatorFriendly(profile))
+            {
+                continue;
+            }
+
+            if (cutFlower && !IsCutFlower(item, profile))
+            {
+                continue;
+            }
+
+            if (deciduous && !IsDeciduous(item, profile))
+            {
+                continue;
+            }
+
+            result.Add(item);
+        }
+
+        return result;
+    }
+
+    private static Lifecycle InferLifecycle(PaletteItem item, PlantProfile? profile)
+    {
+        if (profile?.Lifecycle is { } explicitLc)
+        {
+            return explicitLc;
+        }
+
+        string trait = (item.Trait ?? string.Empty).ToLowerInvariant();
+        return trait switch
+        {
+            "vegetable" => Lifecycle.Annual,
+            "flower-annual" or "flower" => Lifecycle.Annual,
+            "cover-crop" or PlantTraits.CoverCropLegume or PlantTraits.CoverCropGrass
+                or PlantTraits.CoverCropBrassica or PlantTraits.CoverCropForb => Lifecycle.Annual,
+            _ => Lifecycle.Perennial,
+        };
+    }
+
+    private static bool IsContainerFriendly(PaletteItem item, PlantProfile? profile)
+    {
+        if (profile is { ContainerFriendly: true })
+        {
+            return true;
+        }
+
+        // Heuristic: anything small enough to fit a reasonably-sized container.
+        return item.Kind is PaletteKind.Plant && item.WidthFt <= 2.5;
+    }
+
+    private static bool IsPollinatorFriendly(PlantProfile? profile)
+    {
+        return profile is { PollinatorValue.Length: > 0 } || profile is { HostPlantInfo.Length: > 0 };
+    }
+
+    private static bool IsCutFlower(PaletteItem item, PlantProfile? profile)
+    {
+        if (profile is { CutFlower: true })
+        {
+            return true;
+        }
+
+        string trait = (item.Trait ?? string.Empty).ToLowerInvariant();
+        return trait is "flower-annual" or "flower-perennial" or "flower";
+    }
+
+    private static bool IsDeciduous(PaletteItem item, PlantProfile? profile)
+    {
+        if (item.Kind is not (PaletteKind.Tree or PaletteKind.Bush))
+        {
+            return false;
+        }
+
+        if (profile is { Evergreen: true })
+        {
+            return false;
+        }
+
+        string trait = (item.Trait ?? string.Empty).ToLowerInvariant();
+        if (trait is "evergreen" or PlantTraits.DwarfConifer)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private async Task AddCustomTileAsync()
@@ -6664,8 +6915,10 @@ public partial class GardenPlot
                     ? ((s % rowTotal) + rowTotal) % rowTotal
                     : Math.Clamp(s, 0, rowTotal);
                 var (pos, tangent) = PolylineSampler.SampleAt(rowPath, wrapped, closed);
-                shape.X = pos.X;
-                shape.Y = pos.Y;
+                // pos is the desired center on the offset polyline; Shape.X/Y are stored as
+                // the top-left of the bounding box, so subtract half the width/height.
+                shape.X = pos.X - (shape.W / 2);
+                shape.Y = pos.Y - (shape.H / 2);
                 if (group.AlignToTangent)
                 {
                     shape.Rotation = Math.Atan2(tangent.Y, tangent.X) * 180.0 / Math.PI;
@@ -6673,12 +6926,12 @@ public partial class GardenPlot
             }
         }
 
-        // Refresh group anchor to the first member's new position so subsequent UI ops stay aligned.
+        // Refresh group anchor to the first member's new center so subsequent UI ops stay aligned.
         if (members.Count > 0)
         {
             var first = members.OrderBy(m => m.GroupIndex ?? 0).First();
-            group.AnchorCenterX = first.X;
-            group.AnchorCenterY = first.Y;
+            group.AnchorCenterX = first.X + (first.W / 2);
+            group.AnchorCenterY = first.Y + (first.H / 2);
         }
 
         return true;
@@ -10741,6 +10994,132 @@ public partial class GardenPlot
         await ReflowAlongPathGroupsForSourceShapes(movedSourceShapeIds, save: false);
         SyncDropGroupsFromCurrentShapes();
         await SaveAsync();
+    }
+
+    /// <summary>
+    /// True when the current selection is an entire <see cref="DropPattern.AlongPath"/> drop group
+    /// whose source path still exists and has positive length. Drives visibility of the
+    /// <c>Distribute Evenly Along Path</c> button.
+    /// </summary>
+    private bool IsSelectionAlongPathGroup()
+    {
+        var group = GetCurrentSelectedDropGroup();
+        if (group is null || group.Pattern != DropPattern.AlongPath)
+        {
+            return false;
+        }
+
+        return GetAlongPathSourceShape(group) is { } source && TotalPathLengthFt(source) > 0;
+    }
+
+    /// <summary>
+    /// Redistributes the existing items of an along-path drop group with equal arc-length
+    /// spacing. The total inter-item gap (including the closure gap for closed paths) is
+    /// divided by the number of gaps, and that becomes the new spacing. Each member's
+    /// persisted <c>AlongPathArcLengthFt</c> is rewritten so the anchored reflow places it
+    /// at the new even position; the first member (by <c>GroupIndex</c>) keeps its current
+    /// arc position so the sequence doesn't visually rotate around the path.
+    /// </summary>
+    private async Task DistributeAlongPathEvenly()
+    {
+        var group = GetCurrentSelectedDropGroup();
+        if (group is null || group.Pattern != DropPattern.AlongPath)
+        {
+            return;
+        }
+
+        var source = GetAlongPathSourceShape(group);
+        if (source is null)
+        {
+            return;
+        }
+
+        var members = GroupShapesOrdered(group.Id);
+        if (members.Count < 2)
+        {
+            return;
+        }
+
+        // Per-shape anchors are required; without them the reflow falls back to the
+        // legacy template path which would scatter every item.
+        if (members.Any(m => m.AlongPathOffsetFt is null || m.AlongPathArcLengthFt is null))
+        {
+            return;
+        }
+
+        var (points, closed) = ResolvePathPoints(source);
+        if (points.Count < 2)
+        {
+            return;
+        }
+
+        // Each row (one per distinct perpendicular offset) lives on its own offset polyline.
+        // Distribute within each row independently, then publish the spacing of the largest
+        // row to the group's UI-visible SpacingFtOverride.
+        var byOffset = members
+            .GroupBy(m => Math.Round(m.AlongPathOffsetFt!.Value, 6))
+            .ToList();
+
+        double newSpacingFt = 0;
+
+        foreach (var grp in byOffset)
+        {
+            double offsetFt = grp.Key;
+            IReadOnlyList<Point> rowPath = Math.Abs(offsetFt) > 1e-9
+                ? AlongPathBuilder.BuildOffsetPolyline(points, closed, offsetFt)
+                : points;
+            double rowLen = PolylineSampler.TotalLengthFt(rowPath, closed);
+            if (rowLen <= 0)
+            {
+                continue;
+            }
+
+            var sortedShapes = grp.OrderBy(m => m.GroupIndex ?? int.MaxValue).ThenBy(m => m.Id).ToList();
+            int n = sortedShapes.Count;
+            if (n < 2)
+            {
+                continue;
+            }
+
+            // Closed path: N gaps cover L → step = L / N.
+            // Open path:   (N-1) gaps cover the run → step = L / (N-1).
+            double step = rowLen / (closed ? n : n - 1);
+
+            // Anchor: keep the first member's current arc-length so the row visually rotates
+            // around its existing start rather than snapping back to the path's seam.
+            double anchorArc = sortedShapes[0].AlongPathArcLengthFt!.Value;
+            if (closed)
+            {
+                anchorArc = ((anchorArc % rowLen) + rowLen) % rowLen;
+            }
+            else
+            {
+                anchorArc = Math.Clamp(anchorArc, 0, rowLen);
+            }
+
+            for (int i = 0; i < n; i++)
+            {
+                double s = anchorArc + (i * step);
+                if (closed)
+                {
+                    s = ((s % rowLen) + rowLen) % rowLen;
+                }
+
+                sortedShapes[i].AlongPathArcLengthFt = s;
+            }
+
+            if (step > newSpacingFt)
+            {
+                newSpacingFt = step;
+            }
+        }
+
+        if (newSpacingFt > 0)
+        {
+            group.SpacingFtOverride = Math.Clamp(newSpacingFt, 0.1, 200);
+        }
+
+        await ReflowDropGroup(group);
     }
 
     private static (double minX, double minY, double maxX, double maxY) RotatedAABB(Shape s)

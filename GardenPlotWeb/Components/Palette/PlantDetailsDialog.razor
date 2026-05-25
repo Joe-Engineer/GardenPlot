@@ -1,0 +1,232 @@
+﻿@* Copyright (c) Garden Plot. All rights reserved. *@
+@using GardenPlotWeb.Models
+@using GardenPlotWeb.Services
+@inject IPlantProfileService PlantProfiles
+
+@if (Visible && Item is not null)
+{
+    var profile = PlantProfiles.GetProfile(Item);
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="plant-details-title"
+         @onkeydown="OnKeyDown">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="plant-details-title">@Item.Code</h5>
+                        @if (profile?.ScientificName is { Length: > 0 } sci)
+                        {
+                            <div class="text-muted fst-italic small">@sci</div>
+                        }
+                    </div>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="OnCloseAsync" @ref="closeButton"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-2">
+                        <dt class="col-sm-4">Kind</dt>
+                        <dd class="col-sm-8">@Item.Kind</dd>
+
+                        <dt class="col-sm-4">Trait</dt>
+                        <dd class="col-sm-8">@(string.IsNullOrEmpty(Item.Trait) ? "—" : Item.Trait)</dd>
+
+                        <dt class="col-sm-4">Spacing / mature size</dt>
+                        <dd class="col-sm-8">@Item.WidthFt.ToString("0.##")&prime; × @Item.HeightFt.ToString("0.##")&prime;</dd>
+
+                        @if (Item.Sunlight is { Length: > 0 })
+                        {
+                            <dt class="col-sm-4">Sunlight</dt>
+                            <dd class="col-sm-8">@Item.Sunlight</dd>
+                        }
+                        @if (Item.Water is { Length: > 0 })
+                        {
+                            <dt class="col-sm-4">Water</dt>
+                            <dd class="col-sm-8">@Item.Water</dd>
+                        }
+                        @if (Item.DaysToMaturity > 0)
+                        {
+                            <dt class="col-sm-4">Days to maturity</dt>
+                            <dd class="col-sm-8">@Item.DaysToMaturity</dd>
+                        }
+                    </dl>
+
+                    @if (profile is null)
+                    {
+                        <div class="alert alert-light small">No extended profile data is available for this item yet.</div>
+                    }
+                    else
+                    {
+                        <hr />
+                        <dl class="row mb-2">
+                            @if (profile.Family is { Length: > 0 })
+                            {
+                                <dt class="col-sm-4">Family</dt><dd class="col-sm-8">@profile.Family</dd>
+                            }
+                            @if (profile.Genus is { Length: > 0 })
+                            {
+                                <dt class="col-sm-4">Genus</dt><dd class="col-sm-8">@profile.Genus</dd>
+                            }
+                            @if (profile.CommonNames is { Length: > 0 })
+                            {
+                                <dt class="col-sm-4">Common names</dt>
+                                <dd class="col-sm-8">@string.Join(", ", profile.CommonNames)</dd>
+                            }
+                            @if (profile.Hardiness is { } hz)
+                            {
+                                <dt class="col-sm-4">Hardiness</dt>
+                                <dd class="col-sm-8">USDA zones @hz.MinZone–@hz.MaxZone</dd>
+                            }
+                            @if (profile.NativeRegions is { Length: > 0 } natives)
+                            {
+                                <dt class="col-sm-4">Native to</dt>
+                                <dd class="col-sm-8">@string.Join(", ", natives.Select(r => ClimateRegions.Get(r).Label))</dd>
+                            }
+                            @if (profile.GrowRegions is { Length: > 0 } grows)
+                            {
+                                <dt class="col-sm-4">Grows in</dt>
+                                <dd class="col-sm-8">@string.Join(", ", grows.Select(r => ClimateRegions.Get(r).Label))</dd>
+                            }
+                            @if (profile.PollinatorValue is { Length: > 0 })
+                            {
+                                <dt class="col-sm-4">Pollinator value</dt><dd class="col-sm-8">@profile.PollinatorValue</dd>
+                            }
+                            @if (profile.BloomTime is { Length: > 0 })
+                            {
+                                <dt class="col-sm-4">Bloom</dt><dd class="col-sm-8">@profile.BloomTime @(profile.BloomColor is { Length: > 0 } bc ? $"({bc})" : "")</dd>
+                            }
+                            <dt class="col-sm-4">Evergreen</dt><dd class="col-sm-8">@(profile.Evergreen ? "Yes" : "No")</dd>
+                            <dt class="col-sm-4">Drought tolerant</dt><dd class="col-sm-8">@(profile.DroughtTolerant ? "Yes" : "No")</dd>
+                            <dt class="col-sm-4">Deer resistant</dt><dd class="col-sm-8">@(profile.DeerResistant ? "Yes" : "No")</dd>
+                            @if (profile.Lifecycle is { } lc)
+                            {
+                                <dt class="col-sm-4">Lifecycle</dt><dd class="col-sm-8">@lc</dd>
+                            }
+                            @if (profile.ContainerFriendly)
+                            {
+                                <dt class="col-sm-4">Container-friendly</dt><dd class="col-sm-8">Yes</dd>
+                            }
+                            @if (profile.CutFlower)
+                            {
+                                <dt class="col-sm-4">Cut flower</dt><dd class="col-sm-8">Yes</dd>
+                            }
+                            @if (profile.Edible)
+                            {
+                                <dt class="col-sm-4">Edible</dt><dd class="col-sm-8">Yes</dd>
+                            }
+                            @if (profile.Toxicity is { } tox && (tox.ToCats != ToxicityLevel.None || tox.ToDogs != ToxicityLevel.None || tox.ToHumans != ToxicityLevel.None))
+                            {
+                                <dt class="col-sm-4">Toxicity</dt>
+                                <dd class="col-sm-8">
+                                    @($"cats: {tox.ToCats}, dogs: {tox.ToDogs}, humans: {tox.ToHumans}")
+                                    @if (tox.Notes is { Length: > 0 }) { <div class="small text-muted">@tox.Notes</div> }
+                                </dd>
+                            }
+                            @if (profile.Description is { Length: > 0 })
+                            {
+                                <dt class="col-sm-4">Description</dt>
+                                <dd class="col-sm-8">@profile.Description</dd>
+                            }
+                        </dl>
+
+                        @if (profile.Sources is { Length: > 0 } sources)
+                        {
+                            <hr />
+                            <h6>Sources</h6>
+                            <ul class="small">
+                                @foreach (var src in sources)
+                                {
+                                    <li>
+                                        @if (src.Url is { Length: > 0 } url)
+                                        {
+                                            <a href="@url" target="_blank" rel="noopener noreferrer">@src.Source</a>
+                                        }
+                                        else
+                                        {
+                                            @src.Source
+                                        }
+                                        @if (src.RetrievedOn is { Length: > 0 } d) { <span class="text-muted"> · retrieved @d</span> }
+                                        @if (src.License is { Length: > 0 } lic) { <span class="text-muted"> · @lic</span> }
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    }
+
+                    <hr />
+                    <div class="mb-2">
+                        <label class="form-label small">Notes (saved with your plot library)</label>
+                        <textarea class="form-control form-control-sm" rows="3"
+                                  value="@notesDraft"
+                                  @oninput="OnNotesInput"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="OnCloseAsync">Close</button>
+                    <button type="button" class="btn btn-primary" @onclick="OnSaveNotesAsync" disabled="@(!notesDirty)">Save notes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public PaletteItem? Item { get; set; }
+    [Parameter] public string InitialNotes { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NotesSaved { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private string notesDraft = string.Empty;
+    private bool notesDirty;
+    private PaletteItem? lastItem;
+    private ElementReference closeButton;
+    private bool focusOnNextRender;
+
+    protected override void OnParametersSet()
+    {
+        if (Visible && !ReferenceEquals(Item, lastItem))
+        {
+            notesDraft = InitialNotes ?? string.Empty;
+            notesDirty = false;
+            lastItem = Item;
+            focusOnNextRender = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusOnNextRender && Visible)
+        {
+            focusOnNextRender = false;
+            try
+            {
+                await closeButton.FocusAsync();
+            }
+            catch (System.Exception)
+            {
+                // Element may not be in the DOM yet; ignore.
+            }
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (string.Equals(e.Key, "Escape", System.StringComparison.Ordinal))
+        {
+            await OnCloseAsync();
+        }
+    }
+
+    private void OnNotesInput(ChangeEventArgs e)
+    {
+        notesDraft = e.Value?.ToString() ?? string.Empty;
+        notesDirty = true;
+    }
+
+    private async Task OnSaveNotesAsync()
+    {
+        await NotesSaved.InvokeAsync(notesDraft);
+        notesDirty = false;
+    }
+
+    private Task OnCloseAsync() => OnClose.InvokeAsync();
+}
