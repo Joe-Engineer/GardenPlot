@@ -1432,22 +1432,28 @@ else
 
 @if (currentPlot is not null)
 {
-    ReconcileTakeoff();
-    var itemRows = BuildTakeoffItemRows();
-    var summaryRows = BuildTakeoffSummaryRows(itemRows);
-    var totalCount = itemRows.Count;
-    var viewMode = library.Ui.TakeoffViewMode;
-    var labor = LaborRollup();
-    var isInternalView = library.Ui.ShowInternalView;
-    var showMaterialCost = isInternalView && library.Ui.ShowMaterialCostColumn;
-    var showLaborCost = isInternalView && library.Ui.ShowLaborCostColumn;
-    var showMarkupPercent = isInternalView && library.Ui.ShowMarkupPercentColumn;
-    var showLineTotal = !isInternalView || library.Ui.ShowLineTotalColumn;
-    var itemInternalColumnCount = 10 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
-    var summaryInternalColumnCount = 5 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
-
+    @* Perf: Takeoff data is only consumed inside the panel below. Reconciling and building
+       rows is O(N_shapes + N_takeoff) — at 2,700 plants this was running on every pointer
+       move (Blazor auto-renders after each event handler). Gate the work behind panel
+       visibility. Reconciliation is triggered explicitly in ToggleTakeoffPanel,
+       OpenCurrentDossier, MakeAsBuiltCopyAsync, AddVirtualTakeoffItem, and ExportTakeoffCsv
+       so non-panel consumers still see fresh data. *@
     @if (!IsConceptMode && showTakeoffPanel)
     {
+        ReconcileTakeoff();
+        var itemRows = BuildTakeoffItemRows();
+        var summaryRows = BuildTakeoffSummaryRows(itemRows);
+        var totalCount = itemRows.Count;
+        var viewMode = library.Ui.TakeoffViewMode;
+        var labor = LaborRollup();
+        var isInternalView = library.Ui.ShowInternalView;
+        var showMaterialCost = isInternalView && library.Ui.ShowMaterialCostColumn;
+        var showLaborCost = isInternalView && library.Ui.ShowLaborCostColumn;
+        var showMarkupPercent = isInternalView && library.Ui.ShowMarkupPercentColumn;
+        var showLineTotal = !isInternalView || library.Ui.ShowLineTotalColumn;
+        var itemInternalColumnCount = 10 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
+        var summaryInternalColumnCount = 5 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
+
         var positioned = library.Ui.TakeoffPanelX is double && library.Ui.TakeoffPanelY is double;
         <div class="floating-panel takeoff-floating @(positioned ? "" : "default-takeoff-pos")"
              @ref="takeoffPanelRef"

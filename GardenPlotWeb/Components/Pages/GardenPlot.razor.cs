@@ -1271,12 +1271,18 @@ public partial class GardenPlot
         await SaveAsync();
     }
 
-    private void OpenCurrentDossier()
+    private async Task OpenCurrentDossier()
     {
         if (currentPlot is null)
         {
             return;
         }
+
+        // Perf: reconciliation no longer runs on every parent render (it was gated behind
+        // the takeoff panel). Ensure persisted state is fresh before the Dossier page reads
+        // PlotData.Takeoff, which is the canonical source for the dossier table.
+        ReconcileTakeoff();
+        await SaveAsync();
 
         Navigation.NavigateTo($"/dossier/{currentPlot.Id}");
     }
@@ -1287,6 +1293,11 @@ public partial class GardenPlot
         {
             return;
         }
+
+        // Perf: reconciliation no longer runs on every parent render. Ensure the source plot
+        // has up-to-date Takeoff before we clone, otherwise the as-built copy starts life
+        // with stale takeoff state relative to its shapes.
+        ReconcileTakeoff();
 
         PlotData clone = ProjectDossierService.CreateAsBuiltClone(currentPlot);
         library.Plots.Add(clone);
@@ -10359,6 +10370,16 @@ public partial class GardenPlot
 
     private async Task ToggleTakeoffPanel()
     {
+        // Perf: ReconcileTakeoff was previously called on every parent render. We moved it
+        // behind the panel-visibility guard so it does not run during mouse hover on large
+        // plots. When opening the panel, sync state up-front so the first render shows
+        // current data without the previous "every-render" reconciliation.
+        bool opening = !showTakeoffPanel;
+        if (opening && currentPlot is not null)
+        {
+            ReconcileTakeoff();
+        }
+
         showTakeoffPanel = !showTakeoffPanel;
         library.Ui.TakeoffPanelVisible = showTakeoffPanel;
         await SaveAsync();
