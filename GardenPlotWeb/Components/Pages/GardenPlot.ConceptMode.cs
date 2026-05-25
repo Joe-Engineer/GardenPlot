@@ -51,7 +51,7 @@ public partial class GardenPlot
 
     private ViewMode CurrentViewMode => CurrentPlotUi.LastViewMode;
 
-    private bool IsConceptMode => CurrentViewMode == ViewMode.Concept;
+    internal bool IsConceptMode => CurrentViewMode == ViewMode.Concept;
 
     private double CanvasViewBoxXFt => IsConceptMode ? -ConceptMarginLeftFt : 0;
 
@@ -105,9 +105,9 @@ public partial class GardenPlot
         HideShapeContextMenu();
     }
 
-    private bool UseConceptPlantEffects(Shape s) => IsConceptMode && IsPlantLikeShape(s);
+    internal bool UseConceptPlantEffects(Shape s) => IsConceptMode && IsPlantLikeShape(s);
 
-    private double? MatureSpreadDiameterFt(Shape s)
+    internal double? MatureSpreadDiameterFt(Shape s)
     {
         if (!IsPlantLikeShape(s))
         {
