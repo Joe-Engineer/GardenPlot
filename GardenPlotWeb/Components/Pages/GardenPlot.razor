@@ -1062,7 +1062,7 @@ else
                     var sb = GetBounds(s);
                     var scx = sb.x + sb.w / 2;
                     var scy = sb.y + sb.h / 2;
-                    <g class="shape @(IsSelected(s.Id) && !IsConceptMode ? "selected" : string.Empty) @(IsRulerShape(s) ? "concept-ruler" : string.Empty) @(UseConceptPlantEffects(s) ? "concept-shadowed" : string.Empty)"
+                    <g @key="s.Id" class="shape @(IsSelected(s.Id) && !IsConceptMode ? "selected" : string.Empty) @(IsRulerShape(s) ? "concept-ruler" : string.Empty) @(UseConceptPlantEffects(s) ? "concept-shadowed" : string.Empty)"
                        transform="rotate(@F(s.Rotation) @F(scx) @F(scy))"
                        pointer-events="@(!IsConceptMode && currentTool == Tool.Select && CanSelectShape(s) && CanReceiveShapePointer(s) ? "auto" : "none")"
                        @onpointerdown="(e) => OnShapePointerDown(e, s)"
