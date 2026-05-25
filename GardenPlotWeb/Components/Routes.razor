@@ -1,6 +1,27 @@
 ﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        @* ErrorBoundary surfaces unhandled component exceptions in a visible UI
+           instead of the default banner that auto-dismisses. Users can recover by
+           reloading; their plots/photos live in IndexedDB, not in component state. *@
+        <ErrorBoundary>
+            <ChildContent>
+                <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+                <FocusOnNavigate RouteData="routeData" Selector="h1" />
+            </ChildContent>
+            <ErrorContent Context="exception">
+                <div class="alert alert-danger m-4" role="alert">
+                    <h4 class="alert-heading">Something went wrong</h4>
+                    <p>Garden Plot hit an unexpected error and stopped rendering this page. Your saved plots and photos in browser storage were not touched.</p>
+                    <hr />
+                    <details>
+                        <summary>Technical details</summary>
+                        <pre class="mb-0" style="white-space:pre-wrap;">@exception.GetType().FullName: @exception.Message</pre>
+                    </details>
+                    <div class="mt-3">
+                        <a class="btn btn-primary" href=".">Reload Garden Plot</a>
+                    </div>
+                </div>
+            </ErrorContent>
+        </ErrorBoundary>
     </Found>
 </Router>

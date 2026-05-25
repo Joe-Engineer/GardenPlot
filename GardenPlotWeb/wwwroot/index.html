@@ -10,6 +10,9 @@
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="GardenPlotWeb.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+    <meta name="theme-color" content="#3c7a3b" />
 </head>
 
 <body>
@@ -27,7 +30,20 @@
 
     <script src="js/client-images.js" type="module"></script>
     <script src="js/client-store.js" type="module"></script>
-    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_framework/blazor.webassembly.js" autostart="true"></script>
+    <script>
+        // PWA: register the service worker only when the browser supports it
+        // AND we're served over a secure origin (HTTPS or localhost). The dev
+        // service worker is a passthrough; the published one is a precache that
+        // makes the app work offline.
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js').catch(err => {
+                    console.warn('GardenPlot: service worker registration failed', err);
+                });
+            });
+        }
+    </script>
 </body>
 
 </html>

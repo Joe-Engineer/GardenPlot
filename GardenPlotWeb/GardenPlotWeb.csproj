@@ -7,6 +7,10 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <!-- First-paint Brotli payload budget (3 MB). Enforced after Publish by Build/PayloadBudget.targets. -->
     <WasmFirstPaintBudgetBytes>3145728</WasmFirstPaintBudgetBytes>
+    <!-- PWA: lets dotnet publish swap service-worker.js for service-worker.published.js
+         (the precache implementation) and emit service-worker-assets.js with hashed
+         offline manifest entries. -->
+    <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
     <!--
       Payload-budget mitigations (Phase 11.4) — both verified safe after a grep of
       the codebase:
@@ -32,6 +36,13 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.8" PrivateAssets="all" />
     <PackageReference Include="NetTopologySuite" Version="2.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- PWA service worker swap: dev uses service-worker.js (passthrough so reloads
+         always reach the wire); publish replaces it with service-worker.published.js
+         (precache + offline). Tied to ServiceWorkerAssetsManifest above. -->
+    <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
   </ItemGroup>
 
   <Import Project="Build\PayloadBudget.targets" />
