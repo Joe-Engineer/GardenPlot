@@ -23,9 +23,10 @@ A **local-first**, browser-based garden-planning tool. Lay out raised-bed kits, 
 ## Tech stack
 
 - **.NET 10** / C# `latest`
-- **Blazor Server**, `InteractiveServer` render mode
-- **.NET Aspire** (`AppHost` + `ServiceDefaults` with OpenTelemetry, health checks, resilience)
-- **SVG** drawing surface, single ES JS module (`gardenplot.js`) for `localStorage`, conditional wheel handling, pointer capture, and PNG/print export
+- **Blazor WebAssembly** (PWA, offline-capable, installable)
+- **IndexedDB** for browser-local persistence (plots, photos, custom catalog)
+- **SVG** drawing surface, ES JS modules for IndexedDB key/value (`client-store.js`) and image blobs (`client-images.js`)
+- **NetTopologySuite** for polygon math (clipping, area)
 - **StyleCop.Analyzers** + `latest-recommended` analyzers, `EnforceCodeStyleInBuild`, **`TreatWarningsAsErrors=true`**
 
 ## Project layout
@@ -35,14 +36,23 @@ GardenPlot.slnx
 ├── .editorconfig            ← solution-wide style + analyzer rules (Garden Plot SA1633 header)
 ├── stylecop.json            ← Garden Plot company name + copyright template
 ├── Directory.Build.props    ← TreatWarningsAsErrors, AnalysisMode, StyleCop pkg
-├── docs/Requirements.md     ← canonical feature/boundary specification
+├── docs/
+│   ├── Requirements.md      ← canonical feature/boundary specification
+│   ├── hosting.md           ← static-host deployment requirements
+│   ├── migrating-legacy-data.md  ← upgrade path from old Blazor Server build
+│   └── payload-budget.md    ← first-paint payload tracking & investigation guide
 ├── README.md                ← this file
-├── GardenPlot.AppHost/      ← Aspire orchestrator
-├── GardenPlot.ServiceDefaults/
-└── GardenPlotWeb/           ← Blazor Server app
+└── GardenPlotWeb/           ← Blazor WebAssembly app
     ├── Components/Pages/GardenPlot.razor (+ .razor.css)
     ├── Models/(GardenPlotModels.cs, PlantRendering.cs)
-    └── wwwroot/js/gardenplot.js
+    ├── Services/Persistence/  ← IPlotRepository, IndexedDbPlotRepository, IndexedDbStorage
+    ├── Build/PayloadBudget.targets  ← enforces 3 MB Brotli first-paint budget
+    └── wwwroot/
+        ├── js/client-store.js     ← IndexedDB key/value (gardenplot-structured DB)
+        ├── js/client-images.js    ← IndexedDB blob store (gardenplot DB)
+        ├── manifest.webmanifest   ← PWA manifest
+        ├── service-worker.js      ← PWA precache (offline)
+        └── web.config             ← IIS/SWA SPA fallback + MIME types
 ```
 
 ## Getting started
@@ -50,8 +60,7 @@ GardenPlot.slnx
 ### Prerequisites
 
 - **.NET 10 SDK** (project targets `net10.0`)
-- **Visual Studio 2026** (or any IDE with .NET 10 support)
-- **.NET Aspire workload** (for the AppHost project)
+- **Visual Studio 2026**, **VS Code with C# Dev Kit**, or any IDE with .NET 10 support
 
 ### Build and run
 
@@ -59,14 +68,14 @@ GardenPlot.slnx
 # From the repository root
 dotnet build GardenPlot.slnx
 
-# Run via the Aspire AppHost (recommended)
-dotnet run --project GardenPlot.AppHost
-
-# Or run the web project directly
+# Run the WASM app via the dev server (browser opens automatically)
 dotnet run --project GardenPlotWeb
+
+# Publish a release build (also enforces the 3 MB first-paint Brotli budget)
+dotnet publish GardenPlotWeb -c Release
 ```
 
-Open the URL printed in the console; navigate to **Garden Plot** in the side menu.
+Open the URL printed in the console; navigate to **Garden Plot** in the side menu. To install as a PWA, look for the install icon in your browser's address bar.
 
 ### Build is strict
 
@@ -80,7 +89,16 @@ Open the URL printed in the console; navigate to **Garden Plot** in the side men
 
 ## Privacy
 
-All plot data — drawn shapes, plant placements, panel positions, kit-rotation memory — lives in your browser's `localStorage` under the key `gardenplot.library.v1`. The only outbound network call is to the public **Wikipedia REST summary API** (server-side, no API key, sends only the species name), and it fires only when you select a tree or bush.
+Garden Plot is **browser-local first**. Everything you create — plots, custom palette items, tile/photo uploads, panel positions — is stored in your browser's **IndexedDB**, never sent to a server. Two IndexedDB databases are used:
+
+- `gardenplot-structured` — the plot library document (key `library/current`).
+- `gardenplot` — image blobs (tile images, plot background images, dossier photos).
+
+There's no account, no telemetry, no sync server. If you want your data on another machine, use the export button (or simply copy your browser profile). Server-backed sync for paying users is tracked in issue #100 and is out of scope for this build.
+
+The only outbound network call is to the public **Wikipedia REST summary API** (no API key, sends only the species name) when you select a tree or bush. Disable the Wikipedia integration in settings if you want truly zero outbound traffic.
+
+Upgrading from the old Blazor Server / `localStorage` build? See [`docs/migrating-legacy-data.md`](docs/migrating-legacy-data.md) — your data migrates automatically on first load.
 
 ## Roadmap (deferred items)
 
