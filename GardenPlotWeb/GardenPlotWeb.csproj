@@ -5,10 +5,24 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
-    <!-- First-paint Brotli payload budget (3 MB). Enforced by Build/PayloadBudget.targets in Phase 11. -->
+    <!-- First-paint Brotli payload budget (3 MB). Enforced after Publish by Build/PayloadBudget.targets. -->
     <WasmFirstPaintBudgetBytes>3145728</WasmFirstPaintBudgetBytes>
-    <!-- Globalization + timezone defaults are left at framework defaults until the Phase 11
-         regression checklist confirms it's safe to enable InvariantGlobalization / disable TZ. -->
+    <!--
+      Payload-budget mitigations (Phase 11.4) — both verified safe after a grep of
+      the codebase:
+        * InvariantGlobalization=true removes ~600 KB of ICU locale data. The only
+          culture-sensitive usages are date display (`ToString("g", CurrentCulture)`,
+          month names, custom format strings) and StringComparer.CurrentCultureIgnoreCase
+          for sorting task titles. Both gracefully fall back to invariant behavior
+          — date displays always English, sorting always invariant-ordinal — which
+          is acceptable for a single-user personal garden app.
+        * BlazorEnableTimeZoneSupport=false removes the bundled IANA timezone DB
+          (~30 KB). No code calls TimeZoneInfo.FindSystemTimeZoneById; only
+          DateTime.ToLocalTime() is used, which works off the browser's UTC offset
+          and does not require the IANA DB.
+    -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,5 +33,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.8" PrivateAssets="all" />
     <PackageReference Include="NetTopologySuite" Version="2.6.0" />
   </ItemGroup>
+
+  <Import Project="Build\PayloadBudget.targets" />
 
 </Project>

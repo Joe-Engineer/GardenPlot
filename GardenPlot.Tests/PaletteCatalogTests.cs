@@ -96,12 +96,10 @@ public sealed partial class PaletteCatalogTests
             Assert.StartsWith("focal-point-", item.Trait, StringComparison.OrdinalIgnoreCase);
         });
 
-        var env = new FakeWebHostEnvironment
-        {
-            WebRootPath = GetProjectWebRootPath(),
-            ContentRootPath = GetProjectRootPath(),
-        };
-        var catalog = new CatalogService(env, NullLogger<CatalogService>.Instance);
+        // GetBase() reads from BuildBaseFromPalette() at construction time,
+        // so this test exercises only the in-process palette projection and
+        // doesn't need EnsureLoadedAsync() / a populated HttpClient.
+        var catalog = new CatalogService(new HttpClient { BaseAddress = new Uri("http://localhost/") }, NullLogger<CatalogService>.Instance);
         foreach (string code in expectedCodes)
         {
             CatalogItem? item = catalog.GetBase(code);
@@ -162,10 +160,4 @@ public sealed partial class PaletteCatalogTests
         Assert.Equal("Pea Gravel", item!.Code);
         Assert.Equal(MaterialCategory.Gravel, item.MaterialCategory);
     }
-
-    private static string GetProjectWebRootPath()
-        => Path.Combine(GetProjectRootPath(), "GardenPlotWeb", "wwwroot");
-
-    private static string GetProjectRootPath()
-        => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
 }

@@ -5,37 +5,25 @@
 using GardenPlotWeb.Models;
 using GardenPlotWeb.Services;
 using GardenPlotWeb.Services.Catalog;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace GardenPlot.Tests;
 
-[Collection(TestCollections.DataRootEnvironment)]
-public sealed class ProjectDossierServiceTests : IDisposable
+/// <summary>
+/// Behavior tests for <see cref="ProjectDossierService"/>. The service now takes
+/// an <see cref="Microsoft.JSInterop.IJSRuntime"/> only for photo storage; the
+/// dossier math, clone, and catalog-suggestion paths exercised here never cross
+/// the JS boundary, so <see cref="ThrowingJSRuntime"/> is safe.
+/// </summary>
+public sealed class ProjectDossierServiceTests
 {
-    private readonly string previousEnv;
-    private readonly string testRoot;
     private readonly ProjectDossierService service;
 
     public ProjectDossierServiceTests()
     {
-        previousEnv = Environment.GetEnvironmentVariable(DataRootProvider.DataDirectoryEnvironmentVariable) ?? string.Empty;
-        testRoot = Path.Combine(AppContext.BaseDirectory, "test-artifacts", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(testRoot);
-        Environment.SetEnvironmentVariable(DataRootProvider.DataDirectoryEnvironmentVariable, testRoot);
-
-        DataRootProvider dataRoot = new(new FakeWebHostEnvironment { ContentRootPath = testRoot });
-        service = new ProjectDossierService(dataRoot, new CatalogService(new FakeWebHostEnvironment { WebRootPath = System.IO.Path.GetTempPath(), ContentRootPath = System.IO.Path.GetTempPath() }, Microsoft.Extensions.Logging.Abstractions.NullLogger<CatalogService>.Instance));
-    }
-
-    public void Dispose()
-    {
-        Environment.SetEnvironmentVariable(DataRootProvider.DataDirectoryEnvironmentVariable, previousEnv);
-        try
-        {
-            Directory.Delete(testRoot, recursive: true);
-        }
-        catch
-        {
-        }
+        HttpClient http = new() { BaseAddress = new Uri("http://localhost/") };
+        CatalogService catalog = new(http, NullLogger<CatalogService>.Instance);
+        service = new ProjectDossierService(new ThrowingJSRuntime(), catalog);
     }
 
     [Fact]

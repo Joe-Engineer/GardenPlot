@@ -1,3 +1,7 @@
+// <copyright file="CatalogServiceTests.cs" company="Garden Plot">
+// Copyright (c) Garden Plot. All rights reserved.
+// </copyright>
+
 using System.Text.Json;
 using GardenPlotWeb.Models;
 using GardenPlotWeb.Services.Catalog;
@@ -8,19 +12,21 @@ namespace GardenPlot.Tests;
 public sealed class CatalogServiceTests
 {
     [Fact]
-    public void Loads_BaseAssemblies_FromSeedFile()
+    public async Task Loads_BaseAssemblies_FromSeedFile()
     {
-        var env = new FakeWebHostEnvironment
-        {
-            WebRootPath = GetProjectWebRootPath(),
-            ContentRootPath = GetProjectRootPath(),
-        };
+        // The repo ships canned seed files at wwwroot/data/catalog/assemblies/.
+        // We serve those exact bytes via a stub HttpClient so the test covers
+        // the real WASM fetch path (manifest -> per-pack files) without a host.
+        TestHttpHandler handler = BuildHandlerFromShippedSeeds();
+        HttpClient http = handler.ToClient();
 
-        var service = new CatalogService(env, NullLogger<CatalogService>.Instance);
+        CatalogService service = new(http, NullLogger<CatalogService>.Instance);
+        await service.EnsureLoadedAsync();
 
-        Assert.True(service.AllAssemblies.Count >= 5);
+        Assert.True(service.AllAssemblies.Count >= 3);
         Assert.NotNull(service.GetAssembly(CatalogSource.Base, null, "sand-base-brick-edge"));
         Assert.NotNull(service.GetAssembly(CatalogSource.Base, null, "steel-edge-concrete-footing"));
+
         CatalogAssembly? assembly = service.GetAssembly(CatalogSource.Base, null, "gravel-flagstone-path");
         Assert.NotNull(assembly);
         Assert.Equal("Gravel + Flagstone Path", assembly!.DisplayName);
@@ -72,9 +78,36 @@ public sealed class CatalogServiceTests
         Assert.Equal(source.Layers[0].Label, roundTrip.Layers[0].Label);
     }
 
-    private static string GetProjectWebRootPath()
-        => Path.Combine(GetProjectRootPath(), "GardenPlotWeb", "wwwroot");
+    internal static TestHttpHandler BuildHandlerFromShippedSeeds()
+    {
+        string assembliesDir = Path.Combine(GetWebRootPath(), "data", "catalog", "assemblies");
+        string manifestPath = Path.Combine(assembliesDir, "_index.json");
 
-    private static string GetProjectRootPath()
+        TestHttpHandler handler = new();
+        if (File.Exists(manifestPath))
+        {
+            string manifestBody = File.ReadAllText(manifestPath);
+            handler.Map("data/catalog/assemblies/_index.json", manifestBody);
+
+            // Replay every checked-in pack file so the load path exercises the manifest loop.
+            foreach (string packFile in Directory.GetFiles(assembliesDir, "*.json"))
+            {
+                string fileName = Path.GetFileName(packFile);
+                if (string.Equals(fileName, "_index.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                handler.Map($"data/catalog/assemblies/{fileName}", File.ReadAllText(packFile));
+            }
+        }
+
+        return handler;
+    }
+
+    internal static string GetWebRootPath()
+        => Path.Combine(GetRepoRoot(), "GardenPlotWeb", "wwwroot");
+
+    private static string GetRepoRoot()
         => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
 }

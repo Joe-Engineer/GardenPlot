@@ -45,7 +45,7 @@ public partial class GardenPlot
     private static readonly Histogram<double> StorageSaveDurationMs = PersistenceMeter.CreateHistogram<double>("gardenplot.storage.save.duration.ms");
 
     // Per-layer save/load counters so we can see in telemetry which storage layer
-    // succeeded for each attempt. Tag dimension: layer = idb|localstorage|file-index.
+    // succeeded for each attempt. Tag dimension: layer = idb-primary|idb-legacy|localstorage.
     private static readonly Counter<long> StorageSaveLayerOk = PersistenceMeter.CreateCounter<long>("gardenplot.storage.save.layer.ok");
     private static readonly Counter<long> StorageSaveLayerFail = PersistenceMeter.CreateCounter<long>("gardenplot.storage.save.layer.fail");
     private static readonly Counter<long> StorageLoadLayerOk = PersistenceMeter.CreateCounter<long>("gardenplot.storage.load.layer.ok");
@@ -62,17 +62,23 @@ public partial class GardenPlot
     private const string StorageKeyBackup1 = "gardenplot.library.v2.bak1";
     private const string StorageKeyBackup2 = "gardenplot.library.v2.bak2";
     private const string StorageKeyLegacy = "gardenplot.library.v1";
-    private const string FileStoreSourceKey = "file-index";
 
-    // Local-file persistence is the authoritative store: plots are written
-    // to the per-user data root resolved by DataRootProvider (defaults to
-    // %LocalAppData%\GardenPlot on Windows, ~/.local/share/GardenPlot on
-    // Linux/macOS, overridable via the GARDENPLOT_DATA_DIR env var). Browser
-    // IndexedDB / localStorage are kept as a secondary cache + offline
-    // fallback so the same user/browser still works without disk access.
-    // Declared as static readonly (not const) so the compiler does not
-    // const-fold gated branches into CS0162 unreachable-code errors.
-    private static readonly bool FileStoreEnabled = true;
+    /// <summary>
+    /// Metrics tag identifying the new authoritative store: browser IndexedDB via
+    /// <c>IndexedDbPlotRepository</c> / <c>client-store.js</c>. Reads/writes that
+    /// landed here are tagged <c>layer=idb-primary</c>; the legacy
+    /// <c>gardenplot-db/kv</c> reader is tagged <c>layer=idb-legacy</c> (migration
+    /// source only -- never written to from this build).
+    /// </summary>
+    private const string IdbPrimarySourceKey = "idb-primary";
+
+    // Plot data persistence in the WASM build is browser-local:
+    //   1. IndexedDB ("gardenplot-structured" db) via IPlotRepository -- authoritative.
+    //   2. localStorage (StorageKeyPrimary + rolling backups) -- recovery mirror.
+    //   3. Legacy IndexedDB ("gardenplot-db/kv/gardenplot.library.v2") -- read-only
+    //      migration source for users carrying state from the Blazor Server build.
+    //      Owned by wwwroot/js/gardenplot.js; we no longer write to it.
+    // No server filesystem is touched. See issue #92 for the rationale.
     private const double PxPerFt = 16.0; // also used by ToFt()
     private const double DefaultPlotWidthFt = 40.0;
     private const double DefaultPlotHeightFt = 30.0;
@@ -3513,22 +3519,19 @@ public partial class GardenPlot
 
         try
         {
-            if (FileStoreEnabled)
+            PlotLibrary primaryLibrary = NormalizeLibrary(await PlotRepository.LoadLibraryAsync());
+            if (primaryLibrary.Plots.Count > 0)
             {
-                var fileLibrary = NormalizeLibrary(await PlotRepository.LoadLibraryAsync());
-                if (fileLibrary.Plots.Count > 0)
-                {
-                    RecordLoadMetrics("loaded", FileStoreSourceKey, fileLibrary, 0, sw.Elapsed.TotalMilliseconds);
-                    Logger.LogInformation("GardenPlot storage load succeeded from file store. Plots: {PlotCount}, Shapes: {ShapeCount}.",
-                        fileLibrary.Plots.Count,
-                        TotalShapeCount(fileLibrary));
-                    return (fileLibrary, FileStoreSourceKey, true);
-                }
+                RecordLoadMetrics("loaded", IdbPrimarySourceKey, primaryLibrary, 0, sw.Elapsed.TotalMilliseconds);
+                Logger.LogInformation("GardenPlot storage load succeeded from primary IndexedDB. Plots: {PlotCount}, Shapes: {ShapeCount}.",
+                    primaryLibrary.Plots.Count,
+                    TotalShapeCount(primaryLibrary));
+                return (primaryLibrary, IdbPrimarySourceKey, true);
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "GardenPlot file-store load failed; falling back to browser storage sources.");
+            Logger.LogWarning(ex, "GardenPlot primary IndexedDB load failed; falling back to legacy browser storage sources.");
         }
 
         if (jsModule is not null)
@@ -3538,25 +3541,25 @@ public partial class GardenPlot
                 var idbJson = await jsModule.InvokeAsync<string?>("idbGet", StorageKeyPrimary);
                 if (!string.IsNullOrWhiteSpace(idbJson))
                 {
-                    var idbLibrary = NormalizeLibrary(PlotLibraryLoader.Load(idbJson, "indexeddb"));
+                    var idbLibrary = NormalizeLibrary(PlotLibraryLoader.Load(idbJson, "indexeddb-legacy"));
                     var idbBytes = System.Text.Encoding.UTF8.GetByteCount(idbJson);
                     if (idbLibrary.Plots.Count > 0)
                     {
-                        StorageLoadLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
-                        RecordLoadMetrics("loaded", "indexeddb", idbLibrary, idbBytes, sw.Elapsed.TotalMilliseconds);
-                        Logger.LogInformation("[{Sid}] Load: IndexedDB hit. Plots={PlotCount}, Shapes={ShapeCount}, Bytes={Bytes}.",
+                        StorageLoadLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "idb-legacy"));
+                        RecordLoadMetrics("loaded", "indexeddb-legacy", idbLibrary, idbBytes, sw.Elapsed.TotalMilliseconds);
+                        Logger.LogInformation("[{Sid}] Load: Legacy IndexedDB hit (migration source). Plots={PlotCount}, Shapes={ShapeCount}, Bytes={Bytes}.",
                             SessionTraceId, idbLibrary.Plots.Count, TotalShapeCount(idbLibrary), idbBytes);
-                        return (idbLibrary, "indexeddb", true);
+                        return (idbLibrary, "indexeddb-legacy", true);
                     }
 
-                    StorageLoadLayerMiss.Add(1, new KeyValuePair<string, object?>("layer", "idb-empty-plots"));
-                    Logger.LogWarning("[{Sid}] Load: IndexedDB returned JSON but Plots was empty after normalize. Bytes={Bytes}, Json[0..120]={Preview}.",
+                    StorageLoadLayerMiss.Add(1, new KeyValuePair<string, object?>("layer", "idb-legacy-empty-plots"));
+                    Logger.LogWarning("[{Sid}] Load: Legacy IndexedDB returned JSON but Plots was empty after normalize. Bytes={Bytes}, Json[0..120]={Preview}.",
                         SessionTraceId, idbBytes, idbJson.Length > 120 ? idbJson[..120] : idbJson);
                 }
                 else
                 {
-                    StorageLoadLayerMiss.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
-                    Logger.LogInformation("[{Sid}] Load: IndexedDB miss. Key={StorageKey}.", SessionTraceId, StorageKeyPrimary);
+                    StorageLoadLayerMiss.Add(1, new KeyValuePair<string, object?>("layer", "idb-legacy"));
+                    Logger.LogInformation("[{Sid}] Load: Legacy IndexedDB miss. Key={StorageKey}.", SessionTraceId, StorageKeyPrimary);
                 }
             }
             catch (TaskCanceledException)
@@ -3847,28 +3850,27 @@ public partial class GardenPlot
 
         try
         {
-            var fileSaved = false;
-            if (FileStoreEnabled)
+            var primarySaved = false;
+            try
             {
-                try
-                {
-                    await PlotRepository.SaveLibraryAsync(library);
-                    fileSaved = true;
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError(ex, "GardenPlot file-store save failed; attempting browser-storage fallback.");
-                }
+                await PlotRepository.SaveLibraryAsync(library);
+                primarySaved = true;
+                StorageSaveLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "idb-primary"));
+            }
+            catch (Exception ex)
+            {
+                StorageSaveLayerFail.Add(1, new KeyValuePair<string, object?>("layer", "idb-primary"));
+                Logger.LogError(ex, "GardenPlot primary IndexedDB save failed; attempting localStorage fallback.");
             }
 
             var json = JsonSerializer.Serialize(library);
             var payloadBytes = System.Text.Encoding.UTF8.GetByteCount(json);
-            var idbSaved = false;
 
-            if (fileSaved)
+            if (primarySaved)
             {
-                RecordSaveMetrics("saved", "file-index", payloadBytes, sw.Elapsed.TotalMilliseconds);
-                Logger.LogInformation("GardenPlot storage save succeeded (mode: file-index). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
+                RecordSaveMetrics("saved", IdbPrimarySourceKey, payloadBytes, sw.Elapsed.TotalMilliseconds);
+                Logger.LogInformation("GardenPlot storage save succeeded (mode: {Mode}). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
+                    IdbPrimarySourceKey,
                     library.Plots.Count,
                     TotalShapeCount(library),
                     payloadBytes);
@@ -3886,34 +3888,17 @@ public partial class GardenPlot
                 }
             }
 
-            if (fileSaved)
+            if (primarySaved)
             {
-                // File store is the authoritative durable store.
+                // Primary IndexedDB is the authoritative durable store; no need to also
+                // write to the legacy IDB or to localStorage on the happy path. localStorage
+                // is exercised only as a recovery fallback when the primary save fails below.
                 return;
             }
 
-            if (jsModule is not null)
-            {
-                try
-                {
-                    await jsModule.InvokeVoidAsync("idbSet", StorageKeyPrimary, json);
-                    idbSaved = true;
-                    StorageSaveLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
-                    Logger.LogInformation("[{Sid}] SaveAsync idbSet ok. Key={StorageKey}, Bytes={Bytes}.", SessionTraceId, StorageKeyPrimary, payloadBytes);
-                }
-                catch (Exception ex)
-                {
-                    StorageSaveLayerFail.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
-                    Logger.LogWarning(ex, "[{Sid}] SaveAsync idbSet failed; will try localStorage. Key={StorageKey}.", SessionTraceId, StorageKeyPrimary);
-                }
-            }
-            else
-            {
-                StorageSaveSkipped.Add(1, new KeyValuePair<string, object?>("reason", "no-jsmodule"));
-                Logger.LogWarning("[{Sid}] SaveAsync idbSet skipped: jsModule is null after import attempt.", SessionTraceId);
-            }
-
-            // Mirror to localStorage with rolling backups for compatibility/recovery.
+            // Primary IndexedDB save failed; mirror to localStorage with rolling backups so
+            // the user does not lose data. The legacy gardenplot.js IndexedDB is read-only
+            // from this build (see Phase 7 migration); we never write to it.
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
@@ -3933,9 +3918,9 @@ public partial class GardenPlot
                 await JS.InvokeVoidAsync("localStorage.setItem", cts.Token, StorageKeyLegacy, json);
                 StorageSaveLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "localstorage"));
 
-                RecordSaveMetrics("saved", idbSaved ? "idb+full" : "full", payloadBytes, sw.Elapsed.TotalMilliseconds);
-                Logger.LogInformation("[{Sid}] SaveAsync localStorage primary+legacy ok. Bytes={Bytes}, idbAlsoSaved={IdbSaved}.",
-                    SessionTraceId, payloadBytes, idbSaved);
+                RecordSaveMetrics("saved", "fallback-localstorage", payloadBytes, sw.Elapsed.TotalMilliseconds);
+                Logger.LogInformation("[{Sid}] SaveAsync localStorage primary+legacy ok (fallback path). Bytes={Bytes}.",
+                    SessionTraceId, payloadBytes);
                 return;
             }
             catch (Exception ex)
@@ -3944,14 +3929,14 @@ public partial class GardenPlot
                 Logger.LogWarning(ex, "[{Sid}] SaveAsync localStorage full-mode write failed; falling back to compact.", SessionTraceId);
             }
 
-            // Fallback: free space and save primary only.
+            // Last-ditch fallback: free space and save primary only.
             await JS.InvokeVoidAsync("localStorage.removeItem", StorageKeyBackup1);
             await JS.InvokeVoidAsync("localStorage.removeItem", StorageKeyBackup2);
             await JS.InvokeVoidAsync("localStorage.removeItem", StorageKeyLegacy);
             await JS.InvokeVoidAsync("localStorage.setItem", StorageKeyPrimary, json);
 
-            RecordSaveMetrics("saved", idbSaved ? "idb+compact" : "compact", payloadBytes, sw.Elapsed.TotalMilliseconds);
-            Logger.LogInformation("GardenPlot storage save succeeded (mode: compact). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
+            RecordSaveMetrics("saved", "fallback-localstorage-compact", payloadBytes, sw.Elapsed.TotalMilliseconds);
+            Logger.LogInformation("GardenPlot storage save succeeded (mode: fallback-localstorage-compact). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
                 library.Plots.Count,
                 TotalShapeCount(library),
                 payloadBytes);
