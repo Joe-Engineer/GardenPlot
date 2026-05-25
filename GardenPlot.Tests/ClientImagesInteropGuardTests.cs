@@ -32,7 +32,7 @@ namespace GardenPlot.Tests;
 /// helper in <c>GardenPlot.razor.cs</c> is the canonical entry point.
 /// </para>
 /// </remarks>
-public class ClientImagesInteropGuardTests
+public partial class ClientImagesInteropGuardTests
 {
     [Fact]
     public void GardenPlotRazorCs_HasNoClientImagesCallsViaWrongModule()
@@ -42,12 +42,7 @@ public class ClientImagesInteropGuardTests
         // Match any *.InvokeAsync / InvokeVoidAsync that references the dotted
         // "GardenPlot.clientImages.*" identifier inside a string literal — the
         // call shape that silently fails because module refs don't traverse window.
-        Regex pattern = new(
-            @"\.InvokeAsync\s*<[^>]*>\s*\(\s*""GardenPlot\.clientImages\.|" +
-            @"\.InvokeVoidAsync\s*\(\s*""GardenPlot\.clientImages\.",
-            RegexOptions.CultureInvariant);
-
-        MatchCollection matches = pattern.Matches(source);
+        MatchCollection matches = DottedClientImagesCallRegex().Matches(source);
 
         Assert.True(
             matches.Count == 0,
@@ -69,14 +64,22 @@ public class ClientImagesInteropGuardTests
 
         // At least one site routes putImageFromBase64 through the module reference
         // (rather than the dotted-name shape guarded above).
-        Regex correctShape = new(
-            @"\.InvokeAsync\s*<\s*string\s*>\s*\(\s*""putImageFromBase64""",
-            RegexOptions.CultureInvariant);
         Assert.True(
-            correctShape.IsMatch(source),
+            PutImageFromBase64CallShapeRegex().IsMatch(source),
             "Expected at least one InvokeAsync<string>(\"putImageFromBase64\", …) call on a " +
             "client-images module reference. If you've removed image upload, drop these tests too.");
     }
+
+    [GeneratedRegex(
+        @"\.InvokeAsync\s*<[^>]*>\s*\(\s*""GardenPlot\.clientImages\.|" +
+        @"\.InvokeVoidAsync\s*\(\s*""GardenPlot\.clientImages\.",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex DottedClientImagesCallRegex();
+
+    [GeneratedRegex(
+        @"\.InvokeAsync\s*<\s*string\s*>\s*\(\s*""putImageFromBase64""",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex PutImageFromBase64CallShapeRegex();
 
     private static string ReadGardenPlotRazorCs()
     {

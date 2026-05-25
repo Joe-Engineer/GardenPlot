@@ -32,7 +32,7 @@ namespace GardenPlot.Tests;
 /// plot size never auto-fits to the image's aspect ratio.</description></item>
 /// </list>
 /// </remarks>
-public class PlotBackgroundImageGuardTests
+public partial class PlotBackgroundImageGuardTests
 {
     [Fact]
     public void PlotImageUrl_DetectsClientImageGuid()
@@ -44,10 +44,7 @@ public class PlotBackgroundImageGuardTests
         // Find the PlotImageUrl method body and verify it checks IsClientImageId before
         // emitting a server-side path. The exact whitespace doesn't matter; we just
         // need both calls present in the method.
-        Match plotImageUrl = Regex.Match(
-            source,
-            @"private\s+static\s+string\s+PlotImageUrl\s*\([^)]*\)\s*=>\s*(?<body>.+?);",
-            RegexOptions.Singleline | RegexOptions.CultureInvariant);
+        Match plotImageUrl = PlotImageUrlBodyRegex().Match(source);
 
         Assert.True(plotImageUrl.Success, "Could not locate PlotImageUrl in GardenPlot.razor.cs.");
 
@@ -76,16 +73,13 @@ public class PlotBackgroundImageGuardTests
         // (typically on the very next line in this file). Without the attribute,
         // applyClientImages can't resolve client-image GUIDs to blob URLs and the
         // browser shows a broken-image icon.
-        MatchCollection plotUrlLines = Regex.Matches(
-            razor,
-            @"(?<lineStart>^|\r?\n)[^\r\n]*(?:href|src)\s*=\s*""@PlotImageUrl\(",
-            RegexOptions.CultureInvariant);
+        MatchCollection plotUrlLines = PlotImageUrlUsageRegex().Matches(razor);
 
         Assert.True(plotUrlLines.Count > 0, "Expected at least one @PlotImageUrl(...) usage in GardenPlot.razor.");
 
         foreach (Match match in plotUrlLines)
         {
-            // Look in the surrounding ~300 chars for data-client-image-id="@PlotImageClientId(.
+            // Look in the surrounding ~600 chars for data-client-image-id="@PlotImageClientId(.
             // This catches both same-line and adjacent-attribute styles.
             int start = match.Index;
             int end = Math.Min(razor.Length, start + 600);
@@ -107,10 +101,7 @@ public class PlotBackgroundImageGuardTests
     {
         string source = ReadGardenPlotRazorCs();
 
-        Match method = Regex.Match(
-            source,
-            @"private\s+async\s+Task<bool>\s+EnsurePlotBackgroundImageDimensionsAsync\s*\([^)]*\)\s*\{(?<body>.+?)\n    \}",
-            RegexOptions.Singleline | RegexOptions.CultureInvariant);
+        Match method = EnsurePlotBackgroundImageDimensionsAsyncBodyRegex().Match(source);
 
         Assert.True(method.Success, "Could not locate EnsurePlotBackgroundImageDimensionsAsync in GardenPlot.razor.cs.");
 
@@ -124,6 +115,21 @@ public class PlotBackgroundImageGuardTests
         Assert.Contains("probeImageDimensions", body);
         Assert.DoesNotContain("PlotImageUrl(fileName)", body);
     }
+
+    [GeneratedRegex(
+        @"private\s+static\s+string\s+PlotImageUrl\s*\([^)]*\)\s*=>\s*(?<body>.+?);",
+        RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+    private static partial Regex PlotImageUrlBodyRegex();
+
+    [GeneratedRegex(
+        @"(?<lineStart>^|\r?\n)[^\r\n]*(?:href|src)\s*=\s*""@PlotImageUrl\(",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex PlotImageUrlUsageRegex();
+
+    [GeneratedRegex(
+        @"private\s+async\s+Task<bool>\s+EnsurePlotBackgroundImageDimensionsAsync\s*\([^)]*\)\s*\{(?<body>.+?)\n    \}",
+        RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+    private static partial Regex EnsurePlotBackgroundImageDimensionsAsyncBodyRegex();
 
     private static string ReadGardenPlotRazorCs()
         => ReadComponentFile("GardenPlot.razor.cs");
