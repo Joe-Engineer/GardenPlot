@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         // The image-blob IndexedDB is kept separate and owned by wwwroot/js/client-images.js
         // to avoid shared-ownership schema-version traps between the structured and binary stores.
         _ = services.AddScoped<Persistence.IndexedDbStorage>();
+        _ = services.AddScoped<Persistence.IClientKvStorage>(sp => sp.GetRequiredService<Persistence.IndexedDbStorage>());
 
         // Optional rich horticultural metadata loaded from wwwroot/data/plant-profiles.json
         // via HttpClient (lazy: page calls EnsureLoadedAsync at startup).

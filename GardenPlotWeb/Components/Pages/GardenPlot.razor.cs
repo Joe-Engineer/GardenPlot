@@ -618,7 +618,11 @@ public partial class GardenPlot
 
         if (persist)
         {
-            _ = SaveAsync();
+            // View change — orthogonal data, orthogonal storage. Wheel zoom on a precision
+            // touchpad fires >100 Hz; routing this through SaveAsync would rewrite the entire
+            // active plot body (shapes, takeoff, drop groups) on every tick. SaveViewportAsync
+            // touches a single ~80-byte viewport/{id} key.
+            _ = SaveViewportAsync();
         }
     }
 
@@ -3822,6 +3826,46 @@ public partial class GardenPlot
         dotnetRef?.Dispose();
     }
 
+    /// <summary>
+    /// Persists ONLY the active plot's viewport snapshot (zoom + center). Called on view-change
+    /// hot paths (wheel zoom, pan end) where the user has not changed any plot content — so
+    /// rewriting the plot body, reconciling takeoff, or touching the index would be wasted work.
+    /// Failures are swallowed: viewport state isn't user data, and the wheel-tick UX should never
+    /// surface IDB write errors.
+    /// </summary>
+    /// <remarks>
+    /// Pairs with <see cref="GardenPlotWeb.Models.PlotViewportState"/> and
+    /// <see cref="GardenPlotWeb.Services.Persistence.IndexedDbPlotRepository.ViewportKey(Guid)"/>.
+    /// Item-change commits go through <see cref="SaveAsync"/> instead, which writes the plot
+    /// body (and the body carries the live viewport for export round-trips).
+    /// </remarks>
+    private async Task SaveViewportAsync()
+    {
+        if (isDisposingOrDisposed || currentPlot is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await CaptureViewportStateAsync();
+            PlotViewportState viewport = PlotViewportState.FromPlot(currentPlot);
+            await PlotRepository.SaveViewportAsync(currentPlot.Id, viewport);
+        }
+        catch (Microsoft.JSInterop.JSDisconnectedException)
+        {
+            // Expected during page refresh/navigation when the circuit is tearing down.
+        }
+        catch (TaskCanceledException)
+        {
+            // Expected if the circuit disconnects while the save is in flight.
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "[{Sid}] SaveViewportAsync swallowed error (viewport state is not user data).", SessionTraceId);
+        }
+    }
+
     private async Task SaveAsync()
     {
         if (isDisposingOrDisposed)
@@ -3841,7 +3885,7 @@ public partial class GardenPlot
         var sw = Stopwatch.StartNew();
         StorageSaveAttempts.Add(1);
         var shapeCount = TotalShapeCount(library);
-        Logger.LogInformation("[{Sid}] SaveAsync begin. Plots={PlotCount}, Shapes={ShapeCount}, CurrentPlotId={CurrentPlotId}, LastPlotId={LastPlotId}.",
+        Logger.LogDebug("[{Sid}] SaveAsync begin. Plots={PlotCount}, Shapes={ShapeCount}, CurrentPlotId={CurrentPlotId}, LastPlotId={LastPlotId}.",
             SessionTraceId, library.Plots.Count, shapeCount, currentPlot?.Id, library.LastPlotId);
 
         if (currentPlot is not null)
@@ -3849,11 +3893,13 @@ public partial class GardenPlot
             RefreshCatalogOverrides();
             currentPlot.ModifiedUtc = DateTime.UtcNow;
             library.LastPlotId = currentPlot.Id;
-        }
 
-        foreach (var plot in library.Plots)
-        {
-            foreach (var shape in plot.Shapes.Where(s => s.Kind == ShapeKind.Edge))
+            // Reconcile only the active plot's edges. The previous all-plots loop ran
+            // TakeoffMath.Reconcile across every plot in storage on every autosave, multiplying
+            // wheel-zoom and pointer-drag autosave cost by the total shape count across the
+            // entire library. Edits to other plots can't have happened since their last save, so
+            // skipping them here is correct.
+            foreach (var shape in currentPlot.Shapes.Where(s => s.Kind == ShapeKind.Edge))
             {
                 TakeoffMath.Reconcile(shape);
             }
@@ -3873,7 +3919,14 @@ public partial class GardenPlot
             var primarySaved = false;
             try
             {
-                await PlotRepository.SaveLibraryAsync(library);
+                // Per-plot save: only the active plot's storage key is rewritten. Other plots
+                // are untouched. The lean index document tracks LastPlotId + summaries.
+                if (currentPlot is not null)
+                {
+                    await PlotRepository.SavePlotAsync(currentPlot);
+                }
+
+                await PlotRepository.SaveIndexAsync(PlotLibraryIndex.FromLibrary(library));
                 primarySaved = true;
                 StorageSaveLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "idb-primary"));
             }
@@ -3883,18 +3936,29 @@ public partial class GardenPlot
                 Logger.LogError(ex, "GardenPlot primary IndexedDB save failed; attempting localStorage fallback.");
             }
 
-            var json = JsonSerializer.Serialize(library);
-            var payloadBytes = System.Text.Encoding.UTF8.GetByteCount(json);
-
             if (primarySaved)
             {
+                // Cheap metric: only serialize the active plot (what we actually wrote). The previous
+                // implementation serialized the whole library here just to count bytes for the metric.
+                int payloadBytes = currentPlot is null
+                    ? 0
+                    : System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(currentPlot));
                 RecordSaveMetrics("saved", IdbPrimarySourceKey, payloadBytes, sw.Elapsed.TotalMilliseconds);
-                Logger.LogInformation("GardenPlot storage save succeeded (mode: {Mode}). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
+                Logger.LogDebug("GardenPlot storage save succeeded (mode: {Mode}). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
                     IdbPrimarySourceKey,
                     library.Plots.Count,
                     TotalShapeCount(library),
                     payloadBytes);
+                return;
             }
+
+            // Primary IndexedDB save failed; mirror to localStorage with rolling backups so
+            // the user does not lose data. The legacy gardenplot.js IndexedDB is read-only
+            // from this build (see Phase 7 migration); we never write to it. Full-library
+            // serialization is paid here (recovery snapshot needs every plot), but only on
+            // the failure path — happy-path autosaves never do this work.
+            var json = JsonSerializer.Serialize(library);
+            var payloadBytesFallback = System.Text.Encoding.UTF8.GetByteCount(json);
 
             if (jsModule is null)
             {
@@ -3908,17 +3972,6 @@ public partial class GardenPlot
                 }
             }
 
-            if (primarySaved)
-            {
-                // Primary IndexedDB is the authoritative durable store; no need to also
-                // write to the legacy IDB or to localStorage on the happy path. localStorage
-                // is exercised only as a recovery fallback when the primary save fails below.
-                return;
-            }
-
-            // Primary IndexedDB save failed; mirror to localStorage with rolling backups so
-            // the user does not lose data. The legacy gardenplot.js IndexedDB is read-only
-            // from this build (see Phase 7 migration); we never write to it.
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
@@ -3938,9 +3991,9 @@ public partial class GardenPlot
                 await JS.InvokeVoidAsync("localStorage.setItem", cts.Token, StorageKeyLegacy, json);
                 StorageSaveLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "localstorage"));
 
-                RecordSaveMetrics("saved", "fallback-localstorage", payloadBytes, sw.Elapsed.TotalMilliseconds);
-                Logger.LogInformation("[{Sid}] SaveAsync localStorage primary+legacy ok (fallback path). Bytes={Bytes}.",
-                    SessionTraceId, payloadBytes);
+                RecordSaveMetrics("saved", "fallback-localstorage", payloadBytesFallback, sw.Elapsed.TotalMilliseconds);
+                Logger.LogWarning("[{Sid}] SaveAsync localStorage primary+legacy ok (fallback path). Bytes={Bytes}.",
+                    SessionTraceId, payloadBytesFallback);
                 return;
             }
             catch (Exception ex)
@@ -3955,11 +4008,11 @@ public partial class GardenPlot
             await JS.InvokeVoidAsync("localStorage.removeItem", StorageKeyLegacy);
             await JS.InvokeVoidAsync("localStorage.setItem", StorageKeyPrimary, json);
 
-            RecordSaveMetrics("saved", "fallback-localstorage-compact", payloadBytes, sw.Elapsed.TotalMilliseconds);
-            Logger.LogInformation("GardenPlot storage save succeeded (mode: fallback-localstorage-compact). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
+            RecordSaveMetrics("saved", "fallback-localstorage-compact", payloadBytesFallback, sw.Elapsed.TotalMilliseconds);
+            Logger.LogWarning("GardenPlot storage save succeeded (mode: fallback-localstorage-compact). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
                 library.Plots.Count,
                 TotalShapeCount(library),
-                payloadBytes);
+                payloadBytesFallback);
         }
         catch (Microsoft.JSInterop.JSDisconnectedException)
         {
@@ -4663,6 +4716,19 @@ public partial class GardenPlot
     private async Task DeleteCurrentPlot()
     {
         if (currentPlot is null || library.Plots.Count <= 1) return;
+        // Explicitly remove the deleted plot's storage key before saving — the per-plot
+        // SaveAsync path only writes the active plot's key, so without this the deleted plot
+        // would persist as an orphan in IndexedDB.
+        var deletedId = currentPlot.Id;
+        try
+        {
+            await PlotRepository.DeletePlotAsync(deletedId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "DeleteCurrentPlot: failed to remove plot {PlotId} storage key; index save will still proceed.", deletedId);
+        }
+
         library.Plots.Remove(currentPlot);
         currentPlot = library.Plots[0];
         undoStack.Clear();
@@ -7716,7 +7782,8 @@ public partial class GardenPlot
             {
                 if (panActive)
                 {
-                    _ = SaveAsync();
+                    // Pan complete — view change only, route through the cheap viewport-only save.
+                    _ = SaveViewportAsync();
                     suppressContextMenuOnce = panButton == 2;
                 }
 
@@ -7877,7 +7944,8 @@ public partial class GardenPlot
 
             if (panActive)
             {
-                await SaveAsync();
+                // Pan complete — view change only, route through the cheap viewport-only save.
+                await SaveViewportAsync();
                 suppressContextMenuOnce = panButton == 2;
             }
 

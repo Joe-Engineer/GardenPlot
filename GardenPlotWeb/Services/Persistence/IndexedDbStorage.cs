@@ -19,7 +19,7 @@ namespace GardenPlotWeb.Services.Persistence;
 /// <c>client-images.js</c> already uses for its global API. No module reference
 /// is required; the surface is registered when the JS file is loaded by the page.
 /// </remarks>
-public sealed class IndexedDbStorage
+public sealed class IndexedDbStorage : IClientKvStorage
 {
     private readonly IJSRuntime js;
 
