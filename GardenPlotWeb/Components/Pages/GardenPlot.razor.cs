@@ -87,7 +87,7 @@ public partial class GardenPlot
     private double PlotWidthFt => currentPlot?.WidthFt ?? DefaultPlotWidthFt;
     private double PlotHeightFt => currentPlot?.HeightFt ?? DefaultPlotHeightFt;
 
-    private enum Tool { Select, FreeDraw, Edge, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover, Polyline }
+    public enum Tool { Select, FreeDraw, Edge, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover, Polyline }
     private enum NewPlotDialogStep { ImageFirst, Configure }
     private enum DropActivationMode { ClickToggle, HoldKey }
     private enum DropModifierKey { Shift, Ctrl, Alt }
@@ -231,7 +231,7 @@ public partial class GardenPlot
 
     private int SelectionRemoveAll(Predicate<Guid> match) => SelectionStateHelpers.RemoveAll(selectedIds, selectedIdSet, match);
 
-    private bool CanReceiveShapePointer(Shape shape)
+    internal bool CanReceiveShapePointer(Shape shape)
         => currentTool == Tool.Select || (HasSelectedPlantPaletteItem && IsFillableAreaShape(shape));
 
     private void SelectOnly(Guid id)
@@ -381,10 +381,19 @@ public partial class GardenPlot
         return Task.CompletedTask;
     }
 
-    private bool CanSelectShape(Shape shape)
+    internal bool CanSelectShape(Shape shape)
     {
         return currentPlot is not null && LayerResolver.IsSelectable(currentPlot, shape, ResolveLayerCatalogItem(shape));
     }
+
+    /// <summary>
+    /// Resolves a shape by id from the current plot. Used by
+    /// <see cref="ShapeCohortRenderer"/> to look up the parent fill area when
+    /// computing the cohort fingerprint, so cascading style changes on the
+    /// parent area invalidate the cohort's cached render.
+    /// </summary>
+    internal Shape? GetShapeById(Guid id) =>
+        currentPlot?.Shapes.FirstOrDefault(s => s.Id == id);
 
     private int CountShapesOnLayer(string layerKey)
     {
@@ -1266,12 +1275,18 @@ public partial class GardenPlot
         await SaveAsync();
     }
 
-    private void OpenCurrentDossier()
+    private async Task OpenCurrentDossier()
     {
         if (currentPlot is null)
         {
             return;
         }
+
+        // Perf: reconciliation no longer runs on every parent render (it was gated behind
+        // the takeoff panel). Ensure persisted state is fresh before the Dossier page reads
+        // PlotData.Takeoff, which is the canonical source for the dossier table.
+        ReconcileTakeoff();
+        await SaveAsync();
 
         Navigation.NavigateTo($"/dossier/{currentPlot.Id}");
     }
@@ -1282,6 +1297,11 @@ public partial class GardenPlot
         {
             return;
         }
+
+        // Perf: reconciliation no longer runs on every parent render. Ensure the source plot
+        // has up-to-date Takeoff before we clone, otherwise the as-built copy starts life
+        // with stale takeoff state relative to its shapes.
+        ReconcileTakeoff();
 
         PlotData clone = ProjectDossierService.CreateAsBuiltClone(currentPlot);
         library.Plots.Add(clone);
@@ -1298,7 +1318,7 @@ public partial class GardenPlot
         Catalog.SetCustomCatalogItems(library.CustomCatalogItems);
     }
 
-    private static bool IsGroundCoverShape(Shape s)
+    internal static bool IsGroundCoverShape(Shape s)
     {
         return string.Equals(s.Trait, "ground-cover", StringComparison.OrdinalIgnoreCase)
             || string.Equals(s.Trait, "ground-cover-assembly", StringComparison.OrdinalIgnoreCase)
@@ -1696,7 +1716,7 @@ public partial class GardenPlot
         }
     }
 
-    private static double EdgeStrokeWidthFt(Shape shape)
+    internal static double EdgeStrokeWidthFt(Shape shape)
     {
         var thicknessIn = shape.Takeoff?.DefaultThicknessIn
             ?? GardenPlotWeb.Models.Catalog.Find(shape.Takeoff?.CatalogCode ?? shape.Label)?.DefaultThicknessIn
@@ -5671,7 +5691,7 @@ public partial class GardenPlot
         return s[8] == '-' && s[13] == '-' && s[18] == '-' && s[23] == '-';
     }
 
-    private static string TileImageUrl(string fileName)
+    internal static string TileImageUrl(string fileName)
         => string.IsNullOrEmpty(fileName)
             ? string.Empty
             : IsClientImageId(fileName)
@@ -5680,7 +5700,7 @@ public partial class GardenPlot
 
     // When the reference is a client-image GUID, returns the id (caller emits it
     // as data-client-image-id="..."). Otherwise returns null so no attribute is rendered.
-    private static string? TileImageClientId(string? fileName)
+    internal static string? TileImageClientId(string? fileName)
         => IsClientImageId(fileName) ? fileName : null;
 
     private static string PlotImageUrl(string fileName)
@@ -8065,7 +8085,7 @@ public partial class GardenPlot
         if (added) _ = SaveAsync();
     }
 
-    private void OnShapePointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, Shape s)
+    internal void OnShapePointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, Shape s)
     {
         // Right-mouse is reserved for pan and must never disturb selection state.
         // Handle it BEFORE the tool / selectability gates so a right-drag that starts
@@ -8313,7 +8333,7 @@ public partial class GardenPlot
         }
     }
 
-    private void OnShapeContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, Shape s)
+    internal void OnShapeContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, Shape s)
     {
         if (suppressContextMenuOnce)
         {
@@ -9670,7 +9690,7 @@ public partial class GardenPlot
         }
     }
 
-    private static (double x, double y, double w, double h) GetBounds(Shape s)
+    internal static (double x, double y, double w, double h) GetBounds(Shape s)
     {
         if (IsPointBased(s) && s.Points.Count > 0)
         {
@@ -9695,7 +9715,7 @@ public partial class GardenPlot
     private static double RulerLength(List<Point> pts)
         => PolylineSampler.TotalLengthFt(pts);
 
-    private static bool IsRulerShape(Shape s)
+    internal static bool IsRulerShape(Shape s)
         => s.Kind == ShapeKind.Ruler || s.Kind == ShapeKind.CircleRuler || s.Kind == ShapeKind.RectRuler;
 
     private static double RulerLengthForShape(Shape s)
@@ -9742,7 +9762,7 @@ public partial class GardenPlot
     }
 
     /// <summary>Builds the SVG fragment for per-segment length labels (uses MarkupString to avoid Razor's &lt;text&gt; directive).</summary>
-    private static string RulerLabelsSvg(Shape s)
+    internal static string RulerLabelsSvg(Shape s)
     {
         var pts = s.Points;
         if (pts.Count < 2) return string.Empty;
@@ -9764,7 +9784,7 @@ public partial class GardenPlot
         return sb.ToString();
     }
 
-    private static string CircleRulerLabelsSvg(Shape s)
+    internal static string CircleRulerLabelsSvg(Shape s)
     {
         var r = Math.Abs(s.W) / 2;
         if (r <= 0)
@@ -9790,7 +9810,7 @@ public partial class GardenPlot
         return sb.ToString();
     }
 
-    private static string RectRulerLabelsSvg(Shape s)
+    internal static string RectRulerLabelsSvg(Shape s)
     {
         var w = Math.Abs(s.W);
         var h = Math.Abs(s.H);
@@ -9822,7 +9842,7 @@ public partial class GardenPlot
         return sb.ToString();
     }
 
-    private static string CircleRulerGrabbersSvg(Shape s, bool selected)
+    internal static string CircleRulerGrabbersSvg(Shape s, bool selected)
     {
         if (!selected)
         {
@@ -9838,7 +9858,7 @@ public partial class GardenPlot
         return sb.ToString();
     }
 
-    private static string RectRulerGrabbersSvg(Shape s, bool selected)
+    internal static string RectRulerGrabbersSvg(Shape s, bool selected)
     {
         if (!selected)
         {
@@ -9929,9 +9949,9 @@ public partial class GardenPlot
         _ => 1.0,
     };
 
-    private static string EffectiveStroke(Shape s) => s.Stroke ?? DefaultStroke(s);
+    internal static string EffectiveStroke(Shape s) => s.Stroke ?? DefaultStroke(s);
 
-    private static string EffectiveFill(Shape s)
+    internal static string EffectiveFill(Shape s)
     {
         if (IsGroundCoverShape(s)
             && !string.IsNullOrWhiteSpace(s.TextureKey)
@@ -9942,7 +9962,7 @@ public partial class GardenPlot
         return s.Fill ?? DefaultFill(s);
     }
 
-    private double EffectiveFillOpacity(Shape s)
+    internal double EffectiveFillOpacity(Shape s)
     {
         if (IsConceptMode && IsGroundCoverShape(s) && (!string.IsNullOrWhiteSpace(s.TextureKey) || !string.IsNullOrWhiteSpace(s.TextureImageId)))
         {
@@ -9952,7 +9972,7 @@ public partial class GardenPlot
         return s.FillOpacity ?? DefaultFillOpacity(s);
     }
 
-    private static double EffectiveFontScale(Shape s)
+    internal static double EffectiveFontScale(Shape s)
     {
         var scale = s.FontScale ?? 1.0;
         if (double.IsNaN(scale) || double.IsInfinity(scale) || scale <= 0)
@@ -10418,6 +10438,16 @@ public partial class GardenPlot
 
     private async Task ToggleTakeoffPanel()
     {
+        // Perf: ReconcileTakeoff was previously called on every parent render. We moved it
+        // behind the panel-visibility guard so it does not run during mouse hover on large
+        // plots. When opening the panel, sync state up-front so the first render shows
+        // current data without the previous "every-render" reconciliation.
+        bool opening = !showTakeoffPanel;
+        if (opening && currentPlot is not null)
+        {
+            ReconcileTakeoff();
+        }
+
         showTakeoffPanel = !showTakeoffPanel;
         library.Ui.TakeoffPanelVisible = showTakeoffPanel;
         await SaveAsync();
@@ -11289,7 +11319,7 @@ public partial class GardenPlot
         return (minX, minY, maxX, maxY);
     }
 
-    private static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+    internal static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
 
     private static string LinearUnitShortLabel(LinearUnit unit)
         => unit switch
@@ -11329,7 +11359,7 @@ public partial class GardenPlot
         var inches = ft * 12.0;
         return $"{inches:0}\"";
     }
-    private static string PointsString(IReadOnlyList<Point> pts)
+    internal static string PointsString(IReadOnlyList<Point> pts)
         => string.Join(' ', pts.Select(p => $"{F(p.X)},{F(p.Y)}"));
 }
 
