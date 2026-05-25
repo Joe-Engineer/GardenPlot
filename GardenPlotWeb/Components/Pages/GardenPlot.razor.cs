@@ -1604,13 +1604,14 @@ public partial class GardenPlot
             await stream.CopyToAsync(ms);
             var base64 = Convert.ToBase64String(ms.ToArray());
 
-            if (jsModule is null)
+            IJSObjectReference? module = await EnsureClientImagesModuleAsync();
+            if (module is null)
             {
                 return;
             }
 
-            var id = await jsModule.InvokeAsync<string>(
-                "GardenPlot.clientImages.putImageFromBase64",
+            var id = await module.InvokeAsync<string>(
+                "putImageFromBase64",
                 base64,
                 file.ContentType,
                 file.Name);
@@ -4374,17 +4375,49 @@ public partial class GardenPlot
         newPlotDimensionsDerivedFromImage = true;
     }
 
+    /// <summary>
+    /// Returns the <c>./js/client-images.js</c> module reference, importing it on demand if the
+    /// page-load init at <c>OnAfterRenderAsync</c> hasn't completed (or failed). Returns null if
+    /// the import fails so callers can render a graceful error instead of throwing on the next call.
+    /// </summary>
+    /// <remarks>
+    /// All callers that need <c>putImageFromBase64</c>, <c>probeImageDimensions</c>, or any other
+    /// export from <c>client-images.js</c> MUST go through this helper. Do not call
+    /// <see cref="jsModule"/> with a dotted <c>"GardenPlot.clientImages.*"</c> identifier — module
+    /// references resolve identifiers within their own export scope, not against <c>window</c>,
+    /// so that call shape silently fails with a misleading "browser storage" error.
+    /// </remarks>
+    private async Task<IJSObjectReference?> EnsureClientImagesModuleAsync()
+    {
+        if (clientImagesModule is not null)
+        {
+            return clientImagesModule;
+        }
+
+        try
+        {
+            using CancellationTokenSource importCts = new(TimeSpan.FromSeconds(3));
+            clientImagesModule = await JS.InvokeAsync<IJSObjectReference>("import", importCts.Token, "./js/client-images.js");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "client-images.js import failed");
+        }
+
+        return clientImagesModule;
+    }
+
     private async Task<(int Width, int Height)?> TryReadPlotImageSizeAsync(string fileName)
     {
         try
         {
-            if (clientImagesModule is null)
+            IJSObjectReference? module = await EnsureClientImagesModuleAsync();
+            if (module is null)
             {
-                using CancellationTokenSource importCts = new(TimeSpan.FromSeconds(3));
-                clientImagesModule = await JS.InvokeAsync<IJSObjectReference>("import", importCts.Token, "./js/client-images.js");
+                return null;
             }
 
-            JsonElement size = await clientImagesModule.InvokeAsync<JsonElement>(
+            JsonElement size = await module.InvokeAsync<JsonElement>(
                 "probeImageDimensions",
                 $"{PlotImageUrl(fileName)}?v={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}");
             if (size.TryGetProperty("width", out JsonElement widthNode) &&
@@ -4432,10 +4465,11 @@ public partial class GardenPlot
             newPlotBackgroundImageWarning = null;
         }
 
-        // Persist into the browser's IndexedDB via client-images.js (GardenPlot.clientImages.putImageFromBase64).
+        // Persist into the browser's IndexedDB via client-images.js (putImageFromBase64).
         // The returned GUID is stored as the plot's BackgroundImageFileName; client-images.js
         // resolves it back to a blob: URL at render time via resolveImageRef.
-        if (jsModule is null)
+        IJSObjectReference? module = await EnsureClientImagesModuleAsync();
+        if (module is null)
         {
             newPlotError = "Browser storage helper is not ready yet. Please try again in a moment.";
             return null;
@@ -4446,8 +4480,8 @@ public partial class GardenPlot
         await input.CopyToAsync(ms);
         string base64 = Convert.ToBase64String(ms.ToArray());
 
-        string id = await jsModule.InvokeAsync<string>(
-            "GardenPlot.clientImages.putImageFromBase64",
+        string id = await module.InvokeAsync<string>(
+            "putImageFromBase64",
             base64,
             file.ContentType,
             file.Name);
@@ -5491,7 +5525,8 @@ public partial class GardenPlot
             return null;
         }
 
-        if (jsModule is null)
+        IJSObjectReference? module = await EnsureClientImagesModuleAsync();
+        if (module is null)
         {
             addCustomTileError = "Image storage is not ready yet. Try again in a moment.";
             return null;
@@ -5504,8 +5539,8 @@ public partial class GardenPlot
             await input.CopyToAsync(ms);
             var base64 = Convert.ToBase64String(ms.ToArray());
 
-            var id = await jsModule.InvokeAsync<string>(
-                "GardenPlot.clientImages.putImageFromBase64",
+            var id = await module.InvokeAsync<string>(
+                "putImageFromBase64",
                 base64,
                 file.ContentType,
                 file.Name);
