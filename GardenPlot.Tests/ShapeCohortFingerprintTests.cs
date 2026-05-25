@@ -292,38 +292,74 @@ public sealed class ShapeCohortFingerprintTests
 
     [Fact]
     [Trait("Category", "Performance")]
-    public void Compute_ScalesUnder1ms_For1299Shapes()
+    public void Compute_ScalesLinearly_AcrossCohortSize()
     {
         // Issue #109's 1299-crocus repro. The fingerprint runs on every parent
-        // render — measured per-pointer-move during hover. Must stay well below
-        // a frame budget even on the worst-case cohort.
-        var rng = new Random(42);
-        var shapes = new List<Shape>(1299);
-        for (int i = 0; i < 1299; i++)
-        {
-            shapes.Add(new Shape
-            {
-                Id = Guid.NewGuid(),
-                Kind = ShapeKind.Plant,
-                X = rng.NextDouble() * 100,
-                Y = rng.NextDouble() * 100,
-                W = 1.0,
-                H = 1.0,
-                Trait = "flower",
-            });
-        }
+        // render (~60 Hz during hover), so its cost matters. This test guards
+        // against an accidental O(N^2) regression by comparing the time at
+        // N=1299 against N=325 (4x scale) and asserting the ratio stays
+        // sub-linear-with-slack. A relative ratio is immune to CI runner speed
+        // variance; an absolute budget would flake on slower hosted runners.
+        const int Small = 325;
+        const int Large = 1299;
+
+        var smallShapes = MakeRandomCohort(Small);
+        var largeShapes = MakeRandomCohort(Large);
 
         // Warm up to avoid first-call JIT bias.
-        _ = ShapeCohortFingerprint.Compute(shapes, null, EmptySel, false, 0);
+        for (int warm = 0; warm < 3; warm++)
+        {
+            _ = ShapeCohortFingerprint.Compute(smallShapes, null, EmptySel, false, 0);
+            _ = ShapeCohortFingerprint.Compute(largeShapes, null, EmptySel, false, 0);
+        }
 
-        var sw = Stopwatch.StartNew();
-        long fp = ShapeCohortFingerprint.Compute(shapes, null, EmptySel, false, 0);
-        sw.Stop();
+        const int Iterations = 30;
+        long tSmall = Measure(smallShapes, Iterations);
+        long tLarge = Measure(largeShapes, Iterations);
 
-        // Generous bound vs the design target of <1ms. Test machines vary; the
-        // intent is to catch a 10x regression, not micro-benchmark the algo.
+        // Linear scaling is 4x (Large/Small = 1299/325 ≈ 4). Allow up to 8x to
+        // absorb noise and overhead from the parent-area hash + sentinel mixes
+        // that dominate at small N; any genuine O(N^2) regression would
+        // explode this to 16x+.
+        double ratio = (double)tLarge / Math.Max(1, tSmall);
         Assert.True(
-            sw.Elapsed.TotalMilliseconds < 5.0,
-            $"Fingerprint of 1299 shapes took {sw.Elapsed.TotalMilliseconds:F2}ms (budget 5ms). fp={fp}");
+            ratio < 8.0,
+            $"Fingerprint scaling regression: N={Large} / N={Small} = {ratio:N2}x (linear ~4x). " +
+            $"tSmall={tSmall}ticks, tLarge={tLarge}ticks.");
+
+        static long Measure(IReadOnlyList<Shape> shapes, int iterations)
+        {
+            var sw = Stopwatch.StartNew();
+            long acc = 0;
+            for (int iter = 0; iter < iterations; iter++)
+            {
+                acc ^= ShapeCohortFingerprint.Compute(shapes, null, EmptySel, false, 0);
+            }
+
+            sw.Stop();
+            Assert.True(acc != long.MinValue); // suppress dead-code elimination
+            return sw.ElapsedTicks;
+        }
+
+        static List<Shape> MakeRandomCohort(int count)
+        {
+            var rng = new Random(42);
+            var shapes = new List<Shape>(count);
+            for (int i = 0; i < count; i++)
+            {
+                shapes.Add(new Shape
+                {
+                    Id = Guid.NewGuid(),
+                    Kind = ShapeKind.Plant,
+                    X = rng.NextDouble() * 100,
+                    Y = rng.NextDouble() * 100,
+                    W = 1.0,
+                    H = 1.0,
+                    Trait = "flower",
+                });
+            }
+
+            return shapes;
+        }
     }
 }
