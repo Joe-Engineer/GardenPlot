@@ -149,7 +149,11 @@ public partial class GardenPlot
         System.Enum.GetValues<PaletteCategory>()
             .OrderBy(c => CategoryLabel(c), StringComparer.OrdinalIgnoreCase)
             .First();
+    // Ordered selection (preserves insertion order). PrimarySelectedId reads selectedIds[^1].
+    // Always kept in sync with selectedIdSet via the Selection* helper methods below.
     private readonly List<Guid> selectedIds = new();
+    // Parallel HashSet for O(1) IsSelected(id) lookup. Mirrors selectedIds (set semantics: no duplicates).
+    private readonly HashSet<Guid> selectedIdSet = new();
     private ElementReference canvasRef;
     private ElementReference wrapRef;
     private ElementReference rulerPanelRef = default;
@@ -207,38 +211,56 @@ public partial class GardenPlot
     private bool HasClipboard => clipboard.Count > 0;
     private bool HasSelectedPlantPaletteItem => selectedItem?.Kind == PaletteKind.Plant;
     private bool CanFillSelectedArea => HasSelectedPlantPaletteItem && GetSelectedFillAreaShape() is not null;
-    private bool IsSelected(Guid id) => selectedIds.Contains(id);
+    private bool IsSelected(Guid id) => selectedIdSet.Contains(id);
+
+    // === Selection mutation helpers ===
+    // All mutations to selectedIds must go through these so the parallel selectedIdSet stays in sync.
+    // Invariants:
+    //   * selectedIdSet.SetEquals(selectedIds) is true after every call.
+    //   * selectedIds contains no duplicates (SelectionAdd rejects already-present ids).
+    //   * List order is preserved: SelectionAdd appends, SelectionRemove removes the single occurrence,
+    //     SelectionRemoveAll preserves the relative order of survivors.
+
+    private bool SelectionAdd(Guid id) => SelectionStateHelpers.Add(selectedIds, selectedIdSet, id);
+
+    private bool SelectionRemove(Guid id) => SelectionStateHelpers.Remove(selectedIds, selectedIdSet, id);
+
+    private void SelectionClear() => SelectionStateHelpers.Clear(selectedIds, selectedIdSet);
+
+    private void SelectionAddRange(IEnumerable<Guid> ids) => SelectionStateHelpers.AddRange(selectedIds, selectedIdSet, ids);
+
+    private int SelectionRemoveAll(Predicate<Guid> match) => SelectionStateHelpers.RemoveAll(selectedIds, selectedIdSet, match);
 
     private bool CanReceiveShapePointer(Shape shape)
         => currentTool == Tool.Select || (HasSelectedPlantPaletteItem && IsFillableAreaShape(shape));
 
     private void SelectOnly(Guid id)
     {
-        selectedIds.Clear();
+        SelectionClear();
 
         if (currentPlot?.Shapes.FirstOrDefault(s => s.Id == id) is Shape shape && CanSelectShape(shape))
         {
-            selectedIds.Add(id);
+            SelectionAdd(id);
         }
     }
 
     private void ToggleSelection(Guid id)
     {
-        if (selectedIds.Remove(id))
+        if (SelectionRemove(id))
         {
             return;
         }
 
         if (currentPlot?.Shapes.FirstOrDefault(s => s.Id == id) is Shape shape && CanSelectShape(shape))
         {
-            selectedIds.Add(id);
+            SelectionAdd(id);
         }
     }
 
     private void SelectFilledAreaRegion(Guid clickedId)
     {
-        selectedIds.Clear();
-        selectedIds.AddRange(OrderedFilledAreaRegionSelection(clickedId));
+        SelectionClear();
+        SelectionAddRange(OrderedFilledAreaRegionSelection(clickedId));
     }
 
     private void ToggleFilledAreaRegion(Guid clickedId)
@@ -246,20 +268,17 @@ public partial class GardenPlot
         var linkedIds = OrderedFilledAreaRegionSelection(clickedId);
         if (linkedIds.All(IsSelected))
         {
-            selectedIds.RemoveAll(linkedIds.Contains);
+            SelectionRemoveAll(linkedIds.Contains);
             return;
         }
 
         foreach (var id in linkedIds)
         {
-            if (!selectedIds.Contains(id))
-            {
-                selectedIds.Add(id);
-            }
+            SelectionAdd(id);
         }
     }
 
-    private void ClearSelection() => selectedIds.Clear();
+    private void ClearSelection() => SelectionClear();
 
     private LayerState GetLayerState(string layerKey)
     {
@@ -419,7 +438,7 @@ public partial class GardenPlot
             return;
         }
 
-        selectedIds.RemoveAll(id =>
+        SelectionRemoveAll(id =>
         {
             Shape? shape = currentPlot.Shapes.FirstOrDefault(s => s.Id == id);
             return shape is null || !CanSelectShape(shape);
@@ -463,8 +482,8 @@ public partial class GardenPlot
             }
         }
 
-        selectedIds.Clear();
-        selectedIds.AddRange(ordered);
+        SelectionClear();
+        SelectionAddRange(ordered);
     }
 
     private void ExpandSelectionToFilledAreas()
@@ -487,8 +506,8 @@ public partial class GardenPlot
             }
         }
 
-        selectedIds.Clear();
-        selectedIds.AddRange(ordered);
+        SelectionClear();
+        SelectionAddRange(ordered);
     }
 
     private List<Guid> OrderedFilledAreaRegionSelection(Guid clickedId)
@@ -2130,7 +2149,7 @@ public partial class GardenPlot
             return true;
         }
 
-        return t.ShapeId is Guid g && selectedIds.Contains(g);
+        return t.ShapeId is Guid g && selectedIdSet.Contains(g);
     }
 
     /// <summary>
@@ -2148,7 +2167,7 @@ public partial class GardenPlot
             if (additive)
             {
                 ToggleSelection(shapeId);
-                if (selectedIds.Contains(shapeId))
+                if (selectedIdSet.Contains(shapeId))
                 {
                     _ = selectedTakeoffIds.Add(t.Id);
                 }
@@ -2221,7 +2240,7 @@ public partial class GardenPlot
         if (t.ShapeId is Guid sid)
         {
             _ = currentPlot.Shapes.RemoveAll(s => s.Id == sid);
-            _ = selectedIds.Remove(sid);
+            _ = SelectionRemove(sid);
         }
 
         _ = currentPlot.Takeoff.Remove(t);
@@ -3043,12 +3062,12 @@ public partial class GardenPlot
 
         RecordUndoState();
         recentMaterialChangeShapeIds.Clear();
-        selectedIds.Clear();
+        SelectionClear();
         foreach (var shape in targetShapes)
         {
             ApplyMaterialSwap(shape, item);
             recentMaterialChangeShapeIds.Add(shape.Id);
-            selectedIds.Add(shape.Id);
+            SelectionAdd(shape.Id);
         }
 
         CloseMaterialPicker();
@@ -5945,8 +5964,8 @@ public partial class GardenPlot
         // Restore the source path as the active selection so the user can immediately
         // pick a new palette item or Drawing Set and run Along-path again without
         // re-selecting the path.
-        selectedIds.Clear();
-        selectedIds.Add(sourcePath.Id);
+        SelectionClear();
+        SelectionAdd(sourcePath.Id);
         await SaveAsync();
     }
 
@@ -6022,8 +6041,8 @@ public partial class GardenPlot
         var ordered = GardenPlotGroupingOperations.GroupSelectedItems(members, currentPlot.DropGroups);
         CleanupOrphanDropGroups();
         SyncDropGroupsFromCurrentShapes();
-        selectedIds.Clear();
-        selectedIds.AddRange(ordered.Select(s => s.Id));
+        SelectionClear();
+        SelectionAddRange(ordered.Select(s => s.Id));
         DropIneligibleSelection();
 
         await SaveAsync();
@@ -6129,8 +6148,8 @@ public partial class GardenPlot
             currentPlot.Shapes.Add(s);
         }
 
-        selectedIds.Clear();
-        selectedIds.AddRange(pasted.Select(s => s.Id));
+        SelectionClear();
+        SelectionAddRange(pasted.Select(s => s.Id));
         DropIneligibleSelection();
         await SaveAsync();
     }
@@ -6466,7 +6485,7 @@ public partial class GardenPlot
     private bool CanCreateDrawingSetFromSelection
         => currentPlot is not null
            && selectedIds.Count >= 1
-           && currentPlot.Shapes.Any(s => selectedIds.Contains(s.Id) && IsCapturableAsDrawingSetRow(s));
+           && currentPlot.Shapes.Any(s => selectedIdSet.Contains(s.Id) && IsCapturableAsDrawingSetRow(s));
 
     private static bool IsCapturableAsDrawingSetRow(Shape s)
         => s.Kind is ShapeKind.Plant or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.SoilMarker
@@ -6498,7 +6517,7 @@ public partial class GardenPlot
         }
 
         var captured = currentPlot.Shapes
-            .Where(s => selectedIds.Contains(s.Id) && IsCapturableAsDrawingSetRow(s))
+            .Where(s => selectedIdSet.Contains(s.Id) && IsCapturableAsDrawingSetRow(s))
             .ToList();
         if (captured.Count == 0)
         {
@@ -7665,8 +7684,8 @@ public partial class GardenPlot
                         currentPlot.DropGroups.RemoveAll(g => g.Id == group.Id);
                         currentPlot.DropGroups.Add(group);
                     }
-                    selectedIds.Clear();
-                    selectedIds.AddRange(placement.Shapes.Select(z => z.Id));
+                    SelectionClear();
+                    SelectionAddRange(placement.Shapes.Select(z => z.Id));
                     DropIneligibleSelection();
                 }
 
@@ -7927,7 +7946,7 @@ public partial class GardenPlot
             {
                 if (!boxSelectAdditive)
                 {
-                    selectedIds.Clear();
+                    SelectionClear();
                 }
 
                 foreach (var shape in currentPlot.Shapes)
@@ -7943,10 +7962,7 @@ public partial class GardenPlot
                         continue;
                     }
 
-                    if (!selectedIds.Contains(shape.Id))
-                    {
-                        selectedIds.Add(shape.Id);
-                    }
+                    SelectionAdd(shape.Id);
                 }
             }
 
@@ -8052,8 +8068,8 @@ public partial class GardenPlot
             return;
         }
 
-        selectedIds.Clear();
-        selectedIds.AddRange(currentPlot.Shapes.Where(s => s.GroupId == groupId && CanSelectShape(s)).Select(s => s.Id));
+        SelectionClear();
+        SelectionAddRange(currentPlot.Shapes.Where(s => s.GroupId == groupId && CanSelectShape(s)).Select(s => s.Id));
     }
 
     private Task SelectDropGroupFromPanel(Guid groupId)
@@ -8898,8 +8914,8 @@ public partial class GardenPlot
             return;
         }
 
-        selectedIds.Clear();
-        selectedIds.AddRange(currentPlot.Shapes.Where(CanSelectShape).Select(s => s.Id));
+        SelectionClear();
+        SelectionAddRange(currentPlot.Shapes.Where(CanSelectShape).Select(s => s.Id));
     }
 
     private void RemoveSelectionGroup(string kind, string name)
@@ -8915,7 +8931,7 @@ public partial class GardenPlot
             .Select(s => s.Id)
             .ToHashSet();
 
-        selectedIds.RemoveAll(id => drop.Contains(id));
+        SelectionRemoveAll(id => drop.Contains(id));
     }
 
     private DropGroup? GetCurrentSelectedDropGroup()
@@ -9335,15 +9351,15 @@ public partial class GardenPlot
                 }
 
                 // Fallback (legacy / pre-anchor data): regenerate from the first member as template.
-                var hadSelection = members.Any(member => selectedIds.Contains(member.Id));
+                var hadSelection = members.Any(member => selectedIdSet.Contains(member.Id));
                 var template = members[0];
                 currentPlot.Shapes.RemoveAll(shape => shape.GroupId == group.Id);
                 var rebuilt = RebuildAlongPathShapes(group, sourcePath, template);
                 currentPlot.Shapes.AddRange(rebuilt);
                 if (hadSelection)
                 {
-                    selectedIds.Clear();
-                    selectedIds.AddRange(rebuilt.Select(shape => shape.Id));
+                    SelectionClear();
+                    SelectionAddRange(rebuilt.Select(shape => shape.Id));
                 }
             }
             else
