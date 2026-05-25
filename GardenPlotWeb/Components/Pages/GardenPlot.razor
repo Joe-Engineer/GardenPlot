@@ -1,6 +1,5 @@
-﻿@page "/"
+@page "/"
 @page "/plot"
-@rendermode InteractiveServer
 @implements IAsyncDisposable
 @using System.Diagnostics
 @using System.Diagnostics.Metrics
@@ -13,9 +12,7 @@
 @using GardenPlotWeb.Services
 @using GardenPlotWeb.Services.Catalog
 @inject IJSRuntime JS
-@inject IHttpClientFactory HttpFactory
-@inject IWebHostEnvironment Env
-@inject DataRootProvider DataRoot
+@inject HttpClient Http
 @inject IPlantProfileService PlantProfiles
 @inject ProjectDossierService ProjectDossierService
 @inject GardenPlotWeb.Services.Persistence.PlotLibraryLoader PlotLibraryLoader

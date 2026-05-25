@@ -1,20 +1,22 @@
-﻿// <copyright file="ServiceCollectionExtensions.cs" company="Garden Plot">
+// <copyright file="ServiceCollectionExtensions.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
 namespace GardenPlotWeb.Services;
 
 /// <summary>
-/// Composition-root helpers for the Garden Plot web app. Registering app
-/// services through a single extension method keeps <c>Program.cs</c> small
-/// and reads as a story: defaults &#x2192; razor components &#x2192; garden services
-/// &#x2192; pipeline.
+/// Composition-root helpers for the Garden Plot WebAssembly app. Registering app
+/// services through a single extension method keeps <c>Program.cs</c> small and
+/// reads as a story: WASM host -&gt; HTTP client -&gt; garden services.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers all application-specific services used by the Garden Plot
-    /// designer (HTTP client factory, per-user data root, plant profile catalog).
+    /// Registers application-specific services for the Blazor WebAssembly designer.
+    /// All persistence is browser-local (IndexedDB via the <c>client-store.js</c>
+    /// / <c>client-images.js</c> modules); static seed data is fetched from
+    /// <c>wwwroot/data/</c> through the scoped <see cref="HttpClient"/> registered
+    /// in <c>Program.cs</c>.
     /// </summary>
     /// <param name="services">The service collection to add registrations to.</param>
     /// <returns>The same <paramref name="services"/> instance for chaining.</returns>
@@ -22,28 +24,29 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // Used by the Garden Plot page to look up plant info from Wikipedia.
-        _ = services.AddHttpClient();
+        // Thin typed wrapper over wwwroot/js/client-store.js (IndexedDB key/value store).
+        // The image-blob IndexedDB is kept separate and owned by wwwroot/js/client-images.js
+        // to avoid shared-ownership schema-version traps between the structured and binary stores.
+        _ = services.AddScoped<Persistence.IndexedDbStorage>();
 
-        // Per-user data root resolver (LocalAppData by default, override with GARDENPLOT_DATA_DIR).
-        _ = services.AddSingleton<DataRootProvider>();
+        // Optional rich horticultural metadata loaded from wwwroot/data/plant-profiles.json
+        // via HttpClient (lazy: page calls EnsureLoadedAsync at startup).
+        _ = services.AddScoped<IPlantProfileService, LocalPlantProfileService>();
 
-        // Optional rich horticultural metadata loaded from wwwroot/data/plant-profiles.json.
-        _ = services.AddSingleton<IPlantProfileService, LocalPlantProfileService>();
+        // Plot persistence: per-version JSON loader/migrator.
+        _ = services.AddScoped<Persistence.PlotLibraryLoader>();
 
-        // Plot persistence: per-version loader. New schemas add a LoadFromVersionN method
-        // on this type and a switch entry; saves always write PlotSchema.Current.
-        _ = services.AddSingleton<Persistence.PlotLibraryLoader>();
-
-        // Plot persistence: filesystem-backed repository under DataRootProvider.PlotsDirectory.
-        // Phase 2 (accounts + cloud plots) will swap this registration for a DB-backed impl.
-        _ = services.AddSingleton<Persistence.IPlotRepository, Persistence.FileSystemPlotRepository>();
+        // Plot persistence: IndexedDB-backed repository (single library document under
+        // gardenplot-structured/kv/library/current). Replaces the previous filesystem
+        // implementation as part of the WASM conversion (see #92).
+        _ = services.AddScoped<Persistence.IPlotRepository, Persistence.IndexedDbPlotRepository>();
 
         // Catalog of static facts behind each takeoff item kind (Base + future Packs + per-library Custom).
-        _ = services.AddSingleton<Catalog.ICatalogService, Catalog.CatalogService>();
+        // Loads from a checked-in manifest at wwwroot/data/catalog/assemblies/_index.json.
+        _ = services.AddScoped<Catalog.ICatalogService, Catalog.CatalogService>();
 
-        // Project dossier helpers (as-built cloning, PNG export, photo storage, catalog suggestions).
-        _ = services.AddSingleton<ProjectDossierService>();
+        // Project dossier helpers (as-built cloning, PNG export, photo storage via IJSRuntime, catalog suggestions).
+        _ = services.AddScoped<ProjectDossierService>();
 
         return services;
     }

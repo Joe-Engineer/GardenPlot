@@ -1,5 +1,4 @@
-﻿@page "/dossier/{PlotId:guid}"
-@rendermode InteractiveServer
+@page "/dossier/{PlotId:guid}"
 @implements IAsyncDisposable
 @using System.Globalization
 @using System.Text.Json
@@ -297,6 +296,8 @@ else
     private string? statusMessage;
     private string? errorMessage;
     private IJSObjectReference? jsModule;
+    private IJSObjectReference? clientImagesModule;
+    private Dictionary<string, string> photoUrls = new(StringComparer.Ordinal);
     private ElementReference plotPreviewHost;
     private string plotPreviewMarkup = string.Empty;
     private List<DossierTakeoffRow> takeoffRows = [];
@@ -313,12 +314,25 @@ else
         }
 
         jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/gardenplot.js");
+        clientImagesModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/client-images.js");
         await LoadAsync();
+        await ResolvePhotoUrlsAsync();
         StateHasChanged();
     }
 
     public async ValueTask DisposeAsync()
     {
+        if (clientImagesModule is not null)
+        {
+            try
+            {
+                await clientImagesModule.DisposeAsync();
+            }
+            catch
+            {
+            }
+        }
+
         if (jsModule is not null)
         {
             try
@@ -437,7 +451,56 @@ else
 
         takeoffRows = DossierService.BuildDossierTakeoff(currentPlot, library.CustomCatalogItems).ToList();
         hoursSummary = ProjectDossierService.SummarizeHours(takeoffRows);
-        plotPreviewMarkup = DossierService.BuildPlotSvg(currentPlot);
+        plotPreviewMarkup = DossierService.BuildPlotSvg(currentPlot, photoUrls);
+    }
+
+    /// <summary>
+    /// Resolves all photo references on the current plot (project photos + background image)
+    /// into blob URLs hosted by <c>client-images.js</c>. Stored on the local
+    /// <see cref="photoUrls"/> dictionary so markup helpers and SVG generation can stay
+    /// synchronous. Called once after load and after any image upload.
+    /// </summary>
+    private async Task ResolvePhotoUrlsAsync()
+    {
+        photoUrls = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (currentPlot is null || clientImagesModule is null)
+        {
+            return;
+        }
+
+        List<string> refs = new();
+        refs.AddRange(currentPlot.PhotoFileNames.Where(r => !string.IsNullOrWhiteSpace(r)));
+        if (!string.IsNullOrWhiteSpace(currentPlot.BackgroundImageFileName))
+        {
+            refs.Add(currentPlot.BackgroundImageFileName!);
+        }
+
+        if (refs.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            Dictionary<string, string?>? resolved = await clientImagesModule
+                .InvokeAsync<Dictionary<string, string?>?>("resolveMany", refs.Distinct().ToArray());
+            if (resolved is null)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<string, string?> kv in resolved)
+            {
+                if (!string.IsNullOrWhiteSpace(kv.Value))
+                {
+                    photoUrls[kv.Key] = kv.Value!;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to resolve photo URLs for plot {PlotId}.", PlotId);
+        }
     }
 
     private async Task ExportPlotPngAsync()
@@ -474,6 +537,8 @@ else
             }
 
             await SaveLibraryAsync();
+            await ResolvePhotoUrlsAsync();
+            RefreshDerivedState();
             statusMessage = "Photos uploaded.";
         }
         catch (Exception ex)
@@ -580,9 +645,9 @@ else
         }
     }
 
-    private static string PhotoUrl(string relativePath)
+    private string PhotoUrl(string relativePath)
     {
-        return ProjectDossierService.ProjectPhotoUrl(relativePath);
+        return photoUrls.TryGetValue(relativePath, out string? url) ? url : string.Empty;
     }
 
     private void GoBack()

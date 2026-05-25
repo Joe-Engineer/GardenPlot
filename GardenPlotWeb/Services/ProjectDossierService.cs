@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using GardenPlotWeb.Models;
 using GardenPlotWeb.Services.Catalog;
+using Microsoft.JSInterop;
 
 namespace GardenPlotWeb.Services;
 
@@ -15,14 +16,14 @@ public sealed class ProjectDossierService
 {
     private static readonly JsonSerializerOptions CloneSerializerOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly DataRootProvider dataRoot;
+    private readonly IJSRuntime js;
     private readonly ICatalogService catalog;
 
-    public ProjectDossierService(DataRootProvider dataRoot, ICatalogService catalog)
+    public ProjectDossierService(IJSRuntime js, ICatalogService catalog)
     {
-        ArgumentNullException.ThrowIfNull(dataRoot);
+        ArgumentNullException.ThrowIfNull(js);
         ArgumentNullException.ThrowIfNull(catalog);
-        this.dataRoot = dataRoot;
+        this.js = js;
         this.catalog = catalog;
     }
 
@@ -180,34 +181,42 @@ public sealed class ProjectDossierService
         return applied;
     }
 
+    /// <summary>
+    /// Persists a project photo into the browser's IndexedDB via <c>client-images.js</c>
+    /// (<c>GardenPlot.clientImages.putImageFromBase64</c>) and returns the generated
+    /// GUID reference. <paramref name="plotId"/> is recorded only in telemetry; storage
+    /// is keyed by the returned GUID and is shared across all plots in this browser.
+    /// </summary>
     public async Task<string> SaveProjectPhotoAsync(Guid plotId, string originalFileName, Stream input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
+        _ = plotId;
 
-        string extension = Path.GetExtension(originalFileName);
-        if (string.IsNullOrWhiteSpace(extension))
-        {
-            extension = ".img";
-        }
+        using MemoryStream ms = new();
+        await input.CopyToAsync(ms, ct).ConfigureAwait(false);
+        string base64 = Convert.ToBase64String(ms.ToArray());
 
-        string projectDirectory = Path.Combine(dataRoot.PlotImagesDirectory, plotId.ToString("N", CultureInfo.InvariantCulture));
-        _ = Directory.CreateDirectory(projectDirectory);
+        string mime = GuessMimeFromExtension(Path.GetExtension(originalFileName));
 
-        string fileName = $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
-        string physicalPath = Path.Combine(projectDirectory, fileName);
-        await using FileStream output = File.Create(physicalPath);
-        await input.CopyToAsync(output, ct).ConfigureAwait(false);
+        string? id = await js.InvokeAsync<string>(
+            "GardenPlot.clientImages.putImageFromBase64",
+            ct,
+            base64,
+            mime,
+            originalFileName ?? "photo")
+            .ConfigureAwait(false);
 
-        return $"{plotId:N}/{fileName}";
+        return id ?? throw new InvalidOperationException("client-images.putImageFromBase64 returned null.");
     }
 
-    public static string ProjectPhotoUrl(string relativePath)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
-        return $"/plot-images/{string.Join('/', relativePath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries).Select(Uri.EscapeDataString))}";
-    }
-
-    public string BuildPlotSvg(PlotData plot)
+    /// <summary>
+    /// Renders the plot to an SVG string. When <paramref name="photoUrls"/> is provided,
+    /// the background-image reference is resolved through the map (caller pre-resolves
+    /// via <c>client-images.js</c> <c>resolveMany</c>). When omitted, the background
+    /// image is skipped (avoids emitting a broken <c>/plot-images/...</c> URL that no
+    /// longer exists in the WASM build).
+    /// </summary>
+    public string BuildPlotSvg(PlotData plot, IReadOnlyDictionary<string, string>? photoUrls = null)
     {
         ArgumentNullException.ThrowIfNull(plot);
         NormalizePlot(plot);
@@ -225,10 +234,13 @@ public sealed class ProjectDossierService
             .Append(F(plot.HeightFt))
             .Append("\" fill=\"#f3efe3\" />");
 
-        if (!string.IsNullOrWhiteSpace(plot.BackgroundImageFileName))
+        if (!string.IsNullOrWhiteSpace(plot.BackgroundImageFileName)
+            && photoUrls is not null
+            && photoUrls.TryGetValue(plot.BackgroundImageFileName, out string? resolvedUrl)
+            && !string.IsNullOrWhiteSpace(resolvedUrl))
         {
             _ = sb.Append("<image href=\"")
-                .Append(ProjectPhotoUrl(plot.BackgroundImageFileName!))
+                .Append(WebUtility.HtmlEncode(resolvedUrl))
                 .Append("\" x=\"0\" y=\"0\" width=\"")
                 .Append(F(plot.WidthFt))
                 .Append("\" height=\"")
@@ -674,6 +686,25 @@ public sealed class ProjectDossierService
     private static string F(double value)
     {
         return value.ToString("0.###", CultureInfo.InvariantCulture);
+    }
+
+    private static string GuessMimeFromExtension(string? extension)
+    {
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            return "application/octet-stream";
+        }
+
+        return extension.ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            ".bmp" => "image/bmp",
+            ".svg" => "image/svg+xml",
+            _ => "application/octet-stream",
+        };
     }
 }
 

@@ -2,6 +2,7 @@
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
+using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -58,10 +59,12 @@ public sealed class CatalogService : ICatalogService
     private readonly List<CatalogAssembly> allAssemblies = new();
     private List<CatalogItem> customItems = new();
 
-    public CatalogService(IWebHostEnvironment env, ILogger<CatalogService> logger)
+    public CatalogService(HttpClient http, ILogger<CatalogService> logger)
     {
-        ArgumentNullException.ThrowIfNull(env);
+        ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(logger);
+        this.http = http;
+        this.logger = logger;
 
         baseItems = BuildBaseFromPalette();
         baseByCode = new Dictionary<string, CatalogItem>(StringComparer.OrdinalIgnoreCase);
@@ -69,45 +72,89 @@ public sealed class CatalogService : ICatalogService
         {
             baseByCode.TryAdd(item.Code, item);
         }
+    }
 
-        string root = Path.Combine(env.WebRootPath, "data", "catalog", "assemblies");
-        if (!Directory.Exists(root))
+    private readonly HttpClient http;
+    private readonly ILogger<CatalogService> logger;
+    private Task? loadTask;
+
+    /// <summary>True once <see cref="EnsureLoadedAsync"/> has completed at least once.</summary>
+    public bool IsLoaded { get; private set; }
+
+    /// <summary>Raised after <see cref="EnsureLoadedAsync"/> succeeds so the UI can rerender.</summary>
+    public event Action? OnLoaded;
+
+    /// <summary>
+    /// Triggers a one-shot async fetch of the assembly manifest and each listed pack file.
+    /// Safe to call repeatedly: concurrent callers share the same in-flight <see cref="Task"/>.
+    /// </summary>
+    public Task EnsureLoadedAsync()
+    {
+        return loadTask ??= LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
         {
-            if (logger.IsEnabled(LogLevel.Information))
+            // The catalog assemblies folder cannot be enumerated over HTTP, so we read
+            // a checked-in manifest (_index.json) that lists the pack files to fetch.
+            AssemblyManifest? manifest = await http.GetFromJsonAsync<AssemblyManifest>(
+                "data/catalog/assemblies/_index.json", JsonOptions).ConfigureAwait(false);
+
+            if (manifest?.Files is null || manifest.Files.Count == 0)
             {
-                logger.LogInformation("Assembly catalog directory not found at {Path}; running without seeded assemblies.", root);
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation("Assembly catalog manifest empty or missing; running without seeded assemblies.");
+                }
+
+                return;
             }
 
-            return;
-        }
-
-        foreach (string path in Directory.GetFiles(root, "*.json", SearchOption.AllDirectories).OrderBy(static p => p, StringComparer.OrdinalIgnoreCase))
-        {
-            try
+            foreach (string file in manifest.Files.OrderBy(static p => p, StringComparer.OrdinalIgnoreCase))
             {
-                using FileStream stream = File.OpenRead(path);
-                List<CatalogAssembly> loaded = LoadAssemblies(stream);
-                foreach (CatalogAssembly assembly in loaded)
+                string url = $"data/catalog/assemblies/{file}";
+                try
                 {
-                    Normalize(assembly);
-                    if (string.IsNullOrWhiteSpace(assembly.Code) || assembly.Layers.Count == 0)
+                    using Stream stream = await http.GetStreamAsync(url).ConfigureAwait(false);
+                    List<CatalogAssembly> loaded = LoadAssemblies(stream);
+                    foreach (CatalogAssembly assembly in loaded)
                     {
-                        continue;
-                    }
+                        Normalize(assembly);
+                        if (string.IsNullOrWhiteSpace(assembly.Code) || assembly.Layers.Count == 0)
+                        {
+                            continue;
+                        }
 
-                    allAssemblies.Add(assembly);
+                        allAssemblies.Add(assembly);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to load assembly catalog from {Url}.", url);
                 }
             }
-            catch (Exception ex)
+
+            if (logger.IsEnabled(LogLevel.Information))
             {
-                logger.LogError(ex, "Failed to load assembly catalog from {Path}.", path);
+                logger.LogInformation("Loaded {Count} catalog assemblies.", allAssemblies.Count);
             }
         }
-
-        if (logger.IsEnabled(LogLevel.Information))
+        catch (Exception ex)
         {
-            logger.LogInformation("Loaded {Count} catalog assemblies.", allAssemblies.Count);
+            logger.LogError(ex, "Failed to load assembly catalog manifest.");
         }
+        finally
+        {
+            IsLoaded = true;
+            OnLoaded?.Invoke();
+        }
+    }
+
+    private sealed class AssemblyManifest
+    {
+        public List<string>? Files { get; set; }
     }
 
     public static IReadOnlyList<PaletteItem> MaterialItems => MaterialCatalogItems;

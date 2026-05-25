@@ -24,7 +24,6 @@ using GardenPlotWeb.Services.Catalog;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
@@ -3693,24 +3692,14 @@ public partial class GardenPlot
         return safe;
     }
 
-    private async Task<PlotLibrary?> TryLoadRecoveryLibraryAsync()
+    private static Task<PlotLibrary?> TryLoadRecoveryLibraryAsync()
     {
-        try
-        {
-            var recoveryPath = Path.Combine(Env.WebRootPath, "recovery", "recovered-library.json");
-            if (!File.Exists(recoveryPath))
-            {
-                return null;
-            }
-
-            var json = await File.ReadAllTextAsync(recoveryPath);
-            var recovered = PlotLibraryLoader.Load(json, "recovery-file");
-            return NormalizeLibrary(recovered);
-        }
-        catch
-        {
-            return null;
-        }
+        // In the Blazor Server era this method read /wwwroot/recovery/recovered-library.json
+        // off the host filesystem. The WASM build runs entirely in the browser; recovery
+        // now flows through the browser-state migration path (see Phase 7 of the #92 plan)
+        // rather than a server-side recovery file. Returning null keeps the existing
+        // fallback chain intact (caller will continue on to localStorage / seed defaults).
+        return Task.FromResult<PlotLibrary?>(null);
     }
 
     private static int TotalShapeCount(PlotLibrary library)
@@ -4449,12 +4438,6 @@ public partial class GardenPlot
             return null;
         }
 
-        string ext = Path.GetExtension(file.Name);
-        if (string.IsNullOrWhiteSpace(ext))
-        {
-            ext = ".img";
-        }
-
         if (file.Size > PlotImageWarnBytes)
         {
             newPlotBackgroundImageWarning = $"Large file ({Math.Round(file.Size / 1024d / 1024d, 1)} MB). Pan/zoom may feel slower.";
@@ -4464,15 +4447,28 @@ public partial class GardenPlot
             newPlotBackgroundImageWarning = null;
         }
 
-        Directory.CreateDirectory(DataRoot.PlotImagesDirectory);
-        string fileName = $"{Guid.NewGuid():N}{ext}";
-        string path = Path.Combine(DataRoot.PlotImagesDirectory, fileName);
+        // Persist into the browser's IndexedDB via client-images.js (GardenPlot.clientImages.putImageFromBase64).
+        // The returned GUID is stored as the plot's BackgroundImageFileName; client-images.js
+        // resolves it back to a blob: URL at render time via resolveImageRef.
+        if (jsModule is null)
+        {
+            newPlotError = "Browser storage helper is not ready yet. Please try again in a moment.";
+            return null;
+        }
 
         await using Stream input = file.OpenReadStream(PlotImageMaxBytes);
-        await using FileStream output = File.Create(path);
-        await input.CopyToAsync(output);
+        using MemoryStream ms = new();
+        await input.CopyToAsync(ms);
+        string base64 = Convert.ToBase64String(ms.ToArray());
+
+        string id = await jsModule.InvokeAsync<string>(
+            "GardenPlot.clientImages.putImageFromBase64",
+            base64,
+            file.ContentType,
+            file.Name);
+
         newPlotError = null;
-        return fileName;
+        return id;
     }
 
     private void BeginScaleCalibrationFromDialog()
@@ -5405,7 +5401,7 @@ public partial class GardenPlot
                 }
             }
 
-            var client = HttpFactory.CreateClient();
+            var client = Http;
             client.Timeout = TimeSpan.FromSeconds(8);
             var html = await client.GetStringAsync(uri);
             var title = ExtractMetaContent(html, "og:title")
@@ -10788,7 +10784,7 @@ public partial class GardenPlot
     {
         try
         {
-            var http = HttpFactory.CreateClient();
+            var http = Http;
             http.DefaultRequestHeaders.UserAgent.ParseAdd("GardenPlotWeb/1.0 (+local)");
             var url = $"https://en.wikipedia.org/api/rest_v1/page/summary/{Uri.EscapeDataString(topic)}";
             using var resp = await http.GetAsync(url);
