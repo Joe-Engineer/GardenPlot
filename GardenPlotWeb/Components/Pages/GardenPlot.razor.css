@@ -584,6 +584,69 @@
     border-radius: 3px;
     cursor: pointer;
     transition: border-color 0.1s, background 0.1s;
+    position: relative;
+}
+
+.palette-item-info {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    line-height: 1;
+    color: #6b8b3a;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #c8c2ad;
+    border-radius: 50%;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.1s, color 0.1s, border-color 0.1s, background 0.1s;
+}
+
+.palette-item:hover .palette-item-info,
+.palette-item-info:focus {
+    opacity: 1;
+}
+
+.palette-item-info:hover {
+    color: #2f5a3a;
+    border-color: #2f5a3a;
+    background: #fff;
+}
+
+.palette-settings-btn {
+    margin-left: 0.25rem;
+    padding: 0.125rem 0.4rem;
+    line-height: 1;
+    font-size: 1rem;
+}
+
+.palette-filter-chips {
+    padding: 0.25rem 0;
+    border-top: 1px dashed #d2ccb8;
+    margin-top: 0.25rem;
+}
+
+.palette-filter-chip {
+    padding: 0.1rem 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    border-radius: 999px;
+}
+
+.palette-filter-chip.active {
+    background: #2f5a3a;
+    border-color: #2f5a3a;
+}
+
+.palette-lifecycle-select {
+    font-size: 0.75rem;
+    padding: 0.125rem 1.5rem 0.125rem 0.5rem;
+    height: auto;
 }
 
 .palette-item:hover {

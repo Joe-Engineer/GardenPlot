@@ -1,0 +1,52 @@
+﻿@* Copyright (c) Garden Plot. All rights reserved. *@
+@using GardenPlotWeb.Models
+
+<div class="palette-filter-chips d-flex flex-wrap gap-1 align-items-center">
+    <select class="form-select form-select-sm palette-lifecycle-select"
+            style="width:auto"
+            value="@(Lifecycle?.ToString() ?? string.Empty)"
+            @onchange="OnLifecycleChanged"
+            title="Filter by lifecycle">
+        <option value="">Any lifecycle</option>
+        <option value="@nameof(Models.Lifecycle.Annual)">Annual</option>
+        <option value="@nameof(Models.Lifecycle.Biennial)">Biennial</option>
+        <option value="@nameof(Models.Lifecycle.Perennial)">Perennial</option>
+        <option value="@nameof(Models.Lifecycle.TenderPerennial)">Tender perennial</option>
+    </select>
+
+    <Chip Label="Container" Active="@ContainerOnly" OnToggle="OnContainerToggled" Title="Container-friendly only" />
+    <Chip Label="Pollinator" Active="@PollinatorOnly" OnToggle="OnPollinatorToggled" Title="Pollinator-friendly only" />
+    <Chip Label="Cut flower" Active="@CutFlowerOnly" OnToggle="OnCutFlowerToggled" Title="Suited for cutting gardens" />
+    <Chip Label="Deciduous" Active="@DeciduousOnly" OnToggle="OnDeciduousToggled" Title="Deciduous trees/shrubs only" />
+</div>
+
+@code {
+    [Parameter] public Lifecycle? Lifecycle { get; set; }
+    [Parameter] public bool ContainerOnly { get; set; }
+    [Parameter] public bool PollinatorOnly { get; set; }
+    [Parameter] public bool CutFlowerOnly { get; set; }
+    [Parameter] public bool DeciduousOnly { get; set; }
+
+    [Parameter] public EventCallback<Lifecycle?> LifecycleChanged { get; set; }
+    [Parameter] public EventCallback<bool> ContainerOnlyChanged { get; set; }
+    [Parameter] public EventCallback<bool> PollinatorOnlyChanged { get; set; }
+    [Parameter] public EventCallback<bool> CutFlowerOnlyChanged { get; set; }
+    [Parameter] public EventCallback<bool> DeciduousOnlyChanged { get; set; }
+
+    private Task OnLifecycleChanged(ChangeEventArgs e)
+    {
+        string raw = e.Value?.ToString() ?? string.Empty;
+        Lifecycle? next = Enum.TryParse<Lifecycle>(raw, out var v) ? v : null;
+        return LifecycleChanged.InvokeAsync(next);
+    }
+
+    private Task OnContainerToggled() => ContainerOnlyChanged.InvokeAsync(!ContainerOnly);
+
+    private Task OnPollinatorToggled() => PollinatorOnlyChanged.InvokeAsync(!PollinatorOnly);
+
+    private Task OnCutFlowerToggled() => CutFlowerOnlyChanged.InvokeAsync(!CutFlowerOnly);
+
+    private Task OnDeciduousToggled() => DeciduousOnlyChanged.InvokeAsync(!DeciduousOnly);
+
+    private sealed class ChipParameters { }
+}

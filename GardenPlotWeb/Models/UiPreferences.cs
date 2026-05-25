@@ -110,6 +110,38 @@ public class UiPreferences
     /// <summary>Whether the "native only" filter is active on the palette.</summary>
     public bool PaletteNativeOnly { get; set; }
 
+    /// <summary>Lifecycle filter on the palette (annual/biennial/perennial). Null = no filter.</summary>
+    public Lifecycle? PaletteLifecycleFilter { get; set; }
+
+    /// <summary>When true, restrict palette to container-friendly entries.</summary>
+    public bool PaletteContainerOnly { get; set; }
+
+    /// <summary>When true, restrict palette to pollinator-friendly entries.</summary>
+    public bool PalettePollinatorOnly { get; set; }
+
+    /// <summary>When true, restrict palette to cut-flower entries.</summary>
+    public bool PaletteCutFlowerOnly { get; set; }
+
+    /// <summary>When true, restrict palette to deciduous trees/shrubs.</summary>
+    public bool PaletteDeciduousOnly { get; set; }
+
+    /// <summary>
+    /// Per-user set of enabled palette categories. <c>null</c> falls back to
+    /// <see cref="PaletteCategoryDefaults.Essentials"/>. Disabled categories are not listed
+    /// in the category combobox and their items are never sent to the client.
+    /// </summary>
+    public HashSet<PaletteCategory>? EnabledPaletteCategories { get; set; }
+
+    /// <summary>User notes keyed by <see cref="PaletteItem.Code"/>. Saved with the plot library.</summary>
+    public Dictionary<string, string> PaletteItemNotes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>True when <paramref name="category"/> is enabled for this preferences set.</summary>
+    public bool IsPaletteCategoryEnabled(PaletteCategory category)
+    {
+        HashSet<PaletteCategory> set = EnabledPaletteCategories ?? PaletteCategoryDefaults.Essentials;
+        return set.Contains(category);
+    }
+
     /// <summary>Last-selected palette category (sticky across sessions).</summary>
     public PaletteCategory? LastPaletteCategory { get; set; }
 

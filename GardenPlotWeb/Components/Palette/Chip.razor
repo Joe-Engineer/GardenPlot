@@ -1,0 +1,21 @@
+﻿@* Copyright (c) Garden Plot. All rights reserved. *@
+
+<button type="button"
+        class="@CssClass"
+        title="@Title"
+        @onclick="HandleClickAsync">
+    @Label
+</button>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool Active { get; set; }
+    [Parameter] public EventCallback OnToggle { get; set; }
+
+    private string CssClass => Active
+        ? "btn btn-sm btn-primary palette-filter-chip active"
+        : "btn btn-sm btn-outline-secondary palette-filter-chip";
+
+    private Task HandleClickAsync() => OnToggle.InvokeAsync();
+}
