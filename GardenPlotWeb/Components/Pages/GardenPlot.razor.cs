@@ -24,7 +24,6 @@ using GardenPlotWeb.Services.Catalog;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
@@ -46,7 +45,7 @@ public partial class GardenPlot
     private static readonly Histogram<double> StorageSaveDurationMs = PersistenceMeter.CreateHistogram<double>("gardenplot.storage.save.duration.ms");
 
     // Per-layer save/load counters so we can see in telemetry which storage layer
-    // succeeded for each attempt. Tag dimension: layer = idb|localstorage|file-index.
+    // succeeded for each attempt. Tag dimension: layer = idb-primary|idb-legacy|localstorage.
     private static readonly Counter<long> StorageSaveLayerOk = PersistenceMeter.CreateCounter<long>("gardenplot.storage.save.layer.ok");
     private static readonly Counter<long> StorageSaveLayerFail = PersistenceMeter.CreateCounter<long>("gardenplot.storage.save.layer.fail");
     private static readonly Counter<long> StorageLoadLayerOk = PersistenceMeter.CreateCounter<long>("gardenplot.storage.load.layer.ok");
@@ -63,17 +62,23 @@ public partial class GardenPlot
     private const string StorageKeyBackup1 = "gardenplot.library.v2.bak1";
     private const string StorageKeyBackup2 = "gardenplot.library.v2.bak2";
     private const string StorageKeyLegacy = "gardenplot.library.v1";
-    private const string FileStoreSourceKey = "file-index";
 
-    // Local-file persistence is the authoritative store: plots are written
-    // to the per-user data root resolved by DataRootProvider (defaults to
-    // %LocalAppData%\GardenPlot on Windows, ~/.local/share/GardenPlot on
-    // Linux/macOS, overridable via the GARDENPLOT_DATA_DIR env var). Browser
-    // IndexedDB / localStorage are kept as a secondary cache + offline
-    // fallback so the same user/browser still works without disk access.
-    // Declared as static readonly (not const) so the compiler does not
-    // const-fold gated branches into CS0162 unreachable-code errors.
-    private static readonly bool FileStoreEnabled = true;
+    /// <summary>
+    /// Metrics tag identifying the new authoritative store: browser IndexedDB via
+    /// <c>IndexedDbPlotRepository</c> / <c>client-store.js</c>. Reads/writes that
+    /// landed here are tagged <c>layer=idb-primary</c>; the legacy
+    /// <c>gardenplot-db/kv</c> reader is tagged <c>layer=idb-legacy</c> (migration
+    /// source only -- never written to from this build).
+    /// </summary>
+    private const string IdbPrimarySourceKey = "idb-primary";
+
+    // Plot data persistence in the WASM build is browser-local:
+    //   1. IndexedDB ("gardenplot-structured" db) via IPlotRepository -- authoritative.
+    //   2. localStorage (StorageKeyPrimary + rolling backups) -- recovery mirror.
+    //   3. Legacy IndexedDB ("gardenplot-db/kv/gardenplot.library.v2") -- read-only
+    //      migration source for users carrying state from the Blazor Server build.
+    //      Owned by wwwroot/js/gardenplot.js; we no longer write to it.
+    // No server filesystem is touched. See issue #92 for the rationale.
     private const double PxPerFt = 16.0; // also used by ToFt()
     private const double DefaultPlotWidthFt = 40.0;
     private const double DefaultPlotHeightFt = 30.0;
@@ -1599,13 +1604,14 @@ public partial class GardenPlot
             await stream.CopyToAsync(ms);
             var base64 = Convert.ToBase64String(ms.ToArray());
 
-            if (jsModule is null)
+            IJSObjectReference? module = await EnsureClientImagesModuleAsync();
+            if (module is null)
             {
                 return;
             }
 
-            var id = await jsModule.InvokeAsync<string>(
-                "GardenPlot.clientImages.putImageFromBase64",
+            var id = await module.InvokeAsync<string>(
+                "putImageFromBase64",
                 base64,
                 file.ContentType,
                 file.Name);
@@ -3514,22 +3520,19 @@ public partial class GardenPlot
 
         try
         {
-            if (FileStoreEnabled)
+            PlotLibrary primaryLibrary = NormalizeLibrary(await PlotRepository.LoadLibraryAsync());
+            if (primaryLibrary.Plots.Count > 0)
             {
-                var fileLibrary = NormalizeLibrary(await PlotRepository.LoadLibraryAsync());
-                if (fileLibrary.Plots.Count > 0)
-                {
-                    RecordLoadMetrics("loaded", FileStoreSourceKey, fileLibrary, 0, sw.Elapsed.TotalMilliseconds);
-                    Logger.LogInformation("GardenPlot storage load succeeded from file store. Plots: {PlotCount}, Shapes: {ShapeCount}.",
-                        fileLibrary.Plots.Count,
-                        TotalShapeCount(fileLibrary));
-                    return (fileLibrary, FileStoreSourceKey, true);
-                }
+                RecordLoadMetrics("loaded", IdbPrimarySourceKey, primaryLibrary, 0, sw.Elapsed.TotalMilliseconds);
+                Logger.LogInformation("GardenPlot storage load succeeded from primary IndexedDB. Plots: {PlotCount}, Shapes: {ShapeCount}.",
+                    primaryLibrary.Plots.Count,
+                    TotalShapeCount(primaryLibrary));
+                return (primaryLibrary, IdbPrimarySourceKey, true);
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "GardenPlot file-store load failed; falling back to browser storage sources.");
+            Logger.LogWarning(ex, "GardenPlot primary IndexedDB load failed; falling back to legacy browser storage sources.");
         }
 
         if (jsModule is not null)
@@ -3539,25 +3542,25 @@ public partial class GardenPlot
                 var idbJson = await jsModule.InvokeAsync<string?>("idbGet", StorageKeyPrimary);
                 if (!string.IsNullOrWhiteSpace(idbJson))
                 {
-                    var idbLibrary = NormalizeLibrary(PlotLibraryLoader.Load(idbJson, "indexeddb"));
+                    var idbLibrary = NormalizeLibrary(PlotLibraryLoader.Load(idbJson, "indexeddb-legacy"));
                     var idbBytes = System.Text.Encoding.UTF8.GetByteCount(idbJson);
                     if (idbLibrary.Plots.Count > 0)
                     {
-                        StorageLoadLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
-                        RecordLoadMetrics("loaded", "indexeddb", idbLibrary, idbBytes, sw.Elapsed.TotalMilliseconds);
-                        Logger.LogInformation("[{Sid}] Load: IndexedDB hit. Plots={PlotCount}, Shapes={ShapeCount}, Bytes={Bytes}.",
+                        StorageLoadLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "idb-legacy"));
+                        RecordLoadMetrics("loaded", "indexeddb-legacy", idbLibrary, idbBytes, sw.Elapsed.TotalMilliseconds);
+                        Logger.LogInformation("[{Sid}] Load: Legacy IndexedDB hit (migration source). Plots={PlotCount}, Shapes={ShapeCount}, Bytes={Bytes}.",
                             SessionTraceId, idbLibrary.Plots.Count, TotalShapeCount(idbLibrary), idbBytes);
-                        return (idbLibrary, "indexeddb", true);
+                        return (idbLibrary, "indexeddb-legacy", true);
                     }
 
-                    StorageLoadLayerMiss.Add(1, new KeyValuePair<string, object?>("layer", "idb-empty-plots"));
-                    Logger.LogWarning("[{Sid}] Load: IndexedDB returned JSON but Plots was empty after normalize. Bytes={Bytes}, Json[0..120]={Preview}.",
+                    StorageLoadLayerMiss.Add(1, new KeyValuePair<string, object?>("layer", "idb-legacy-empty-plots"));
+                    Logger.LogWarning("[{Sid}] Load: Legacy IndexedDB returned JSON but Plots was empty after normalize. Bytes={Bytes}, Json[0..120]={Preview}.",
                         SessionTraceId, idbBytes, idbJson.Length > 120 ? idbJson[..120] : idbJson);
                 }
                 else
                 {
-                    StorageLoadLayerMiss.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
-                    Logger.LogInformation("[{Sid}] Load: IndexedDB miss. Key={StorageKey}.", SessionTraceId, StorageKeyPrimary);
+                    StorageLoadLayerMiss.Add(1, new KeyValuePair<string, object?>("layer", "idb-legacy"));
+                    Logger.LogInformation("[{Sid}] Load: Legacy IndexedDB miss. Key={StorageKey}.", SessionTraceId, StorageKeyPrimary);
                 }
             }
             catch (TaskCanceledException)
@@ -3693,24 +3696,14 @@ public partial class GardenPlot
         return safe;
     }
 
-    private async Task<PlotLibrary?> TryLoadRecoveryLibraryAsync()
+    private static Task<PlotLibrary?> TryLoadRecoveryLibraryAsync()
     {
-        try
-        {
-            var recoveryPath = Path.Combine(Env.WebRootPath, "recovery", "recovered-library.json");
-            if (!File.Exists(recoveryPath))
-            {
-                return null;
-            }
-
-            var json = await File.ReadAllTextAsync(recoveryPath);
-            var recovered = PlotLibraryLoader.Load(json, "recovery-file");
-            return NormalizeLibrary(recovered);
-        }
-        catch
-        {
-            return null;
-        }
+        // In the Blazor Server era this method read /wwwroot/recovery/recovered-library.json
+        // off the host filesystem. The WASM build runs entirely in the browser; recovery
+        // now flows through the browser-state migration path (see Phase 7 of the #92 plan)
+        // rather than a server-side recovery file. Returning null keeps the existing
+        // fallback chain intact (caller will continue on to localStorage / seed defaults).
+        return Task.FromResult<PlotLibrary?>(null);
     }
 
     private static int TotalShapeCount(PlotLibrary library)
@@ -3858,28 +3851,27 @@ public partial class GardenPlot
 
         try
         {
-            var fileSaved = false;
-            if (FileStoreEnabled)
+            var primarySaved = false;
+            try
             {
-                try
-                {
-                    await PlotRepository.SaveLibraryAsync(library);
-                    fileSaved = true;
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError(ex, "GardenPlot file-store save failed; attempting browser-storage fallback.");
-                }
+                await PlotRepository.SaveLibraryAsync(library);
+                primarySaved = true;
+                StorageSaveLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "idb-primary"));
+            }
+            catch (Exception ex)
+            {
+                StorageSaveLayerFail.Add(1, new KeyValuePair<string, object?>("layer", "idb-primary"));
+                Logger.LogError(ex, "GardenPlot primary IndexedDB save failed; attempting localStorage fallback.");
             }
 
             var json = JsonSerializer.Serialize(library);
             var payloadBytes = System.Text.Encoding.UTF8.GetByteCount(json);
-            var idbSaved = false;
 
-            if (fileSaved)
+            if (primarySaved)
             {
-                RecordSaveMetrics("saved", "file-index", payloadBytes, sw.Elapsed.TotalMilliseconds);
-                Logger.LogInformation("GardenPlot storage save succeeded (mode: file-index). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
+                RecordSaveMetrics("saved", IdbPrimarySourceKey, payloadBytes, sw.Elapsed.TotalMilliseconds);
+                Logger.LogInformation("GardenPlot storage save succeeded (mode: {Mode}). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
+                    IdbPrimarySourceKey,
                     library.Plots.Count,
                     TotalShapeCount(library),
                     payloadBytes);
@@ -3897,34 +3889,17 @@ public partial class GardenPlot
                 }
             }
 
-            if (fileSaved)
+            if (primarySaved)
             {
-                // File store is the authoritative durable store.
+                // Primary IndexedDB is the authoritative durable store; no need to also
+                // write to the legacy IDB or to localStorage on the happy path. localStorage
+                // is exercised only as a recovery fallback when the primary save fails below.
                 return;
             }
 
-            if (jsModule is not null)
-            {
-                try
-                {
-                    await jsModule.InvokeVoidAsync("idbSet", StorageKeyPrimary, json);
-                    idbSaved = true;
-                    StorageSaveLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
-                    Logger.LogInformation("[{Sid}] SaveAsync idbSet ok. Key={StorageKey}, Bytes={Bytes}.", SessionTraceId, StorageKeyPrimary, payloadBytes);
-                }
-                catch (Exception ex)
-                {
-                    StorageSaveLayerFail.Add(1, new KeyValuePair<string, object?>("layer", "idb"));
-                    Logger.LogWarning(ex, "[{Sid}] SaveAsync idbSet failed; will try localStorage. Key={StorageKey}.", SessionTraceId, StorageKeyPrimary);
-                }
-            }
-            else
-            {
-                StorageSaveSkipped.Add(1, new KeyValuePair<string, object?>("reason", "no-jsmodule"));
-                Logger.LogWarning("[{Sid}] SaveAsync idbSet skipped: jsModule is null after import attempt.", SessionTraceId);
-            }
-
-            // Mirror to localStorage with rolling backups for compatibility/recovery.
+            // Primary IndexedDB save failed; mirror to localStorage with rolling backups so
+            // the user does not lose data. The legacy gardenplot.js IndexedDB is read-only
+            // from this build (see Phase 7 migration); we never write to it.
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
@@ -3944,9 +3919,9 @@ public partial class GardenPlot
                 await JS.InvokeVoidAsync("localStorage.setItem", cts.Token, StorageKeyLegacy, json);
                 StorageSaveLayerOk.Add(1, new KeyValuePair<string, object?>("layer", "localstorage"));
 
-                RecordSaveMetrics("saved", idbSaved ? "idb+full" : "full", payloadBytes, sw.Elapsed.TotalMilliseconds);
-                Logger.LogInformation("[{Sid}] SaveAsync localStorage primary+legacy ok. Bytes={Bytes}, idbAlsoSaved={IdbSaved}.",
-                    SessionTraceId, payloadBytes, idbSaved);
+                RecordSaveMetrics("saved", "fallback-localstorage", payloadBytes, sw.Elapsed.TotalMilliseconds);
+                Logger.LogInformation("[{Sid}] SaveAsync localStorage primary+legacy ok (fallback path). Bytes={Bytes}.",
+                    SessionTraceId, payloadBytes);
                 return;
             }
             catch (Exception ex)
@@ -3955,14 +3930,14 @@ public partial class GardenPlot
                 Logger.LogWarning(ex, "[{Sid}] SaveAsync localStorage full-mode write failed; falling back to compact.", SessionTraceId);
             }
 
-            // Fallback: free space and save primary only.
+            // Last-ditch fallback: free space and save primary only.
             await JS.InvokeVoidAsync("localStorage.removeItem", StorageKeyBackup1);
             await JS.InvokeVoidAsync("localStorage.removeItem", StorageKeyBackup2);
             await JS.InvokeVoidAsync("localStorage.removeItem", StorageKeyLegacy);
             await JS.InvokeVoidAsync("localStorage.setItem", StorageKeyPrimary, json);
 
-            RecordSaveMetrics("saved", idbSaved ? "idb+compact" : "compact", payloadBytes, sw.Elapsed.TotalMilliseconds);
-            Logger.LogInformation("GardenPlot storage save succeeded (mode: compact). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
+            RecordSaveMetrics("saved", "fallback-localstorage-compact", payloadBytes, sw.Elapsed.TotalMilliseconds);
+            Logger.LogInformation("GardenPlot storage save succeeded (mode: fallback-localstorage-compact). Plots: {PlotCount}, Shapes: {ShapeCount}, Bytes: {PayloadBytes}.",
                 library.Plots.Count,
                 TotalShapeCount(library),
                 payloadBytes);
@@ -4400,19 +4375,58 @@ public partial class GardenPlot
         newPlotDimensionsDerivedFromImage = true;
     }
 
+    /// <summary>
+    /// Returns the <c>./js/client-images.js</c> module reference, importing it on demand if the
+    /// page-load init at <c>OnAfterRenderAsync</c> hasn't completed (or failed). Returns null if
+    /// the import fails so callers can render a graceful error instead of throwing on the next call.
+    /// </summary>
+    /// <remarks>
+    /// All callers that need <c>putImageFromBase64</c>, <c>probeImageDimensions</c>, or any other
+    /// export from <c>client-images.js</c> MUST go through this helper. Do not call
+    /// <see cref="jsModule"/> with a dotted <c>"GardenPlot.clientImages.*"</c> identifier — module
+    /// references resolve identifiers within their own export scope, not against <c>window</c>,
+    /// so that call shape silently fails with a misleading "browser storage" error.
+    /// </remarks>
+    private async Task<IJSObjectReference?> EnsureClientImagesModuleAsync()
+    {
+        if (clientImagesModule is not null)
+        {
+            return clientImagesModule;
+        }
+
+        try
+        {
+            using CancellationTokenSource importCts = new(TimeSpan.FromSeconds(3));
+            clientImagesModule = await JS.InvokeAsync<IJSObjectReference>("import", importCts.Token, "./js/client-images.js");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "client-images.js import failed");
+        }
+
+        return clientImagesModule;
+    }
+
     private async Task<(int Width, int Height)?> TryReadPlotImageSizeAsync(string fileName)
     {
         try
         {
-            if (clientImagesModule is null)
+            IJSObjectReference? module = await EnsureClientImagesModuleAsync();
+            if (module is null)
             {
-                using CancellationTokenSource importCts = new(TimeSpan.FromSeconds(3));
-                clientImagesModule = await JS.InvokeAsync<IJSObjectReference>("import", importCts.Token, "./js/client-images.js");
+                return null;
             }
 
-            JsonElement size = await clientImagesModule.InvokeAsync<JsonElement>(
-                "probeImageDimensions",
-                $"{PlotImageUrl(fileName)}?v={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}");
+            // resolveImageRef maps a stored ref (client-image GUID or legacy filename) to a
+            // URL the browser can actually load (blob: for GUIDs, /tile-images/ for legacy).
+            // probeImageDimensions then reads naturalWidth/Height from the loaded image.
+            string? url = await module.InvokeAsync<string?>("resolveImageRef", fileName);
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return null;
+            }
+
+            JsonElement size = await module.InvokeAsync<JsonElement>("probeImageDimensions", url);
             if (size.TryGetProperty("width", out JsonElement widthNode) &&
                 size.TryGetProperty("height", out JsonElement heightNode))
             {
@@ -4449,12 +4463,6 @@ public partial class GardenPlot
             return null;
         }
 
-        string ext = Path.GetExtension(file.Name);
-        if (string.IsNullOrWhiteSpace(ext))
-        {
-            ext = ".img";
-        }
-
         if (file.Size > PlotImageWarnBytes)
         {
             newPlotBackgroundImageWarning = $"Large file ({Math.Round(file.Size / 1024d / 1024d, 1)} MB). Pan/zoom may feel slower.";
@@ -4464,15 +4472,29 @@ public partial class GardenPlot
             newPlotBackgroundImageWarning = null;
         }
 
-        Directory.CreateDirectory(DataRoot.PlotImagesDirectory);
-        string fileName = $"{Guid.NewGuid():N}{ext}";
-        string path = Path.Combine(DataRoot.PlotImagesDirectory, fileName);
+        // Persist into the browser's IndexedDB via client-images.js (putImageFromBase64).
+        // The returned GUID is stored as the plot's BackgroundImageFileName; client-images.js
+        // resolves it back to a blob: URL at render time via resolveImageRef.
+        IJSObjectReference? module = await EnsureClientImagesModuleAsync();
+        if (module is null)
+        {
+            newPlotError = "Browser storage helper is not ready yet. Please try again in a moment.";
+            return null;
+        }
 
         await using Stream input = file.OpenReadStream(PlotImageMaxBytes);
-        await using FileStream output = File.Create(path);
-        await input.CopyToAsync(output);
+        using MemoryStream ms = new();
+        await input.CopyToAsync(ms);
+        string base64 = Convert.ToBase64String(ms.ToArray());
+
+        string id = await module.InvokeAsync<string>(
+            "putImageFromBase64",
+            base64,
+            file.ContentType,
+            file.Name);
+
         newPlotError = null;
-        return fileName;
+        return id;
     }
 
     private void BeginScaleCalibrationFromDialog()
@@ -5405,7 +5427,7 @@ public partial class GardenPlot
                 }
             }
 
-            var client = HttpFactory.CreateClient();
+            var client = Http;
             client.Timeout = TimeSpan.FromSeconds(8);
             var html = await client.GetStringAsync(uri);
             var title = ExtractMetaContent(html, "og:title")
@@ -5510,7 +5532,8 @@ public partial class GardenPlot
             return null;
         }
 
-        if (jsModule is null)
+        IJSObjectReference? module = await EnsureClientImagesModuleAsync();
+        if (module is null)
         {
             addCustomTileError = "Image storage is not ready yet. Try again in a moment.";
             return null;
@@ -5523,8 +5546,8 @@ public partial class GardenPlot
             await input.CopyToAsync(ms);
             var base64 = Convert.ToBase64String(ms.ToArray());
 
-            var id = await jsModule.InvokeAsync<string>(
-                "GardenPlot.clientImages.putImageFromBase64",
+            var id = await module.InvokeAsync<string>(
+                "putImageFromBase64",
                 base64,
                 file.ContentType,
                 file.Name);
@@ -5576,7 +5599,17 @@ public partial class GardenPlot
         => IsClientImageId(fileName) ? fileName : null;
 
     private static string PlotImageUrl(string fileName)
-        => $"/plot-images/{Uri.EscapeDataString(fileName)}";
+        => string.IsNullOrEmpty(fileName)
+            ? string.Empty
+            : IsClientImageId(fileName)
+                ? TransparentPixelDataUrl
+                : $"/plot-images/{Uri.EscapeDataString(fileName)}";
+
+    // When the reference is a client-image GUID, returns the id (caller emits it
+    // as data-client-image-id="..."). Otherwise returns null so no attribute is rendered.
+    // Mirrors TileImageClientId for plot background images.
+    private static string? PlotImageClientId(string? fileName)
+        => IsClientImageId(fileName) ? fileName : null;
 
     private static BackgroundFit EffectivePlotBackgroundFit(PlotData plot)
         => Enum.IsDefined(plot.BackgroundFit) ? plot.BackgroundFit : BackgroundFit.Fit;
@@ -5613,14 +5646,30 @@ public partial class GardenPlot
 
     private async Task<bool> EnsurePlotBackgroundImageDimensionsAsync(string? fileName)
     {
-        if (jsModule is null || string.IsNullOrWhiteSpace(fileName) || plotBackgroundImageDimensions.ContainsKey(fileName))
+        if (string.IsNullOrWhiteSpace(fileName) || plotBackgroundImageDimensions.ContainsKey(fileName))
+        {
+            return false;
+        }
+
+        IJSObjectReference? module = await EnsureClientImagesModuleAsync();
+        if (module is null)
         {
             return false;
         }
 
         try
         {
-            JsonElement dimensions = await jsModule.InvokeAsync<JsonElement>("getImageDimensions", PlotImageUrl(fileName));
+            // Same resolveImageRef + probeImageDimensions chain as TryReadPlotImageSizeAsync.
+            // Going through client-images.js means GUID-based refs (the WASM-era default)
+            // resolve to a blob: URL whose Image() can actually load; calling the legacy
+            // /plot-images/{guid} path here would just 404.
+            string? url = await module.InvokeAsync<string?>("resolveImageRef", fileName);
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return false;
+            }
+
+            JsonElement dimensions = await module.InvokeAsync<JsonElement>("probeImageDimensions", url);
             if (!dimensions.TryGetProperty("width", out JsonElement widthNode) ||
                 !dimensions.TryGetProperty("height", out JsonElement heightNode))
             {
@@ -10788,7 +10837,7 @@ public partial class GardenPlot
     {
         try
         {
-            var http = HttpFactory.CreateClient();
+            var http = Http;
             http.DefaultRequestHeaders.UserAgent.ParseAdd("GardenPlotWeb/1.0 (+local)");
             var url = $"https://en.wikipedia.org/api/rest_v1/page/summary/{Uri.EscapeDataString(topic)}";
             using var resp = await http.GetAsync(url);

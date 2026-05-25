@@ -1,6 +1,5 @@
-﻿@page "/"
+@page "/"
 @page "/plot"
-@rendermode InteractiveServer
 @implements IAsyncDisposable
 @using System.Diagnostics
 @using System.Diagnostics.Metrics
@@ -13,9 +12,7 @@
 @using GardenPlotWeb.Services
 @using GardenPlotWeb.Services.Catalog
 @inject IJSRuntime JS
-@inject IHttpClientFactory HttpFactory
-@inject IWebHostEnvironment Env
-@inject DataRootProvider DataRoot
+@inject HttpClient Http
 @inject IPlantProfileService PlantProfiles
 @inject ProjectDossierService ProjectDossierService
 @inject GardenPlotWeb.Services.Persistence.PlotLibraryLoader PlotLibraryLoader
@@ -958,6 +955,7 @@ else
                     if (backgroundRenderInfo is not null)
                     {
                         <image href="@PlotImageUrl(currentPlot.BackgroundImageFileName!)"
+                               data-client-image-id="@PlotImageClientId(currentPlot.BackgroundImageFileName)"
                                x="@F(backgroundRenderInfo.X)" y="@F(backgroundRenderInfo.Y)"
                                width="@F(backgroundRenderInfo.Width)" height="@F(backgroundRenderInfo.Height)"
                                preserveAspectRatio="none"
@@ -966,6 +964,7 @@ else
                     else
                     {
                         <image href="@PlotImageUrl(currentPlot.BackgroundImageFileName!)"
+                               data-client-image-id="@PlotImageClientId(currentPlot.BackgroundImageFileName)"
                                x="0" y="0" width="@F(PlotWidthFt)" height="@F(PlotHeightFt)"
                                preserveAspectRatio="@PlotBackgroundPreserveAspectRatio(currentPlot)"
                                opacity="@F(EffectivePlotBackgroundOpacity(currentPlot))" />
@@ -3256,6 +3255,7 @@ else
                                 </div>
                                 <img class="plot-calibration-image mt-2"
                                      src="@PlotImageUrl(newPlotBackgroundImageFileName!)"
+                                     data-client-image-id="@PlotImageClientId(newPlotBackgroundImageFileName)"
                                      alt="Plot background calibration preview" />
                             }
                         </div>

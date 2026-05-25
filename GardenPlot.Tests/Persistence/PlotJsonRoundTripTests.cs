@@ -153,7 +153,7 @@ public sealed class PlotJsonRoundTripTests
     public void LegacyPlotFiles_Load_WithoutThrowing_AndMatchFileNames()
     {
         string[] plotFiles = Directory.GetFiles(GetLegacyPlotsDirectory(), "*.json")
-            .Where(path => !string.Equals(Path.GetFileName(path), FileSystemPlotRepository.IndexFileName, StringComparison.OrdinalIgnoreCase))
+            .Where(path => !string.Equals(Path.GetFileName(path), "index.json", StringComparison.OrdinalIgnoreCase))
             .OrderBy(Path.GetFileName)
             .ToArray();
 

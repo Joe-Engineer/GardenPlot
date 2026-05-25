@@ -1,0 +1,104 @@
+<!--
+  PayloadBudget.targets
+  Enforces a Brotli-compressed first-paint payload budget on the published
+  Blazor WebAssembly app. The budget is expressed in bytes via the
+  WasmFirstPaintBudgetBytes property in GardenPlotWeb.csproj.
+
+  Measurement model:
+    - "First paint" payload = every *.br file under
+      $(PublishDir)wwwroot/_framework/ (post-publish), which is what the
+      browser must download to render the initial app shell.
+
+  Behavior:
+    - Runs after the Publish target so the .br files exist.
+    - Sums actual byte sizes of every *.br file under _framework/.
+    - Emits an MSBuild message with the measurement.
+    - Errors out if the sum exceeds $(WasmFirstPaintBudgetBytes).
+    - If brotli compression was disabled, the *.br files are absent and the
+      target prints a warning rather than passing silently.
+
+  Updating the budget:
+    - Adjust <WasmFirstPaintBudgetBytes> in GardenPlotWeb.csproj.
+    - Document the reason in docs/payload-budget.md.
+-->
+<Project>
+
+  <UsingTask
+    TaskName="MeasureWasmFirstPaintPayload"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <FrameworkDirectory ParameterType="System.String" Required="true" />
+      <BudgetBytes ParameterType="System.Int64" Required="true" />
+      <MeasuredBytes ParameterType="System.Int64" Output="true" />
+      <FileCount ParameterType="System.Int32" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+          MeasuredBytes = 0;
+          FileCount = 0;
+
+          if (!Directory.Exists(FrameworkDirectory))
+          {
+              Log.LogWarning("Payload budget: _framework directory '{0}' not found; nothing to measure.", FrameworkDirectory);
+              return true;
+          }
+
+          string[] brFiles = Directory.GetFiles(FrameworkDirectory, "*.br", SearchOption.AllDirectories);
+          if (brFiles.Length == 0)
+          {
+              Log.LogWarning("Payload budget: no *.br files under '{0}'. Was Brotli compression disabled? Skipping enforcement.", FrameworkDirectory);
+              return true;
+          }
+
+          long total = 0;
+          foreach (string f in brFiles)
+          {
+              total += new FileInfo(f).Length;
+          }
+
+          MeasuredBytes = total;
+          FileCount = brFiles.Length;
+
+          double measuredMb = total / (1024.0 * 1024.0);
+          double budgetMb = BudgetBytes / (1024.0 * 1024.0);
+
+          Log.LogMessage(MessageImportance.High,
+              "Payload budget: {0} Brotli files under _framework/ total {1:N0} bytes ({2:N2} MB); budget {3:N0} bytes ({4:N2} MB).",
+              brFiles.Length, total, measuredMb, BudgetBytes, budgetMb);
+
+          if (total > BudgetBytes)
+          {
+              Log.LogError(
+                  "Payload budget exceeded: first-paint Brotli payload is {0:N0} bytes ({1:N2} MB), budget is {2:N0} bytes ({3:N2} MB). " +
+                  "Investigate via `dotnet publish -c Release` and inspect publish/wwwroot/_framework. " +
+                  "Options: enable InvariantGlobalization, disable timezone support, add JsonSerializable source-gen contexts, " +
+                  "raise the budget in GardenPlotWeb.csproj with rationale in docs/payload-budget.md.",
+                  total, measuredMb, BudgetBytes, budgetMb);
+          }
+
+          // RoslynCodeTaskFactory wraps Fragment code in a method whose return is
+          // `!Log.HasLoggedErrors`. Explicit returns here generate CS0162 warnings
+          // on the auto-appended return, so we just let logging drive the outcome.
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target
+    Name="EnforceWasmFirstPaintBudget"
+    AfterTargets="Publish"
+    Condition="'$(WasmFirstPaintBudgetBytes)' != ''">
+
+    <MeasureWasmFirstPaintPayload
+      FrameworkDirectory="$(PublishDir)wwwroot\_framework"
+      BudgetBytes="$(WasmFirstPaintBudgetBytes)">
+      <Output TaskParameter="MeasuredBytes" PropertyName="WasmFirstPaintMeasuredBytes" />
+      <Output TaskParameter="FileCount"     PropertyName="WasmFirstPaintFileCount" />
+    </MeasureWasmFirstPaintPayload>
+
+  </Target>
+
+</Project>

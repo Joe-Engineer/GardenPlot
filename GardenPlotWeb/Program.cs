@@ -1,104 +1,25 @@
-﻿// <copyright file="Program.cs" company="Garden Plot">
+// <copyright file="Program.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
 using GardenPlotWeb.Components;
 using GardenPlotWeb.Services;
-using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
-WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+WebAssemblyHostBuilder builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-// 1. Aspire service defaults (logging, telemetry, health, etc.).
-builder.AddServiceDefaults();
+builder.RootComponents.Add<App>("#app");
+builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// 2. Interactive Server Blazor.
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+// WASM convention: a single scoped HttpClient backed by the host origin. All static
+// data under wwwroot/data/... is fetched relative to BaseAddress.
+builder.Services.AddScoped(sp => new HttpClient
+{
+    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress),
+});
 
-// 3. Garden Plot application services (HTTP, data root, plant profiles).
 builder.Services.AddGardenPlotServices();
 
-WebApplication app = builder.Build();
+await builder.Build().RunAsync().ConfigureAwait(false);
 
-// Pipeline: errors -> static assets (incl. per-user image roots) -> antiforgery -> components.
-app.MapDefaultEndpoints();
-
-if (!app.Environment.IsDevelopment())
-{
-    _ = app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    _ = app.UseHsts();
-}
-
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
-
-// Serve per-user uploaded tile and plot images from the resolved data root.
-DataRootProvider dataRoot = app.Services.GetRequiredService<DataRootProvider>();
-
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(dataRoot.TileImagesDirectory),
-    RequestPath = "/tile-images",
-});
-
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(dataRoot.PlotImagesDirectory),
-    RequestPath = "/plot-images",
-});
-
-app.UseAntiforgery();
-
-app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
-
-// Development-only probe so we can exercise the plot-library migration runner
-// from curl and watch the resulting metrics/logs in the Aspire dashboard.
-// POST /dev/plot-migration-probe with raw PlotLibrary JSON in the body.
-if (app.Environment.IsDevelopment())
-{
-    _ = app.MapPost("/dev/plot-migration-probe", async (
-        HttpContext ctx,
-        GardenPlotWeb.Services.Persistence.PlotLibraryLoader loader) =>
-    {
-        using StreamReader reader = new(ctx.Request.Body);
-        string json = await reader.ReadToEndAsync();
-        GardenPlotWeb.Models.PlotLibrary? library = loader.Load(json, source: "dev-probe");
-        return Results.Json(new
-        {
-            schemaCurrent = GardenPlotWeb.Services.Persistence.PlotSchema.Current,
-            loaded = library is not null,
-            schemaVersion = library?.SchemaVersion,
-            plotCount = library?.Plots?.Count ?? 0,
-        });
-    }).WithName("PlotMigrationProbe");
-
-    _ = app.MapPost("/dev/plot-repository-probe", async (
-        GardenPlotWeb.Services.Persistence.IPlotRepository repo) =>
-    {
-        // Synthetic save -> load -> list round-trip so the Aspire dashboard shows the
-        // repository's op counter/histogram firing without needing a browser.
-        GardenPlotWeb.Models.PlotLibrary lib = new();
-        lib.Plots.Add(new GardenPlotWeb.Models.PlotData
-        {
-            Name = $"probe-{DateTime.UtcNow:HHmmss}",
-            WidthFt = 20,
-            HeightFt = 15,
-        });
-
-        await repo.SaveLibraryAsync(lib);
-        GardenPlotWeb.Models.PlotLibrary? loaded = await repo.LoadLibraryAsync();
-        IReadOnlyList<GardenPlotWeb.Services.Persistence.PlotSummary> summaries = await repo.ListAsync();
-
-        return Results.Json(new
-        {
-            savedPlots = lib.Plots.Count,
-            loadedPlots = loaded?.Plots?.Count ?? 0,
-            indexed = summaries.Count,
-        });
-    }).WithName("PlotRepositoryProbe");
-}
-
-app.Run();
