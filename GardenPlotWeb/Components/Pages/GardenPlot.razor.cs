@@ -4417,9 +4417,16 @@ public partial class GardenPlot
                 return null;
             }
 
-            JsonElement size = await module.InvokeAsync<JsonElement>(
-                "probeImageDimensions",
-                $"{PlotImageUrl(fileName)}?v={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}");
+            // resolveImageRef maps a stored ref (client-image GUID or legacy filename) to a
+            // URL the browser can actually load (blob: for GUIDs, /tile-images/ for legacy).
+            // probeImageDimensions then reads naturalWidth/Height from the loaded image.
+            string? url = await module.InvokeAsync<string?>("resolveImageRef", fileName);
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return null;
+            }
+
+            JsonElement size = await module.InvokeAsync<JsonElement>("probeImageDimensions", url);
             if (size.TryGetProperty("width", out JsonElement widthNode) &&
                 size.TryGetProperty("height", out JsonElement heightNode))
             {
@@ -5592,7 +5599,17 @@ public partial class GardenPlot
         => IsClientImageId(fileName) ? fileName : null;
 
     private static string PlotImageUrl(string fileName)
-        => $"/plot-images/{Uri.EscapeDataString(fileName)}";
+        => string.IsNullOrEmpty(fileName)
+            ? string.Empty
+            : IsClientImageId(fileName)
+                ? TransparentPixelDataUrl
+                : $"/plot-images/{Uri.EscapeDataString(fileName)}";
+
+    // When the reference is a client-image GUID, returns the id (caller emits it
+    // as data-client-image-id="..."). Otherwise returns null so no attribute is rendered.
+    // Mirrors TileImageClientId for plot background images.
+    private static string? PlotImageClientId(string? fileName)
+        => IsClientImageId(fileName) ? fileName : null;
 
     private static BackgroundFit EffectivePlotBackgroundFit(PlotData plot)
         => Enum.IsDefined(plot.BackgroundFit) ? plot.BackgroundFit : BackgroundFit.Fit;
@@ -5629,14 +5646,30 @@ public partial class GardenPlot
 
     private async Task<bool> EnsurePlotBackgroundImageDimensionsAsync(string? fileName)
     {
-        if (jsModule is null || string.IsNullOrWhiteSpace(fileName) || plotBackgroundImageDimensions.ContainsKey(fileName))
+        if (string.IsNullOrWhiteSpace(fileName) || plotBackgroundImageDimensions.ContainsKey(fileName))
+        {
+            return false;
+        }
+
+        IJSObjectReference? module = await EnsureClientImagesModuleAsync();
+        if (module is null)
         {
             return false;
         }
 
         try
         {
-            JsonElement dimensions = await jsModule.InvokeAsync<JsonElement>("getImageDimensions", PlotImageUrl(fileName));
+            // Same resolveImageRef + probeImageDimensions chain as TryReadPlotImageSizeAsync.
+            // Going through client-images.js means GUID-based refs (the WASM-era default)
+            // resolve to a blob: URL whose Image() can actually load; calling the legacy
+            // /plot-images/{guid} path here would just 404.
+            string? url = await module.InvokeAsync<string?>("resolveImageRef", fileName);
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return false;
+            }
+
+            JsonElement dimensions = await module.InvokeAsync<JsonElement>("probeImageDimensions", url);
             if (!dimensions.TryGetProperty("width", out JsonElement widthNode) ||
                 !dimensions.TryGetProperty("height", out JsonElement heightNode))
             {
