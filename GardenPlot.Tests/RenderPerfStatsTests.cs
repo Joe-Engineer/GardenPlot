@@ -126,6 +126,34 @@ public sealed class RenderPerfStatsTests
     }
 
     [Fact]
+    public void RecordSuppressed_IncrementsCounterButNotTotalOrSamples()
+    {
+        var stats = new RenderPerfStats();
+        stats.RecordRender(5.0, 100, 2);
+
+        stats.RecordSuppressed();
+        stats.RecordSuppressed();
+        stats.RecordSuppressed();
+
+        Assert.Equal(3, stats.SuppressedRenders);
+        Assert.Equal(1, stats.TotalRenders);
+        Assert.Equal(5.0, stats.LastRenderMs, Tolerance);
+        Assert.Equal(5.0, stats.AverageMs(), Tolerance);
+    }
+
+    [Fact]
+    public void Reset_ClearsSuppressedCounterToo()
+    {
+        var stats = new RenderPerfStats();
+        stats.RecordSuppressed();
+        stats.RecordSuppressed();
+
+        stats.Reset();
+
+        Assert.Equal(0, stats.SuppressedRenders);
+    }
+
+    [Fact]
     public void MarkRenderTrigger_IgnoresEmptyOrWhitespace()
     {
         var stats = new RenderPerfStats();

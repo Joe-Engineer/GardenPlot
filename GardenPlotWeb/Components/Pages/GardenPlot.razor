@@ -1312,8 +1312,8 @@ else
             @if (!IsConceptMode)
             {
                 <div class="plot-status-bar" role="status" aria-live="polite">
-                    <span class="status-item status-pos"><strong>X:</strong> @(lastCanvasX is double statusX ? F(statusX) : "--")</span>
-                    <span class="status-item status-pos"><strong>Y:</strong> @(lastCanvasY is double statusY ? F(statusY) : "--")</span>
+                    <span class="status-item status-pos"><strong>X:</strong> <span id="garden-status-x">@(lastCanvasX is double statusX ? F(statusX) : "--")</span></span>
+                    <span class="status-item status-pos"><strong>Y:</strong> <span id="garden-status-y">@(lastCanvasY is double statusY ? F(statusY) : "--")</span></span>
                     <span class="status-item"><strong>Action:</strong> @CurrentMouseActionLabel()</span>
                     <span class="status-item ms-auto d-inline-flex align-items-center gap-3">
                         <label class="clip-hatch-toggle">

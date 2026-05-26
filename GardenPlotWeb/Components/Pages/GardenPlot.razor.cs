@@ -114,6 +114,29 @@ public partial class GardenPlot
     /// </summary>
     internal int lastRenderCohortCount;
 
+    /// <summary>
+    /// Set to <c>true</c> by the "idle" branch of <see cref="OnPointerMove"/> when the
+    /// only thing the move changed is the on-screen cursor coordinate display. The next
+    /// <see cref="ShouldRender"/> consumes and clears the flag, returning <c>false</c>
+    /// so the parent doesn't pay an O(N) viewport-cull + cohort-fingerprint pass just
+    /// to redraw a status-bar X/Y label. The label is patched directly via the
+    /// <c>updateStatusPos</c> JS interop instead.
+    /// <para>
+    /// The flag is consumed on the very next render check; any subsequent "real" event
+    /// handler will see <c>false</c> and render normally. The narrow race window where
+    /// two events fire before Blazor's renderer runs is mitigated by every non-move
+    /// event handler clearing the flag at entry (see <see cref="ClearIdleRenderSuppression"/>).
+    /// </para>
+    /// </summary>
+    private bool suppressNextRender;
+
+    /// <summary>
+    /// Called from the top of every non-pointer-move event handler so a pending
+    /// "idle move suppress" flag can't accidentally swallow that handler's render.
+    /// Cheap (single store); safe to call even when the flag is already false.
+    /// </summary>
+    private void ClearIdleRenderSuppression() => suppressNextRender = false;
+
     private enum NewPlotDialogStep { ImageFirst, Configure }
     private enum DropActivationMode { ClickToggle, HoldKey }
     private enum DropModifierKey { Shift, Ctrl, Alt }
@@ -399,6 +422,7 @@ public partial class GardenPlot
     [JSInvokable]
     public Task OnViewportFromJs(double scrollLeft, double scrollTop, double clientWidth, double clientHeight)
     {
+        ClearIdleRenderSuppression();
         viewportScrollLeftPx = scrollLeft;
         viewportScrollTopPx = scrollTop;
         viewportClientWidthPx = clientWidth;
@@ -2407,8 +2431,38 @@ public partial class GardenPlot
     /// the implicit StateHasChanged after each OnPointerMove keeps panning smooth on big plots.
     /// Drag, draft, and box-select still need per-move renders to update their visuals, so they
     /// are NOT suppressed here.
+    ///
+    /// <para>Additionally suppresses the implicit render after an "idle" pointer move that only
+    /// updated the cursor X/Y display — those are patched into the DOM via JS interop instead
+    /// (see <c>updateStatusPos</c>). On a 2000+ shape canvas this kills the dominant render-storm:
+    /// every mouse-move was paying for a full <c>visibleShapes</c> cull + cohort fingerprint
+    /// pass just to redraw the status bar.</para>
     /// </summary>
-    protected override bool ShouldRender() => !panActive;
+    protected override bool ShouldRender()
+    {
+        if (panActive)
+        {
+            return false;
+        }
+
+        if (suppressNextRender)
+        {
+            suppressNextRender = false;
+
+            // The suppressed render still asked for a render duration, so undo the
+            // MarkRenderStart timestamp so the HUD doesn't mis-attribute the gap to
+            // the next real render.
+            renderStartTimestamp = 0;
+            if (perfStats is not null)
+            {
+                perfStats.RecordSuppressed();
+            }
+
+            return false;
+        }
+
+        return true;
+    }
 
     private void OnCanvasContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
     {
@@ -7496,6 +7550,7 @@ public partial class GardenPlot
     {
         if (currentPlot is null) return;
 
+        ClearIdleRenderSuppression();
         MarkRenderStart("pointer-down");
 
         if (panPending)
@@ -7939,6 +7994,46 @@ public partial class GardenPlot
             return;
         }
 
+        // ── Idle-move fast path ─────────────────────────────────────────────
+        // Detect whether ANY interactive state is active for this move. If not,
+        // the only thing this event would change in the UI is the status-bar X/Y
+        // display — which costs a full Blazor render pass (O(N) viewport cull +
+        // cohort fingerprint) on a 2000+ shape canvas just to repaint two text
+        // spans. We bypass that by patching the spans directly via JS and asking
+        // ShouldRender to swallow the implicit StateHasChanged.
+        //
+        // The interactive flags listed here are exactly the same paths that
+        // currently mutate non-display state below (paste-hover, box-select,
+        // ruler-handle drag, stamp-ghost, drag-move, drafting). If any of them
+        // is true we MUST take the render path so visual feedback updates.
+        bool isInteractiveMove =
+            showCanvasScalePanel
+            || (currentTool == Tool.Select && isPasteMode)
+            || isBoxSelecting
+            || isHandleDragging
+            || (currentTool == Tool.Stamp && selectedItem is not null)
+            || isDragging
+            || drafting is not null;
+
+        if (!isInteractiveMove && !IsConceptMode)
+        {
+            var (idleX, idleY) = ToFt(e);
+            idleX = Math.Clamp(idleX, 0, PlotWidthFt);
+            idleY = Math.Clamp(idleY, 0, PlotHeightFt);
+            lastCanvasX = idleX;
+            lastCanvasY = idleY;
+
+            if (jsModule is not null)
+            {
+                // Fire-and-forget — JS only patches two textContent nodes; failure
+                // here is not visible to the user and not worth a try/catch.
+                _ = jsModule.InvokeVoidAsync("updateStatusPos", F(idleX), F(idleY)).AsTask();
+            }
+
+            suppressNextRender = true;
+            return;
+        }
+
         var (x, y) = ToFt(e);
         x = Math.Clamp(x, 0, PlotWidthFt);
         y = Math.Clamp(y, 0, PlotHeightFt);
@@ -8062,6 +8157,7 @@ public partial class GardenPlot
     {
         if (currentPlot is null) return;
 
+        ClearIdleRenderSuppression();
         MarkRenderStart("pointer-up");
 
         pointerShiftDown = e.ShiftKey;
@@ -8514,6 +8610,7 @@ public partial class GardenPlot
     [JSInvokable]
     public async Task OnWheelFromJs(double deltaY, bool shift, bool ctrl, bool alt)
     {
+        ClearIdleRenderSuppression();
         await HandleWheel(deltaY, shift, ctrl, alt);
         StateHasChanged();
     }
@@ -8807,6 +8904,7 @@ public partial class GardenPlot
 
     private void OnPointerLeave(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
+        ClearIdleRenderSuppression();
         MarkRenderStart("pointer-leave");
 
         ghostX = ghostY = null;
@@ -8929,6 +9027,7 @@ public partial class GardenPlot
 
     private async Task OnKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
     {
+        ClearIdleRenderSuppression();
         var kb = KeyBindings;
 
         if (IsConceptMode)

@@ -38,6 +38,14 @@ public sealed class RenderPerfStats
     /// <summary>Gets the total number of renders observed since stats were created or reset.</summary>
     public long TotalRenders { get; private set; }
 
+    /// <summary>
+    /// Gets the total number of render-attempts the page suppressed via
+    /// <c>ShouldRender</c> since stats were created or reset. High values relative
+    /// to <see cref="TotalRenders"/> indicate the suppression is doing real work
+    /// (e.g. idle pointer moves on a 2000+ shape canvas).
+    /// </summary>
+    public long SuppressedRenders { get; private set; }
+
     /// <summary>Gets the duration of the most recent render, in milliseconds.</summary>
     public double LastRenderMs { get; private set; }
 
@@ -104,6 +112,14 @@ public sealed class RenderPerfStats
             this.LastTriggerLabel = label;
         }
     }
+
+    /// <summary>
+    /// Records that the parent's <c>ShouldRender</c> suppressed a render attempt.
+    /// Counted separately from <see cref="TotalRenders"/> so the HUD can show the
+    /// suppression ratio — a high value here means the idle-pointer-move bypass is
+    /// actually paying off.
+    /// </summary>
+    public void RecordSuppressed() => this.SuppressedRenders++;
 
     /// <summary>Gets the average render duration across the rolling window, in milliseconds.</summary>
     /// <returns>0 when no samples have been recorded.</returns>
@@ -189,6 +205,7 @@ public sealed class RenderPerfStats
         this.sampleCount = 0;
         this.writeIndex = 0;
         this.TotalRenders = 0;
+        this.SuppressedRenders = 0;
         this.LastRenderMs = 0;
         this.LastVisibleShapeCount = 0;
         this.LastCohortCount = 0;
