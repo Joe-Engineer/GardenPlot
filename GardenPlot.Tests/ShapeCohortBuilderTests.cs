@@ -147,4 +147,106 @@ public sealed class ShapeCohortBuilderTests
 
         Assert.Equal(s.Id, ShapeCohortBuilder.CohortKey(s));
     }
+
+    [Fact]
+    public void ThreeConsecutiveLooseShapes_GroupedIntoOneCohort()
+    {
+        // The point of chunking: don't emit one child component per loose plant.
+        Shape a = Loose();
+        Shape b = Loose();
+        Shape c = Loose();
+
+        List<ShapeCohort> result = ShapeCohortBuilder.BuildContiguous(new[] { a, b, c });
+
+        ShapeCohort only = Assert.Single(result);
+        Assert.Equal(a.Id, only.Key);
+        Assert.Equal(0, only.StartIndex);
+        Assert.Equal(new[] { a, b, c }, only.Shapes);
+    }
+
+    [Fact]
+    public void LooseShapeRunHittingChunkCap_SplitsIntoTwoCohorts()
+    {
+        // 128 (cap) + 2 overflow → two cohorts: first of 128, second of 2.
+        // The second cohort's key is the 129th shape's id; its StartIndex is 128.
+        const int count = ShapeCohortBuilder.MaxLooseCohortSize + 2;
+        Shape[] shapes = new Shape[count];
+        for (int i = 0; i < count; i++)
+        {
+            shapes[i] = Loose();
+        }
+
+        List<ShapeCohort> result = ShapeCohortBuilder.BuildContiguous(shapes);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(ShapeCohortBuilder.MaxLooseCohortSize, result[0].Shapes.Count);
+        Assert.Equal(shapes[0].Id, result[0].Key);
+        Assert.Equal(0, result[0].StartIndex);
+        Assert.Equal(2, result[1].Shapes.Count);
+        Assert.Equal(shapes[ShapeCohortBuilder.MaxLooseCohortSize].Id, result[1].Key);
+        Assert.Equal(ShapeCohortBuilder.MaxLooseCohortSize, result[1].StartIndex);
+    }
+
+    [Fact]
+    public void ExactlyChunkSizeLooseShapes_StaysOneCohort()
+    {
+        // Boundary: hitting the cap exactly must NOT spill into a second cohort.
+        Shape[] shapes = new Shape[ShapeCohortBuilder.MaxLooseCohortSize];
+        for (int i = 0; i < shapes.Length; i++)
+        {
+            shapes[i] = Loose();
+        }
+
+        List<ShapeCohort> result = ShapeCohortBuilder.BuildContiguous(shapes);
+
+        ShapeCohort only = Assert.Single(result);
+        Assert.Equal(ShapeCohortBuilder.MaxLooseCohortSize, only.Shapes.Count);
+    }
+
+    [Fact]
+    public void LooseShapesInterruptedByFilledArea_ProduceLooseChunkThenFillThenLooseChunk()
+    {
+        // Sentinel test: a filled-area shape MUST break the loose chunk in two
+        // and preserve z-order. The fill area shape is its own cohort regardless
+        // of chunk size; this verifies chunking doesn't accidentally merge across
+        // filled-area boundaries (which would change visual stacking).
+        Guid area = Guid.NewGuid();
+        Shape l1 = Loose();
+        Shape l2 = Loose();
+        Shape fill = InArea(area);
+        Shape l3 = Loose();
+        Shape l4 = Loose();
+
+        List<ShapeCohort> result = ShapeCohortBuilder.BuildContiguous(new[] { l1, l2, fill, l3, l4 });
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(new[] { l1, l2 }, result[0].Shapes);
+        Assert.Equal(l1.Id, result[0].Key);
+        Assert.Same(fill, Assert.Single(result[1].Shapes));
+        Assert.Equal(area, result[1].Key);
+        Assert.Equal(2, result[1].StartIndex);
+        Assert.Equal(new[] { l3, l4 }, result[2].Shapes);
+        Assert.Equal(l3.Id, result[2].Key);
+        Assert.Equal(3, result[2].StartIndex);
+    }
+
+    [Fact]
+    public void LargeFilledAreaCohort_IsNotChunked()
+    {
+        // Important non-regression: the chunk cap applies ONLY to loose shapes.
+        // A fill area of 500 plants must stay ONE cohort so the fingerprint /
+        // selection / cascading-style invalidation still scope to the whole fill.
+        Guid area = Guid.NewGuid();
+        Shape[] shapes = new Shape[500];
+        for (int i = 0; i < shapes.Length; i++)
+        {
+            shapes[i] = InArea(area);
+        }
+
+        List<ShapeCohort> result = ShapeCohortBuilder.BuildContiguous(shapes);
+
+        ShapeCohort only = Assert.Single(result);
+        Assert.Equal(500, only.Shapes.Count);
+        Assert.Equal(area, only.Key);
+    }
 }
