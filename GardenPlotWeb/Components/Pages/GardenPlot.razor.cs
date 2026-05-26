@@ -2611,6 +2611,18 @@ public partial class GardenPlot
         public double X;
         public double Y;
         public Point[]? OrigPoints;
+
+        /// <summary>
+        /// Cached reference to the live <see cref="Shape"/> in the plot. Captured
+        /// at drag start (<see cref="StartDrag"/>) so the per-frame drag loop in
+        /// <see cref="OnPointerMove"/> can mutate the shape directly without a
+        /// repeated O(N) <c>Shapes.FirstOrDefault(z =&gt; z.Id == snap.Id)</c> scan.
+        /// On a 2271-shape drag that scan was ~5.2M id-compares per pointer event
+        /// (60Hz × 2271² = 310M/s) and pinned a CPU core for the duration of the
+        /// drag. With the cached ref it becomes 2271 pointer-deref + 2271 field
+        /// writes per event.
+        /// </summary>
+        public Shape? Shape;
     }
 
     private sealed record PlotBackgroundImageDimensions(double Width, double Height);
@@ -8090,7 +8102,8 @@ public partial class GardenPlot
             dy = SafeClamp(dy, -dragUnionMinY, PlotHeightFt - dragUnionMaxY);
             foreach (var snap in dragSnaps)
             {
-                var s = currentPlot.Shapes.FirstOrDefault(z => z.Id == snap.Id);
+                // O(1) cached lookup — see DragSnap.Shape for the rationale.
+                var s = snap.Shape;
                 if (s is null) continue;
                 if (IsPointBased(s))
                 {
@@ -8595,6 +8608,7 @@ public partial class GardenPlot
                 X = s.X,
                 Y = s.Y,
                 OrigPoints = s.Points.Count > 0 ? s.Points.ToArray() : null,
+                Shape = s,
             });
         }
         dragUnionMinX = minX; dragUnionMinY = minY;
