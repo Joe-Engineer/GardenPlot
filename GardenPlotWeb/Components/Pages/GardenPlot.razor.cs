@@ -88,6 +88,32 @@ public partial class GardenPlot
     private double PlotHeightFt => currentPlot?.HeightFt ?? DefaultPlotHeightFt;
 
     public enum Tool { Select, FreeDraw, Edge, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover, Polyline }
+
+    // ---- Perf HUD (opt-in via ?perf=1) -------------------------------------
+    // The whole block is null-when-off so production traffic pays a single null
+    // check per render. See <see cref="OnInitialized"/> for the enable trigger.
+
+    /// <summary>Render statistics owned by the parent and read by the optional <c>PerfHud</c> child.</summary>
+    internal RenderPerfStats? perfStats;
+
+    /// <summary>Stopwatch timestamp captured at the top of a hot event handler; consumed by <see cref="OnAfterRenderAsync"/>.</summary>
+    private long renderStartTimestamp;
+
+    /// <summary>
+    /// Visible-shape count from the most recent render. Set by <c>GardenPlot.razor</c>
+    /// at the top of the shape rendering block; read in <see cref="OnAfterRenderAsync"/>
+    /// so the perf HUD can report "what was actually drawn last frame".
+    /// </summary>
+    internal int lastRenderVisibleShapeCount;
+
+    /// <summary>
+    /// Cohort count from the most recent render (from <c>ShapeCohortBuilder</c>).
+    /// Set by <c>GardenPlot.razor</c> in the shape rendering block; surfaces in the
+    /// HUD so the user can see whether 2000+ filled-area plants collapsed into one
+    /// cohort (good) or fragmented (bad).
+    /// </summary>
+    internal int lastRenderCohortCount;
+
     private enum NewPlotDialogStep { ImageFirst, Configure }
     private enum DropActivationMode { ClickToggle, HoldKey }
     private enum DropModifierKey { Shift, Ctrl, Alt }
@@ -3193,6 +3219,67 @@ public partial class GardenPlot
         routeSelectionPending = true;
     }
 
+    /// <inheritdoc/>
+    protected override void OnInitialized()
+    {
+        // Opt-in perf HUD: enabled when the page is loaded with ?perf=1 (or perf=true).
+        // The HUD is otherwise zero-cost: perfStats stays null and the <PerfHud /> child
+        // short-circuits its render path on null. The query-param parse is done once
+        // at init time so the HUD's enabled state doesn't flicker on navigation.
+        try
+        {
+            var uri = new Uri(Navigation.Uri);
+            var query = uri.Query;
+            if (!string.IsNullOrEmpty(query))
+            {
+                // Manual parse to avoid taking a dependency on Microsoft.AspNetCore.WebUtilities.
+                // Query is short and the only key we care about is "perf".
+                var search = query.StartsWith('?') ? query[1..] : query;
+                foreach (var pair in search.Split('&', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var eq = pair.IndexOf('=');
+                    var key = eq >= 0 ? pair[..eq] : pair;
+                    if (!string.Equals(key, "perf", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var value = eq >= 0 ? pair[(eq + 1)..] : string.Empty;
+                    if (string.Equals(value, "1", StringComparison.Ordinal) ||
+                        string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+                    {
+                        perfStats = new RenderPerfStats();
+                    }
+
+                    break;
+                }
+            }
+        }
+        catch
+        {
+            // Navigation.Uri can throw in some test/SSR setups; silently leave the HUD off.
+        }
+    }
+
+    /// <summary>
+    /// Captures a render-start timestamp and a short label describing what triggered the
+    /// render so the perf HUD can attribute frame cost to its source. Called from the
+    /// top of the hot event handlers (pointer-move/down/up). Cheap when the HUD is off:
+    /// the <c>perfStats is null</c> early-out keeps this to a single null check.
+    /// </summary>
+    private void MarkRenderStart(string trigger)
+    {
+        if (perfStats is null)
+        {
+            return;
+        }
+
+        renderStartTimestamp = Stopwatch.GetTimestamp();
+        perfStats.MarkRenderTrigger(trigger);
+    }
+
+    private void OnPerfHudReset() => perfStats?.Reset();
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -3506,6 +3593,26 @@ public partial class GardenPlot
         }
 
         await EnsureFloatingPanelsInViewAsync();
+
+        // Perf HUD: record this render's duration. We measure from the timestamp
+        // that the originating event handler stamped (MarkRenderStart) so the HUD
+        // reflects the time the user actually paid for the frame, not idle gap.
+        if (perfStats is not null)
+        {
+            if (renderStartTimestamp > 0)
+            {
+                var elapsed = Stopwatch.GetElapsedTime(renderStartTimestamp);
+                perfStats.RecordRender(elapsed.TotalMilliseconds, lastRenderVisibleShapeCount, lastRenderCohortCount);
+                renderStartTimestamp = 0;
+            }
+            else
+            {
+                // Render fired without a tagged trigger (e.g. async completion). Record
+                // a 0ms entry so the counter still ticks; the user can see "frame count
+                // jumped but I didn't move the mouse" which is itself useful signal.
+                perfStats.RecordRender(0, lastRenderVisibleShapeCount, lastRenderCohortCount);
+            }
+        }
     }
 
     private bool ApplyRouteSelectionIfRequested()
@@ -7389,6 +7496,8 @@ public partial class GardenPlot
     {
         if (currentPlot is null) return;
 
+        MarkRenderStart("pointer-down");
+
         if (panPending)
         {
             return;
@@ -7784,6 +7893,8 @@ public partial class GardenPlot
     {
         if (currentPlot is null) return;
 
+        MarkRenderStart("pointer-move");
+
         pointerShiftDown = e.ShiftKey;
         pointerCtrlDown = e.CtrlKey;
         pointerAltDown = e.AltKey;
@@ -7950,6 +8061,8 @@ public partial class GardenPlot
     private async Task OnPointerUp(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
         if (currentPlot is null) return;
+
+        MarkRenderStart("pointer-up");
 
         pointerShiftDown = e.ShiftKey;
         pointerCtrlDown = e.CtrlKey;
@@ -8694,6 +8807,8 @@ public partial class GardenPlot
 
     private void OnPointerLeave(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
+        MarkRenderStart("pointer-leave");
+
         ghostX = ghostY = null;
         pasteHoverX = pasteHoverY = null;
         lastCanvasX = null;
