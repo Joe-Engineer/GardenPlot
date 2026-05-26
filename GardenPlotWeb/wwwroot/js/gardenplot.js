@@ -17,6 +17,20 @@ export function panBy(el, dx, dy) {
     el.scrollTop -= dy;
 }
 
+// Cheap status-bar X/Y updater. The GardenPlot page calls this from the
+// "idle" branch of OnPointerMove so we can show fresh cursor coordinates
+// without forcing a Blazor parent re-render (which, on a 2000+ shape canvas,
+// re-runs viewport culling + cohort fingerprinting on every pointer event
+// even though the canvas content itself didn't change). The Blazor render
+// path still owns the spans on real renders; this just patches the text
+// content in-between. Refs #128.
+export function updateStatusPos(xText, yText) {
+    const xEl = document.getElementById('garden-status-x');
+    if (xEl) xEl.textContent = xText;
+    const yEl = document.getElementById('garden-status-y');
+    if (yEl) yEl.textContent = yText;
+}
+
 export function getViewCenterFt(wrapEl, svgEl, pxPerFt, zoom) {
     if (!wrapEl || !svgEl || !pxPerFt || !zoom) return { x: 0, y: 0 };
     const wrapRect = wrapEl.getBoundingClientRect();

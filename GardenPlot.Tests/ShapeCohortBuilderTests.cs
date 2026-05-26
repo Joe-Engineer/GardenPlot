@@ -147,4 +147,125 @@ public sealed class ShapeCohortBuilderTests
 
         Assert.Equal(s.Id, ShapeCohortBuilder.CohortKey(s));
     }
+
+    [Fact]
+    public void ThreeConsecutiveLooseShapes_GroupedIntoOneCohort()
+    {
+        // The point of chunking: don't emit one child component per loose plant.
+        Shape a = Loose();
+        Shape b = Loose();
+        Shape c = Loose();
+
+        List<ShapeCohort> result = ShapeCohortBuilder.BuildContiguous(new[] { a, b, c });
+
+        ShapeCohort only = Assert.Single(result);
+        Assert.Equal(a.Id, only.Key);
+        Assert.Equal(0, only.StartIndex);
+        Assert.Equal(new[] { a, b, c }, only.Shapes);
+    }
+
+    [Fact]
+    public void LooseShapeRunHittingChunkCap_SplitsIntoTwoCohorts()
+    {
+        // 128 (cap) + 2 overflow → two cohorts: first of 128, second of 2.
+        // The second cohort's key is the 129th shape's id; its StartIndex is 128.
+        const int count = ShapeCohortBuilder.MaxCohortSize + 2;
+        Shape[] shapes = new Shape[count];
+        for (int i = 0; i < count; i++)
+        {
+            shapes[i] = Loose();
+        }
+
+        List<ShapeCohort> result = ShapeCohortBuilder.BuildContiguous(shapes);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(ShapeCohortBuilder.MaxCohortSize, result[0].Shapes.Count);
+        Assert.Equal(shapes[0].Id, result[0].Key);
+        Assert.Equal(0, result[0].StartIndex);
+        Assert.Equal(2, result[1].Shapes.Count);
+        Assert.Equal(shapes[ShapeCohortBuilder.MaxCohortSize].Id, result[1].Key);
+        Assert.Equal(ShapeCohortBuilder.MaxCohortSize, result[1].StartIndex);
+    }
+
+    [Fact]
+    public void ExactlyChunkSizeLooseShapes_StaysOneCohort()
+    {
+        // Boundary: hitting the cap exactly must NOT spill into a second cohort.
+        Shape[] shapes = new Shape[ShapeCohortBuilder.MaxCohortSize];
+        for (int i = 0; i < shapes.Length; i++)
+        {
+            shapes[i] = Loose();
+        }
+
+        List<ShapeCohort> result = ShapeCohortBuilder.BuildContiguous(shapes);
+
+        ShapeCohort only = Assert.Single(result);
+        Assert.Equal(ShapeCohortBuilder.MaxCohortSize, only.Shapes.Count);
+    }
+
+    [Fact]
+    public void LooseShapesInterruptedByFilledArea_ProduceLooseChunkThenFillThenLooseChunk()
+    {
+        // Sentinel test: a filled-area shape MUST break the loose chunk in two
+        // and preserve z-order. The fill area shape is its own cohort regardless
+        // of chunk size; this verifies chunking doesn't accidentally merge across
+        // filled-area boundaries (which would change visual stacking).
+        Guid area = Guid.NewGuid();
+        Shape l1 = Loose();
+        Shape l2 = Loose();
+        Shape fill = InArea(area);
+        Shape l3 = Loose();
+        Shape l4 = Loose();
+
+        List<ShapeCohort> result = ShapeCohortBuilder.BuildContiguous(new[] { l1, l2, fill, l3, l4 });
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(new[] { l1, l2 }, result[0].Shapes);
+        Assert.Equal(l1.Id, result[0].Key);
+        Assert.Same(fill, Assert.Single(result[1].Shapes));
+        Assert.Equal(area, result[1].Key);
+        Assert.Equal(2, result[1].StartIndex);
+        Assert.Equal(new[] { l3, l4 }, result[2].Shapes);
+        Assert.Equal(l3.Id, result[2].Key);
+        Assert.Equal(3, result[2].StartIndex);
+    }
+
+    [Fact]
+    public void LargeFilledAreaCohort_IsChunkedIntoCapSizedRuns()
+    {
+        // Wedge 6: fill-area cohorts ALSO chunk. The HUD on a 1407-plant canvas
+        // showed 2 cohorts averaging 283 ms per render because a single selection
+        // click invalidated all ~700 shapes in the cohort. Chunking the fill at
+        // 128 scopes the re-emit to one chunk of 128, an ~11x reduction.
+        //
+        // All chunks share the same cohort.Key (the fill-area id), so the
+        // ParentArea lookup in ShapeCohortRenderer still resolves correctly for
+        // every chunk. The Razor @key="(cohort.Key, cohort.StartIndex)" tuple
+        // disambiguates the chunks for Blazor.
+        Guid area = Guid.NewGuid();
+        const int count = 500; // 500 / 128 = 4 chunks: 128 + 128 + 128 + 116
+        Shape[] shapes = new Shape[count];
+        for (int i = 0; i < count; i++)
+        {
+            shapes[i] = InArea(area);
+        }
+
+        List<ShapeCohort> result = ShapeCohortBuilder.BuildContiguous(shapes);
+
+        Assert.Equal(4, result.Count);
+        Assert.Equal(ShapeCohortBuilder.MaxCohortSize, result[0].Shapes.Count);
+        Assert.Equal(ShapeCohortBuilder.MaxCohortSize, result[1].Shapes.Count);
+        Assert.Equal(ShapeCohortBuilder.MaxCohortSize, result[2].Shapes.Count);
+        Assert.Equal(count - (3 * ShapeCohortBuilder.MaxCohortSize), result[3].Shapes.Count);
+
+        // Every chunk MUST share the same Key (the fill-area id) so the parent
+        // page's GetShapeById(cohort.Key) still resolves to the same parent area.
+        Assert.All(result, c => Assert.Equal(area, c.Key));
+
+        // StartIndex MUST advance contiguously so z-order is preserved.
+        Assert.Equal(0, result[0].StartIndex);
+        Assert.Equal(ShapeCohortBuilder.MaxCohortSize, result[1].StartIndex);
+        Assert.Equal(2 * ShapeCohortBuilder.MaxCohortSize, result[2].StartIndex);
+        Assert.Equal(3 * ShapeCohortBuilder.MaxCohortSize, result[3].StartIndex);
+    }
 }

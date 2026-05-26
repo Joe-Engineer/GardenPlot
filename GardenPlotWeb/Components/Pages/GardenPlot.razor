@@ -23,6 +23,8 @@
 
 <PageTitle>Garden Plot</PageTitle>
 
+<PerfHud Stats="@perfStats" OnReset="@OnPerfHudReset" />
+
 <div class="d-flex align-items-center mb-2 gap-2 flex-wrap">
     <h1 class="mb-0 me-2">Garden Plot</h1>
     @if (currentPlot is not null)
@@ -1017,6 +1019,7 @@ else
                     var visibleShapes = currentPlot.Shapes.Where(IsShapeVisible).ToList();
                     var interacting = IsInteractingWithCanvas;
                     var stampGhosting = IsStampGhostActive;
+                    lastRenderVisibleShapeCount = visibleShapes.Count;
 
                     // Plant spacing overlay (under shapes): one set of rings per plant, color-coded by overlap.
                     // Suppressed during pan/drag/draft to keep per-pointer-move frames light on big plots,
@@ -1058,7 +1061,11 @@ else
                 }
 
                 <CascadingValue Value="this" IsFixed="true">
-                    @foreach (var cohort in ShapeCohortBuilder.BuildContiguous(visibleShapes))
+                    @{
+                        var cohortList = ShapeCohortBuilder.BuildContiguous(visibleShapes);
+                        lastRenderCohortCount = cohortList.Count;
+                    }
+                    @foreach (var cohort in cohortList)
                     {
                         <ShapeCohortRenderer @key="(cohort.Key, cohort.StartIndex)"
                                              Shapes="@cohort.Shapes"
@@ -1305,8 +1312,8 @@ else
             @if (!IsConceptMode)
             {
                 <div class="plot-status-bar" role="status" aria-live="polite">
-                    <span class="status-item status-pos"><strong>X:</strong> @(lastCanvasX is double statusX ? F(statusX) : "--")</span>
-                    <span class="status-item status-pos"><strong>Y:</strong> @(lastCanvasY is double statusY ? F(statusY) : "--")</span>
+                    <span class="status-item status-pos"><strong>X:</strong> <span id="garden-status-x">@(lastCanvasX is double statusX ? F(statusX) : "--")</span></span>
+                    <span class="status-item status-pos"><strong>Y:</strong> <span id="garden-status-y">@(lastCanvasY is double statusY ? F(statusY) : "--")</span></span>
                     <span class="status-item"><strong>Action:</strong> @CurrentMouseActionLabel()</span>
                     <span class="status-item ms-auto d-inline-flex align-items-center gap-3">
                         <label class="clip-hatch-toggle">

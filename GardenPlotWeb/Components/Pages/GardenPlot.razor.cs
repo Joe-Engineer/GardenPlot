@@ -88,6 +88,55 @@ public partial class GardenPlot
     private double PlotHeightFt => currentPlot?.HeightFt ?? DefaultPlotHeightFt;
 
     public enum Tool { Select, FreeDraw, Edge, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover, Polyline }
+
+    // ---- Perf HUD (opt-in via ?perf=1) -------------------------------------
+    // The whole block is null-when-off so production traffic pays a single null
+    // check per render. See <see cref="OnInitialized"/> for the enable trigger.
+
+    /// <summary>Render statistics owned by the parent and read by the optional <c>PerfHud</c> child.</summary>
+    internal RenderPerfStats? perfStats;
+
+    /// <summary>Stopwatch timestamp captured at the top of a hot event handler; consumed by <see cref="OnAfterRenderAsync"/>.</summary>
+    private long renderStartTimestamp;
+
+    /// <summary>
+    /// Visible-shape count from the most recent render. Set by <c>GardenPlot.razor</c>
+    /// at the top of the shape rendering block; read in <see cref="OnAfterRenderAsync"/>
+    /// so the perf HUD can report "what was actually drawn last frame".
+    /// </summary>
+    internal int lastRenderVisibleShapeCount;
+
+    /// <summary>
+    /// Cohort count from the most recent render (from <c>ShapeCohortBuilder</c>).
+    /// Set by <c>GardenPlot.razor</c> in the shape rendering block; surfaces in the
+    /// HUD so the user can see whether 2000+ filled-area plants collapsed into one
+    /// cohort (good) or fragmented (bad).
+    /// </summary>
+    internal int lastRenderCohortCount;
+
+    /// <summary>
+    /// Set to <c>true</c> by the "idle" branch of <see cref="OnPointerMove"/> when the
+    /// only thing the move changed is the on-screen cursor coordinate display. The next
+    /// <see cref="ShouldRender"/> consumes and clears the flag, returning <c>false</c>
+    /// so the parent doesn't pay an O(N) viewport-cull + cohort-fingerprint pass just
+    /// to redraw a status-bar X/Y label. The label is patched directly via the
+    /// <c>updateStatusPos</c> JS interop instead.
+    /// <para>
+    /// The flag is consumed on the very next render check; any subsequent "real" event
+    /// handler will see <c>false</c> and render normally. The narrow race window where
+    /// two events fire before Blazor's renderer runs is mitigated by every non-move
+    /// event handler clearing the flag at entry (see <see cref="ClearIdleRenderSuppression"/>).
+    /// </para>
+    /// </summary>
+    private bool suppressNextRender;
+
+    /// <summary>
+    /// Called from the top of every non-pointer-move event handler so a pending
+    /// "idle move suppress" flag can't accidentally swallow that handler's render.
+    /// Cheap (single store); safe to call even when the flag is already false.
+    /// </summary>
+    private void ClearIdleRenderSuppression() => suppressNextRender = false;
+
     private enum NewPlotDialogStep { ImageFirst, Configure }
     private enum DropActivationMode { ClickToggle, HoldKey }
     private enum DropModifierKey { Shift, Ctrl, Alt }
@@ -373,6 +422,7 @@ public partial class GardenPlot
     [JSInvokable]
     public Task OnViewportFromJs(double scrollLeft, double scrollTop, double clientWidth, double clientHeight)
     {
+        ClearIdleRenderSuppression();
         viewportScrollLeftPx = scrollLeft;
         viewportScrollTopPx = scrollTop;
         viewportClientWidthPx = clientWidth;
@@ -2381,8 +2431,38 @@ public partial class GardenPlot
     /// the implicit StateHasChanged after each OnPointerMove keeps panning smooth on big plots.
     /// Drag, draft, and box-select still need per-move renders to update their visuals, so they
     /// are NOT suppressed here.
+    ///
+    /// <para>Additionally suppresses the implicit render after an "idle" pointer move that only
+    /// updated the cursor X/Y display — those are patched into the DOM via JS interop instead
+    /// (see <c>updateStatusPos</c>). On a 2000+ shape canvas this kills the dominant render-storm:
+    /// every mouse-move was paying for a full <c>visibleShapes</c> cull + cohort fingerprint
+    /// pass just to redraw the status bar.</para>
     /// </summary>
-    protected override bool ShouldRender() => !panActive;
+    protected override bool ShouldRender()
+    {
+        if (panActive)
+        {
+            return false;
+        }
+
+        if (suppressNextRender)
+        {
+            suppressNextRender = false;
+
+            // The suppressed render still asked for a render duration, so undo the
+            // MarkRenderStart timestamp so the HUD doesn't mis-attribute the gap to
+            // the next real render.
+            renderStartTimestamp = 0;
+            if (perfStats is not null)
+            {
+                perfStats.RecordSuppressed();
+            }
+
+            return false;
+        }
+
+        return true;
+    }
 
     private void OnCanvasContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
     {
@@ -2531,6 +2611,18 @@ public partial class GardenPlot
         public double X;
         public double Y;
         public Point[]? OrigPoints;
+
+        /// <summary>
+        /// Cached reference to the live <see cref="Shape"/> in the plot. Captured
+        /// at drag start (<see cref="StartDrag"/>) so the per-frame drag loop in
+        /// <see cref="OnPointerMove"/> can mutate the shape directly without a
+        /// repeated O(N) <c>Shapes.FirstOrDefault(z =&gt; z.Id == snap.Id)</c> scan.
+        /// On a 2271-shape drag that scan was ~5.2M id-compares per pointer event
+        /// (60Hz × 2271² = 310M/s) and pinned a CPU core for the duration of the
+        /// drag. With the cached ref it becomes 2271 pointer-deref + 2271 field
+        /// writes per event.
+        /// </summary>
+        public Shape? Shape;
     }
 
     private sealed record PlotBackgroundImageDimensions(double Width, double Height);
@@ -3193,6 +3285,67 @@ public partial class GardenPlot
         routeSelectionPending = true;
     }
 
+    /// <inheritdoc/>
+    protected override void OnInitialized()
+    {
+        // Opt-in perf HUD: enabled when the page is loaded with ?perf=1 (or perf=true).
+        // The HUD is otherwise zero-cost: perfStats stays null and the <PerfHud /> child
+        // short-circuits its render path on null. The query-param parse is done once
+        // at init time so the HUD's enabled state doesn't flicker on navigation.
+        try
+        {
+            var uri = new Uri(Navigation.Uri);
+            var query = uri.Query;
+            if (!string.IsNullOrEmpty(query))
+            {
+                // Manual parse to avoid taking a dependency on Microsoft.AspNetCore.WebUtilities.
+                // Query is short and the only key we care about is "perf".
+                var search = query.StartsWith('?') ? query[1..] : query;
+                foreach (var pair in search.Split('&', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var eq = pair.IndexOf('=');
+                    var key = eq >= 0 ? pair[..eq] : pair;
+                    if (!string.Equals(key, "perf", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var value = eq >= 0 ? pair[(eq + 1)..] : string.Empty;
+                    if (string.Equals(value, "1", StringComparison.Ordinal) ||
+                        string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+                    {
+                        perfStats = new RenderPerfStats();
+                    }
+
+                    break;
+                }
+            }
+        }
+        catch
+        {
+            // Navigation.Uri can throw in some test/SSR setups; silently leave the HUD off.
+        }
+    }
+
+    /// <summary>
+    /// Captures a render-start timestamp and a short label describing what triggered the
+    /// render so the perf HUD can attribute frame cost to its source. Called from the
+    /// top of the hot event handlers (pointer-move/down/up). Cheap when the HUD is off:
+    /// the <c>perfStats is null</c> early-out keeps this to a single null check.
+    /// </summary>
+    private void MarkRenderStart(string trigger)
+    {
+        if (perfStats is null)
+        {
+            return;
+        }
+
+        renderStartTimestamp = Stopwatch.GetTimestamp();
+        perfStats.MarkRenderTrigger(trigger);
+    }
+
+    private void OnPerfHudReset() => perfStats?.Reset();
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -3506,6 +3659,26 @@ public partial class GardenPlot
         }
 
         await EnsureFloatingPanelsInViewAsync();
+
+        // Perf HUD: record this render's duration. We measure from the timestamp
+        // that the originating event handler stamped (MarkRenderStart) so the HUD
+        // reflects the time the user actually paid for the frame, not idle gap.
+        if (perfStats is not null)
+        {
+            if (renderStartTimestamp > 0)
+            {
+                var elapsed = Stopwatch.GetElapsedTime(renderStartTimestamp);
+                perfStats.RecordRender(elapsed.TotalMilliseconds, lastRenderVisibleShapeCount, lastRenderCohortCount);
+                renderStartTimestamp = 0;
+            }
+            else
+            {
+                // Render fired without a tagged trigger (e.g. async completion). Record
+                // a 0ms entry so the counter still ticks; the user can see "frame count
+                // jumped but I didn't move the mouse" which is itself useful signal.
+                perfStats.RecordRender(0, lastRenderVisibleShapeCount, lastRenderCohortCount);
+            }
+        }
     }
 
     private bool ApplyRouteSelectionIfRequested()
@@ -7389,6 +7562,9 @@ public partial class GardenPlot
     {
         if (currentPlot is null) return;
 
+        ClearIdleRenderSuppression();
+        MarkRenderStart("pointer-down");
+
         if (panPending)
         {
             return;
@@ -7784,6 +7960,8 @@ public partial class GardenPlot
     {
         if (currentPlot is null) return;
 
+        MarkRenderStart("pointer-move");
+
         pointerShiftDown = e.ShiftKey;
         pointerCtrlDown = e.CtrlKey;
         pointerAltDown = e.AltKey;
@@ -7825,6 +8003,46 @@ public partial class GardenPlot
                     _ = jsModule.InvokeVoidAsync("panBy", wrapRef, dx, dy).AsTask();
                 }
             }
+            return;
+        }
+
+        // ── Idle-move fast path ─────────────────────────────────────────────
+        // Detect whether ANY interactive state is active for this move. If not,
+        // the only thing this event would change in the UI is the status-bar X/Y
+        // display — which costs a full Blazor render pass (O(N) viewport cull +
+        // cohort fingerprint) on a 2000+ shape canvas just to repaint two text
+        // spans. We bypass that by patching the spans directly via JS and asking
+        // ShouldRender to swallow the implicit StateHasChanged.
+        //
+        // The interactive flags listed here are exactly the same paths that
+        // currently mutate non-display state below (paste-hover, box-select,
+        // ruler-handle drag, stamp-ghost, drag-move, drafting). If any of them
+        // is true we MUST take the render path so visual feedback updates.
+        bool isInteractiveMove =
+            showCanvasScalePanel
+            || (currentTool == Tool.Select && isPasteMode)
+            || isBoxSelecting
+            || isHandleDragging
+            || (currentTool == Tool.Stamp && selectedItem is not null)
+            || isDragging
+            || drafting is not null;
+
+        if (!isInteractiveMove && !IsConceptMode)
+        {
+            var (idleX, idleY) = ToFt(e);
+            idleX = Math.Clamp(idleX, 0, PlotWidthFt);
+            idleY = Math.Clamp(idleY, 0, PlotHeightFt);
+            lastCanvasX = idleX;
+            lastCanvasY = idleY;
+
+            if (jsModule is not null)
+            {
+                // Fire-and-forget — JS only patches two textContent nodes; failure
+                // here is not visible to the user and not worth a try/catch.
+                _ = jsModule.InvokeVoidAsync("updateStatusPos", F(idleX), F(idleY)).AsTask();
+            }
+
+            suppressNextRender = true;
             return;
         }
 
@@ -7884,7 +8102,8 @@ public partial class GardenPlot
             dy = SafeClamp(dy, -dragUnionMinY, PlotHeightFt - dragUnionMaxY);
             foreach (var snap in dragSnaps)
             {
-                var s = currentPlot.Shapes.FirstOrDefault(z => z.Id == snap.Id);
+                // O(1) cached lookup — see DragSnap.Shape for the rationale.
+                var s = snap.Shape;
                 if (s is null) continue;
                 if (IsPointBased(s))
                 {
@@ -7950,6 +8169,9 @@ public partial class GardenPlot
     private async Task OnPointerUp(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
         if (currentPlot is null) return;
+
+        ClearIdleRenderSuppression();
+        MarkRenderStart("pointer-up");
 
         pointerShiftDown = e.ShiftKey;
         pointerCtrlDown = e.CtrlKey;
@@ -8386,6 +8608,7 @@ public partial class GardenPlot
                 X = s.X,
                 Y = s.Y,
                 OrigPoints = s.Points.Count > 0 ? s.Points.ToArray() : null,
+                Shape = s,
             });
         }
         dragUnionMinX = minX; dragUnionMinY = minY;
@@ -8401,6 +8624,7 @@ public partial class GardenPlot
     [JSInvokable]
     public async Task OnWheelFromJs(double deltaY, bool shift, bool ctrl, bool alt)
     {
+        ClearIdleRenderSuppression();
         await HandleWheel(deltaY, shift, ctrl, alt);
         StateHasChanged();
     }
@@ -8694,6 +8918,9 @@ public partial class GardenPlot
 
     private void OnPointerLeave(Microsoft.AspNetCore.Components.Web.PointerEventArgs e)
     {
+        ClearIdleRenderSuppression();
+        MarkRenderStart("pointer-leave");
+
         ghostX = ghostY = null;
         pasteHoverX = pasteHoverY = null;
         lastCanvasX = null;
@@ -8814,6 +9041,7 @@ public partial class GardenPlot
 
     private async Task OnKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
     {
+        ClearIdleRenderSuppression();
         var kb = KeyBindings;
 
         if (IsConceptMode)

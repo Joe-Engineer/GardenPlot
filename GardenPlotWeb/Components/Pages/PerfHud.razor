@@ -1,0 +1,21 @@
+@using GardenPlotWeb.Models
+
+@if (Stats is not null)
+{
+    <div class="perf-hud" role="status" aria-live="off">
+        <div class="perf-hud-title">Perf HUD <button class="perf-hud-reset" type="button" @onclick="OnReset" title="Reset rolling window">⟳</button></div>
+        <table class="perf-hud-table">
+            <tbody>
+                <tr><th>renders</th><td>@Stats.TotalRenders</td></tr>
+                <tr><th>suppressed</th><td>@Stats.SuppressedRenders</td></tr>
+                <tr><th>last ms</th><td>@FormatMs(Stats.LastRenderMs)</td></tr>
+                <tr><th>avg ms</th><td>@FormatMs(Stats.AverageMs())</td></tr>
+                <tr><th>p90 ms</th><td>@FormatMs(Stats.P90Ms())</td></tr>
+                <tr><th>max ms</th><td>@FormatMs(Stats.MaxMs())</td></tr>
+                <tr><th>visible</th><td>@Stats.LastVisibleShapeCount shapes</td></tr>
+                <tr><th>cohorts</th><td>@Stats.LastCohortCount</td></tr>
+                <tr><th>last trigger</th><td>@Stats.LastTriggerLabel</td></tr>
+            </tbody>
+        </table>
+    </div>
+}

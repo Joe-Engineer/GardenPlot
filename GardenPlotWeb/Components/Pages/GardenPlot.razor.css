@@ -1760,3 +1760,68 @@
     padding: .15rem .4rem;
     line-height: 1.1;
 }
+
+/* Performance HUD overlay — opt-in via ?perf=1. Floating top-right of the
+   viewport with a semi-transparent background so it doesn't obscure the
+   canvas. Sized small enough not to interfere with regular UI but large
+   enough to read at a glance during debugging. */
+::deep .perf-hud {
+    position: fixed;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 9999;
+    background: rgba(20, 20, 24, 0.88);
+    color: #d6e2ee;
+    font: 11px/1.25 ui-monospace, SFMono-Regular, Consolas, monospace;
+    border: 1px solid rgba(140, 170, 200, 0.35);
+    border-radius: 6px;
+    padding: 0.35rem 0.5rem 0.4rem 0.5rem;
+    min-width: 9rem;
+    pointer-events: auto;
+    user-select: none;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+
+::deep .perf-hud-title {
+    font-weight: 600;
+    color: #a4d4ff;
+    margin-bottom: 0.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+::deep .perf-hud-reset {
+    background: transparent;
+    color: #a4d4ff;
+    border: 1px solid rgba(164, 212, 255, 0.4);
+    border-radius: 3px;
+    font: inherit;
+    line-height: 1;
+    padding: 0 0.25rem;
+    cursor: pointer;
+}
+
+::deep .perf-hud-reset:hover {
+    background: rgba(164, 212, 255, 0.15);
+}
+
+::deep .perf-hud-table {
+    border-collapse: collapse;
+    margin: 0;
+}
+
+::deep .perf-hud-table th {
+    text-align: left;
+    color: #8aa2b8;
+    font-weight: 400;
+    padding: 1px 0.5rem 1px 0;
+}
+
+::deep .perf-hud-table td {
+    text-align: right;
+    color: #d6e2ee;
+    font-variant-numeric: tabular-nums;
+    padding: 1px 0;
+}
