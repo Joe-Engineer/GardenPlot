@@ -10,9 +10,9 @@ namespace GardenPlotWeb.Components.Pages;
 /// Builds <see cref="ShapeCohort"/> instances from the per-render visible-shapes
 /// list. Groups shapes into <b>contiguous</b> runs that share a cohort key
 /// (<see cref="Shape.FilledAreaShapeId"/>, falling back to <see cref="Shape.Id"/>),
-/// and additionally bundles consecutive loose shapes into chunks of up to
-/// <see cref="MaxLooseCohortSize"/> so the parent doesn't emit one child
-/// component per loose plant.
+/// and bundles consecutive same-kind shapes into chunks of up to
+/// <see cref="MaxCohortSize"/> so a single-shape mutation re-emits one chunk
+/// instead of the entire cohort.
 ///
 /// <para>
 /// Why contiguous rather than <c>GroupBy</c>: shape order in the source list is
@@ -26,35 +26,49 @@ namespace GardenPlotWeb.Components.Pages;
 /// </para>
 ///
 /// <para>
-/// Why chunk loose shapes: the per-cohort <c>ShouldRender</c> gating in
-/// <c>ShapeCohortRenderer</c> is the actual perf lever, but each cohort emits a
-/// Blazor child component with its own render-tree frame. With 2335 individually
-/// stamped plants (no <c>FilledAreaShapeId</c>) the parent was emitting 2335
-/// child components per render at 626 ms average (HUD measured). Bundling
-/// consecutive loose shapes into chunks of 128 collapses that to ~19 child
-/// components per render. The fingerprint still invalidates only the chunk
-/// containing a changed shape, so selection/hover scoping is preserved.
+/// Why chunk: <c>ShapeCohortRenderer.ShouldRender</c> short-circuits when nothing
+/// changed, but when something <em>does</em> change (selection, drag, hover) it
+/// re-emits per-shape SVG markup for every shape in the cohort. HUD measured
+/// on a 1407-plant canvas: 2 cohorts × ~700 shapes each = ~7000 RenderTreeFrames
+/// per single-shape selection click → 283 ms per render. Chunking at 128 drops
+/// that to ~640 frames per chunk re-emit, an ~11x reduction. Fingerprint scoping
+/// still invalidates only the chunk(s) containing changed shapes.
 /// </para>
 /// </summary>
 internal static class ShapeCohortBuilder
 {
     /// <summary>
-    /// Maximum number of consecutive loose (non-filled-area) shapes grouped
-    /// into a single cohort. Filled-area cohorts are <em>not</em> chunked: they
-    /// are bounded by their natural fill-area boundary and the <c>ShouldRender</c>
-    /// fingerprint already gates them effectively.
+    /// Maximum number of consecutive shapes grouped into a single cohort, for
+    /// both loose shapes and shapes that share a <see cref="Shape.FilledAreaShapeId"/>.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// The cohort renderer's <c>ShouldRender</c> fingerprint short-circuits
+    /// re-emits when nothing in the cohort changed. But when something
+    /// <em>does</em> change (selection click, drag, hover effect on one shape),
+    /// the cohort re-emits per-shape SVG markup for <em>every</em> shape in the
+    /// cohort. With unchunked fill-area cohorts of ~1400 plants, that meant
+    /// ~7000 RenderTreeFrames per single-shape selection click — measured at
+    /// 283 ms average per render on a 1407-plant canvas via the perf HUD.
+    /// </para>
+    /// <para>
+    /// Chunking at 128 collapses the per-selection re-emit to ~640 frames
+    /// (one chunk worth), an ~11x reduction. Filled-area cohorts that span
+    /// multiple chunks still share the same <c>cohort.Key</c> and the same
+    /// <c>ParentArea</c> lookup, so cascading parent-area style changes still
+    /// invalidate every chunk that maps to that area — which is correct,
+    /// because every chunk's rendered output depends on the parent's style.
+    /// </para>
+    /// <para>
     /// 128 was chosen as a balance between:
     /// <list type="bullet">
     /// <item>parent render cost (lower with bigger chunks: fewer child components)</item>
     /// <item>fingerprint compute per cohort (linear in chunk size; smaller chunks invalidate less work on a single shape mutation)</item>
-    /// <item>selection-scope: clicking one shape re-renders one chunk only</item>
+    /// <item>selection-scope: clicking one shape re-emits one chunk only</item>
     /// </list>
-    /// On the 2335-shape repro: 2335 / 128 ≈ 19 cohorts. If profiling justifies
-    /// a different size later, this is a single-line change.
+    /// </para>
     /// </remarks>
-    public const int MaxLooseCohortSize = 128;
+    public const int MaxCohortSize = 128;
 
     public static List<ShapeCohort> BuildContiguous(IReadOnlyList<Shape> shapes)
     {
@@ -75,12 +89,16 @@ internal static class ShapeCohortBuilder
             bool isFilled = s.FilledAreaShapeId.HasValue;
 
             // Continue the current cohort if either:
-            // - both shapes belong to the SAME fill area (existing semantics), OR
-            // - both shapes are loose AND the chunk hasn't hit its size cap.
-            bool sameFilledArea = isFilled && currentIsFilled && s.FilledAreaShapeId!.Value == currentKey;
-            bool joinLooseChunk = !isFilled && !currentIsFilled && currentItems.Count < MaxLooseCohortSize;
+            // - both shapes belong to the SAME fill area, OR
+            // - both shapes are loose (no fill-area parent).
+            // In both cases the chunk must still be under the size cap;
+            // otherwise we start a new chunk to keep per-shape re-emit cost
+            // bounded when a single shape mutates.
+            bool sameKindAndKey = isFilled == currentIsFilled
+                && (isFilled ? s.FilledAreaShapeId!.Value == currentKey : true);
+            bool joinChunk = sameKindAndKey && currentItems.Count < MaxCohortSize;
 
-            if (sameFilledArea || joinLooseChunk)
+            if (joinChunk)
             {
                 currentItems.Add(s);
                 continue;
