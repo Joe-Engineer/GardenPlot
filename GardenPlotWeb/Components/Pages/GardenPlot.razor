@@ -1196,47 +1196,48 @@ else
                             var sb = GetBounds(s);
                             var scx = sb.x + sb.w / 2;
                             var scy = sb.y + sb.h / 2;
+                            var style = GetEffectiveStyle(s);
                             <g transform="rotate(@F(s.Rotation) @F(scx) @F(scy))">
                                 @switch (s.Kind)
                                 {
                                     case ShapeKind.Rectangle:
                                         <rect x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
-                                              fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
-                                              stroke="@EffectiveStroke(s)" stroke-width="0.06" stroke-dasharray="0.12,0.08" />
+                                              fill="@style.Fill" fill-opacity="@F(style.FillOpacity)"
+                                              stroke="@style.Stroke" stroke-width="0.06" stroke-dasharray="0.12,0.08" />
                                         break;
                                     case ShapeKind.Oval:
                                         <ellipse cx="@F(s.X + s.W / 2)" cy="@F(s.Y + s.H / 2)"
                                                  rx="@F(s.W / 2)" ry="@F(s.H / 2)"
-                                                 fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
-                                                 stroke="@EffectiveStroke(s)" stroke-width="0.06" stroke-dasharray="0.12,0.08" />
+                                                 fill="@style.Fill" fill-opacity="@F(style.FillOpacity)"
+                                                 stroke="@style.Stroke" stroke-width="0.06" stroke-dasharray="0.12,0.08" />
                                         break;
                                     case ShapeKind.FreeDraw:
                                         <polyline points="@PointsString(s.Points)"
-                                                  fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.08"
+                                                  fill="none" stroke="@style.Stroke" stroke-width="0.08"
                                                   stroke-linecap="round" stroke-linejoin="round"
                                                   stroke-dasharray="0.12,0.08" />
                                         break;
                                     case ShapeKind.Ruler:
                                         <polyline points="@PointsString(s.Points)"
-                                                  fill="none" stroke="@EffectiveStroke(s)" stroke-width="0.06"
+                                                  fill="none" stroke="@style.Stroke" stroke-width="0.06"
                                                   stroke-linecap="round" stroke-linejoin="round"
                                                   stroke-dasharray="0.12,0.08" />
                                         @foreach (var p in s.Points)
                                         {
                                             <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.08"
-                                                    fill="#fff" stroke="@EffectiveStroke(s)" stroke-width="0.04" />
+                                                    fill="#fff" stroke="@style.Stroke" stroke-width="0.04" />
                                         }
                                         break;
                                     case ShapeKind.CircleRuler:
                                         <circle cx="@F(s.X + (s.W / 2))" cy="@F(s.Y + (s.H / 2))" r="@F(s.W / 2)"
-                                                fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
-                                                stroke="@EffectiveStroke(s)" stroke-width="0.06"
+                                                fill="@style.Fill" fill-opacity="@F(style.FillOpacity)"
+                                                stroke="@style.Stroke" stroke-width="0.06"
                                                 stroke-dasharray="0.12,0.08" />
                                         break;
                                     case ShapeKind.RectRuler:
                                         <rect x="@F(s.X)" y="@F(s.Y)" width="@F(s.W)" height="@F(s.H)"
-                                              fill="@EffectiveFill(s)" fill-opacity="@F(EffectiveFillOpacity(s))"
-                                              stroke="@EffectiveStroke(s)" stroke-width="0.06"
+                                              fill="@style.Fill" fill-opacity="@F(style.FillOpacity)"
+                                              stroke="@style.Stroke" stroke-width="0.06"
                                               stroke-dasharray="0.12,0.08" />
                                         break;
                                     case ShapeKind.BedKit:
@@ -1256,7 +1257,7 @@ else
                                         @((MarkupString)PlantRendering.PlantSpriteSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, s.Trait))
                                         break;
                                     case ShapeKind.SoilMarker:
-                                        @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, EffectiveFill(s), EffectiveStroke(s)))
+                                        @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, style.Fill, style.Stroke))
                                         break;
                                 }
                             </g>
