@@ -1233,41 +1233,23 @@ else
 
                 @if (!IsConceptMode && drafting is not null && buildingPolygon
                     && drafting.Kind is ShapeKind.FreeDraw or ShapeKind.Edge or ShapeKind.Ruler
-                    && drafting.Points.Count >= 2)
+                    && drafting.Points.Count >= 2 && lastCanvasX is double cursorX && lastCanvasY is double cursorY
+                    && !isDraftVertexDragging)
                 {
-                    @* Issue #129: in-progress polygon HUD. Shows segment length at cursor,
-                       running perimeter + area in the canvas top-left. Suppress segment
-                       length when dragging an existing vertex so a stale trailer segment
-                       isn't surfaced. *@
-                    var hudClosed = drafting.CloseEdge || (drafting.Kind == ShapeKind.FreeDraw && IsGroundCoverShape(drafting));
-                    var hudReadout = DraftPolygonHud.Compute(drafting.Points, hudClosed, includeTrailerSegment: !isDraftVertexDragging);
+                    @* Issue #129: while the user is in cursor-follow mode, show the
+                       current-segment length as a small tag next to the cursor. The
+                       running perimeter / area / vertex count live in the info panel
+                       (see the buildingPolygon branch in the panel below). *@
                     var hudFontFt = DraftPolygonHud.FontSizeFt(library.Ui.DraftHudFontSize);
-                    var hudPad = hudFontFt * 0.6;
-                    var perimText = $"Perimeter: {hudReadout.PerimeterFt:0.##} ft";
-                    string? areaText = hudReadout.AreaFt2 is double areaFt2 ? $"Area: {areaFt2:0.##} ft²" : null;
-                    var maxLabelLen = areaText is null ? perimText.Length : Math.Max(perimText.Length, areaText.Length);
-                    var labelWidth = maxLabelLen * hudFontFt * 0.55 + 0.2;
-                    var rows = areaText is null ? 1 : 2;
-                    var cornerX = hudPad;
-                    var cornerY = hudPad + hudFontFt;
+                    var segLenFt = Distance(drafting.Points[^2], drafting.Points[^1]);
+                    var segText = $"{segLenFt:0.##} ft";
+                    var tagX = cursorX + (hudFontFt * 0.5);
+                    var tagY = cursorY - (hudFontFt * 0.4);
+                    var tagWidth = segText.Length * hudFontFt * 0.55 + 0.15;
                     <g pointer-events="none" class="draft-polygon-hud">
-                        @if (hudReadout.SegmentLengthFt is double segLenFt && lastCanvasX is double cursorX && lastCanvasY is double cursorY)
-                        {
-                            var segText = $"{segLenFt:0.##} ft";
-                            var tagX = cursorX + (hudFontFt * 0.5);
-                            var tagY = cursorY - (hudFontFt * 0.4);
-                            var tagWidth = segText.Length * hudFontFt * 0.55 + 0.15;
-                            <rect x="@F(tagX - 0.05)" y="@F(tagY - hudFontFt)" width="@F(tagWidth)" height="@F(hudFontFt * 1.25)"
-                                  fill="rgba(255,255,255,0.85)" stroke="#2f5a3a" stroke-width="0.02" rx="0.06" />
-                            <svg:text x="@F(tagX)" y="@F(tagY)" font-size="@F(hudFontFt)" fill="#1f3d28" style="font-family: sans-serif;">@segText</svg:text>
-                        }
-                        <rect x="@F(cornerX - 0.05)" y="@F(cornerY - hudFontFt)" width="@F(labelWidth)" height="@F(hudFontFt * 1.25 * rows + 0.1)"
+                        <rect x="@F(tagX - 0.05)" y="@F(tagY - hudFontFt)" width="@F(tagWidth)" height="@F(hudFontFt * 1.25)"
                               fill="rgba(255,255,255,0.85)" stroke="#2f5a3a" stroke-width="0.02" rx="0.06" />
-                        <svg:text x="@F(cornerX)" y="@F(cornerY)" font-size="@F(hudFontFt)" fill="#1f3d28" style="font-family: sans-serif;">@perimText</svg:text>
-                        @if (areaText is not null)
-                        {
-                            <svg:text x="@F(cornerX)" y="@F(cornerY + hudFontFt * 1.25)" font-size="@F(hudFontFt)" fill="#1f3d28" style="font-family: sans-serif;">@areaText</svg:text>
-                        }
+                        <svg:text x="@F(tagX)" y="@F(tagY)" font-size="@F(hudFontFt)" fill="#1f3d28" style="font-family: sans-serif;">@segText</svg:text>
                     </g>
                 }
                 @if (!IsConceptMode && currentTool == Tool.Select && isBoxSelecting)
@@ -2087,11 +2069,70 @@ else
     var primaryShape = currentPlot is not null && PrimarySelectedId is { } pid
         ? currentPlot.Shapes.FirstOrDefault(z => z.Id == pid)
         : null;
+    // Issue #129: surface live polygon stats in the info panel from the moment
+    // the click-by-vertex tool is active, not just once a vertex has been placed.
+    // The panel shows tool name on tool selection (empty body), starting
+    // measurements once Points.Count >= 2, and full vertex/perimeter/area from 3+.
+    var isVertexTool = currentTool == Tool.Polygon || currentTool == Tool.Polyline;
+    var draftPanelShape = drafting is not null
+        && drafting.Kind == ShapeKind.FreeDraw
+        && !IsRulerShape(drafting)
+        ? drafting
+        : null;
+    var hasDraftPanelContent = isVertexTool || draftPanelShape is not null;
 }
 
-@if (!IsConceptMode && (selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null) || infoRuler is not null) && currentPlot is not null)
+@if (!IsConceptMode && (selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null) || infoRuler is not null || hasDraftPanelContent) && currentPlot is not null)
 {
     var forceRulerMode = infoRuler is not null && (drafting is not null || selectedIds.Count <= 1);
+    var draftPanelOnly = !forceRulerMode
+        && selectedIds.Count == 0
+        && !(currentTool == Tool.Stamp && selectedItem is not null)
+        && hasDraftPanelContent;
+
+    if (draftPanelOnly)
+    {
+        var draftPositioned = library.Ui.InfoPanelX is double && library.Ui.InfoPanelY is double;
+        var hudClosed = draftPanelShape is not null
+            && (draftPanelShape.CloseEdge || IsGroundCoverShape(draftPanelShape));
+        var draftReadout = draftPanelShape is null
+            ? DraftHudReadout.Empty
+            : DraftPolygonHud.Compute(draftPanelShape.Points, hudClosed, includeTrailerSegment: !isDraftVertexDragging);
+        var draftTitle = currentTool == Tool.Polygon ? "Polygon · drawing"
+            : currentTool == Tool.Polyline ? "Polyline · drawing"
+            : (draftPanelShape is not null && draftPanelShape.CloseEdge) ? "Polygon · drawing"
+            : "Polyline · drawing";
+        var committedVertexCount = draftPanelShape is null ? 0 : Math.Max(0, draftPanelShape.Points.Count - (buildingPolygon ? 1 : 0));
+
+        <div class="floating-panel info-panel @(draftPositioned ? "" : "default-info-pos")"
+             @ref="infoPanelRef"
+             style="@(draftPositioned ? $"left:{library.Ui.InfoPanelX!.Value}px;top:{library.Ui.InfoPanelY!.Value}px;" : "")"
+             @onpointermove="OnPanelDragMove"
+             @onpointerup="OnPanelDragEnd"
+             @onpointercancel="OnPanelDragEnd">
+            <div class="panel-header"
+                 @onpointerdown="StartInfoPanelDrag">
+                <span class="panel-title">@draftTitle</span>
+                <span class="drag-grip" aria-hidden="true">⠿</span>
+            </div>
+            <div class="panel-body">
+                <div class="small"><span class="text-muted">Vertices:</span> <strong>@committedVertexCount</strong></div>
+                @if (draftReadout.SegmentLengthFt is double segLenFt)
+                {
+                    <div class="small"><span class="text-muted">Current segment:</span> <strong>@($"{segLenFt:0.##} ft")</strong></div>
+                }
+                <div class="small"><span class="text-muted">Perimeter:</span> <strong>@($"{draftReadout.PerimeterFt:0.##} ft")</strong></div>
+                @if (draftReadout.AreaFt2 is double draftAreaFt2)
+                {
+                    <div class="small"><span class="text-muted">Area:</span> <strong>@($"{draftAreaFt2:0.##} ft²")</strong></div>
+                }
+                <div class="x-small text-muted mt-1">Click to add a vertex · drag a handle to move · double-click to finish · Esc to cancel</div>
+            </div>
+        </div>
+    }
+    else
+    {
+
     var stampPreview = (!forceRulerMode && selectedIds.Count == 0 && currentTool == Tool.Stamp && selectedItem is not null)
         ? PreviewShapeFromItem(selectedItem)
         : null;
@@ -3066,6 +3107,7 @@ else
             }
         </div>
     </div>
+    }
 }
 
 @if (showNewPlotDialog)
