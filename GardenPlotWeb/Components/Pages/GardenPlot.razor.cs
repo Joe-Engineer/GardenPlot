@@ -182,7 +182,7 @@ public partial class GardenPlot
     private enum EdgeSubMode { StraightSegments, Freehand }
 
     /// <summary>Ground-cover drawing sub-mode (selected when Tool.GroundCover is active).</summary>
-    private enum GroundCoverSubMode { Polygon, Rectangle, Oval, FreehandArea, Ribbon }
+    private enum GroundCoverSubMode { Polygon, Rectangle, Oval, FreehandArea, PolylineRibbon, FreehandRibbon }
 
     private EdgeSubMode edgeSubMode = EdgeSubMode.StraightSegments;
     private GroundCoverSubMode groundCoverSubMode = GroundCoverSubMode.Polygon;
@@ -1808,19 +1808,26 @@ public partial class GardenPlot
 
     /// <summary>
     /// Issue #132 — live ribbon preview shape derived from the in-progress GroundCover
-    /// Ribbon centerline. Returns <see langword="null"/> when not in that submode or the
-    /// current draft has too few points. The trailing cursor-tracker is included so the
-    /// preview ribbon visibly reaches the cursor.
+    /// Ribbon centerline (either Polyline submode or Freehand submode). Returns
+    /// <see langword="null"/> when not in a ribbon submode or the current draft has too
+    /// few points. For PolylineRibbon the trailing cursor-tracker is included so the
+    /// preview reaches the cursor; for FreehandRibbon the draft IS the live path being
+    /// drag-built so no tracker exists.
     /// </summary>
     internal Shape? GroundCoverRibbonDraftPreview
     {
         get
         {
             if (currentTool != Tool.GroundCover
-                || groundCoverSubMode != GroundCoverSubMode.Ribbon
                 || drafting is null
-                || !buildingPolygon
                 || drafting.Points.Count < 2)
+            {
+                return null;
+            }
+
+            bool isPolylineRibbon = groundCoverSubMode == GroundCoverSubMode.PolylineRibbon && buildingPolygon;
+            bool isFreehandRibbon = groundCoverSubMode == GroundCoverSubMode.FreehandRibbon;
+            if (!isPolylineRibbon && !isFreehandRibbon)
             {
                 return null;
             }
@@ -5367,7 +5374,7 @@ public partial class GardenPlot
         // the user later.
         bool newToolIsArcCapable =
             t is Tool.Polygon or Tool.Polyline
-            || (t == Tool.GroundCover && groundCoverSubMode is GroundCoverSubMode.Polygon or GroundCoverSubMode.Ribbon);
+            || (t == Tool.GroundCover && groundCoverSubMode is GroundCoverSubMode.Polygon or GroundCoverSubMode.PolylineRibbon);
         if (!newToolIsArcCapable)
         {
             arcModeArmed = false;
@@ -8278,7 +8285,29 @@ public partial class GardenPlot
                         };
                         drafting.Points.Add(new Point(x, y));
                     }
-                    else if (groundCoverSubMode == GroundCoverSubMode.Ribbon)
+                    else if (groundCoverSubMode == GroundCoverSubMode.FreehandRibbon)
+                    {
+                        // Issue #132 — Freehand Ribbon submode. Mirrors FreehandArea (drag
+                        // to sketch a centerline) but commits as a closed ribbon polygon
+                        // in OnPointerUp via the same RibbonGeometry pipeline used by the
+                        // PolylineRibbon submode.
+                        drafting = new Shape
+                        {
+                            Kind = ShapeKind.FreeDraw,
+                            Trait = surfaceTrait,
+                            Label = gcItem.Code,
+                            Stroke = gcItem.StrokeColor,
+                            Fill = gcItem.FillColor,
+                            MaterialCode = gcItem.Code,
+                            DepthIn = depthOverride,
+                            GroundCoverCode = gcItem.Code,
+                            GroundCoverDepthIn = legacyDepth,
+                            IsGroundCoverSurface = isSurface,
+                            TextureKey = gcItem.TextureKey,
+                        };
+                        drafting.Points.Add(new Point(x, y));
+                    }
+                    else if (groundCoverSubMode == GroundCoverSubMode.PolylineRibbon)
                     {
                         // Issue #132 GC-Ribbon submode. Identical click-by-vertex flow to
                         // the Polygon submode (TryHandleArcClick lights up A + T just like
@@ -8862,6 +8891,37 @@ public partial class GardenPlot
         {
             if (drafting.Points.Count >= 2)
             {
+                // Issue #132 — Freehand Ribbon submode commits as a CLOSED offset polygon
+                // derived from the freehand centerline, mirroring what the PolylineRibbon
+                // submode does in OnCanvasDoubleClick. The drag path becomes the source
+                // path; RibbonGeometry stitches it into a ribbon outline carrying the
+                // palette item's MaterialCode + DepthIn so area + volume readouts work.
+                if (currentTool == Tool.GroundCover
+                    && groundCoverSubMode == GroundCoverSubMode.FreehandRibbon)
+                {
+                    double widthFt = library.Ui.LastRibbonWidthFt;
+                    if (widthFt > 0)
+                    {
+                        try
+                        {
+                            var ribbon = RibbonGeometry.BuildRibbon(
+                                drafting.Points,
+                                drafting.EdgeBulges,
+                                widthFt,
+                                library.Ui.LastRibbonAlignment,
+                                library.Ui.LastRibbonEndCap);
+                            drafting.Points = ribbon.Points;
+                            drafting.EdgeBulges = ribbon.EdgeBulges;
+                            drafting.CloseEdge = true;
+                        }
+                        catch (ArgumentException)
+                        {
+                            // Bad inputs (degenerate freehand path) — fall back to committing
+                            // the centerline as-is rather than losing the user's work.
+                        }
+                    }
+                }
+
                 RecordUndoState();
                 currentPlot.Shapes.Add(drafting);
                 added = true;
@@ -9579,7 +9639,7 @@ public partial class GardenPlot
 
         if (drafting.Points.Count >= 3
             || (drafting.Points.Count >= 2 && !IsGroundCoverShape(drafting))
-            || (drafting.Points.Count >= 2 && currentTool == Tool.GroundCover && groundCoverSubMode == GroundCoverSubMode.Ribbon))
+            || (drafting.Points.Count >= 2 && currentTool == Tool.GroundCover && groundCoverSubMode == GroundCoverSubMode.PolylineRibbon))
         {
             // Issue #132 — Ground-Cover Ribbon submode commits as a CLOSED offset polygon
             // rather than the open centerline. The user clicks the centerline; the
@@ -9593,7 +9653,7 @@ public partial class GardenPlot
             // annular-sector ribbon. The commit guard above explicitly allows
             // Points.Count == 2 for the GC-Ribbon submode for that reason.
             if (currentTool == Tool.GroundCover
-                && groundCoverSubMode == GroundCoverSubMode.Ribbon
+                && groundCoverSubMode == GroundCoverSubMode.PolylineRibbon
                 && drafting.Points.Count >= 2)
             {
                 double? widthFt = library.Ui.LastRibbonWidthFt > 0 ? library.Ui.LastRibbonWidthFt : (double?)null;
@@ -9807,7 +9867,7 @@ public partial class GardenPlot
     /// </summary>
     private bool IsArcCapableTool =>
         currentTool is Tool.Polygon or Tool.Polyline
-        || (currentTool == Tool.GroundCover && groundCoverSubMode is GroundCoverSubMode.Polygon or GroundCoverSubMode.Ribbon);
+        || (currentTool == Tool.GroundCover && groundCoverSubMode is GroundCoverSubMode.Polygon or GroundCoverSubMode.PolylineRibbon);
 
     internal void ToggleArcMode()
     {

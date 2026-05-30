@@ -471,15 +471,20 @@ else
                                 class="btn @(groundCoverSubMode == GroundCoverSubMode.FreehandArea ? "btn-primary" : "btn-outline-secondary")"
                                 title="Click and drag to sketch a freeform area"
                                 @onclick="() => { groundCoverSubMode = GroundCoverSubMode.FreehandArea; CancelPolygonInProgress(); }">Freehand Area</button>
-                        @* Issue #132 — Ribbon sub-mode for ground cover. Draws like Polyline
-                           with a live ribbon overlay; commits as a closed offset polygon so
-                           area + volume calc work for pathway materials (gravel, mulch, etc.). *@
+                        @* Issue #132 — Ribbon sub-modes for ground cover. Two input methods
+                           that both produce a closed offset polygon for area + volume calc:
+                             • Polyline = click vertices like the Polyline tool (A=arc, T=tangent)
+                             • Freehand = drag the cursor to sketch a freeform centerline *@
                         <button type="button"
-                                class="btn @(groundCoverSubMode == GroundCoverSubMode.Ribbon ? "btn-primary" : "btn-outline-secondary")"
-                                title="Click vertices to lay out a path centerline (or edge), see the ribbon being drawn, double-click to finish. Width / alignment / end-cap to the right."
-                                @onclick="() => { groundCoverSubMode = GroundCoverSubMode.Ribbon; CancelPolygonInProgress(); }">Ribbon</button>
+                                class="btn @(groundCoverSubMode == GroundCoverSubMode.PolylineRibbon ? "btn-primary" : "btn-outline-secondary")"
+                                title="Polyline Ribbon — click vertices to lay out a pathway centerline (or edge), see the ribbon being drawn live, double-click to finish. Width / alignment / end-cap to the right."
+                                @onclick="() => { groundCoverSubMode = GroundCoverSubMode.PolylineRibbon; CancelPolygonInProgress(); }">Polyline</button>
+                        <button type="button"
+                                class="btn @(groundCoverSubMode == GroundCoverSubMode.FreehandRibbon ? "btn-primary" : "btn-outline-secondary")"
+                                title="Freehand Ribbon — click and drag to sketch a freeform pathway centerline; release to commit. Same width / alignment / end-cap controls apply."
+                                @onclick="() => { groundCoverSubMode = GroundCoverSubMode.FreehandRibbon; CancelPolygonInProgress(); }">Freehand</button>
                     </div>
-                    @if (groundCoverSubMode == GroundCoverSubMode.Ribbon)
+                    @if (groundCoverSubMode is GroundCoverSubMode.PolylineRibbon or GroundCoverSubMode.FreehandRibbon)
                     {
                         @* Inline ribbon controls — width / alignment / end cap. Persist via
                            UiPreferences so the user's preferred path width sticks. *@
@@ -535,9 +540,13 @@ else
                             {
                                 <span class="text-muted ms-2">Click and drag to sketch</span>
                             }
-                            else if (groundCoverSubMode == GroundCoverSubMode.Ribbon)
+                            else if (groundCoverSubMode == GroundCoverSubMode.PolylineRibbon)
                             {
                                 <span class="text-muted ms-2">Click vertices · A=arc · T=tangent · double-click to finish</span>
+                            }
+                            else if (groundCoverSubMode == GroundCoverSubMode.FreehandRibbon)
+                            {
+                                <span class="text-muted ms-2">Click and drag to sketch · release to finish</span>
                             }
                         </span>
                     }
