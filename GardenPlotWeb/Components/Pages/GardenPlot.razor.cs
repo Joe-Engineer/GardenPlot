@@ -420,15 +420,54 @@ public partial class GardenPlot
     }
 
     [JSInvokable]
-    public Task OnViewportFromJs(double scrollLeft, double scrollTop, double clientWidth, double clientHeight)
+    public async Task OnViewportFromJs(double scrollLeft, double scrollTop, double clientWidth, double clientHeight)
     {
+        // Issue #97: JS pushes a viewport update on every scroll / zoom frame.
+        // Pre-fix this triggered a full StateHasChanged per tick, which on a big
+        // plot meant a whole render-diff pass per scroll frame. The coalescer
+        // drops sub-pixel changes outright and throttles significant ones to
+        // ~30 fps via a single trailing flush — see ViewportRenderCoalescer.
         ClearIdleRenderSuppression();
+
+        var result = viewportCoalescer.OnViewportUpdate(scrollLeft, scrollTop, clientWidth, clientHeight, Environment.TickCount64);
+        switch (result.Action)
+        {
+            case ViewportCoalesceAction.FlushNow:
+                ApplyViewportFromCoalescer(scrollLeft, scrollTop, clientWidth, clientHeight);
+                StateHasChanged();
+                break;
+            case ViewportCoalesceAction.ScheduleFlush:
+                await Task.Delay(result.DelayMs).ConfigureAwait(false);
+                await InvokeAsync(FlushPendingViewport).ConfigureAwait(false);
+                break;
+            case ViewportCoalesceAction.NoOp:
+            default:
+                break;
+        }
+    }
+
+    private void ApplyViewportFromCoalescer(double scrollLeft, double scrollTop, double clientWidth, double clientHeight)
+    {
         viewportScrollLeftPx = scrollLeft;
         viewportScrollTopPx = scrollTop;
         viewportClientWidthPx = clientWidth;
         viewportClientHeightPx = clientHeight;
+    }
+
+    private void FlushPendingViewport()
+    {
+        if (!viewportCoalescer.TryConsumePending(
+                Environment.TickCount64,
+                out var sl,
+                out var st,
+                out var cw,
+                out var ch))
+        {
+            return;
+        }
+
+        ApplyViewportFromCoalescer(sl, st, cw, ch);
         StateHasChanged();
-        return Task.CompletedTask;
     }
 
     internal bool CanSelectShape(Shape shape)
@@ -2521,6 +2560,10 @@ public partial class GardenPlot
     private double? viewportClientWidthPx;
     private double? viewportClientHeightPx;
 
+    // Coalesces the per-frame OnViewportFromJs stream into at most one render per
+    // ~33 ms (issue #97). Reset() is called on dispose so a re-attach starts fresh.
+    private readonly ViewportRenderCoalescer viewportCoalescer = new();
+
     // Floating-panel drag state
     private string? draggingPanel;
     private double panelDragOffsetX, panelDragOffsetY;
@@ -4042,6 +4085,9 @@ public partial class GardenPlot
         rotationShiftHintCts?.Cancel();
         rotationShiftHintCts?.Dispose();
         dotnetRef?.Dispose();
+
+        // Drop any pending viewport flush so a late callback after dispose is a no-op.
+        viewportCoalescer.Reset();
     }
 
     /// <summary>
