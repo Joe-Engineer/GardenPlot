@@ -2783,6 +2783,10 @@ public partial class GardenPlot
         Fill = item.FillColor,
         TileBackgroundImageFileName = item.TileBackgroundImageFileName,
         Takeoff = item.Kind == PaletteKind.Edging ? GardenPlotWeb.Models.Catalog.CreateTakeoff(item.Code) : null,
+
+        // Issue #31 Phase A — carry the head's coverage arc into the preview so the
+        // inspector shows the correct value AND the canvas ghost halo renders as a wedge.
+        ArcDegrees = item.ArcDegrees,
     };
 
     /// <summary>

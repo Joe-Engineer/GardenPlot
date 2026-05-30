@@ -2853,6 +2853,52 @@ else
                     </div>
                 }
 
+                @* Issue #31 Phase A — irrigation head detail panel for the single-shape
+                   inspector. Surfaces the throw radius, palette code, and arc-degree
+                   dropdown. Setting the arc updates this head's ArcDegrees and persists.
+                   Visible for both real selections AND palette-preview shapes so the user
+                   sees the head's data the moment they pick one from the palette. *@
+                @if (single!.Kind == ShapeKind.IrrigationHead)
+                {
+                    var headThrowFt = single!.W / 2;
+                    var headArc = single!.ArcDegrees ?? 360.0;
+                    var headSelectedArray = new[] { single! };
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Irrigation Head</div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Type:</span>
+                            <strong>@(single!.Label ?? "(unnamed head)")</strong>
+                        </div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Throw:</span>
+                            <strong>@F(headThrowFt) ft</strong>
+                            <span class="text-muted ms-2">Ø</span>
+                            <strong>@F(single!.W) ft</strong>
+                        </div>
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Coverage:</span>
+                            <select class="form-select form-select-sm" style="max-width: 8rem;"
+                                    value="@F(headArc)"
+                                    disabled="@isPreview"
+                                    @onchange="(e) => OnSprinklerArcChanged(headSelectedArray, e)">
+                                @foreach (double deg in PaletteCatalog.StandardSprinklerArcDegrees)
+                                {
+                                    <option value="@F(deg)">@F(deg)°</option>
+                                }
+                            </select>
+                            <span class="small text-muted">arc</span>
+                        </div>
+                        @if (isPreview)
+                        {
+                            <div class="x-small text-muted mt-1">Pick from the palette to see other heads, or click on the canvas to drop this one.</div>
+                        }
+                        else
+                        {
+                            <div class="x-small text-muted mt-1">Rotate the head to aim the arc.</div>
+                        }
+                    </div>
+                }
+
                 @if (!isPreview && single!.Kind == ShapeKind.Edge)
                 {
                     <div class="ground-cover-info mt-2 pt-2 border-top">
@@ -3282,11 +3328,10 @@ else
                     </div>
                 }
 
-                @* Issue #31 Phase A — sprinkler coverage arc. Surfaces a dropdown of standard
-                   arc degrees (15, 30, 45, 90, 120, 150, 180, 210, 300, 360) when every
-                   selected shape is an irrigation head. Setting the value updates each
-                   selected head's ArcDegrees; the render layer redraws the wedge accordingly. *@
-                @if (selShapes.Count > 0 && selShapes.All(sh => sh.Kind == ShapeKind.IrrigationHead))
+                @* Issue #31 Phase A — multi-selection coverage-arc dropdown for irrigation
+                   heads. The single-shape branch above has a richer detail panel; this is
+                   for selecting many heads at once and setting them all to the same arc. *@
+                @if (selShapes.Count > 1 && selShapes.All(sh => sh.Kind == ShapeKind.IrrigationHead))
                 {
                     var arcValues = selShapes.Select(sh => sh.ArcDegrees ?? 360.0).Distinct().ToList();
                     var arcSingle = arcValues.Count == 1 ? arcValues[0] : (double?)null;
@@ -3304,7 +3349,7 @@ else
                                 <option value="@F(deg)">@F(deg)°</option>
                             }
                         </select>
-                        <span class="small text-muted">arc</span>
+                        <span class="small text-muted">arc · applies to all @selShapes.Count selected heads</span>
                     </div>
                 }
             }
