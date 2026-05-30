@@ -87,7 +87,7 @@ public partial class GardenPlot
     private double PlotWidthFt => currentPlot?.WidthFt ?? DefaultPlotWidthFt;
     private double PlotHeightFt => currentPlot?.HeightFt ?? DefaultPlotHeightFt;
 
-    public enum Tool { Select, FreeDraw, Edge, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover, Polyline }
+    public enum Tool { Select, FreeDraw, Edge, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover, Polyline, Polygon }
 
     // ---- Perf HUD (opt-in via ?perf=1) -------------------------------------
     // The whole block is null-when-off so production traffic pays a single null
@@ -200,6 +200,7 @@ public partial class GardenPlot
     {
         ["Select"] = Tool.Select,
         ["Polyline"] = Tool.Polyline,
+        ["Polygon"] = Tool.Polygon,
         ["Free Draw"] = Tool.FreeDraw,
         ["Rectangle"] = Tool.Rectangle,
         ["Oval"] = Tool.Oval,
@@ -5125,7 +5126,7 @@ public partial class GardenPlot
             buildingPolygon = false;
         }
 
-        if (t != Tool.Polyline && buildingPolygon && drafting?.Kind == ShapeKind.FreeDraw && !IsGroundCoverShape(drafting))
+        if (t != Tool.Polyline && t != Tool.Polygon && buildingPolygon && drafting?.Kind == ShapeKind.FreeDraw && !IsGroundCoverShape(drafting))
         {
             drafting = null;
             buildingPolygon = false;
@@ -7798,6 +7799,29 @@ public partial class GardenPlot
                 if (drafting is null || drafting.Kind != ShapeKind.FreeDraw || !buildingPolygon)
                 {
                     drafting = new Shape { Kind = ShapeKind.FreeDraw };
+                    drafting.Points.Add(new Point(x, y));
+                    drafting.Points.Add(new Point(x, y));
+                    buildingPolygon = true;
+                }
+                else
+                {
+                    drafting.Points[^1] = new Point(x, y);
+                    drafting.Points.Add(new Point(x, y));
+                }
+                break;
+            case Tool.Polygon:
+                // Click-by-vertex CLOSED path. Identical input flow to Polyline (first click
+                // seeds the start + trailing cursor tracker, subsequent clicks commit + extend,
+                // double-click finalizes via OnCanvasDoubleClick) but the committed shape gets
+                // CloseEdge=true so the renderer draws it as a filled polygon and IsFillableAreaShape
+                // accepts it for "Fill with plants". See issue #120 for the rationale on reusing
+                // FreeDraw+CloseEdge rather than introducing a new ShapeKind: the existing closed-
+                // path semantics on Shape (already used by Edge with CloseEdge) cover every
+                // downstream consumer (area math, rotation, hit testing) without a 169-call-site
+                // ShapeKind audit.
+                if (drafting is null || drafting.Kind != ShapeKind.FreeDraw || !buildingPolygon)
+                {
+                    drafting = new Shape { Kind = ShapeKind.FreeDraw, CloseEdge = true };
                     drafting.Points.Add(new Point(x, y));
                     drafting.Points.Add(new Point(x, y));
                     buildingPolygon = true;
