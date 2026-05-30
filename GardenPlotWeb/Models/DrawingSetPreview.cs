@@ -17,6 +17,87 @@ public static class DrawingSetPreview
     public const double PreviewPathLengthFt = 20.0;
 
     /// <summary>
+    /// Classifies a row's visual style for the preview. Stripe rows (GroundCover,
+    /// GroundCoverSurface, Edging) tile continuously along the path; Stamp rows
+    /// (Plant, Tree, Bush, BedKit, FocalPoint, SoilMarker, CustomTile) are discrete
+    /// copies placed at <c>width + gap</c> stride.
+    /// </summary>
+    public enum RowVisualKind
+    {
+        /// <summary>Continuous ribbon spanning the path length (ground cover, edging).</summary>
+        Stripe,
+
+        /// <summary>Discrete copies placed at intervals along the path (plants, trees, etc.).</summary>
+        Stamp,
+    }
+
+    /// <summary>Returns the preview visual classification for a row given its palette kind.</summary>
+    public static RowVisualKind VisualKindFor(PaletteKind kind)
+    {
+        return kind switch
+        {
+            PaletteKind.GroundCover => RowVisualKind.Stripe,
+            PaletteKind.GroundCoverSurface => RowVisualKind.Stripe,
+            PaletteKind.Edging => RowVisualKind.Stripe,
+            PaletteKind.Plant => RowVisualKind.Stamp,
+            PaletteKind.Tree => RowVisualKind.Stamp,
+            PaletteKind.Bush => RowVisualKind.Stamp,
+            PaletteKind.BedKit => RowVisualKind.Stamp,
+            PaletteKind.FocalPoint => RowVisualKind.Stamp,
+            PaletteKind.SoilMarker => RowVisualKind.Stamp,
+            PaletteKind.CustomTile => RowVisualKind.Stamp,
+            _ => RowVisualKind.Stamp,
+        };
+    }
+
+    /// <summary>
+    /// Computes the centres (along-path positions in feet) of stamp copies for a row,
+    /// given the path length, effective stamp width, gap, and phase. Stamps are placed
+    /// at stride = <paramref name="widthFt"/> + <paramref name="gapFt"/>, starting at
+    /// <paramref name="phaseFt"/>, and clipped so each stamp's footprint fits within
+    /// [0, <paramref name="pathLengthFt"/>].
+    /// </summary>
+    /// <param name="pathLengthFt">Total path length in feet.</param>
+    /// <param name="widthFt">Effective stamp footprint along the path in feet (must be &gt; 0).</param>
+    /// <param name="gapFt">Spacing between stamps in feet (negative gaps overlap; the slide-forward apply rule normally trims those at apply time but the preview just shows the literal stride).</param>
+    /// <param name="phaseFt">Distance from path start to the first stamp's centre.</param>
+    /// <returns>List of stamp centre positions in feet; never null.</returns>
+    public static IReadOnlyList<double> StampCentres(double pathLengthFt, double widthFt, double gapFt, double phaseFt)
+    {
+        var centres = new List<double>();
+        if (widthFt <= 0 || pathLengthFt <= 0)
+        {
+            return centres;
+        }
+
+        double stride = widthFt + gapFt;
+        if (stride <= 0)
+        {
+            // Defensive cap so the preview doesn't loop forever on overlapping rows.
+            stride = widthFt;
+        }
+
+        double half = widthFt / 2.0;
+        double centre = phaseFt + half;
+        const int safetyMax = 200; // preview cap; real apply pipeline handles unbounded counts
+        int safety = 0;
+        // Right edge of stamp = centre + half. Include stamps whose right edge fits in
+        // [0, pathLengthFt]; an epsilon makes the boundary case inclusive.
+        const double eps = 1e-9;
+        while (centre + half <= pathLengthFt + eps && safety++ < safetyMax)
+        {
+            if (centre - half >= -eps)
+            {
+                centres.Add(centre);
+            }
+
+            centre += stride;
+        }
+
+        return centres;
+    }
+
+    /// <summary>
     /// Computes the y-axis extent (min, max) in feet of the preview, given the rows'
     /// offset/width pairs and a small padding. Used to scale the SVG viewBox.
     /// </summary>

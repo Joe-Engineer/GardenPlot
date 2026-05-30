@@ -165,4 +165,69 @@ public sealed class DrawingSetTests
         Assert.Null(PaletteCatalog.FindByCode(string.Empty));
         Assert.Null(PaletteCatalog.FindByCode(null));
     }
+
+    [Theory]
+    [InlineData(PaletteKind.GroundCover, DrawingSetPreview.RowVisualKind.Stripe)]
+    [InlineData(PaletteKind.GroundCoverSurface, DrawingSetPreview.RowVisualKind.Stripe)]
+    [InlineData(PaletteKind.Edging, DrawingSetPreview.RowVisualKind.Stripe)]
+    [InlineData(PaletteKind.Plant, DrawingSetPreview.RowVisualKind.Stamp)]
+    [InlineData(PaletteKind.Tree, DrawingSetPreview.RowVisualKind.Stamp)]
+    [InlineData(PaletteKind.Bush, DrawingSetPreview.RowVisualKind.Stamp)]
+    [InlineData(PaletteKind.BedKit, DrawingSetPreview.RowVisualKind.Stamp)]
+    [InlineData(PaletteKind.FocalPoint, DrawingSetPreview.RowVisualKind.Stamp)]
+    [InlineData(PaletteKind.SoilMarker, DrawingSetPreview.RowVisualKind.Stamp)]
+    [InlineData(PaletteKind.CustomTile, DrawingSetPreview.RowVisualKind.Stamp)]
+    public void VisualKindFor_StripeKindsAreContinuous_StampKindsAreDiscrete(PaletteKind kind, DrawingSetPreview.RowVisualKind expected)
+    {
+        Assert.Equal(expected, DrawingSetPreview.VisualKindFor(kind));
+    }
+
+    [Fact]
+    public void StampCentres_Plants_PlacedAtStride_FromPhase()
+    {
+        // 20 ft path, 1 ft wide plant, 0 ft gap, phase 0 -> stride=1, first centre 0.5,
+        // last centre <= 20-0.5 = 19.5. Expect 20 centres at 0.5, 1.5, 2.5, ..., 19.5.
+        IReadOnlyList<double> centres = DrawingSetPreview.StampCentres(20.0, 1.0, 0.0, 0.0);
+
+        Assert.Equal(20, centres.Count);
+        Assert.Equal(0.5, centres[0], 6);
+        Assert.Equal(19.5, centres[^1], 6);
+    }
+
+    [Fact]
+    public void StampCentres_WithGap_IncreasesStride()
+    {
+        // width 1.0 + gap 1.0 = stride 2.0. First centre at phase+half=0.5. 20/2 = 10 centres.
+        IReadOnlyList<double> centres = DrawingSetPreview.StampCentres(20.0, 1.0, 1.0, 0.0);
+
+        Assert.Equal(10, centres.Count);
+        Assert.Equal(0.5, centres[0], 6);
+        Assert.Equal(2.5, centres[1], 6);
+    }
+
+    [Fact]
+    public void StampCentres_WithPhase_OffsetsFirstCentre()
+    {
+        // phase 3 -> first centre at 3 + 0.5 = 3.5; nothing before that.
+        IReadOnlyList<double> centres = DrawingSetPreview.StampCentres(20.0, 1.0, 0.0, 3.0);
+
+        Assert.Equal(3.5, centres[0], 6);
+        Assert.DoesNotContain(centres, c => c < 3.0);
+    }
+
+    [Fact]
+    public void StampCentres_ZeroWidth_ReturnsEmpty()
+    {
+        Assert.Empty(DrawingSetPreview.StampCentres(20.0, 0.0, 0.0, 0.0));
+    }
+
+    [Fact]
+    public void StampCentres_OverlappingStride_DoesNotLoopForever()
+    {
+        // width 1, gap -2 -> stride would be -1 (overlapping). Helper should cap at width.
+        IReadOnlyList<double> centres = DrawingSetPreview.StampCentres(20.0, 1.0, -2.0, 0.0);
+
+        Assert.NotEmpty(centres);
+        Assert.True(centres.Count <= 200, "preview should cap to safetyMax even for overlapping rows");
+    }
 }
