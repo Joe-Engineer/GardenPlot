@@ -569,6 +569,31 @@ public partial class GardenPlot
         SelectionAddRange(ordered);
     }
 
+    /// <summary>
+    /// Deletion-time expansion rule: if a fillable area is in the selection, also
+    /// pull in its child plants (otherwise they would dangle pointing at a deleted
+    /// parent). Selecting only the child plants does NOT pull in the parent area,
+    /// so the user can prune plants without losing the rectangle that holds them.
+    /// See <see cref="FilledAreaSelectionRules.ExpandForDeletion"/> for the rule
+    /// in its testable form, and issue #122 for the bug this asymmetry fixes.
+    /// </summary>
+    private void ExpandSelectionToFilledAreaChildren()
+    {
+        if (currentPlot is null || selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        var expanded = FilledAreaSelectionRules.ExpandForDeletion(currentPlot.Shapes, selectedIds);
+        if (expanded.Count == selectedIds.Count)
+        {
+            return;
+        }
+
+        SelectionClear();
+        SelectionAddRange(expanded);
+    }
+
     private List<Guid> OrderedFilledAreaRegionSelection(Guid clickedId)
     {
         var regionIds = GetFilledAreaRegionIds(clickedId);
@@ -6341,7 +6366,7 @@ public partial class GardenPlot
     private async Task DeleteSelected()
     {
         if (currentPlot is null || selectedIds.Count == 0) return;
-        ExpandSelectionToFilledAreas();
+        ExpandSelectionToFilledAreaChildren();
         RecordUndoState();
         var ids = selectedIds.ToHashSet();
         currentPlot.Shapes.RemoveAll(s => ids.Contains(s.Id));
@@ -6448,71 +6473,10 @@ public partial class GardenPlot
     }
 
     private static Shape CloneShape(Shape source, bool assignNewId)
-    {
-        return new Shape
-        {
-            Id = assignNewId ? Guid.NewGuid() : source.Id,
-            Kind = source.Kind,
-            X = source.X,
-            Y = source.Y,
-            W = source.W,
-            H = source.H,
-            Rotation = source.Rotation,
-            Points = source.Points.Select(p => new Point(p.X, p.Y)).ToList(),
-            ClippedBy = assignNewId ? new List<Guid>() : source.ClippedBy.Distinct().ToList(),
-            Label = source.Label,
-            FilledAreaShapeId = source.FilledAreaShapeId,
-            Trait = source.Trait,
-            Stroke = source.Stroke,
-            Fill = source.Fill,
-            FillOpacity = source.FillOpacity,
-            FontScale = source.FontScale,
-            GroupId = assignNewId ? null : source.GroupId,
-            GroupIndex = assignNewId ? null : source.GroupIndex,
-            TileBackgroundImageFileName = source.TileBackgroundImageFileName,
-            GroundCoverCode = source.GroundCoverCode,
-            GroundCoverDepthIn = source.GroundCoverDepthIn,
-            IsGroundCoverSurface = source.IsGroundCoverSurface,
-            TextureKey = source.TextureKey,
-            TextureImageId = source.TextureImageId,
-            Readings = source.Readings.Select(r => new SoilReading
-            {
-                TakenOnUtc = r.TakenOnUtc,
-                PhValue = r.PhValue,
-                SalinityEcDsm = r.SalinityEcDsm,
-                OrganicMatterPct = r.OrganicMatterPct,
-                NitrogenPpm = r.NitrogenPpm,
-                PhosphorusPpm = r.PhosphorusPpm,
-                PotassiumPpm = r.PotassiumPpm,
-                DrainageNotes = r.DrainageNotes,
-                GeneralNotes = r.GeneralNotes,
-                LabSource = r.LabSource,
-            }).ToList(),
-        };
-    }
+        => source.DeepClone(assignNewId);
 
     private static DropGroup CloneDropGroup(DropGroup source)
-    {
-        return new DropGroup
-        {
-            Id = source.Id,
-            Pattern = source.Pattern,
-            ItemCount = source.ItemCount,
-            Rows = source.Rows,
-            CenterSpacingXFt = source.CenterSpacingXFt,
-            CenterSpacingYFt = source.CenterSpacingYFt,
-            StaggerHalf = source.StaggerHalf,
-            Rotation = source.Rotation,
-            AnchorCenterX = source.AnchorCenterX,
-            AnchorCenterY = source.AnchorCenterY,
-            AutoShiftOnRotate = source.AutoShiftOnRotate,
-            SourcePathShapeId = source.SourcePathShapeId,
-            SpacingFtOverride = source.SpacingFtOverride,
-            OffsetIn = source.OffsetIn,
-            Anchor = source.Anchor,
-            AlignToTangent = source.AlignToTangent,
-        };
-    }
+        => source.DeepClone();
 
     private void CleanupOrphanDropGroups()
     {

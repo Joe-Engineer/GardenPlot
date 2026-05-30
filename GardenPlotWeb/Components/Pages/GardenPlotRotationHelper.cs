@@ -212,7 +212,9 @@ public sealed class PlotUndoSnapshot
     public static PlotUndoSnapshot Capture(PlotData plot)
     {
         ArgumentNullException.ThrowIfNull(plot);
-        return new PlotUndoSnapshot(plot.Shapes.Select(CloneShape).ToList(), plot.DropGroups.Select(CloneDropGroup).ToList());
+        return new PlotUndoSnapshot(
+            plot.Shapes.Select(shape => shape.DeepClone()).ToList(),
+            plot.DropGroups.Select(group => group.DeepClone()).ToList());
     }
 
     /// <summary>
@@ -222,59 +224,11 @@ public sealed class PlotUndoSnapshot
     public void RestoreInto(PlotData plot)
     {
         ArgumentNullException.ThrowIfNull(plot);
-        plot.Shapes = this.shapes.Select(CloneShape).ToList();
-        plot.DropGroups = this.dropGroups.Select(CloneDropGroup).ToList();
-    }
 
-    private static Shape CloneShape(Shape source)
-    {
-        return new Shape
-        {
-            Id = source.Id,
-            Kind = source.Kind,
-            X = source.X,
-            Y = source.Y,
-            W = source.W,
-            H = source.H,
-            Rotation = source.Rotation,
-            Points = source.Points.Select(point => new Point(point.X, point.Y)).ToList(),
-            Label = source.Label,
-            Trait = source.Trait,
-            Stroke = source.Stroke,
-            Fill = source.Fill,
-            FillOpacity = source.FillOpacity,
-            FontScale = source.FontScale,
-            GroupId = source.GroupId,
-            GroupIndex = source.GroupIndex,
-            TileBackgroundImageFileName = source.TileBackgroundImageFileName,
-            GroundCoverCode = source.GroundCoverCode,
-            GroundCoverDepthIn = source.GroundCoverDepthIn,
-            IsGroundCoverSurface = source.IsGroundCoverSurface,
-            TextureKey = source.TextureKey,
-            TextureImageId = source.TextureImageId,
-        };
-    }
-
-    private static DropGroup CloneDropGroup(DropGroup source)
-    {
-        return new DropGroup
-        {
-            Id = source.Id,
-            Pattern = source.Pattern,
-            ItemCount = source.ItemCount,
-            Rows = source.Rows,
-            CenterSpacingXFt = source.CenterSpacingXFt,
-            CenterSpacingYFt = source.CenterSpacingYFt,
-            Triangulated = source.Triangulated,
-            Rotation = source.Rotation,
-            AnchorCenterX = source.AnchorCenterX,
-            AnchorCenterY = source.AnchorCenterY,
-            AutoShiftOnRotate = source.AutoShiftOnRotate,
-            SourcePathShapeId = source.SourcePathShapeId,
-            SpacingFtOverride = source.SpacingFtOverride,
-            OffsetIn = source.OffsetIn,
-            Anchor = source.Anchor,
-            AlignToTangent = source.AlignToTangent,
-        };
+        // Deep-clone on restore too so subsequent edits to the plot do not mutate
+        // the captured snapshot. The same snapshot may be peeked / restored again
+        // by future undo logic, so the captured shapes must remain immutable.
+        plot.Shapes = this.shapes.Select(shape => shape.DeepClone()).ToList();
+        plot.DropGroups = this.dropGroups.Select(group => group.DeepClone()).ToList();
     }
 }
