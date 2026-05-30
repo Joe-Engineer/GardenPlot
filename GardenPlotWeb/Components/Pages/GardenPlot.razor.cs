@@ -3189,6 +3189,9 @@ public partial class GardenPlot
         // Issue #131 — tangent-snap hotkey. Same persistence concern as the #130 fields:
         // forgetting to clone strips the binding on the next Save.
         ToggleTangentSnap = source.ToggleTangentSnap,
+
+        // Issue #134 — Merge Selected hotkey. Same defensive clone discipline.
+        MergeSelected = source.MergeSelected,
     };
 
     private KeyBindingSettings KeyBindings => library.Ui.KeyBindings ??= new KeyBindingSettings();
@@ -10088,6 +10091,155 @@ public partial class GardenPlot
     }
 
     /// <summary>
+    /// Issue #134 — predicate gating the "Merge" toolbar button. At least two of the
+    /// selected shapes must be area-capable (so the boolean union has something to
+    /// chew on). Open paths, points, rulers, etc. are skipped silently by the merge
+    /// helper but the button stays disabled until two valid candidates are picked.
+    /// </summary>
+    private bool CanMergeSelectedShapes
+    {
+        get
+        {
+            if (currentPlot is null || selectedIds.Count < 2)
+            {
+                return false;
+            }
+
+            int areaCount = SelectedShapes().Count(GroundCoverMath.IsAreaShape);
+            return areaCount >= 2;
+        }
+    }
+
+    // Issue #134 — material conflict dialog state. When MergeSelectedShapes detects that
+    // the selection mixes materials (different MaterialCode / GroundCoverCode / trait+fill
+    // composite), the actual merge is deferred until the user picks a representative shape
+    // whose style/material the merged result should adopt.
+    private bool showMergeMaterialDialog;
+    private List<Shape>? pendingMergeSources;
+    private List<Shape>? pendingMergeMaterialOptions;
+
+    /// <summary>
+    /// Issue #134 — runs the boolean-union pipeline on the current selection. Source
+    /// shapes are removed; the resulting outer ring(s) are added as new closed
+    /// FreeDraw polygons carrying material / fill from the chosen source. The new
+    /// shape(s) are selected so the user can immediately apply further commands.
+    /// </summary>
+    /// <remarks>
+    /// When the selection mixes materials, the actual union is deferred — the conflict
+    /// dialog opens with one button per distinct material and the user picks which one
+    /// the merged result should inherit. Defensive try/catch around the NTS pipeline
+    /// keeps the canvas alive even when the buffer-recovery in PolygonClipping.Union
+    /// can't sanitize a particularly pathological input.
+    /// </remarks>
+    private async Task MergeSelectedShapes()
+    {
+        if (!CanMergeSelectedShapes || currentPlot is null)
+        {
+            return;
+        }
+
+        // Snapshot the targets BEFORE undo — RecordUndoState may rebuild collection refs.
+        var targets = SelectedShapes()
+            .Where(GroundCoverMath.IsAreaShape)
+            .ToList();
+        if (targets.Count < 2)
+        {
+            return;
+        }
+
+        // Issue #134 — material conflict detection. One representative per distinct
+        // MaterialKey; if more than one distinct material is present, defer the actual
+        // merge until the user picks which material the result should inherit.
+        var materialOptions = targets
+            .GroupBy(PolygonMergeUtility.MaterialKey)
+            .Select(g => g.First())
+            .ToList();
+        if (materialOptions.Count > 1)
+        {
+            pendingMergeSources = targets;
+            pendingMergeMaterialOptions = materialOptions;
+            showMergeMaterialDialog = true;
+            return;
+        }
+
+        await ExecuteMerge(targets, styleCarrier: targets[0]);
+    }
+
+    /// <summary>
+    /// Issue #134 — commits a merge with the user's chosen style carrier (from the
+    /// material-conflict dialog).
+    /// </summary>
+    /// <param name="chosen">The shape whose Fill / Stroke / MaterialCode / DepthIn / Texture the merged result should adopt.</param>
+    private async Task PickMergeMaterial(Shape chosen)
+    {
+        var sources = pendingMergeSources;
+        showMergeMaterialDialog = false;
+        pendingMergeSources = null;
+        pendingMergeMaterialOptions = null;
+
+        if (sources is null || sources.Count < 2)
+        {
+            return;
+        }
+
+        await ExecuteMerge(sources, chosen);
+    }
+
+    /// <summary>Closes the material-conflict dialog without performing the merge.</summary>
+    private void CancelMergeMaterialDialog()
+    {
+        showMergeMaterialDialog = false;
+        pendingMergeSources = null;
+        pendingMergeMaterialOptions = null;
+    }
+
+    private async Task ExecuteMerge(List<Shape> sources, Shape styleCarrier)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        IReadOnlyList<Shape> merged;
+        try
+        {
+            merged = PolygonMergeUtility.MergeShapes(sources, styleCarrier);
+        }
+        catch (Exception ex)
+        {
+            // NetTopologySuite or downstream math threw despite the Buffer(0) recovery.
+            // Surface to the browser console so the user can report it, but keep the
+            // canvas alive — losing the selection state would be worse than no-op.
+            Console.Error.WriteLine($"[#134] MergeShapes failed: {ex.GetType().Name}: {ex.Message}");
+            return;
+        }
+
+        if (merged.Count == 0)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        foreach (Shape source in sources)
+        {
+            currentPlot.Shapes.Remove(source);
+        }
+
+        foreach (Shape result in merged)
+        {
+            currentPlot.Shapes.Add(result);
+        }
+
+        SelectionClear();
+        foreach (Shape result in merged)
+        {
+            SelectionAdd(result.Id);
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>
     /// Issue #132 — opens the Path → Ribbon dialog, pre-filling width / alignment /
     /// end-cap from the user's last persisted choices.
     /// </summary>
@@ -10624,6 +10776,12 @@ public partial class GardenPlot
         else if (IsBindingMatch(e, kb.MirrorVertical))
         {
             await MirrorSelected(horizontal: false);
+        }
+        else if (IsBindingMatch(e, kb.MergeSelected))
+        {
+            // Issue #134 — boolean-union of 2+ selected closed polygons. No-ops when
+            // the selection has fewer than two area shapes.
+            await MergeSelectedShapes();
         }
         else if (IsBindingMatch(e, kb.Escape))
         {

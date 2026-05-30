@@ -209,6 +209,67 @@ public static class EdgeArcGeometry
     }
 
     /// <summary>
+    /// Issue #134 — samples points along an edge (line OR arc) at <paramref name="segmentsPerArc"/>
+    /// equal angular increments. For line edges (bulge near zero) returns exactly
+    /// <c>[start, end]</c>; for arcs returns <c>segmentsPerArc + 1</c> points. Used by the
+    /// boolean-union pipeline to tessellate arc-sided polygons into polylines before NTS
+    /// performs the overlay (NTS doesn't know about bulges).
+    /// </summary>
+    /// <param name="start">Edge start vertex.</param>
+    /// <param name="end">Edge end vertex.</param>
+    /// <param name="bulge">Edge bulge value.</param>
+    /// <param name="segmentsPerArc">How many chord segments the arc is split into. Must be at least 1.</param>
+    /// <returns>The sampled points, including both endpoints.</returns>
+    public static IEnumerable<Point> SampleArcPoints(Point start, Point end, double bulge, int segmentsPerArc)
+    {
+        if (segmentsPerArc < 1)
+        {
+            segmentsPerArc = 1;
+        }
+
+        yield return start;
+        if (Math.Abs(bulge) < LineThreshold)
+        {
+            yield return end;
+            yield break;
+        }
+
+        double dx = end.X - start.X;
+        double dy = end.Y - start.Y;
+        double chord = Math.Sqrt((dx * dx) + (dy * dy));
+        if (chord < GeometryEpsilon)
+        {
+            yield return end;
+            yield break;
+        }
+
+        double absB = Math.Abs(bulge);
+        double radius = chord * (1.0 + (absB * absB)) / (4.0 * absB);
+        double theta = 4.0 * Math.Atan(absB);
+        double signedTheta = Math.Sign(bulge) * theta;
+
+        // Arc center: on the side of the chord opposite to where the arc bows. Distance
+        // from chord midpoint = radius - sagitta = radius - |bulge| * chord / 2.
+        double mx = (start.X + end.X) / 2.0;
+        double my = (start.Y + end.Y) / 2.0;
+        double dCenter = radius - (absB * chord / 2.0);
+        double centerX = mx + (Math.Sign(bulge) * dCenter * (-dy / chord));
+        double centerY = my + (Math.Sign(bulge) * dCenter * (dx / chord));
+
+        double thetaStart = Math.Atan2(start.Y - centerY, start.X - centerX);
+        for (int i = 1; i < segmentsPerArc; i++)
+        {
+            double t = (double)i / segmentsPerArc;
+            double thetaAt = thetaStart + (signedTheta * t);
+            double px = centerX + (radius * Math.Cos(thetaAt));
+            double py = centerY + (radius * Math.Sin(thetaAt));
+            yield return new Point(px, py);
+        }
+
+        yield return end;
+    }
+
+    /// <summary>
     /// Issue #131 — outgoing tangent (unit vector) at the END of an edge. For a line edge
     /// this is the chord direction; for an arc it is the chord direction rotated by half
     /// the included angle in the bulge's handedness. Returns <see langword="null"/> when

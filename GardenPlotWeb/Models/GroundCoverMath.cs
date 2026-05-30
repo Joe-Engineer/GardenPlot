@@ -201,6 +201,48 @@ public static class GroundCoverMath
         return areaFt2 * depthIn / 324.0;
     }
 
+    /// <summary>
+    /// Issue #134 — arc-aware variant of <see cref="ToPolygon"/>. For FreeDraw shapes that
+    /// carry per-edge bulges, samples each arc edge into <paramref name="segmentsPerArc"/>
+    /// chord segments before assembling the polygon. Non-arc shapes (Rectangle, Oval, etc.)
+    /// and line-only FreeDraw delegate to <see cref="ToPolygon"/> unchanged. Used by the
+    /// polygon-union pipeline so NTS sees a polyline that approximates the arc curve.
+    /// </summary>
+    /// <param name="shape">The shape whose outline to sample.</param>
+    /// <param name="segmentsPerArc">Chord-segment count per arc edge. Higher = smoother result but more vertices.</param>
+    /// <returns>The (possibly rotated) polygon outline with arcs tessellated.</returns>
+    public static IReadOnlyList<Point> ToPolygonArcAware(Shape shape, int segmentsPerArc = 24)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        if (shape.Kind != ShapeKind.FreeDraw || !ArcPolygonPathBuilder.HasAnyArc(shape.EdgeBulges))
+        {
+            return ToPolygon(shape);
+        }
+
+        List<Point> sampled = new();
+        int n = shape.Points.Count;
+        for (int i = 0; i < n; i++)
+        {
+            Point a = shape.Points[i];
+            Point b = shape.Points[(i + 1) % n];
+            double bulge = i < shape.EdgeBulges!.Count ? shape.EdgeBulges[i] : 0;
+
+            // Include all sampled points EXCEPT the trailing endpoint — that's the start
+            // of the next edge and would otherwise be duplicated.
+            int included = 0;
+            int totalSamples = Math.Abs(bulge) < EdgeArcGeometry.LineThreshold ? 2 : segmentsPerArc + 1;
+            foreach (Point p in EdgeArcGeometry.SampleArcPoints(a, b, bulge, segmentsPerArc))
+            {
+                if (included++ < totalSamples - 1)
+                {
+                    sampled.Add(p);
+                }
+            }
+        }
+
+        return ApplyShapeRotation(shape, sampled);
+    }
+
     internal static List<Point> NormalizePolygon(IEnumerable<Point>? points)
     {
         if (points is null)

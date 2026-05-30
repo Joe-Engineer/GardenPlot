@@ -277,6 +277,14 @@ else
                         title="Offset the selected open path into a closed ribbon polygon of a given width (pathway, walkway, garden border).">
                     Path → Ribbon
                 </button>
+                @* Issue #134 — Merge / boolean-union of selected closed polygons.
+                   Disabled unless 2 or more area shapes (Rectangle, Oval, BedKit, closed
+                   FreeDraw) are selected. *@
+                <button class="btn btn-sm btn-outline-secondary" @onclick="MergeSelectedShapes"
+                        disabled="@(!CanMergeSelectedShapes)"
+                        title="Merge the selected polygons into a single combined shape (boolean union). Touching shapes become one outline; overlapping shapes lose their shared interior. Arc edges are tessellated to polylines in the result.">
+                    Merge
+                </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="PlaceSelectedItemAlongPath" disabled="@(!CanPlaceAlongPath)" title="Place copies of the selected palette stamp (plant, tree, etc.) evenly along a selected path. Path can be a Polyline, Free Draw, Edge, Rectangle perimeter, or Oval perimeter. Pick a stamp item or a Drawing Set from the palette.">
                     Along path
                 </button>
@@ -616,6 +624,7 @@ else
                         <label title="Issue #130 — mirror selected shapes horizontally; arc bulges flip.">Mirror horizontal</label><input class="form-control form-control-sm" @bind="kb.MirrorHorizontal" />
                         <label title="Issue #130 — mirror selected shapes vertically; arc bulges flip.">Mirror vertical</label><input class="form-control form-control-sm" @bind="kb.MirrorVertical" />
                         <label title="Issue #131 — toggles tangent-snap mode while drawing. Locks the next terminus to the tangent line of the previous segment.">Toggle tangent snap</label><input class="form-control form-control-sm" @bind="kb.ToggleTangentSnap" />
+                        <label title="Issue #134 — merges 2+ selected closed polygons into a single boolean-union shape.">Merge selected</label><input class="form-control form-control-sm" @bind="kb.MergeSelected" />
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -676,6 +685,53 @@ else
                 <div class="modal-footer">
                     <button class="btn btn-sm btn-outline-secondary" @onclick="CloseRibbonDialog">Cancel</button>
                     <button class="btn btn-sm btn-primary" @onclick="ApplyRibbon" disabled="@(preview is null)">Create ribbon</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Issue #134 — material conflict dialog for the Merge command. Triggered when the
+   selection mixes materials; the user picks which material the merged result should
+   inherit. *@
+@if (showMergeMaterialDialog && pendingMergeMaterialOptions is { } mergeOptions)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Merge — pick the material</h5>
+                    <button type="button" class="btn-close" @onclick="CancelMergeMaterialDialog"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="x-small text-muted mb-2">The selected shapes use different materials. Pick which one the merged shape should inherit (fill, stroke, depth, texture all carry over).</div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var option in mergeOptions)
+                        {
+                            var label = !string.IsNullOrWhiteSpace(option.MaterialCode) ? option.MaterialCode
+                                      : !string.IsNullOrWhiteSpace(option.GroundCoverCode) ? option.GroundCoverCode
+                                      : !string.IsNullOrWhiteSpace(option.Trait) ? option.Trait
+                                      : "(unstyled)";
+                            var fill = option.Fill ?? "#8a8276";
+                            var stroke = option.Stroke ?? "#3f3a30";
+                            var depthHint = option.DepthIn ?? option.GroundCoverDepthIn;
+                            var captured = option;
+                            <button type="button" class="list-group-item list-group-item-action d-flex align-items-center gap-2"
+                                    @onclick="@(() => PickMergeMaterial(captured))">
+                                <span class="gc-swatch gc-swatch-sm" style="@($"background:{fill};border-color:{stroke};")"></span>
+                                <strong>@label</strong>
+                                @if (depthHint is double d)
+                                {
+                                    <span class="small text-muted">depth @F(d) in</span>
+                                }
+                                <span class="ms-auto small text-primary">Use this material →</span>
+                            </button>
+                        }
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="CancelMergeMaterialDialog">Cancel merge</button>
                 </div>
             </div>
         </div>
