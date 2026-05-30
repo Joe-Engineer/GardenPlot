@@ -10110,19 +10110,26 @@ public partial class GardenPlot
         }
     }
 
+    // Issue #134 — material conflict dialog state. When MergeSelectedShapes detects that
+    // the selection mixes materials (different MaterialCode / GroundCoverCode / trait+fill
+    // composite), the actual merge is deferred until the user picks a representative shape
+    // whose style/material the merged result should adopt.
+    private bool showMergeMaterialDialog;
+    private List<Shape>? pendingMergeSources;
+    private List<Shape>? pendingMergeMaterialOptions;
+
     /// <summary>
     /// Issue #134 — runs the boolean-union pipeline on the current selection. Source
     /// shapes are removed; the resulting outer ring(s) are added as new closed
-    /// FreeDraw polygons carrying material / fill from the first selected source. The
-    /// new shape(s) are selected so the user can immediately apply further commands.
+    /// FreeDraw polygons carrying material / fill from the chosen source. The new
+    /// shape(s) are selected so the user can immediately apply further commands.
     /// </summary>
     /// <remarks>
-    /// Defensive try/catch — if NTS still throws after the <c>Buffer(0)</c> recovery in
-    /// <see cref="PolygonClipping.Union"/>, we leave the selection unchanged and log the
-    /// reason rather than letting a NetTopologySuite exception bubble up to Blazor's
-    /// error boundary and unmount the canvas. Real-world pathological inputs (heavily
-    /// tessellated freehand ribbons with near-duplicate vertices) can defeat even the
-    /// sanitize pass; the user can re-try by simplifying or adjusting the inputs.
+    /// When the selection mixes materials, the actual union is deferred — the conflict
+    /// dialog opens with one button per distinct material and the user picks which one
+    /// the merged result should inherit. Defensive try/catch around the NTS pipeline
+    /// keeps the canvas alive even when the buffer-recovery in PolygonClipping.Union
+    /// can't sanitize a particularly pathological input.
     /// </remarks>
     private async Task MergeSelectedShapes()
     {
@@ -10140,10 +10147,63 @@ public partial class GardenPlot
             return;
         }
 
+        // Issue #134 — material conflict detection. One representative per distinct
+        // MaterialKey; if more than one distinct material is present, defer the actual
+        // merge until the user picks which material the result should inherit.
+        var materialOptions = targets
+            .GroupBy(PolygonMergeUtility.MaterialKey)
+            .Select(g => g.First())
+            .ToList();
+        if (materialOptions.Count > 1)
+        {
+            pendingMergeSources = targets;
+            pendingMergeMaterialOptions = materialOptions;
+            showMergeMaterialDialog = true;
+            return;
+        }
+
+        await ExecuteMerge(targets, styleCarrier: targets[0]);
+    }
+
+    /// <summary>
+    /// Issue #134 — commits a merge with the user's chosen style carrier (from the
+    /// material-conflict dialog).
+    /// </summary>
+    /// <param name="chosen">The shape whose Fill / Stroke / MaterialCode / DepthIn / Texture the merged result should adopt.</param>
+    private async Task PickMergeMaterial(Shape chosen)
+    {
+        var sources = pendingMergeSources;
+        showMergeMaterialDialog = false;
+        pendingMergeSources = null;
+        pendingMergeMaterialOptions = null;
+
+        if (sources is null || sources.Count < 2)
+        {
+            return;
+        }
+
+        await ExecuteMerge(sources, chosen);
+    }
+
+    /// <summary>Closes the material-conflict dialog without performing the merge.</summary>
+    private void CancelMergeMaterialDialog()
+    {
+        showMergeMaterialDialog = false;
+        pendingMergeSources = null;
+        pendingMergeMaterialOptions = null;
+    }
+
+    private async Task ExecuteMerge(List<Shape> sources, Shape styleCarrier)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
         IReadOnlyList<Shape> merged;
         try
         {
-            merged = PolygonMergeUtility.MergeShapes(targets);
+            merged = PolygonMergeUtility.MergeShapes(sources, styleCarrier);
         }
         catch (Exception ex)
         {
@@ -10160,7 +10220,7 @@ public partial class GardenPlot
         }
 
         RecordUndoState();
-        foreach (Shape source in targets)
+        foreach (Shape source in sources)
         {
             currentPlot.Shapes.Remove(source);
         }

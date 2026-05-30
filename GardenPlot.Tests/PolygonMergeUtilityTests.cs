@@ -156,4 +156,44 @@ public sealed class PolygonMergeUtilityTests
         // Overlap is 1x1 = 1 ft^2; union = 4 + 4 - 1 = 7.
         Assert.Equal(7.0, mergedArea, 5);
     }
+
+    [Fact]
+    public void MergeShapes_WithExplicitStyleCarrier_AdoptsThatStyleNotTheFirst()
+    {
+        Shape first = new()
+        {
+            Kind = ShapeKind.Rectangle, X = 0, Y = 0, W = 2, H = 2,
+            Fill = "#aaaaaa", MaterialCode = "Mulch", DepthIn = 2,
+        };
+        Shape second = new()
+        {
+            Kind = ShapeKind.Rectangle, X = 1, Y = 0, W = 2, H = 2,
+            Fill = "#cccccc", MaterialCode = "Pea Gravel", DepthIn = 3,
+        };
+
+        // Without an explicit carrier, the first shape's style wins.
+        var defaultMerge = PolygonMergeUtility.MergeShapes(new[] { first, second });
+        Assert.Equal("Mulch", defaultMerge[0].MaterialCode);
+
+        // With the second shape as explicit carrier, its style wins instead.
+        var pickedMerge = PolygonMergeUtility.MergeShapes(new[] { first, second }, styleCarrier: second);
+        Assert.Equal("Pea Gravel", pickedMerge[0].MaterialCode);
+        Assert.Equal("#cccccc", pickedMerge[0].Fill);
+        Assert.Equal(3.0, pickedMerge[0].DepthIn);
+    }
+
+    [Theory]
+    [InlineData("Pea Gravel", null, null, null, "code:Pea Gravel")]
+    [InlineData(null, "Mulch", null, null, "legacy:Mulch")]
+    [InlineData(null, null, "ground-cover", "#abc", "trait:ground-cover|fill:#abc")]
+    [InlineData(null, null, null, null, "trait:|fill:")]
+    public void MaterialKey_GroupsShapesAsExpected(string? materialCode, string? legacyCode, string? trait, string? fill, string expectedKey)
+    {
+        Shape s = new()
+        {
+            Kind = ShapeKind.Rectangle, W = 1, H = 1,
+            MaterialCode = materialCode, GroundCoverCode = legacyCode, Trait = trait ?? string.Empty, Fill = fill,
+        };
+        Assert.Equal(expectedKey, PolygonMergeUtility.MaterialKey(s));
+    }
 }

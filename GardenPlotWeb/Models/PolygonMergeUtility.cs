@@ -19,20 +19,22 @@ public static class PolygonMergeUtility
 
     /// <summary>
     /// Merges two or more shapes into one or more new shapes via boolean union. The
-    /// fill / stroke / opacity / material / depth / texture are inherited from the FIRST
-    /// non-null carrier in <paramref name="shapes"/> so disconnected result regions all
-    /// look like the same material.
+    /// fill / stroke / opacity / material / depth / texture are inherited from
+    /// <paramref name="styleCarrier"/> when supplied, or from the FIRST non-null area
+    /// shape in <paramref name="shapes"/> otherwise.
     /// </summary>
-    /// <param name="shapes">The source shapes to merge. Non-area shapes (those for which <see cref="GroundCoverMath.IsAreaShape"/> returns false) are skipped silently.</param>
+    /// <param name="shapes">The source shapes to merge. Non-area shapes are skipped silently.</param>
+    /// <param name="styleCarrier">When non-null, the merged shape(s) inherit style from this shape. Used by the page to honour the user's pick from the material-conflict dialog (issue #134).</param>
     /// <param name="segmentsPerArc">Chord-segment count per arc edge in the tessellation.</param>
-    /// <returns>One or more new <see cref="Shape"/> instances (FreeDraw, CloseEdge=true). Empty when no area shapes were supplied or the union was empty.</returns>
+    /// <returns>One or more new <see cref="Shape"/> instances (FreeDraw, CloseEdge=true).</returns>
     public static IReadOnlyList<Shape> MergeShapes(
         IReadOnlyList<Shape> shapes,
+        Shape? styleCarrier = null,
         int segmentsPerArc = DefaultSegmentsPerArc)
     {
         ArgumentNullException.ThrowIfNull(shapes);
         List<IReadOnlyList<Point>> polygons = new();
-        Shape? styleCarrier = null;
+        Shape? fallbackCarrier = null;
 
         foreach (Shape shape in shapes)
         {
@@ -48,10 +50,11 @@ public static class PolygonMergeUtility
             }
 
             polygons.Add(outline);
-            styleCarrier ??= shape;
+            fallbackCarrier ??= shape;
         }
 
-        if (polygons.Count == 0)
+        Shape? carrier = styleCarrier ?? fallbackCarrier;
+        if (polygons.Count == 0 || carrier is null)
         {
             return Array.Empty<Shape>();
         }
@@ -60,7 +63,7 @@ public static class PolygonMergeUtility
         {
             // Nothing to merge. Return a clone of the lone shape so the caller can swap
             // it into place without disturbing the original.
-            return new[] { CreateMergedShape(polygons[0], styleCarrier!) };
+            return new[] { CreateMergedShape(polygons[0], carrier) };
         }
 
         List<IReadOnlyList<Point>> unioned = PolygonClipping.Union(polygons);
@@ -77,10 +80,35 @@ public static class PolygonMergeUtility
                 continue;
             }
 
-            result.Add(CreateMergedShape(ring, styleCarrier!));
+            result.Add(CreateMergedShape(ring, carrier));
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Issue #134 — derives a material identity key from a shape so the page can detect
+    /// when a merge crosses material boundaries and prompt the user. Prefers the new
+    /// <see cref="Shape.MaterialCode"/> field; falls back to the legacy
+    /// <see cref="Shape.GroundCoverCode"/>; finally falls back to a trait+fill composite
+    /// so two unstyled shapes still compare equal.
+    /// </summary>
+    /// <param name="shape">The shape whose material identity is being queried.</param>
+    /// <returns>A stable string key. Equal-key shapes are considered the same material.</returns>
+    public static string MaterialKey(Shape shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        if (!string.IsNullOrWhiteSpace(shape.MaterialCode))
+        {
+            return $"code:{shape.MaterialCode}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(shape.GroundCoverCode))
+        {
+            return $"legacy:{shape.GroundCoverCode}";
+        }
+
+        return $"trait:{shape.Trait ?? string.Empty}|fill:{shape.Fill ?? string.Empty}";
     }
 
     private static Shape CreateMergedShape(IReadOnlyList<Point> ring, Shape styleCarrier)
