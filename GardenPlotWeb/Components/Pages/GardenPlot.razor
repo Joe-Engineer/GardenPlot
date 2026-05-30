@@ -1,4 +1,4 @@
-@page "/"
+﻿@page "/"
 @page "/plot"
 @implements IAsyncDisposable
 @using System.Diagnostics
@@ -181,6 +181,16 @@ else
 
             <div class="toolbar-group zoom-group">
                 <span class="small text-muted">Tool: <strong>@currentTool</strong></span>
+                @* Issue #130 — arc-mode badge. Visible only while drafting a polygon /
+                   polyline. Click toggles the mode (mirrors the A hotkey). *@
+                @if (drafting is not null && buildingPolygon && drafting.Kind == ShapeKind.FreeDraw)
+                {
+                    <button class="btn btn-sm @(arcModeArmed ? "btn-warning" : "btn-outline-secondary") ms-1"
+                            @onclick="ToggleArcMode"
+                            title="Toggle arc segments. When ON, each new side is an arc — click terminus, then apex.">
+                        @(arcModeArmed ? "\u25DC Arc on" : "Line")
+                    </button>
+                }
                 <span class="zoom-controls">
                     <button class="toolbar-icon-btn zoom-btn" @onclick="ZoomOut" title="Zoom out (−10%)" aria-label="Zoom out">
                         <svg viewBox="0 0 24 24"><path d="M6 12H18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="2" /><path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
@@ -225,6 +235,18 @@ else
                 </button>
                 <button class="toolbar-icon-btn" @onclick="UngroupSelectedItems" disabled="@(!CanUngroupSelection)" title="Ungroup selection" aria-label="Ungroup selection">
                     <svg viewBox="0 0 24 24"><rect x="4" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="14" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="9" y="13" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M10 10H14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /><path d="M12 12L12 12" stroke="currentColor" stroke-width="1.6" /></svg>
+                </button>
+                @* Issue #130 — Mirror Horizontal / Vertical commands. Negates arc bulges so curved-side
+                   pathway designs flip correctly. Disabled when no selection. *@
+                <button class="toolbar-icon-btn" @onclick="@(() => MirrorSelected(horizontal: true))"
+                        disabled="@(selectedIds.Count == 0)"
+                        title="Mirror selection horizontally (Shift+H)" aria-label="Mirror horizontal">
+                    <svg viewBox="0 0 24 24"><path d="M12 4V20" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2" /><path d="M4 8L10 8L10 16L4 16Z" fill="currentColor" fill-opacity="0.6" /><path d="M20 8L14 8L14 16L20 16Z" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
+                </button>
+                <button class="toolbar-icon-btn" @onclick="@(() => MirrorSelected(horizontal: false))"
+                        disabled="@(selectedIds.Count == 0)"
+                        title="Mirror selection vertically (Shift+V)" aria-label="Mirror vertical">
+                    <svg viewBox="0 0 24 24"><path d="M4 12H20" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2" /><path d="M8 4L8 10L16 10L16 4Z" fill="currentColor" fill-opacity="0.6" /><path d="M8 20L8 14L16 14L16 20Z" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="PlaceSelectedItemAlongPath" disabled="@(!CanPlaceAlongPath)" title="Place copies of the selected palette stamp (plant, tree, etc.) evenly along a selected path. Path can be a Polyline, Free Draw, Edge, Rectangle perimeter, or Oval perimeter. Pick a stamp item or a Drawing Set from the palette.">
                     Along path
@@ -512,6 +534,10 @@ else
 
                         <label>Group orientation CCW</label><input class="form-control form-control-sm" @bind="kb.RotateGroupOrientationCounterClockwise" />
                         <label>Group orientation CW</label><input class="form-control form-control-sm" @bind="kb.RotateGroupOrientationClockwise" />
+
+                        <label title="Issue #130 — toggles arc mode while drawing a polygon / polyline.">Toggle arc side</label><input class="form-control form-control-sm" @bind="kb.ToggleArcSegment" />
+                        <label title="Issue #130 — mirror selected shapes horizontally; arc bulges flip.">Mirror horizontal</label><input class="form-control form-control-sm" @bind="kb.MirrorHorizontal" />
+                        <label title="Issue #130 — mirror selected shapes vertically; arc bulges flip.">Mirror vertical</label><input class="form-control form-control-sm" @bind="kb.MirrorVertical" />
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1131,14 +1157,27 @@ else
                                      stroke-dasharray="0.2,0.1" pointer-events="none" />
                             break;
                         case ShapeKind.FreeDraw:
+                            bool hasArc = ArcPolygonPathBuilder.HasAnyArc(drafting.EdgeBulges);
+                            bool inApexPick = awaitingArcApex; // tracker is frozen at terminus; no candidate-next-vertex preview
+                            int handleEnd = inApexPick ? drafting.Points.Count : Math.Max(0, drafting.Points.Count - 1);
                             @if (buildingPolygon && IsGroundCoverShape(drafting))
                             {
-                                <polygon points="@PointsString(drafting.Points)"
-                                         fill="@(drafting.Fill ?? "rgba(74,124,89,0.25)")" fill-opacity="0.35"
-                                         stroke="@(drafting.Stroke ?? "#2f5a3a")" stroke-width="0.08"
-                                         stroke-dasharray="0.2,0.1" pointer-events="none" />
+                                @if (hasArc)
+                                {
+                                    <path d="@ArcPolygonPathBuilder.Build(drafting.Points, drafting.EdgeBulges, close: true)"
+                                          fill="@(drafting.Fill ?? "rgba(74,124,89,0.25)")" fill-opacity="0.35"
+                                          stroke="@(drafting.Stroke ?? "#2f5a3a")" stroke-width="0.08"
+                                          stroke-dasharray="0.2,0.1" pointer-events="none" />
+                                }
+                                else
+                                {
+                                    <polygon points="@PointsString(drafting.Points)"
+                                             fill="@(drafting.Fill ?? "rgba(74,124,89,0.25)")" fill-opacity="0.35"
+                                             stroke="@(drafting.Stroke ?? "#2f5a3a")" stroke-width="0.08"
+                                             stroke-dasharray="0.2,0.1" pointer-events="none" />
+                                }
                                 @* Issue #129: vertex handles are interactive — pointer-down starts a drag that repositions just that vertex. *@
-                                @for (int vi = 0; vi < drafting.Points.Count - 1; vi++)
+                                @for (int vi = 0; vi < handleEnd; vi++)
                                 {
                                     var localIndex = vi;
                                     var p = drafting.Points[vi];
@@ -1152,12 +1191,22 @@ else
                             else if (buildingPolygon && drafting.CloseEdge && drafting.Points.Count >= 4)
                             {
                                 @* Issue #120 closed Polygon draft: render as closed dashed polygon, with virtual edge from last committed vertex back to the first. *@
-                                <polygon points="@PointsString(drafting.Points)"
-                                         fill="rgba(74,124,89,0.20)" fill-opacity="0.35"
-                                         stroke="#2f5a3a" stroke-width="0.08"
-                                         stroke-dasharray="0.2,0.1" pointer-events="none" />
+                                @if (hasArc)
+                                {
+                                    <path d="@ArcPolygonPathBuilder.Build(drafting.Points, drafting.EdgeBulges, close: true)"
+                                          fill="rgba(74,124,89,0.20)" fill-opacity="0.35"
+                                          stroke="#2f5a3a" stroke-width="0.08"
+                                          stroke-dasharray="0.2,0.1" pointer-events="none" />
+                                }
+                                else
+                                {
+                                    <polygon points="@PointsString(drafting.Points)"
+                                             fill="rgba(74,124,89,0.20)" fill-opacity="0.35"
+                                             stroke="#2f5a3a" stroke-width="0.08"
+                                             stroke-dasharray="0.2,0.1" pointer-events="none" />
+                                }
                                 @* Issue #129 vertex handles. *@
-                                @for (int vi = 0; vi < drafting.Points.Count - 1; vi++)
+                                @for (int vi = 0; vi < handleEnd; vi++)
                                 {
                                     var localIndex = vi;
                                     var p = drafting.Points[vi];
@@ -1170,12 +1219,22 @@ else
                             }
                             else if (buildingPolygon)
                             {
-                                <polyline points="@PointsString(drafting.Points)"
+                                @if (hasArc)
+                                {
+                                    <path d="@ArcPolygonPathBuilder.Build(drafting.Points, drafting.EdgeBulges, close: false)"
                                           fill="none" stroke="#2f5a3a" stroke-width="0.08"
                                           stroke-linecap="round" stroke-linejoin="round"
                                           stroke-dasharray="0.2,0.1" pointer-events="none" />
+                                }
+                                else
+                                {
+                                    <polyline points="@PointsString(drafting.Points)"
+                                              fill="none" stroke="#2f5a3a" stroke-width="0.08"
+                                              stroke-linecap="round" stroke-linejoin="round"
+                                              stroke-dasharray="0.2,0.1" pointer-events="none" />
+                                }
                                 @* Issue #129 vertex handles. *@
-                                @for (int vi = 0; vi < Math.Max(0, drafting.Points.Count - 1); vi++)
+                                @for (int vi = 0; vi < handleEnd; vi++)
                                 {
                                     var localIndex = vi;
                                     var p = drafting.Points[vi];
@@ -1239,18 +1298,37 @@ else
                     @* Issue #129: while the user is in cursor-follow mode, show the
                        current-segment length as a small tag next to the cursor. The
                        running perimeter / area / vertex count live in the info panel
-                       (see the buildingPolygon branch in the panel below). *@
+                       (see the buildingPolygon branch in the panel below). Issue #130:
+                       suppress when picking an arc apex (the cursor isn't a candidate
+                       vertex) and instead show a "Pick apex" hint. *@
                     var hudFontFt = DraftPolygonHud.FontSizeFt(library.Ui.DraftHudFontSize);
-                    var segLenFt = Distance(drafting.Points[^2], drafting.Points[^1]);
-                    var segText = $"{segLenFt:0.##} ft";
-                    var tagX = cursorX + (hudFontFt * 0.5);
-                    var tagY = cursorY - (hudFontFt * 0.4);
-                    var tagWidth = segText.Length * hudFontFt * 0.55 + 0.15;
-                    <g pointer-events="none" class="draft-polygon-hud">
-                        <rect x="@F(tagX - 0.05)" y="@F(tagY - hudFontFt)" width="@F(tagWidth)" height="@F(hudFontFt * 1.25)"
-                              fill="rgba(255,255,255,0.85)" stroke="#2f5a3a" stroke-width="0.02" rx="0.06" />
-                        <svg:text x="@F(tagX)" y="@F(tagY)" font-size="@F(hudFontFt)" fill="#1f3d28" style="font-family: sans-serif;">@segText</svg:text>
-                    </g>
+                    if (awaitingArcApex)
+                    {
+                        var hintText = "Arc apex \u2014 click to set";
+                        var hintTagX = cursorX + (hudFontFt * 0.5);
+                        var hintTagY = cursorY - (hudFontFt * 0.4);
+                        var hintWidth = hintText.Length * hudFontFt * 0.55 + 0.15;
+                        <g pointer-events="none" class="draft-polygon-hud">
+                            <rect x="@F(hintTagX - 0.05)" y="@F(hintTagY - hudFontFt)" width="@F(hintWidth)" height="@F(hudFontFt * 1.25)"
+                                  fill="rgba(255,243,205,0.92)" stroke="#b58105" stroke-width="0.02" rx="0.06" />
+                            <svg:text x="@F(hintTagX)" y="@F(hintTagY)" font-size="@F(hudFontFt)" fill="#5a3a02" style="font-family: sans-serif;">@hintText</svg:text>
+                        </g>
+                    }
+                    else
+                    {
+                        var primary = $"{Distance(drafting.Points[^2], drafting.Points[^1]):0.##} ft";
+                        var segText = arcModeArmed && drafting.Kind == ShapeKind.FreeDraw
+                            ? $"Arc terminus \u2014 {primary}"
+                            : primary;
+                        var tagX = cursorX + (hudFontFt * 0.5);
+                        var tagY = cursorY - (hudFontFt * 0.4);
+                        var tagWidth = segText.Length * hudFontFt * 0.55 + 0.15;
+                        <g pointer-events="none" class="draft-polygon-hud">
+                            <rect x="@F(tagX - 0.05)" y="@F(tagY - hudFontFt)" width="@F(tagWidth)" height="@F(hudFontFt * 1.25)"
+                                  fill="@(arcModeArmed ? "rgba(255,243,205,0.92)" : "rgba(255,255,255,0.85)")" stroke="@(arcModeArmed ? "#b58105" : "#2f5a3a")" stroke-width="0.02" rx="0.06" />
+                            <svg:text x="@F(tagX)" y="@F(tagY)" font-size="@F(hudFontFt)" fill="@(arcModeArmed ? "#5a3a02" : "#1f3d28")" style="font-family: sans-serif;">@segText</svg:text>
+                        </g>
+                    }
                 }
                 @if (!IsConceptMode && snapPreview is { IsSnapped: true } snap && snap.Target is SnapCandidate snapTarget)
                 {

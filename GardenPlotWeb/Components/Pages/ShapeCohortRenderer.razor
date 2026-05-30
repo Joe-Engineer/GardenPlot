@@ -1,4 +1,4 @@
-@using GardenPlotWeb.Models
+﻿@using GardenPlotWeb.Models
 @using GardenPlotWeb.Services
 @namespace GardenPlotWeb.Components.Pages
 
@@ -64,35 +64,79 @@
                 @if (GardenPlot.IsGroundCoverShape(s))
                 {
                     var polyClipId = $"poly-clip-{s.Id:N}";
-                    <polygon class="@((!string.IsNullOrWhiteSpace(s.TextureKey) || !string.IsNullOrWhiteSpace(s.TextureImageId)) ? "ground-cover-textured" : string.Empty)" points="@GardenPlot.PointsString(s.Points)"
-                             fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
-                             stroke="@style.Stroke" stroke-width="0.08"
-                             stroke-linejoin="round" />
-                    @if (!string.IsNullOrWhiteSpace(s.TextureImageId))
+                    @if (ArcPolygonPathBuilder.HasAnyArc(s.EdgeBulges))
                     {
-                        <clipPath id="@polyClipId">
-                            <polygon points="@GardenPlot.PointsString(s.Points)" />
-                        </clipPath>
-                        <image href="@GardenPlot.TileImageUrl(s.TextureImageId!)"
-                               data-client-image-id="@GardenPlot.TileImageClientId(s.TextureImageId)"
-                               x="@GardenPlot.F(sb.x)" y="@GardenPlot.F(sb.y)" width="@GardenPlot.F(sb.w)" height="@GardenPlot.F(sb.h)"
-                               preserveAspectRatio="xMidYMid slice"
-                               clip-path="url(#@polyClipId)" />
+                        @* Issue #130: arc-sided ground cover area renders via <path d=...>. *@
+                        var arcD = ArcPolygonPathBuilder.Build(s.Points, s.EdgeBulges, close: true);
+                        <path class="@((!string.IsNullOrWhiteSpace(s.TextureKey) || !string.IsNullOrWhiteSpace(s.TextureImageId)) ? "ground-cover-textured" : string.Empty)"
+                              d="@arcD"
+                              fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
+                              stroke="@style.Stroke" stroke-width="0.08"
+                              stroke-linejoin="round" />
+                        @if (!string.IsNullOrWhiteSpace(s.TextureImageId))
+                        {
+                            <clipPath id="@polyClipId">
+                                <path d="@arcD" />
+                            </clipPath>
+                            <image href="@GardenPlot.TileImageUrl(s.TextureImageId!)"
+                                   data-client-image-id="@GardenPlot.TileImageClientId(s.TextureImageId)"
+                                   x="@GardenPlot.F(sb.x)" y="@GardenPlot.F(sb.y)" width="@GardenPlot.F(sb.w)" height="@GardenPlot.F(sb.h)"
+                                   preserveAspectRatio="xMidYMid slice"
+                                   clip-path="url(#@polyClipId)" />
+                        }
+                    }
+                    else
+                    {
+                        <polygon class="@((!string.IsNullOrWhiteSpace(s.TextureKey) || !string.IsNullOrWhiteSpace(s.TextureImageId)) ? "ground-cover-textured" : string.Empty)" points="@GardenPlot.PointsString(s.Points)"
+                                 fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
+                                 stroke="@style.Stroke" stroke-width="0.08"
+                                 stroke-linejoin="round" />
+                        @if (!string.IsNullOrWhiteSpace(s.TextureImageId))
+                        {
+                            <clipPath id="@polyClipId">
+                                <polygon points="@GardenPlot.PointsString(s.Points)" />
+                            </clipPath>
+                            <image href="@GardenPlot.TileImageUrl(s.TextureImageId!)"
+                                   data-client-image-id="@GardenPlot.TileImageClientId(s.TextureImageId)"
+                                   x="@GardenPlot.F(sb.x)" y="@GardenPlot.F(sb.y)" width="@GardenPlot.F(sb.w)" height="@GardenPlot.F(sb.h)"
+                                   preserveAspectRatio="xMidYMid slice"
+                                   clip-path="url(#@polyClipId)" />
+                        }
                     }
                 }
                 else if (s.CloseEdge && s.Points.Count >= 3)
                 {
                     @* Issue #120: closed Polygon tool — FreeDraw shape with CloseEdge=true renders as a filled polygon. *@
-                    <polygon points="@GardenPlot.PointsString(s.Points)"
-                             fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
-                             stroke="@style.Stroke" stroke-width="0.08"
-                             stroke-linejoin="round" />
+                    @* Issue #130: arc-sided polygons switch to <path d=...> when any edge has a non-zero bulge. *@
+                    @if (ArcPolygonPathBuilder.HasAnyArc(s.EdgeBulges))
+                    {
+                        <path d="@ArcPolygonPathBuilder.Build(s.Points, s.EdgeBulges, close: true)"
+                              fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
+                              stroke="@style.Stroke" stroke-width="0.08"
+                              stroke-linejoin="round" />
+                    }
+                    else
+                    {
+                        <polygon points="@GardenPlot.PointsString(s.Points)"
+                                 fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
+                                 stroke="@style.Stroke" stroke-width="0.08"
+                                 stroke-linejoin="round" />
+                    }
                 }
                 else
                 {
-                    <polyline points="@GardenPlot.PointsString(s.Points)"
+                    @if (ArcPolygonPathBuilder.HasAnyArc(s.EdgeBulges))
+                    {
+                        <path d="@ArcPolygonPathBuilder.Build(s.Points, s.EdgeBulges, close: false)"
                               fill="none" stroke="@style.Stroke" stroke-width="0.08"
                               stroke-linecap="round" stroke-linejoin="round" />
+                    }
+                    else
+                    {
+                        <polyline points="@GardenPlot.PointsString(s.Points)"
+                                  fill="none" stroke="@style.Stroke" stroke-width="0.08"
+                                  stroke-linecap="round" stroke-linejoin="round" />
+                    }
                 }
                 <rect x="@GardenPlot.F(sb.x - 0.1)" y="@GardenPlot.F(sb.y - 0.1)"
                       width="@GardenPlot.F(sb.w + 0.2)" height="@GardenPlot.F(sb.h + 0.2)"
@@ -181,6 +225,32 @@
                   width="@GardenPlot.F(sb.w + 0.1)" height="@GardenPlot.F(sb.h + 0.1)"
                   fill="none" stroke="#0d6efd" stroke-width="0.05"
                   stroke-dasharray="0.15,0.1" pointer-events="none" />
+
+            @* Issue #130: per-edge midpoint handles on selected FreeDraw polygons. Dragging
+               a handle live-updates the edge's bulge via OnEdgeBulgePointerDown; dropping it
+               within the snap-to-line tolerance restores the edge as a straight line. *@
+            @if (CurrentTool == GardenPlot.Tool.Select && s.Kind == ShapeKind.FreeDraw && s.Points.Count >= 2)
+            {
+                var edgeCount = s.CloseEdge ? s.Points.Count : s.Points.Count - 1;
+                @for (int edgeIdx = 0; edgeIdx < edgeCount; edgeIdx++)
+                {
+                    var localEdgeIdx = edgeIdx;
+                    var edgeStart = s.Points[localEdgeIdx];
+                    var edgeEnd = s.Points[(localEdgeIdx + 1) % s.Points.Count];
+                    var edgeBulge = s.EdgeBulges is not null && localEdgeIdx < s.EdgeBulges.Count
+                        ? s.EdgeBulges[localEdgeIdx]
+                        : 0;
+                    var handle = EdgeArcGeometry.MidpointOnEdge(edgeStart, edgeEnd, edgeBulge);
+                    var capturedShapeId = s.Id;
+                    <circle cx="@GardenPlot.F(handle.X)" cy="@GardenPlot.F(handle.Y)" r="0.1"
+                            fill="#fffbe6" stroke="#b58105" stroke-width="0.04" cursor="ns-resize"
+                            pointer-events="auto"
+                            @onpointerdown="@(e => Parent!.OnEdgeBulgePointerDown(e, capturedShapeId, localEdgeIdx))"
+                            @onpointerdown:stopPropagation="true">
+                        <title>Drag to curve this side</title>
+                    </circle>
+                }
+            }
         }
     </g>
 }

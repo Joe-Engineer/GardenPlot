@@ -1,4 +1,4 @@
-// <copyright file="DraftPolygonHud.cs" company="Garden Plot">
+﻿// <copyright file="DraftPolygonHud.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -48,6 +48,26 @@ public static class DraftPolygonHud
         IReadOnlyList<Point> points,
         bool closeOnVirtualEdge,
         bool includeTrailerSegment)
+        => Compute(points, edgeBulges: null, trailerBulge: 0, closeOnVirtualEdge, includeTrailerSegment);
+
+    /// <summary>
+    /// Arc-aware overload (issue #130). When <paramref name="edgeBulges"/> contains any
+    /// non-zero entry — or <paramref name="trailerBulge"/> is non-zero — the perimeter and
+    /// area use the arc edge length and arc-aware area formula so the live HUD readout
+    /// matches the post-commit takeoff.
+    /// </summary>
+    /// <param name="points">The full draft point list (committed vertices + trailing cursor).</param>
+    /// <param name="edgeBulges">Bulges for committed edges (index <c>i</c> = edge from <c>points[i]</c> to <c>points[i+1]</c>). Trailing-tracker edge is handled by <paramref name="trailerBulge"/>.</param>
+    /// <param name="trailerBulge">Bulge that should be previewed on the trailing tracker edge (committed[^1] -> tracker).</param>
+    /// <param name="closeOnVirtualEdge">When <see langword="true"/>, perimeter and area include a virtual line edge from the last vertex back to the first (Polygon tool semantic).</param>
+    /// <param name="includeTrailerSegment">When <see langword="true"/>, the trailing vertex counts as the candidate next vertex.</param>
+    /// <returns>The computed readouts.</returns>
+    public static DraftHudReadout Compute(
+        IReadOnlyList<Point> points,
+        IReadOnlyList<double>? edgeBulges,
+        double trailerBulge,
+        bool closeOnVirtualEdge,
+        bool includeTrailerSegment)
     {
         ArgumentNullException.ThrowIfNull(points);
 
@@ -57,9 +77,6 @@ public static class DraftPolygonHud
             return DraftHudReadout.Empty;
         }
 
-        // Effective vertex set for perimeter / area:
-        //   includeTrailerSegment=true  -> all points (committed + trailer)
-        //   includeTrailerSegment=false -> committed vertices only (drop the trailer)
         int effectiveCount = includeTrailerSegment ? count : count - 1;
         if (effectiveCount < 2)
         {
@@ -69,35 +86,86 @@ public static class DraftPolygonHud
         double perimeter = 0;
         for (int i = 1; i < effectiveCount; i++)
         {
-            perimeter += Distance(points[i - 1], points[i]);
+            double chord = Distance(points[i - 1], points[i]);
+            double bulge = EdgeBulgeForDraftIndex(edgeBulges, trailerBulge, i - 1, count, includeTrailerSegment);
+            perimeter += EdgeArcGeometry.EdgeLength(chord, bulge);
         }
 
         if (closeOnVirtualEdge && effectiveCount >= 3)
         {
+            // Closing chord is always a line in the live preview.
             perimeter += Distance(points[effectiveCount - 1], points[0]);
         }
 
         double? area = null;
         if (effectiveCount >= 3)
         {
-            // Shoelace over the effective vertex slice. PolygonArea is signed-independent
-            // (returns the absolute value) so winding order doesn't matter.
             var slice = new List<Point>(effectiveCount);
             for (int i = 0; i < effectiveCount; i++)
             {
                 slice.Add(points[i]);
             }
 
-            area = GroundCoverMath.PolygonArea(slice);
+            if (ArcPolygonPathBuilder.HasAnyArc(edgeBulges)
+                || Math.Abs(trailerBulge) >= EdgeArcGeometry.LineThreshold)
+            {
+                double shoelace = 0;
+                double arcSum = 0;
+                int n = slice.Count;
+                for (int i = 0; i < n; i++)
+                {
+                    Point a = slice[i];
+                    Point b = slice[(i + 1) % n];
+                    shoelace += (a.X * b.Y) - (b.X * a.Y);
+
+                    double bulge = i < n - 1
+                        ? EdgeBulgeForDraftIndex(edgeBulges, trailerBulge, i, count, includeTrailerSegment)
+                        : 0; // virtual closing edge is a line
+                    if (Math.Abs(bulge) >= EdgeArcGeometry.LineThreshold)
+                    {
+                        double chord = Distance(a, b);
+                        arcSum += EdgeArcGeometry.SignedShoelaceContribution(chord, bulge);
+                    }
+                }
+
+                area = Math.Abs((shoelace / 2.0) + arcSum);
+            }
+            else
+            {
+                area = GroundCoverMath.PolygonArea(slice);
+            }
         }
 
         double? segmentLength = null;
         if (includeTrailerSegment && count >= 2)
         {
-            segmentLength = Distance(points[count - 2], points[count - 1]);
+            double chord = Distance(points[count - 2], points[count - 1]);
+            segmentLength = EdgeArcGeometry.EdgeLength(chord, trailerBulge);
         }
 
         return new DraftHudReadout(segmentLength, perimeter, area);
+    }
+
+    private static double EdgeBulgeForDraftIndex(
+        IReadOnlyList<double>? edgeBulges,
+        double trailerBulge,
+        int edgeIndex,
+        int totalPoints,
+        bool includeTrailerSegment)
+    {
+        // The trailing-tracker edge (committed[^1] -> tracker) sits at edge index
+        // totalPoints - 2. When the trailer is excluded that edge isn't in the slice.
+        if (includeTrailerSegment && edgeIndex == totalPoints - 2)
+        {
+            return trailerBulge;
+        }
+
+        if (edgeBulges is null || edgeIndex < 0 || edgeIndex >= edgeBulges.Count)
+        {
+            return 0;
+        }
+
+        return edgeBulges[edgeIndex];
     }
 
     /// <summary>

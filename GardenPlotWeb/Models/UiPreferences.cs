@@ -238,6 +238,15 @@ public class KeyBindingSettings
 
     public string RotateGroupOrientationCounterClockwise { get; set; } = "Alt+[";
     public string RotateGroupOrientationClockwise { get; set; } = "Alt+]";
+
+    /// <summary>Issue #130: toggles latched arc mode while drawing a polygon / polyline. Default <c>A</c>.</summary>
+    public string ToggleArcSegment { get; set; } = "a";
+
+    /// <summary>Issue #130: mirror selected shapes horizontally (flip across vertical axis). Default <c>Shift+H</c>.</summary>
+    public string MirrorHorizontal { get; set; } = "Shift+H";
+
+    /// <summary>Issue #130: mirror selected shapes vertically (flip across horizontal axis). Default <c>Shift+V</c>.</summary>
+    public string MirrorVertical { get; set; } = "Shift+V";
 }
 
 internal sealed class RecentPlotSizesJsonConverter : JsonConverter<List<(double WidthFt, double HeightFt)>>

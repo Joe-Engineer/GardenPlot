@@ -49,6 +49,7 @@ public static class ShapeCloning
             Rotation = source.Rotation,
             Points = source.Points.Select(p => new Point(p.X, p.Y)).ToList(),
             CloseEdge = source.CloseEdge,
+            EdgeBulges = source.EdgeBulges?.ToList(),
             ClippedBy = assignNewId ? new List<Guid>() : source.ClippedBy.ToList(),
             Label = source.Label,
             FilledAreaShapeId = source.FilledAreaShapeId,
