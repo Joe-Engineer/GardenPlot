@@ -7736,6 +7736,9 @@ public partial class GardenPlot
             TileBackgroundImageFileName = item.TileBackgroundImageFileName,
             GroupId = groupId,
             GroupIndex = groupIndex,
+            // Issue #31 Phase A — irrigation heads carry their coverage arc on the shape
+            // so a stamped head can be edited independently of the catalog.
+            ArcDegrees = item.ArcDegrees,
         };
     }
 
@@ -11693,6 +11696,46 @@ public partial class GardenPlot
     /// <summary>Quick-set button handler: jumps every shape in <paramref name="shapes"/> to <paramref name="degrees"/>.</summary>
     private Task QuickSetShapeRotationAsync(IReadOnlyList<Shape> shapes, double degrees)
         => SetShapeRotationAsync(shapes, NormalizeDegrees(degrees));
+
+    /// <summary>
+    /// Issue #31 Phase A — handler for the sprinkler-arc dropdown in the inspector. Sets
+    /// every selected IrrigationHead's <see cref="Shape.ArcDegrees"/> to the chosen value,
+    /// records an undo step, and persists. No-ops when the selection contains anything
+    /// other than irrigation heads (defensive guard; the dropdown only renders for
+    /// homogeneous head selections).
+    /// </summary>
+    private async Task OnSprinklerArcChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double degrees))
+        {
+            return;
+        }
+
+        // Treat 360 as the "full circle" sentinel (stored as null).
+        double? arcValue = degrees >= 360 - 1e-6 ? null : degrees;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationHead)
+            {
+                shape.ArcDegrees = arcValue;
+            }
+        }
+
+        await SaveAsync();
+    }
 
     private async Task SetShapeRotationAsync(IReadOnlyList<Shape> shapes, double normalizedDegrees)
     {

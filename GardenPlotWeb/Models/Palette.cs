@@ -216,7 +216,8 @@ public record PaletteItem(
     string? TextureKey = null,
     string? TextureImageId = null,
     MaterialCategory? MaterialCategory = null,
-    MaterialSoldBy? MaterialSoldBy = null);
+    MaterialSoldBy? MaterialSoldBy = null,
+    double? ArcDegrees = null);
 
 /// <summary>Legacy alias kept for compatibility with existing references.</summary>
 public record BedKit(string Code, double WidthFt, double HeightFt, int Pieces);

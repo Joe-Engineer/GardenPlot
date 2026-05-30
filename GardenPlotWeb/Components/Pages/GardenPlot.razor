@@ -3281,6 +3281,32 @@ else
                         </div>
                     </div>
                 }
+
+                @* Issue #31 Phase A — sprinkler coverage arc. Surfaces a dropdown of standard
+                   arc degrees (15, 30, 45, 90, 120, 150, 180, 210, 300, 360) when every
+                   selected shape is an irrigation head. Setting the value updates each
+                   selected head's ArcDegrees; the render layer redraws the wedge accordingly. *@
+                @if (selShapes.Count > 0 && selShapes.All(sh => sh.Kind == ShapeKind.IrrigationHead))
+                {
+                    var arcValues = selShapes.Select(sh => sh.ArcDegrees ?? 360.0).Distinct().ToList();
+                    var arcSingle = arcValues.Count == 1 ? arcValues[0] : (double?)null;
+                    <div class="rotation-edit-row mt-2 pt-2 border-top">
+                        <span class="text-muted small">Coverage:</span>
+                        <select class="form-select form-select-sm" style="max-width: 9rem;"
+                                value="@(arcSingle is double a ? F(a) : string.Empty)"
+                                @onchange="(e) => OnSprinklerArcChanged(selShapes, e)">
+                            @if (arcSingle is null)
+                            {
+                                <option value="">(mixed)</option>
+                            }
+                            @foreach (double deg in PaletteCatalog.StandardSprinklerArcDegrees)
+                            {
+                                <option value="@F(deg)">@F(deg)°</option>
+                            }
+                        </select>
+                        <span class="small text-muted">arc</span>
+                    </div>
+                }
             }
 
             @if (!isPreview && selectedDropGroup is null && singleDropGroup is not null)

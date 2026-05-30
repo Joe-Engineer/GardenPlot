@@ -111,6 +111,14 @@ public class Shape
 
     /// <summary>Extra slide-forward (ft) applied by the collision pass at apply time. Diagnostic / replay aid.</summary>
     public double? AlongPathSlideFt { get; set; }
+
+    /// <summary>
+    /// Issue #31 Phase A — irrigation head coverage arc in degrees. Null means 360° (full
+    /// circle). Standard values are 15, 30, 45, 90, 120, 150, 180, 210, 300, 360. The arc
+    /// is centered on the shape's local "up" axis and rotated with the shape's
+    /// <see cref="Rotation"/>.
+    /// </summary>
+    public double? ArcDegrees { get; set; }
 }
 
 public enum AlongPathAnchor

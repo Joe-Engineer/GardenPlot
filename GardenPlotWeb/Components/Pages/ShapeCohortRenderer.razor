@@ -222,16 +222,29 @@
                 @* Issue #31 Phase A — irrigation head + throw halo. The halo is water-blue at
                    15% opacity with a dotted outline; the head body is a small filled circle
                    centered on the throw center. Catalog stores throw diameter as WidthFt so
-                   throw radius = s.W / 2. *@
+                   throw radius = s.W / 2. When ArcDegrees < 360, draw a wedge (path) instead
+                   of a full circle; the shape's outer rotation transform rotates the wedge. *@
                 {
                     var headCx = s.X + s.W / 2;
                     var headCy = s.Y + s.H / 2;
                     var throwR = s.W / 2;
                     var headBodyR = Math.Max(0.18, Math.Min(0.6, throwR * 0.06));
-                    <circle cx="@GardenPlot.F(headCx)" cy="@GardenPlot.F(headCy)" r="@GardenPlot.F(throwR)"
-                            fill="#3aa9d4" fill-opacity="0.15"
-                            stroke="#1f6f8b" stroke-width="0.05"
-                            stroke-dasharray="0.1 0.1" />
+                    if (GardenPlotWeb.Models.SprinklerArcGeometry.IsFullCircle(s.ArcDegrees))
+                    {
+                        <circle cx="@GardenPlot.F(headCx)" cy="@GardenPlot.F(headCy)" r="@GardenPlot.F(throwR)"
+                                fill="#3aa9d4" fill-opacity="0.15"
+                                stroke="#1f6f8b" stroke-width="0.05"
+                                stroke-dasharray="0.1 0.1" />
+                    }
+                    else
+                    {
+                        var arcD = GardenPlotWeb.Models.SprinklerArcGeometry.BuildArcPath(headCx, headCy, throwR, s.ArcDegrees ?? 360);
+                        <path d="@arcD"
+                              fill="#3aa9d4" fill-opacity="0.15"
+                              stroke="#1f6f8b" stroke-width="0.05"
+                              stroke-dasharray="0.1 0.1"
+                              stroke-linejoin="round" />
+                    }
                     <circle cx="@GardenPlot.F(headCx)" cy="@GardenPlot.F(headCy)" r="@GardenPlot.F(headBodyR)"
                             fill="#1f6f8b" stroke="#fff" stroke-width="0.04" />
                 }
