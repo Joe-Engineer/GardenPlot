@@ -76,14 +76,7 @@ public static class GroundCoverMath
                 break;
         }
 
-        if (polygon.Count < 3 || Math.Abs(s.Rotation) < PolygonClipping.Epsilon)
-        {
-            return polygon;
-        }
-
-        Point center = PolygonCenterForRotation(s, polygon);
-        double radians = DegreesToRadians(s.Rotation);
-        return polygon.Select(p => RotateAround(p, center, radians)).ToList();
+        return ApplyShapeRotation(s, polygon);
     }
 
     /// <summary>Gets the current material code, preferring the new field and falling back to the legacy field.</summary>
@@ -190,21 +183,54 @@ public static class GroundCoverMath
         return normalized.Count >= 3 ? normalized : new List<Point>();
     }
 
-    /// <summary>Returns a polygon outline for an area-capable shape.</summary>
+    /// <summary>
+    /// Returns a polygon outline for an area-capable shape, in plot-space (world)
+    /// coordinates. The shape's <see cref="Shape.Rotation"/> is applied around the
+    /// shape's geometric center, so callers that fill or hit-test against the polygon
+    /// operate on the same rotated region the user sees on the canvas.
+    /// </summary>
+    /// <remarks>
+    /// Issue #121: the previous implementation returned the axis-aligned polygon
+    /// regardless of rotation, so "Fill with plants" on a rotated rectangle placed
+    /// the plants in the wrong region. Applying the shape rotation here means every
+    /// caller — current and future — automatically gets the visually correct region.
+    /// </remarks>
+    /// <param name="shape">The shape whose outline is requested.</param>
+    /// <param name="ovalSegments">Segment count for oval tessellation.</param>
+    /// <returns>The (possibly rotated) polygon outline. Empty when the shape is not area-capable.</returns>
 #pragma warning disable IDE0072
     public static IReadOnlyList<Point> AreaPolygon(Shape shape, int ovalSegments = 72)
     {
         ArgumentNullException.ThrowIfNull(shape);
 
-        return shape.Kind switch
+        List<Point> polygon = shape.Kind switch
         {
             ShapeKind.Rectangle => RectanglePolygon(shape),
             ShapeKind.Oval => OvalPolygon(shape, ovalSegments),
             ShapeKind.FreeDraw => NormalizePolygon(shape.Points),
-            _ => Array.Empty<Point>(),
+            _ => new List<Point>(),
         };
+
+        return ApplyShapeRotation(shape, polygon);
     }
 #pragma warning restore IDE0072
+
+    /// <summary>
+    /// Rotates a polygon around the shape's center if <see cref="Shape.Rotation"/>
+    /// is non-zero. Shared by <see cref="ToPolygon"/> and <see cref="AreaPolygon"/>
+    /// so the two stay in lockstep — see issue #121.
+    /// </summary>
+    private static List<Point> ApplyShapeRotation(Shape s, List<Point> polygon)
+    {
+        if (polygon.Count < 3 || Math.Abs(s.Rotation) < PolygonClipping.Epsilon)
+        {
+            return polygon;
+        }
+
+        Point center = PolygonCenterForRotation(s, polygon);
+        double radians = DegreesToRadians(s.Rotation);
+        return polygon.Select(p => RotateAround(p, center, radians)).ToList();
+    }
 
     /// <summary>Returns the polygon's bounding box.</summary>
     public static (double MinX, double MinY, double MaxX, double MaxY) PolygonBounds(IReadOnlyList<Point> pts)
