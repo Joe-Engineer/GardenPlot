@@ -8221,6 +8221,16 @@ public partial class GardenPlot
         // currently mutate non-display state below (paste-hover, box-select,
         // ruler-handle drag, stamp-ghost, drag-move, drafting). If any of them
         // is true we MUST take the render path so visual feedback updates.
+        //
+        // Issue #133 — the click-by-vertex tools (Polygon, Polyline, GroundCover,
+        // Edge) need the snap glyph to appear on hover BEFORE the first click —
+        // otherwise the user has no visual signal that snap is engaged, and the
+        // first-click snap appears not to work. Treat the moment-of-tool-selection
+        // through to first-click as interactive so the snap-resolver fires and
+        // snapPreview drives a real render.
+        bool isVertexToolAwaitingFirstClick =
+            currentTool is Tool.Polygon or Tool.Polyline or Tool.Edge
+            || (currentTool == Tool.GroundCover && selectedItem is not null);
         bool isInteractiveMove =
             showCanvasScalePanel
             || (currentTool == Tool.Select && isPasteMode)
@@ -8228,7 +8238,8 @@ public partial class GardenPlot
             || isHandleDragging
             || (currentTool == Tool.Stamp && selectedItem is not null)
             || isDragging
-            || drafting is not null;
+            || drafting is not null
+            || isVertexToolAwaitingFirstClick;
 
         if (!isInteractiveMove && !IsConceptMode)
         {
