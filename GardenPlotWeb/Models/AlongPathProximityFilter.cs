@@ -21,6 +21,22 @@ public static class AlongPathProximityFilter
     private const double Eps = 1e-6;
 
     /// <summary>
+    /// Sagitta-tolerance slack as a fraction of the offset magnitude, capped to a floor of
+    /// <see cref="MinAbsoluteSlackFt"/>. Densifying an arc edge into chord segments
+    /// undershoots the true arc by a small sagitta; a sample placed at the offset
+    /// distance from the true arc is therefore slightly closer to the chord polyline.
+    /// Without this slack the proximity rule would drop every interior-offset sample on
+    /// an arc-bulged path. 10% of the offset is generous enough to swallow the worst
+    /// case at our default 24-segments-per-arc subdivision while still tightly catching
+    /// genuine corner crowding (where the violating distance is normally much less than
+    /// the offset).
+    /// </summary>
+    private const double SagittaSlackFraction = 0.10;
+
+    /// <summary>Floor for the sagitta slack so tiny offsets still tolerate some chord undershoot.</summary>
+    private const double MinAbsoluteSlackFt = 0.05;
+
+    /// <summary>
     /// Returns the subset of <paramref name="samples"/> whose centre is at least
     /// <c>|sample.OffsetFt|</c> away from every path segment. Samples on rows with
     /// non-negative offset are passed through unchanged — exterior placements don't
@@ -56,7 +72,9 @@ public static class AlongPathProximityFilter
                 continue;
             }
 
-            double required = Math.Abs(s.OffsetFt) - Eps;
+            double offsetAbs = Math.Abs(s.OffsetFt);
+            double slack = Math.Max(MinAbsoluteSlackFt, offsetAbs * SagittaSlackFraction);
+            double required = offsetAbs - slack - Eps;
             double minDistSquared = double.PositiveInfinity;
 
             int segmentCount = closed ? pathPoints.Count : pathPoints.Count - 1;

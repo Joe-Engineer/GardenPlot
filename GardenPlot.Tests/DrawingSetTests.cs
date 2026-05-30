@@ -461,9 +461,9 @@ public sealed class DrawingSetTests
     [Fact]
     public void ProximityFilter_NegativeOffsetAtCorrectDistance_Survives()
     {
-        // Same rectangle; sample at (3, 3) with row offset -3 requires 3 ft from all
-        // segments. Distance to top edge = 3, to left edge = 3, to right = 7, to bottom = 7.
-        // The minimum is exactly 3 — passes the threshold.
+        // Same rectangle; sample at (3, 3) with row offset -3 requires (3 - slack) ft from
+        // all segments. Distance to top edge = 3, to left edge = 3 — well above the slack-
+        // adjusted threshold so the sample survives.
         Point[] rect = [new(0, 0), new(10, 0), new(10, 10), new(0, 10)];
         AlongPathSample[] samples =
         [
@@ -473,6 +473,45 @@ public sealed class DrawingSetTests
         var result = AlongPathProximityFilter.Filter(samples, rect, closed: true);
 
         Assert.Single(result);
+    }
+
+    [Fact]
+    public void ProximityFilter_NegativeOffsetOnArcChordPath_PassesDespiteChordUndershoot()
+    {
+        // Simulate a sample placed at the true offset distance from a 24-segment chord
+        // approximation of an arc. The sample sits at distance 1.98 from the nearest
+        // chord (slightly less than the row's |offset|=2 due to the chord undershoot).
+        // The 10%-of-offset slack must pass this sample so arc-bulged paths place stamps
+        // correctly.
+        Point[] chordPath =
+        [
+            new(0, 0), new(1, 0.05), new(2, 0.07), new(3, 0.05), new(4, 0),
+        ];
+        AlongPathSample[] samples =
+        [
+            new(0, 0, new Point(2, -1.93), 0, false, 2, -2, 0),
+        ];
+
+        var result = AlongPathProximityFilter.Filter(samples, chordPath, closed: false);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void ProximityFilter_SmallOffsetNearCorner_StillDropped()
+    {
+        // Even with the slack, an actual corner-crowding case (distance to adjacent edge
+        // is much less than |offset|) must still be dropped. Sample at (0.5, 0.5) with
+        // offset -3: top edge distance 0.5 << 2.7 threshold.
+        Point[] rect = [new(0, 0), new(10, 0), new(10, 10), new(0, 10)];
+        AlongPathSample[] samples =
+        [
+            new(0, 0, new Point(0.5, 0.5), 0, false, 1, -3, 0),
+        ];
+
+        var result = AlongPathProximityFilter.Filter(samples, rect, closed: true);
+
+        Assert.Empty(result);
     }
 
     [Fact]
