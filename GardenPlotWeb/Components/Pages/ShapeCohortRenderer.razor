@@ -80,6 +80,14 @@
                                clip-path="url(#@polyClipId)" />
                     }
                 }
+                else if (s.CloseEdge && s.Points.Count >= 3)
+                {
+                    @* Issue #120: closed Polygon tool — FreeDraw shape with CloseEdge=true renders as a filled polygon. *@
+                    <polygon points="@GardenPlot.PointsString(s.Points)"
+                             fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
+                             stroke="@style.Stroke" stroke-width="0.08"
+                             stroke-linejoin="round" />
+                }
                 else
                 {
                     <polyline points="@GardenPlot.PointsString(s.Points)"

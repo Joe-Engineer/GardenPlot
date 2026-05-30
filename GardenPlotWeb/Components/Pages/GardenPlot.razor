@@ -133,6 +133,10 @@ else
                             case Tool.Polyline:
                                 <svg viewBox="0 0 24 24"><path d="M4 17L9 7L15 11L20 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><circle cx="4" cy="17" r="1.6" fill="currentColor" /><circle cx="9" cy="7" r="1.6" fill="currentColor" /><circle cx="15" cy="11" r="1.6" fill="currentColor" /><circle cx="20" cy="5" r="1.6" fill="currentColor" /></svg>
                                 break;
+                            case Tool.Polygon:
+                                @* Issue #120: closed click-by-vertex polygon. Icon: a closed pentagon with vertex dots. *@
+                                <svg viewBox="0 0 24 24"><polygon points="12,3 21,10 17,20 7,20 3,10" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><circle cx="12" cy="3" r="1.6" fill="currentColor" /><circle cx="21" cy="10" r="1.6" fill="currentColor" /><circle cx="17" cy="20" r="1.6" fill="currentColor" /><circle cx="7" cy="20" r="1.6" fill="currentColor" /><circle cx="3" cy="10" r="1.6" fill="currentColor" /></svg>
+                                break;
                             case Tool.Rectangle:
                                 <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
                                 break;
@@ -1212,10 +1216,22 @@ else
                                                  stroke="@style.Stroke" stroke-width="0.06" stroke-dasharray="0.12,0.08" />
                                         break;
                                     case ShapeKind.FreeDraw:
-                                        <polyline points="@PointsString(s.Points)"
-                                                  fill="none" stroke="@style.Stroke" stroke-width="0.08"
-                                                  stroke-linecap="round" stroke-linejoin="round"
-                                                  stroke-dasharray="0.12,0.08" />
+                                        @if (s.CloseEdge && s.Points.Count >= 3)
+                                        {
+                                            @* Issue #120: in-progress closed Polygon draft renders as a closed dashed polygon. *@
+                                            <polygon points="@PointsString(s.Points)"
+                                                     fill="@style.Fill" fill-opacity="@F(style.FillOpacity)"
+                                                     stroke="@style.Stroke" stroke-width="0.08"
+                                                     stroke-linejoin="round"
+                                                     stroke-dasharray="0.12,0.08" />
+                                        }
+                                        else
+                                        {
+                                            <polyline points="@PointsString(s.Points)"
+                                                      fill="none" stroke="@style.Stroke" stroke-width="0.08"
+                                                      stroke-linecap="round" stroke-linejoin="round"
+                                                      stroke-dasharray="0.12,0.08" />
+                                        }
                                         break;
                                     case ShapeKind.Ruler:
                                         <polyline points="@PointsString(s.Points)"
