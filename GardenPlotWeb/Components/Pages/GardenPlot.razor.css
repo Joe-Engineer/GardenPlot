@@ -1038,6 +1038,13 @@
     justify-content: flex-end;
 }
 
+.drawing-set-editor-na {
+    text-align: center;
+    color: #b8b3a3;
+    font-size: 0.85rem;
+    cursor: help;
+}
+
 .drawing-set-editor-preview {
     padding: 0.4rem 0;
 }

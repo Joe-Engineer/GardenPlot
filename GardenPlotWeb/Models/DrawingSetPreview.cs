@@ -51,6 +51,45 @@ public static class DrawingSetPreview
     }
 
     /// <summary>
+    /// Returns true when a phase-along-path input makes sense for this row. Phase = the
+    /// distance from the path start to the FIRST stamp; meaningless for continuous-stripe
+    /// rows (ground cover, edging) which always start at the path start.
+    /// </summary>
+    public static bool HasPhase(PaletteKind kind) => VisualKindFor(kind) == RowVisualKind.Stamp;
+
+    /// <summary>
+    /// Returns true when a depth input makes sense for this row. Depth applies to
+    /// volumetric materials (mulch, gravel, soil) where the user buys yards-of-material
+    /// to fill an area. Stamps (plants / trees / bushes / etc.), surface ground covers
+    /// (seed mixes sold by area), and edging without a volumetric profile don't have a
+    /// meaningful depth — they're either sold by EACH or by linear / area.
+    /// </summary>
+    /// <param name="resolved">The resolved palette item; nullable.</param>
+    /// <returns>True when this row should show a depth input.</returns>
+    public static bool HasDepth(PaletteItem? resolved)
+    {
+        if (resolved is null)
+        {
+            return false;
+        }
+
+        // Volume-sold materials always have depth.
+        if (resolved.MaterialSoldBy == MaterialSoldBy.Volume)
+        {
+            return true;
+        }
+
+        // Some non-volume catalog items still carry a DefaultDepthIn for installation
+        // hints (e.g. seed depth). Treat that as "show the input".
+        if (resolved.DefaultDepthIn is double d && d > 0)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Computes the centres (along-path positions in feet) of stamp copies for a row,
     /// given the path length, effective stamp width, gap, and phase. Stamps are placed
     /// at stride = <paramref name="widthFt"/> + <paramref name="gapFt"/>, starting at

@@ -230,4 +230,49 @@ public sealed class DrawingSetTests
         Assert.NotEmpty(centres);
         Assert.True(centres.Count <= 200, "preview should cap to safetyMax even for overlapping rows");
     }
+
+    [Theory]
+    [InlineData(PaletteKind.Plant, true)]
+    [InlineData(PaletteKind.Tree, true)]
+    [InlineData(PaletteKind.Bush, true)]
+    [InlineData(PaletteKind.BedKit, true)]
+    [InlineData(PaletteKind.FocalPoint, true)]
+    [InlineData(PaletteKind.SoilMarker, true)]
+    [InlineData(PaletteKind.GroundCover, false)]
+    [InlineData(PaletteKind.GroundCoverSurface, false)]
+    [InlineData(PaletteKind.Edging, false)]
+    public void HasPhase_OnlyForStampKinds(PaletteKind kind, bool expected)
+    {
+        Assert.Equal(expected, DrawingSetPreview.HasPhase(kind));
+    }
+
+    [Fact]
+    public void HasDepth_VolumeMaterial_True()
+    {
+        // Pull a real volume-sold material from the catalog (mulches / gravels are sold by volume).
+        PaletteItem mulch = PaletteCatalog.GroundCoverMaterials.First(p => p.MaterialSoldBy == MaterialSoldBy.Volume);
+        Assert.True(DrawingSetPreview.HasDepth(mulch));
+    }
+
+    [Fact]
+    public void HasDepth_AreaSoldSurfaceCover_False()
+    {
+        // Seed mixes are sold by area, no volumetric depth.
+        PaletteItem seed = PaletteCatalog.GroundCoverSurfaceCovers.First(p => p.MaterialSoldBy == MaterialSoldBy.Area && (p.DefaultDepthIn is null || p.DefaultDepthIn == 0));
+        Assert.False(DrawingSetPreview.HasDepth(seed));
+    }
+
+    [Fact]
+    public void HasDepth_Plant_False()
+    {
+        // Plants don't have a volumetric depth.
+        PaletteItem plant = PaletteCatalog.Plants.First();
+        Assert.False(DrawingSetPreview.HasDepth(plant));
+    }
+
+    [Fact]
+    public void HasDepth_NullResolvedItem_False()
+    {
+        Assert.False(DrawingSetPreview.HasDepth(null));
+    }
 }
