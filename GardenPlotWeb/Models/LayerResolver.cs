@@ -1,4 +1,4 @@
-// <copyright file="LayerResolver.cs" company="Garden Plot">
+﻿// <copyright file="LayerResolver.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -100,6 +100,7 @@ public static class LayerResolver
             ShapeKind.Oval => LayerKeys.Hardscape,
             ShapeKind.FreeDraw => LayerKeys.Hardscape,
             ShapeKind.SoilMarker => LayerKeys.Measurement,
+            ShapeKind.IrrigationHead => LayerKeys.Irrigation,
             _ => LayerKeys.Notes,
         };
     }
@@ -134,6 +135,7 @@ public static class LayerResolver
             PaletteKind.FocalPoint => LayerKeys.FocalPoints,
             PaletteKind.SoilMarker => LayerKeys.Measurement,
             PaletteKind.CustomTile => ResolveCustomTileLayer(item),
+            PaletteKind.IrrigationHead => LayerKeys.Irrigation,
             _ => null,
         };
     }

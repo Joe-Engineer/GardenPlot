@@ -548,6 +548,19 @@ public sealed class ProjectDossierService
             case ShapeKind.SoilMarker:
                 _ = sb.Append(PlantRendering.SoilMarkerSvg(shape.X, shape.Y, shape.W, shape.H, shape.Label, fill, stroke));
                 break;
+            case ShapeKind.IrrigationHead:
+                // Issue #31 Phase A — dossier rendering for irrigation heads. Faint throw
+                // halo + small head body, mirroring the canvas render.
+                {
+                    double headCx = shape.X + (shape.W / 2);
+                    double headCy = shape.Y + (shape.H / 2);
+                    double throwR = shape.W / 2;
+                    double bodyR = Math.Max(0.25, Math.Min(0.6, throwR * 0.05));
+                    _ = sb.Append("<circle cx=\"").Append(F(headCx)).Append("\" cy=\"").Append(F(headCy)).Append("\" r=\"").Append(F(throwR)).Append("\" fill=\"").Append(fill).Append("\" fill-opacity=\"0.18\" stroke=\"").Append(stroke).Append("\" stroke-width=\"0.06\" stroke-dasharray=\"0.4 0.2\" />");
+                    _ = sb.Append("<circle cx=\"").Append(F(headCx)).Append("\" cy=\"").Append(F(headCy)).Append("\" r=\"").Append(F(bodyR)).Append("\" fill=\"").Append(stroke).Append("\" stroke=\"#fff\" stroke-width=\"0.04\" />");
+                }
+
+                break;
             default:
                 break;
         }
@@ -634,6 +647,7 @@ public sealed class ProjectDossierService
             ShapeKind.CircleRuler => "#2f5a3a",
             ShapeKind.RectRuler => "#2f5a3a",
             ShapeKind.SoilMarker => "#6b4b2a",
+            ShapeKind.IrrigationHead => "#1f6f8b",
             _ => "#2f5a3a",
         };
     }
@@ -659,6 +673,7 @@ public sealed class ProjectDossierService
             ShapeKind.Bush => "#9fcf9f",
             ShapeKind.Plant => "#9fcf9f",
             ShapeKind.SoilMarker => "#d49b52",
+            ShapeKind.IrrigationHead => "#5fb0cf",
             _ => "#9fcf9f",
         };
     }
@@ -679,6 +694,7 @@ public sealed class ProjectDossierService
             ShapeKind.Bush => 0.6,
             ShapeKind.Plant => 0.6,
             ShapeKind.SoilMarker => 1.0,
+            ShapeKind.IrrigationHead => 0.18,
             _ => 0.6,
         };
     }

@@ -18,6 +18,9 @@ public enum ShapeKind
     Bush,
     Plant,
     SoilMarker,
+
+    /// <summary>Issue #31 Phase A — irrigation head (sprinkler / drip emitter).</summary>
+    IrrigationHead,
 }
 
 public record struct Point(double X, double Y);
@@ -34,6 +37,9 @@ public enum PaletteKind
     GroundCover,
     GroundCoverSurface,
     Edging,
+
+    /// <summary>Issue #31 Phase A — irrigation head (sprinkler / drip).</summary>
+    IrrigationHead,
 }
 
 public static class LayerKeys
@@ -94,6 +100,9 @@ public enum PaletteCategory
     CoverCropsForb,
     CustomTiles,
     GroundCoverAssemblies,
+
+    /// <summary>Issue #31 Phase A — irrigation head catalog (sprinklers + drip emitters).</summary>
+    IrrigationHeads,
 }
 
 /// <summary>

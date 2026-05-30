@@ -5576,6 +5576,7 @@ public partial class GardenPlot
         PaletteCategory.CoverCropsForb => "Cover Crops — Forb",
         PaletteCategory.CustomTiles => "Custom Tiles",
         PaletteCategory.GroundCoverAssemblies => "Materials — Assemblies",
+        PaletteCategory.IrrigationHeads => "Irrigation — Heads",
         _ => k.ToString(),
     };
 
@@ -6692,6 +6693,7 @@ public partial class GardenPlot
             PaletteKind.Plant => PaletteCatalog.Plants.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.FocalPoint => PaletteCatalog.FocalPoints.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.SoilMarker => PaletteCatalog.SoilMarkers.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.IrrigationHead => PaletteCatalog.IrrigationHeads.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.BedKit => PaletteCatalog.BedKits.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             // Issue #138 — volume materials (mulch / gravel / soil / rock) live in
             // GroundCoverMaterials and carry MaterialSoldBy.Volume + DefaultDepthIn.
@@ -7712,6 +7714,7 @@ public partial class GardenPlot
         PaletteKind.SoilMarker => ShapeKind.SoilMarker,
         PaletteKind.CustomTile => item.StampShapeKind is ShapeKind.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
         PaletteKind.Edging => ShapeKind.Edge,
+        PaletteKind.IrrigationHead => ShapeKind.IrrigationHead,
         _ => ShapeKind.BedKit,
     };
 

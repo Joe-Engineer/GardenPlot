@@ -1925,6 +1925,25 @@ else
                                     case ShapeKind.SoilMarker:
                                         @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, style.Fill, style.Stroke))
                                         break;
+                                    case ShapeKind.IrrigationHead:
+                                        @* Issue #31 Phase A — irrigation head + faint throw halo. The head
+                                           body is a small filled circle (~6 px in plot feet at this scale);
+                                           the throw radius = s.W / 2 (catalog stores diameter as WidthFt).
+                                           Drip emitters draw with a tighter halo since their wetted radius
+                                           is small. *@
+                                        {
+                                            var headCx = s.X + s.W / 2;
+                                            var headCy = s.Y + s.H / 2;
+                                            var throwR = s.W / 2;
+                                            var headBodyR = Math.Max(0.25, Math.Min(0.6, throwR * 0.05));
+                                            <circle cx="@F(headCx)" cy="@F(headCy)" r="@F(throwR)"
+                                                    fill="@(style.Fill ?? "#5fb0cf")" fill-opacity="0.18"
+                                                    stroke="@(style.Stroke ?? "#1f6f8b")" stroke-width="0.06"
+                                                    stroke-dasharray="0.4 0.2" />
+                                            <circle cx="@F(headCx)" cy="@F(headCy)" r="@F(headBodyR)"
+                                                    fill="@(style.Stroke ?? "#1f6f8b")" stroke="#fff" stroke-width="0.04" />
+                                        }
+                                        break;
                                 }
                             </g>
                         }
@@ -1963,6 +1982,20 @@ else
                                         break;
                                     case ShapeKind.SoilMarker:
                                         @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, EffectiveFill(s), EffectiveStroke(s)))
+                                        break;
+                                    case ShapeKind.IrrigationHead:
+                                        {
+                                            var ghostHeadCx = s.X + s.W / 2;
+                                            var ghostHeadCy = s.Y + s.H / 2;
+                                            var ghostThrowR = s.W / 2;
+                                            var ghostHeadBodyR = Math.Max(0.25, Math.Min(0.6, ghostThrowR * 0.05));
+                                            <circle cx="@F(ghostHeadCx)" cy="@F(ghostHeadCy)" r="@F(ghostThrowR)"
+                                                    fill="@(EffectiveFill(s) ?? "#5fb0cf")" fill-opacity="0.18"
+                                                    stroke="@(EffectiveStroke(s) ?? "#1f6f8b")" stroke-width="0.06"
+                                                    stroke-dasharray="0.4 0.2" />
+                                            <circle cx="@F(ghostHeadCx)" cy="@F(ghostHeadCy)" r="@F(ghostHeadBodyR)"
+                                                    fill="@(EffectiveStroke(s) ?? "#1f6f8b")" stroke="#fff" stroke-width="0.04" />
+                                        }
                                         break;
                                 }
                             </g>
