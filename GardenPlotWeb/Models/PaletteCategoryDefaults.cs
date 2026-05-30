@@ -36,6 +36,7 @@ public static class PaletteCategoryDefaults
         PaletteCategory.Edging,
         PaletteCategory.SoilMarkers,
         PaletteCategory.CustomTiles,
+        PaletteCategory.IrrigationHeads,
     };
 
     /// <summary>Display grouping for the settings dialog (label + categories in order).</summary>
@@ -49,6 +50,10 @@ public static class PaletteCategoryDefaults
             PaletteCategory.GroundCoverAssemblies,
             PaletteCategory.Edging,
             PaletteCategory.SoilMarkers,
+        ]),
+        ("Irrigation",
+        [
+            PaletteCategory.IrrigationHeads,
         ]),
         ("Trees",
         [
