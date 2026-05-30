@@ -2776,6 +2776,13 @@ public partial class GardenPlot
     private double boxSelectStartX, boxSelectStartY;
     private double boxSelectCurrentX, boxSelectCurrentY;
 
+    // Issue #129 — in-progress polygon vertex drag. Active when the user pointer-downs
+    // on one of the existing draft vertices (rendered with pointer-events="auto").
+    // The trailing cursor-tracker (drafting.Points[^1]) freezes for the duration of
+    // the drag so the HUD doesn't show stale segment lengths.
+    private bool isDraftVertexDragging;
+    private int draftVertexIndex = -1;
+
     private sealed class DragSnap
     {
         public Guid Id;
@@ -5130,6 +5137,8 @@ public partial class GardenPlot
         {
             drafting = null;
             buildingPolygon = false;
+            isDraftVertexDragging = false;
+            draftVertexIndex = -1;
         }
 
         if (t != Tool.Select)
@@ -8228,6 +8237,19 @@ public partial class GardenPlot
             return;
         }
 
+        if (isDraftVertexDragging && drafting is not null
+            && draftVertexIndex >= 0 && draftVertexIndex < drafting.Points.Count)
+        {
+            // Issue #129 — drag an already-placed draft vertex. Update only that
+            // vertex; the trailing cursor-tracker (Points[^1]) is intentionally
+            // NOT moved so the HUD's "candidate next vertex" preview stays stable.
+            // Clamp inside the plot like the regular vertex-placement path does.
+            drafting.Points[draftVertexIndex] = new Point(
+                Math.Clamp(x, 0, PlotWidthFt),
+                Math.Clamp(y, 0, PlotHeightFt));
+            return;
+        }
+
         if (currentTool == Tool.Stamp && selectedItem is not null)
         {
             ghostX = x;
@@ -8383,6 +8405,17 @@ public partial class GardenPlot
             await ReflowAlongPathGroupsForSourceShapes([sourceShapeId], save: false);
             SyncDropGroupsFromCurrentShapes();
             await SaveAsync();
+            return;
+        }
+
+        if (isDraftVertexDragging)
+        {
+            // Issue #129 — finish a draft-vertex drag. No undo state is recorded
+            // because the polygon itself isn't yet committed to currentPlot.Shapes;
+            // the eventual finalize (OnCanvasDoubleClick) records undo for the
+            // whole shape at once, including the dragged vertex's final position.
+            isDraftVertexDragging = false;
+            draftVertexIndex = -1;
             return;
         }
 
@@ -9103,6 +9136,8 @@ public partial class GardenPlot
 
             drafting = null;
             buildingPolygon = false;
+            isDraftVertexDragging = false;
+            draftVertexIndex = -1;
             StateHasChanged();
             return;
         }
@@ -9139,7 +9174,52 @@ public partial class GardenPlot
 
         drafting = null;
         buildingPolygon = false;
+        isDraftVertexDragging = false;
+        draftVertexIndex = -1;
         StateHasChanged();
+    }
+
+    /// <summary>
+    /// Handler for pointer-down on a draft-polygon vertex handle (issue #129).
+    /// Starts a vertex-drag that mutates only <c>drafting.Points[<paramref name="vertexIndex"/>]</c>;
+    /// the trailing cursor-tracker is left frozen so the HUD's "candidate next vertex"
+    /// preview doesn't jitter.
+    /// </summary>
+    /// <param name="e">The pointer event.</param>
+    /// <param name="vertexIndex">The index into <c>drafting.Points</c> being dragged.</param>
+    private void OnDraftVertexPointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, int vertexIndex)
+    {
+        if (drafting is null || vertexIndex < 0 || vertexIndex >= drafting.Points.Count)
+        {
+            return;
+        }
+
+        // Only left-button starts the drag; right-button preserves the existing
+        // right-drag-to-pan behaviour even when the cursor is over a vertex.
+        if (e.Button != 0)
+        {
+            return;
+        }
+
+        ClearIdleRenderSuppression();
+        isDraftVertexDragging = true;
+        draftVertexIndex = vertexIndex;
+    }
+
+    /// <summary>
+    /// Persists the HUD font-size preference (issue #129). Bound to the S/M/L
+    /// toolbar buttons; the choice round-trips with <see cref="UiPreferences"/>.
+    /// </summary>
+    /// <param name="size">The new HUD font size.</param>
+    private async Task SetDraftHudFontSize(DraftHudFontSize size)
+    {
+        if (library.Ui.DraftHudFontSize == size)
+        {
+            return;
+        }
+
+        library.Ui.DraftHudFontSize = size;
+        await SaveAsync();
     }
 
     /// <summary>Cancel an in-progress click-by-vertex polygon (used when changing sub-mode or Escape).</summary>
@@ -9149,6 +9229,8 @@ public partial class GardenPlot
         {
             drafting = null;
             buildingPolygon = false;
+            isDraftVertexDragging = false;
+            draftVertexIndex = -1;
         }
     }
 
@@ -9305,6 +9387,8 @@ public partial class GardenPlot
             ghostX = ghostY = null;
             drafting = null;
             buildingPolygon = false;
+            isDraftVertexDragging = false;
+            draftVertexIndex = -1;
             ClearSelection();
         }
     }

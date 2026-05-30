@@ -161,6 +161,25 @@ else
             </div>
 
             <div class="toolbar-group zoom-group">
+                <span class="small text-muted">HUD:</span>
+                <button class="toolbar-icon-btn @(library.Ui.DraftHudFontSize == DraftHudFontSize.Small ? "active" : string.Empty)"
+                        @onclick="@(() => SetDraftHudFontSize(DraftHudFontSize.Small))"
+                        title="Small HUD text while drawing" aria-label="Small HUD text">
+                    <span style="font-size:0.7rem; font-weight:600;">S</span>
+                </button>
+                <button class="toolbar-icon-btn @(library.Ui.DraftHudFontSize == DraftHudFontSize.Medium ? "active" : string.Empty)"
+                        @onclick="@(() => SetDraftHudFontSize(DraftHudFontSize.Medium))"
+                        title="Medium HUD text while drawing" aria-label="Medium HUD text">
+                    <span style="font-size:0.85rem; font-weight:600;">M</span>
+                </button>
+                <button class="toolbar-icon-btn @(library.Ui.DraftHudFontSize == DraftHudFontSize.Large ? "active" : string.Empty)"
+                        @onclick="@(() => SetDraftHudFontSize(DraftHudFontSize.Large))"
+                        title="Large HUD text while drawing" aria-label="Large HUD text">
+                    <span style="font-size:1rem; font-weight:600;">L</span>
+                </button>
+            </div>
+
+            <div class="toolbar-group zoom-group">
                 <span class="small text-muted">Tool: <strong>@currentTool</strong></span>
                 <span class="zoom-controls">
                     <button class="toolbar-icon-btn zoom-btn" @onclick="ZoomOut" title="Zoom out (−10%)" aria-label="Zoom out">
@@ -1118,10 +1137,35 @@ else
                                          fill="@(drafting.Fill ?? "rgba(74,124,89,0.25)")" fill-opacity="0.35"
                                          stroke="@(drafting.Stroke ?? "#2f5a3a")" stroke-width="0.08"
                                          stroke-dasharray="0.2,0.1" pointer-events="none" />
-                                @foreach (var p in drafting.Points.Take(drafting.Points.Count - 1))
+                                @* Issue #129: vertex handles are interactive — pointer-down starts a drag that repositions just that vertex. *@
+                                @for (int vi = 0; vi < drafting.Points.Count - 1; vi++)
                                 {
-                                    <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.08"
-                                            fill="#fff" stroke="#2f5a3a" stroke-width="0.04" pointer-events="none" />
+                                    var localIndex = vi;
+                                    var p = drafting.Points[vi];
+                                    <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.12"
+                                            fill="#fff" stroke="#2f5a3a" stroke-width="0.05" cursor="grab"
+                                            pointer-events="auto"
+                                            @onpointerdown="@(e => OnDraftVertexPointerDown(e, localIndex))"
+                                            @onpointerdown:stopPropagation="true" />
+                                }
+                            }
+                            else if (buildingPolygon && drafting.CloseEdge && drafting.Points.Count >= 4)
+                            {
+                                @* Issue #120 closed Polygon draft: render as closed dashed polygon, with virtual edge from last committed vertex back to the first. *@
+                                <polygon points="@PointsString(drafting.Points)"
+                                         fill="rgba(74,124,89,0.20)" fill-opacity="0.35"
+                                         stroke="#2f5a3a" stroke-width="0.08"
+                                         stroke-dasharray="0.2,0.1" pointer-events="none" />
+                                @* Issue #129 vertex handles. *@
+                                @for (int vi = 0; vi < drafting.Points.Count - 1; vi++)
+                                {
+                                    var localIndex = vi;
+                                    var p = drafting.Points[vi];
+                                    <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.12"
+                                            fill="#fff" stroke="#2f5a3a" stroke-width="0.05" cursor="grab"
+                                            pointer-events="auto"
+                                            @onpointerdown="@(e => OnDraftVertexPointerDown(e, localIndex))"
+                                            @onpointerdown:stopPropagation="true" />
                                 }
                             }
                             else if (buildingPolygon)
@@ -1130,10 +1174,16 @@ else
                                           fill="none" stroke="#2f5a3a" stroke-width="0.08"
                                           stroke-linecap="round" stroke-linejoin="round"
                                           stroke-dasharray="0.2,0.1" pointer-events="none" />
-                                @foreach (var p in drafting.Points.Take(Math.Max(0, drafting.Points.Count - 1)))
+                                @* Issue #129 vertex handles. *@
+                                @for (int vi = 0; vi < Math.Max(0, drafting.Points.Count - 1); vi++)
                                 {
-                                    <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.08"
-                                            fill="#fff" stroke="#2f5a3a" stroke-width="0.04" pointer-events="none" />
+                                    var localIndex = vi;
+                                    var p = drafting.Points[vi];
+                                    <circle cx="@F(p.X)" cy="@F(p.Y)" r="0.12"
+                                            fill="#fff" stroke="#2f5a3a" stroke-width="0.05" cursor="grab"
+                                            pointer-events="auto"
+                                            @onpointerdown="@(e => OnDraftVertexPointerDown(e, localIndex))"
+                                            @onpointerdown:stopPropagation="true" />
                                 }
                             }
                             else
@@ -1179,6 +1229,46 @@ else
                             @((MarkupString)RectRulerLabelsSvg(drafting))
                             break;
                     }
+                }
+
+                @if (!IsConceptMode && drafting is not null && buildingPolygon
+                    && drafting.Kind is ShapeKind.FreeDraw or ShapeKind.Edge or ShapeKind.Ruler
+                    && drafting.Points.Count >= 2)
+                {
+                    @* Issue #129: in-progress polygon HUD. Shows segment length at cursor,
+                       running perimeter + area in the canvas top-left. Suppress segment
+                       length when dragging an existing vertex so a stale trailer segment
+                       isn't surfaced. *@
+                    var hudClosed = drafting.CloseEdge || (drafting.Kind == ShapeKind.FreeDraw && IsGroundCoverShape(drafting));
+                    var hudReadout = DraftPolygonHud.Compute(drafting.Points, hudClosed, includeTrailerSegment: !isDraftVertexDragging);
+                    var hudFontFt = DraftPolygonHud.FontSizeFt(library.Ui.DraftHudFontSize);
+                    var hudPad = hudFontFt * 0.6;
+                    var perimText = $"Perimeter: {hudReadout.PerimeterFt:0.##} ft";
+                    string? areaText = hudReadout.AreaFt2 is double areaFt2 ? $"Area: {areaFt2:0.##} ft²" : null;
+                    var maxLabelLen = areaText is null ? perimText.Length : Math.Max(perimText.Length, areaText.Length);
+                    var labelWidth = maxLabelLen * hudFontFt * 0.55 + 0.2;
+                    var rows = areaText is null ? 1 : 2;
+                    var cornerX = hudPad;
+                    var cornerY = hudPad + hudFontFt;
+                    <g pointer-events="none" class="draft-polygon-hud">
+                        @if (hudReadout.SegmentLengthFt is double segLenFt && lastCanvasX is double cursorX && lastCanvasY is double cursorY)
+                        {
+                            var segText = $"{segLenFt:0.##} ft";
+                            var tagX = cursorX + (hudFontFt * 0.5);
+                            var tagY = cursorY - (hudFontFt * 0.4);
+                            var tagWidth = segText.Length * hudFontFt * 0.55 + 0.15;
+                            <rect x="@F(tagX - 0.05)" y="@F(tagY - hudFontFt)" width="@F(tagWidth)" height="@F(hudFontFt * 1.25)"
+                                  fill="rgba(255,255,255,0.85)" stroke="#2f5a3a" stroke-width="0.02" rx="0.06" />
+                            <svg:text x="@F(tagX)" y="@F(tagY)" font-size="@F(hudFontFt)" fill="#1f3d28" style="font-family: sans-serif;">@segText</svg:text>
+                        }
+                        <rect x="@F(cornerX - 0.05)" y="@F(cornerY - hudFontFt)" width="@F(labelWidth)" height="@F(hudFontFt * 1.25 * rows + 0.1)"
+                              fill="rgba(255,255,255,0.85)" stroke="#2f5a3a" stroke-width="0.02" rx="0.06" />
+                        <svg:text x="@F(cornerX)" y="@F(cornerY)" font-size="@F(hudFontFt)" fill="#1f3d28" style="font-family: sans-serif;">@perimText</svg:text>
+                        @if (areaText is not null)
+                        {
+                            <svg:text x="@F(cornerX)" y="@F(cornerY + hudFontFt * 1.25)" font-size="@F(hudFontFt)" fill="#1f3d28" style="font-family: sans-serif;">@areaText</svg:text>
+                        }
+                    </g>
                 }
                 @if (!IsConceptMode && currentTool == Tool.Select && isBoxSelecting)
                 {
