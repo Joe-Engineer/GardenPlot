@@ -1252,6 +1252,19 @@ else
                         <svg:text x="@F(tagX)" y="@F(tagY)" font-size="@F(hudFontFt)" fill="#1f3d28" style="font-family: sans-serif;">@segText</svg:text>
                     </g>
                 }
+                @if (!IsConceptMode && snapPreview is { IsSnapped: true } snap && snap.Target is SnapCandidate snapTarget)
+                {
+                    @* Issue #133: snap-glyph at the snapped vertex. Visible during
+                       any pointer move that engages snap; cleared on pointer-up. *@
+                    var sgX = snap.Position.X;
+                    var sgY = snap.Position.Y;
+                    <g pointer-events="none" class="snap-glyph">
+                        <circle cx="@F(sgX)" cy="@F(sgY)" r="0.18" fill="none" stroke="#0d6efd" stroke-width="0.04" />
+                        <line x1="@F(sgX - 0.22)" y1="@F(sgY)" x2="@F(sgX + 0.22)" y2="@F(sgY)" stroke="#0d6efd" stroke-width="0.04" />
+                        <line x1="@F(sgX)" y1="@F(sgY - 0.22)" x2="@F(sgX)" y2="@F(sgY + 0.22)" stroke="#0d6efd" stroke-width="0.04" />
+                        <title>Snapped to @snapTarget.Label</title>
+                    </g>
+                }
                 @if (!IsConceptMode && currentTool == Tool.Select && isBoxSelecting)
                 {
                     var bx = Math.Min(boxSelectStartX, boxSelectCurrentX);

@@ -2821,6 +2821,13 @@ public partial class GardenPlot
     private bool isDraftVertexDragging;
     private int draftVertexIndex = -1;
 
+    // Issue #133 — corner-snap state. snapPreview is what the renderer draws as the
+    // visible "snapped here" glyph; null means no snap is engaged for the current
+    // pointer move. The default 8 CSS-pixel radius matches the user's request; the
+    // value is converted to plot-space feet at the current zoom inside ResolveCornerSnap.
+    private SnapResult? snapPreview;
+    private const double SnapRadiusPx = 8.0;
+
     private sealed class DragSnap
     {
         public Guid Id;
@@ -7774,6 +7781,16 @@ public partial class GardenPlot
         var (x, y) = ToFt(e);
         x = Math.Clamp(x, 0, PlotWidthFt);
         y = Math.Clamp(y, 0, PlotHeightFt);
+
+        // Issue #133 — first-click snap, mirrors the pointer-move snap logic.
+        var snapDown = ResolveCornerSnap(new Point(x, y), e.AltKey);
+        if (snapDown.IsSnapped)
+        {
+            x = snapDown.Position.X;
+            y = snapDown.Position.Y;
+        }
+
+        snapPreview = null; // Click commits the position; clear glyph until next move.
         lastCanvasX = x;
         lastCanvasY = y;
         pasteAnchorX = x;
@@ -8233,6 +8250,23 @@ public partial class GardenPlot
         var (x, y) = ToFt(e);
         x = Math.Clamp(x, 0, PlotWidthFt);
         y = Math.Clamp(y, 0, PlotHeightFt);
+
+        // Issue #133 — corner snap. Applies during click-by-vertex drafting,
+        // rectangle/oval drag-out drafts, draft-vertex drag, and existing-shape
+        // drag-move. Alt held disables snap so the user can place a vertex
+        // very close to an existing one without the cursor sticking.
+        var snapResult = ResolveCornerSnap(new Point(x, y), e.AltKey);
+        if (snapResult.IsSnapped)
+        {
+            x = snapResult.Position.X;
+            y = snapResult.Position.Y;
+            snapPreview = snapResult;
+        }
+        else
+        {
+            snapPreview = null;
+        }
+
         lastCanvasX = x;
         lastCanvasY = y;
 
@@ -8379,6 +8413,10 @@ public partial class GardenPlot
         pointerShiftDown = e.ShiftKey;
         pointerCtrlDown = e.CtrlKey;
         pointerAltDown = e.AltKey;
+
+        // Issue #133 — clear snap glyph on pointer release so it doesn't linger
+        // after a click commits a vertex.
+        snapPreview = null;
 
         if (panPending)
         {
@@ -9215,6 +9253,57 @@ public partial class GardenPlot
         isDraftVertexDragging = false;
         draftVertexIndex = -1;
         StateHasChanged();
+    }
+
+    /// <summary>
+    /// Issue #133 — corner-snap resolver. Enumerates the vertices of every
+    /// snappable shape in the current plot (excluding the one being drafted,
+    /// to prevent self-snap during the same drag), feeds them into a transient
+    /// <see cref="SpatialGridIndex{T}"/> for fast neighborhood lookup, and asks
+    /// <see cref="VertexSnapResolver.Resolve"/> for the nearest within the
+    /// pixel-radius (converted to feet at the current zoom).
+    /// </summary>
+    /// <param name="cursor">The candidate cursor position in plot-space feet.</param>
+    /// <param name="altHeld">When <see langword="true"/>, snap is disabled.</param>
+    /// <returns>The (possibly snapped) result.</returns>
+    private SnapResult ResolveCornerSnap(Point cursor, bool altHeld)
+    {
+        if (currentPlot is null || altHeld)
+        {
+            return SnapResult.Unsnapped(cursor);
+        }
+
+        double scale = PxPerFt * zoom;
+        if (scale <= 0)
+        {
+            return SnapResult.Unsnapped(cursor);
+        }
+
+        double snapRadiusFt = SnapRadiusPx / scale;
+        Guid? draftId = drafting?.Id;
+        bool dragSelf = isDragging && selectedIds.Count > 0;
+
+        var grid = new SpatialGridIndex<SnapCandidate>(cellSize: Math.Max(snapRadiusFt * 4, 0.5));
+        foreach (var shape in currentPlot.Shapes)
+        {
+            if (draftId is Guid dId && shape.Id == dId)
+            {
+                continue;
+            }
+
+            if (dragSelf && selectedIdSet.Contains(shape.Id))
+            {
+                continue;
+            }
+
+            foreach (var candidate in ShapeVertexEnumerator.Enumerate(shape))
+            {
+                grid.Insert(candidate, candidate.Position.X, candidate.Position.Y, candidate.Position.X, candidate.Position.Y);
+            }
+        }
+
+        var neighborhood = grid.QueryRadius(cursor.X, cursor.Y, snapRadiusFt);
+        return VertexSnapResolver.Resolve(cursor, neighborhood, snapRadiusFt, altHeld);
     }
 
     /// <summary>

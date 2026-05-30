@@ -30,7 +30,6 @@ namespace GardenPlotWeb.Models;
 /// </remarks>
 /// <typeparam name="T">The item type stored in the grid.</typeparam>
 public sealed class SpatialGridIndex<T>
-    where T : class
 {
     private readonly double cellSize;
     private readonly double originX;
@@ -77,7 +76,11 @@ public sealed class SpatialGridIndex<T>
     /// <param name="maxY">AABB maximum Y. Must be ≥ <paramref name="minY"/>.</param>
     public void Insert(T item, double minX, double minY, double maxX, double maxY)
     {
-        ArgumentNullException.ThrowIfNull(item);
+        if (item is null)
+        {
+            throw new ArgumentNullException(nameof(item));
+        }
+
         if (maxX < minX || maxY < minY)
         {
             throw new ArgumentException("AABB max must be greater than or equal to min on every axis.", nameof(maxX));
