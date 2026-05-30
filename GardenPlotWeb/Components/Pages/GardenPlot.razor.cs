@@ -2844,6 +2844,10 @@ public partial class GardenPlot
     private const int ArcDoubleClickGuardMs = 350;
     private DateTime? lastArcClickAt;
 
+    // Issue #130 diagnostic — last key pressed, shown in the on-page debug HUD so the
+    // user can confirm key events reach the page without opening browser dev tools.
+    private string? lastKeyDebug;
+
     private bool isEdgeBulgeDragging;
     private Guid edgeBulgeDragShapeId;
     private int edgeBulgeDragEdgeIndex = -1;
@@ -9592,9 +9596,12 @@ public partial class GardenPlot
     /// </summary>
     internal void ToggleArcMode()
     {
+        Console.WriteLine($"[#130] ToggleArcMode entered: currentTool={currentTool} drafting={(drafting != null ? "yes" : "no")} buildingPolygon={buildingPolygon} arcModeArmed(before)={arcModeArmed} awaitingArcApex={awaitingArcApex}");
+
         // Arc mode only makes sense for the click-by-vertex tools.
         if (currentTool is not Tool.Polygon and not Tool.Polyline)
         {
+            Console.WriteLine($"[#130] ToggleArcMode bailed: tool is {currentTool}");
             return;
         }
 
@@ -9622,6 +9629,13 @@ public partial class GardenPlot
         {
             arcModeArmed = !arcModeArmed;
         }
+
+        Console.WriteLine($"[#130] ToggleArcMode exit: arcModeArmed(after)={arcModeArmed} awaitingArcApex={awaitingArcApex}");
+        StateHasChanged();
+
+        // Return focus to the canvas so the next A press fires OnKeyDown there instead
+        // of bouncing off whatever button/input had focus.
+        _ = canvasRef.FocusAsync(preventScroll: true).AsTask();
     }
 
     /// <summary>
@@ -9969,6 +9983,13 @@ public partial class GardenPlot
     {
         ClearIdleRenderSuppression();
         var kb = KeyBindings;
+
+        // Issue #130 — diagnostic logging so the user can share browser console output
+        // when reporting hotkey issues. Logs every key + modifier + current tool, and a
+        // ✓ when the ToggleArcSegment binding matches.
+        bool arcMatch = IsBindingMatch(e, kb.ToggleArcSegment) || IsArcToggleFallback(e, kb.ToggleArcSegment);
+        Console.WriteLine($"[#130] OnKeyDown key='{e.Key}' ctrl={e.CtrlKey} shift={e.ShiftKey} alt={e.AltKey} tool={currentTool} arcArmed={arcModeArmed} arcBinding='{kb.ToggleArcSegment}' arcMatch={arcMatch}");
+        lastKeyDebug = $"{e.Key}{(e.CtrlKey ? "+Ctrl" : "")}{(e.ShiftKey ? "+Shift" : "")}{(e.AltKey ? "+Alt" : "")} {(arcMatch ? "(arc!)" : "")}";
 
         if (IsConceptMode)
         {
