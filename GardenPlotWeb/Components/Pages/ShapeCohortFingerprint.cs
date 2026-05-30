@@ -1,4 +1,4 @@
-// <copyright file="ShapeCohortFingerprint.cs" company="Garden Plot">
+﻿// <copyright file="ShapeCohortFingerprint.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -145,6 +145,21 @@ internal static class ShapeCohortFingerprint
         {
             h = MixD(h, p.X);
             h = MixD(h, p.Y);
+        }
+
+        // Issue #130 — arc bulges must mix into the fingerprint or live midpoint-drag
+        // updates of a selected polygon's bulge won't trigger a re-render of its cohort.
+        if (s.EdgeBulges is { } bulges)
+        {
+            h = Mix(h, bulges.Count + 1); // +1 so empty list and null hash differently
+            foreach (double b in bulges)
+            {
+                h = MixD(h, b);
+            }
+        }
+        else
+        {
+            h = Mix(h, 0);
         }
 
         return h;

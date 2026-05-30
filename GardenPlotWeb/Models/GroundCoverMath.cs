@@ -22,7 +22,7 @@ public static class GroundCoverMath
         {
             ShapeKind.Rectangle => Math.Abs(s.W) * Math.Abs(s.H),
             ShapeKind.Oval => Math.PI * (Math.Abs(s.W) / 2.0) * (Math.Abs(s.H) / 2.0),
-            ShapeKind.FreeDraw => PolygonArea(s.Points),
+            ShapeKind.FreeDraw => FreeDrawArea(s),
             ShapeKind.Edge => 0,
             ShapeKind.BedKit => Math.Abs(s.W) * Math.Abs(s.H),
             ShapeKind.Ruler => 0,
@@ -34,6 +34,48 @@ public static class GroundCoverMath
             ShapeKind.SoilMarker => 0,
             _ => 0,
         };
+    }
+
+    /// <summary>
+    /// Area of a FreeDraw shape, accounting for arc edges (issue #130). When the shape carries
+    /// no <see cref="Shape.EdgeBulges"/> data the result is identical to the line-only shoelace.
+    /// </summary>
+    private static double FreeDrawArea(Shape s)
+    {
+        if (!ArcPolygonPathBuilder.HasAnyArc(s.EdgeBulges))
+        {
+            return PolygonArea(s.Points);
+        }
+
+        var polygon = NormalizePolygon(s.Points);
+        if (polygon.Count < 3)
+        {
+            return 0;
+        }
+
+        double shoelace = 0;
+        double arcSum = 0;
+        int n = polygon.Count;
+        var bulges = s.EdgeBulges!;
+        for (int i = 0; i < n; i++)
+        {
+            Point a = polygon[i];
+            Point b = polygon[(i + 1) % n];
+            shoelace += (a.X * b.Y) - (b.X * a.Y);
+
+            double bulge = i < bulges.Count ? bulges[i] : 0;
+            if (Math.Abs(bulge) < EdgeArcGeometry.LineThreshold)
+            {
+                continue;
+            }
+
+            double dx = b.X - a.X;
+            double dy = b.Y - a.Y;
+            double chord = Math.Sqrt((dx * dx) + (dy * dy));
+            arcSum += EdgeArcGeometry.SignedShoelaceContribution(chord, bulge);
+        }
+
+        return Math.Abs((shoelace / 2.0) + arcSum);
     }
 
     /// <summary>Returns true when the shape has an area footprint that can participate in clipping.</summary>

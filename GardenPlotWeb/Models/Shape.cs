@@ -17,6 +17,16 @@ public class Shape
     public double Rotation { get; set; }
     public List<Point> Points { get; set; } = new();
     public bool CloseEdge { get; set; }
+
+    /// <summary>
+    /// Optional per-edge bulge values for arc-sided polygons (issue #130). Index <c>i</c> is the
+    /// bulge for the edge from <c>Points[i]</c> to <c>Points[(i + 1) % Points.Count]</c>. AutoCAD
+    /// convention: <c>bulge = tan(theta / 4)</c> where <c>theta</c> is the included arc angle.
+    /// <c>0</c> = straight line (default); positive = arc bulges to the left of walking direction;
+    /// <c>1</c> = semicircle. <c>null</c> means every edge is a line (back-compat with all existing
+    /// data). When non-null, missing trailing entries are treated as <c>0</c>.
+    /// </summary>
+    public List<double>? EdgeBulges { get; set; }
     public List<Guid> ClippedBy { get; set; } = new();
     public string? Label { get; set; }
 

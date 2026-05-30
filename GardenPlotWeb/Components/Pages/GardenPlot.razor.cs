@@ -1,4 +1,4 @@
-// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
+﻿// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -2821,6 +2821,45 @@ public partial class GardenPlot
     private bool isDraftVertexDragging;
     private int draftVertexIndex = -1;
 
+    // Issue #130 — arc-sided polygon drawing state.
+    //   arcModeArmed: latched by pressing A while drawing a polygon / polyline. Persists
+    //     across multiple arc edges until A is pressed again (or drafting ends).
+    //   awaitingArcApex: set true after a TERMINUS click in arc mode. The cursor
+    //     between terminus and apex clicks live-updates EdgeBulges[arcApexEdgeIndex];
+    //     the apex click locks the bulge in. During this phase no new trailing tracker
+    //     is appended — the cursor is the apex, not a candidate next vertex.
+    //   arcApexEdgeIndex: index into drafting.EdgeBulges that the apex pick is editing.
+    //   isEdgeBulgeDragging et al.: midpoint-drag of a committed polygon's edge bulge.
+    //     Activated by pointer-down on the per-edge midpoint handle rendered by
+    //     ShapeCohortRenderer when the shape is selected.
+    internal bool arcModeArmed;
+    private bool awaitingArcApex;
+    private int arcApexEdgeIndex = -1;
+
+    // Issue #130 — guards against the browser's natural double-click producing TWO
+    // terminus commits in a row. When the second pointer-down lands within this many
+    // milliseconds of the first, TryHandleArcClick discards it so the subsequent
+    // dblclick event finalises the polygon cleanly instead of leaving a spurious
+    // zero-length arc edge behind.
+    private const int ArcDoubleClickGuardMs = 350;
+    private DateTime? lastArcClickAt;
+
+    // Issue #130 diagnostic — last key pressed, shown in the on-page debug HUD so the
+    // user can confirm key events reach the page without opening browser dev tools.
+    private string? lastKeyDebug;
+
+    private bool isEdgeBulgeDragging;
+    private Guid edgeBulgeDragShapeId;
+    private int edgeBulgeDragEdgeIndex = -1;
+
+    // Issue #130 — vertex-drag for committed FreeDraw polygons. The square handles
+    // rendered by ShapeCohortRenderer when a polygon is selected use this state to
+    // reposition a single vertex without affecting any of the polygon's other points
+    // or its bulges. Records undo on pointer-down so the whole drag is one undo step.
+    private bool isShapeVertexDragging;
+    private Guid shapeVertexDragShapeId;
+    private int shapeVertexDragIndex = -1;
+
     // Issue #133 — corner-snap state. snapPreview is what the renderer draws as the
     // visible "snapped here" glyph; null means no snap is engaged for the current
     // pointer move. 14 CSS-pixel radius is forgiving enough that a casual click
@@ -2987,6 +3026,24 @@ public partial class GardenPlot
         return string.Equals(e.Key, keyPart, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Issue #130 — fallback for the arc-toggle hotkey. Returns <see langword="true"/> for
+    /// a bare 'A' or 'a' key with no modifiers, but only when the persisted keybinding
+    /// string is missing / blank (e.g. older preference payloads predating this field).
+    /// Without this guard, users would be locked out of arc mode until they manually
+    /// reset keybindings.
+    /// </summary>
+    private static bool IsArcToggleFallback(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, string? binding)
+    {
+        if (!string.IsNullOrWhiteSpace(binding))
+        {
+            return false;
+        }
+
+        return !e.CtrlKey && !e.AltKey && !e.ShiftKey
+            && (string.Equals(e.Key, "a", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static KeyBindingSettings CloneKeyBindings(KeyBindingSettings source) => new()
     {
         StampSpacingLeft = source.StampSpacingLeft,
@@ -3012,6 +3069,13 @@ public partial class GardenPlot
         PanDown = source.PanDown,
         RotateGroupOrientationCounterClockwise = source.RotateGroupOrientationCounterClockwise,
         RotateGroupOrientationClockwise = source.RotateGroupOrientationClockwise,
+
+        // Issue #130 — every persisted KeyBindings round-trip MUST carry the new fields,
+        // otherwise saving the dialog drops them silently and the A / Shift+H / Shift+V
+        // shortcuts stop working until the user resets defaults.
+        ToggleArcSegment = source.ToggleArcSegment,
+        MirrorHorizontal = source.MirrorHorizontal,
+        MirrorVertical = source.MirrorVertical,
     };
 
     private KeyBindingSettings KeyBindings => library.Ui.KeyBindings ??= new KeyBindingSettings();
@@ -5186,6 +5250,21 @@ public partial class GardenPlot
             buildingPolygon = false;
             isDraftVertexDragging = false;
             draftVertexIndex = -1;
+            awaitingArcApex = false;
+            arcApexEdgeIndex = -1;
+            lastArcClickAt = null;
+        }
+
+        // Issue #130 — arc mode is only meaningful for the click-by-vertex tools
+        // (Polygon, Polyline, or GroundCover-Polygon submode). Switching to any
+        // non-arc-capable tool disarms it so a stale "Arc on" state doesn't surprise
+        // the user later.
+        bool newToolIsArcCapable =
+            t is Tool.Polygon or Tool.Polyline
+            || (t == Tool.GroundCover && groundCoverSubMode == GroundCoverSubMode.Polygon);
+        if (!newToolIsArcCapable)
+        {
+            arcModeArmed = false;
         }
 
         if (t != Tool.Select)
@@ -7862,14 +7941,18 @@ public partial class GardenPlot
                 // Click-by-vertex open path. First click anchors the start AND a trailing
                 // cursor-tracking endpoint; later clicks commit the previous endpoint and
                 // append a new tracker. Double-click finalizes (see OnCanvasDoubleClick).
+                // Issue #130: when arcModeArmed is true the click flow becomes two-step
+                // per edge — terminus first, then apex — handled in TryHandleArcClick.
                 if (drafting is null || drafting.Kind != ShapeKind.FreeDraw || !buildingPolygon)
                 {
                     drafting = new Shape { Kind = ShapeKind.FreeDraw };
                     drafting.Points.Add(new Point(x, y));
                     drafting.Points.Add(new Point(x, y));
                     buildingPolygon = true;
+                    awaitingArcApex = false;
+                    arcApexEdgeIndex = -1;
                 }
-                else
+                else if (!TryHandleArcClick(x, y))
                 {
                     drafting.Points[^1] = new Point(x, y);
                     drafting.Points.Add(new Point(x, y));
@@ -7884,15 +7967,18 @@ public partial class GardenPlot
                 // FreeDraw+CloseEdge rather than introducing a new ShapeKind: the existing closed-
                 // path semantics on Shape (already used by Edge with CloseEdge) cover every
                 // downstream consumer (area math, rotation, hit testing) without a 169-call-site
-                // ShapeKind audit.
+                // ShapeKind audit. Issue #130 adds the two-click arc flow (terminus + apex) under
+                // arcModeArmed; see TryHandleArcClick.
                 if (drafting is null || drafting.Kind != ShapeKind.FreeDraw || !buildingPolygon)
                 {
                     drafting = new Shape { Kind = ShapeKind.FreeDraw, CloseEdge = true };
                     drafting.Points.Add(new Point(x, y));
                     drafting.Points.Add(new Point(x, y));
                     buildingPolygon = true;
+                    awaitingArcApex = false;
+                    arcApexEdgeIndex = -1;
                 }
-                else
+                else if (!TryHandleArcClick(x, y))
                 {
                     drafting.Points[^1] = new Point(x, y);
                     drafting.Points.Add(new Point(x, y));
@@ -8031,7 +8117,8 @@ public partial class GardenPlot
                     {
                         // Click-by-vertex polygon. First click: start the shape with an
                         // anchor + cursor-tracking endpoint. Subsequent clicks add vertices.
-                        // Double-click finalizes (see OnCanvasDoubleClick).
+                        // Double-click finalizes (see OnCanvasDoubleClick). Issue #130 wires
+                        // the two-click arc apex flow in via TryHandleArcClick.
                         if (drafting is null || !buildingPolygon)
                         {
                             drafting = new Shape
@@ -8051,8 +8138,10 @@ public partial class GardenPlot
                             drafting.Points.Add(new Point(x, y));
                             drafting.Points.Add(new Point(x, y));
                             buildingPolygon = true;
+                            awaitingArcApex = false;
+                            arcApexEdgeIndex = -1;
                         }
-                        else
+                        else if (!TryHandleArcClick(x, y))
                         {
                             // Commit the previous cursor-tracking endpoint as a real vertex,
                             // then add a new trailing endpoint at the same spot.
@@ -8239,7 +8328,9 @@ public partial class GardenPlot
             || (currentTool == Tool.Stamp && selectedItem is not null)
             || isDragging
             || drafting is not null
-            || isVertexToolAwaitingFirstClick;
+            || isVertexToolAwaitingFirstClick
+            || isEdgeBulgeDragging
+            || isShapeVertexDragging;
 
         if (!isInteractiveMove && !IsConceptMode)
         {
@@ -8370,11 +8461,35 @@ public partial class GardenPlot
             return;
         }
 
-        if (drafting is null) return;
-        switch (drafting.Kind)
+        if (drafting is null && !isEdgeBulgeDragging && !isShapeVertexDragging) return;
+
+        // Issue #130 — midpoint-drag of a committed polygon's edge bulge.
+        if (isEdgeBulgeDragging)
+        {
+            ApplyEdgeBulgeFromCursor(x, y);
+            return;
+        }
+
+        // Issue #130 — vertex-drag of a committed polygon.
+        if (isShapeVertexDragging)
+        {
+            ApplyShapeVertexDragFromCursor(x, y);
+            return;
+        }
+
+        switch (drafting!.Kind)
         {
             case ShapeKind.FreeDraw:
-                if (buildingPolygon && drafting.Points.Count >= 1)
+                if (awaitingArcApex)
+                {
+                    // Issue #130 — apex-pick mode: the cursor controls the bulge of the just-
+                    // placed edge instead of moving a trailing tracker. drafting.Points[^1]
+                    // stays at the terminus position so the renderer keeps the arc anchored.
+                    UpdateArcApexFromCursor(
+                        Math.Clamp(x, 0, PlotWidthFt),
+                        Math.Clamp(y, 0, PlotHeightFt));
+                }
+                else if (buildingPolygon && drafting.Points.Count >= 1)
                 {
                     // Replace the trailing cursor-tracker so the in-progress edge follows the cursor.
                     drafting.Points[^1] = new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt));
@@ -8505,6 +8620,39 @@ public partial class GardenPlot
             // whole shape at once, including the dragged vertex's final position.
             isDraftVertexDragging = false;
             draftVertexIndex = -1;
+            return;
+        }
+
+        if (isEdgeBulgeDragging)
+        {
+            // Issue #130 — finish an edge-bulge midpoint drag. The bulge was already
+            // mutated on the live shape during pointer-move; commit it to disk and
+            // strip the EdgeBulges list back to null when every entry has snapped back
+            // to zero so the renderer stays on the cheaper polygon element.
+            var draggedShapeId = edgeBulgeDragShapeId;
+            isEdgeBulgeDragging = false;
+            edgeBulgeDragShapeId = Guid.Empty;
+            edgeBulgeDragEdgeIndex = -1;
+
+            var draggedShape = currentPlot.Shapes.FirstOrDefault(s => s.Id == draggedShapeId);
+            if (draggedShape is not null && !ArcPolygonPathBuilder.HasAnyArc(draggedShape.EdgeBulges))
+            {
+                draggedShape.EdgeBulges = null;
+            }
+
+            await SaveAsync();
+            return;
+        }
+
+        if (isShapeVertexDragging)
+        {
+            // Issue #130 — finish a committed-polygon vertex drag. The drag mutated the
+            // live shape; persist via SaveAsync (undo state was already snapshotted at
+            // pointer-down).
+            isShapeVertexDragging = false;
+            shapeVertexDragShapeId = Guid.Empty;
+            shapeVertexDragIndex = -1;
+            await SaveAsync();
             return;
         }
 
@@ -9227,6 +9375,10 @@ public partial class GardenPlot
             buildingPolygon = false;
             isDraftVertexDragging = false;
             draftVertexIndex = -1;
+            arcModeArmed = false;
+            awaitingArcApex = false;
+            arcApexEdgeIndex = -1;
+            lastArcClickAt = null;
             StateHasChanged();
             return;
         }
@@ -9234,6 +9386,19 @@ public partial class GardenPlot
         if (!buildingPolygon)
         {
             return;
+        }
+
+        // Issue #130 — when the polygon is finalised mid apex-pick, the cursor's last
+        // bulge value is already stored in EdgeBulges[arcApexEdgeIndex]. The trailing
+        // tracker that the line-path commit logic below expects isn't there yet, so we
+        // synthesize one (equal to the terminus) so the trim path runs uniformly.
+        if (awaitingArcApex)
+        {
+            var terminus = drafting.Points[^1];
+            drafting.Points.Add(new Point(terminus.X, terminus.Y));
+            awaitingArcApex = false;
+            arcApexEdgeIndex = -1;
+            lastArcClickAt = null;
         }
 
         // Drop the trailing cursor-tracking endpoint.
@@ -9256,6 +9421,7 @@ public partial class GardenPlot
 
         if (drafting.Points.Count >= 3 || (drafting.Points.Count >= 2 && !IsGroundCoverShape(drafting)))
         {
+            NormalizeEdgeBulgesOnCommit(drafting); // issue #130
             RecordUndoState();
             currentPlot.Shapes.Add(drafting);
             _ = SaveAsync();
@@ -9265,6 +9431,9 @@ public partial class GardenPlot
         buildingPolygon = false;
         isDraftVertexDragging = false;
         draftVertexIndex = -1;
+        arcModeArmed = false;
+        awaitingArcApex = false;
+        arcApexEdgeIndex = -1;
         StateHasChanged();
     }
 
@@ -9320,6 +9489,426 @@ public partial class GardenPlot
     }
 
     /// <summary>
+    /// Issue #130: arc-sided polygon click handling.
+    /// <list type="bullet">
+    ///   <item><description>When NOT in arc mode, returns <see langword="false"/> so the caller
+    ///   runs the normal line-edge click path.</description></item>
+    ///   <item><description>In arc mode, the first click commits the terminus (a regular vertex)
+    ///   and enters apex-pick mode. Cursor movement live-updates the bulge of the new edge.</description></item>
+    ///   <item><description>In apex-pick mode, the second click locks the bulge in (it was
+    ///   already in <see cref="Shape.EdgeBulges"/> from cursor updates) and starts a new
+    ///   trailing tracker from the terminus. <see cref="arcModeArmed"/> is latched, so the
+    ///   next edge is also an arc until the user toggles A.</description></item>
+    /// </list>
+    /// Returns <see langword="true"/> when the click was consumed by the arc flow.
+    /// </summary>
+    /// <param name="x">Click x position (feet).</param>
+    /// <param name="y">Click y position (feet).</param>
+    /// <returns><see langword="true"/> when the click was consumed by the arc state machine.</returns>
+    private bool TryHandleArcClick(double x, double y)
+    {
+        if (drafting is null || !buildingPolygon)
+        {
+            return false;
+        }
+
+        if (awaitingArcApex)
+        {
+            // The apex click locks in the bulge already stored in EdgeBulges[arcApexEdgeIndex]
+            // by the cursor-tracking updates in UpdateArcApexFromCursor. We just need to add a
+            // fresh trailing tracker starting from the terminus (drafting.Points[^1]) so the
+            // next click continues the polygon normally.
+            var terminus = drafting.Points[^1];
+            drafting.Points.Add(new Point(terminus.X, terminus.Y));
+            awaitingArcApex = false;
+            arcApexEdgeIndex = -1;
+            lastArcClickAt = DateTime.UtcNow;
+            return true;
+        }
+
+        if (!arcModeArmed)
+        {
+            return false;
+        }
+
+        // Issue #130 — double-click guard. A browser double-click fires two pointerdowns
+        // in quick succession before the dblclick event. Without this guard the second
+        // pointerdown would commit a spurious new terminus (with a zero-bulge edge), and
+        // the polygon would finalise with an extra vertex right next to the apex.
+        if (lastArcClickAt is { } previous
+            && (DateTime.UtcNow - previous).TotalMilliseconds < ArcDoubleClickGuardMs)
+        {
+            // Consume the click without mutating state so the dblclick that's about to
+            // arrive sees the polygon in its just-apex-committed shape.
+            return true;
+        }
+
+        // Arc mode armed but no terminus yet. Commit terminus exactly like the line path
+        // would (replace trailing tracker, append new tracker), then DROP the new tracker
+        // — during apex pick the cursor controls the bulge, not a candidate next vertex.
+        drafting.Points[^1] = new Point(x, y);
+        drafting.EdgeBulges ??= new List<double>();
+        while (drafting.EdgeBulges.Count < drafting.Points.Count - 2)
+        {
+            drafting.EdgeBulges.Add(0);
+        }
+
+        // The edge whose bulge the cursor will drive runs from drafting.Points[^2] (the
+        // previous committed vertex) to drafting.Points[^1] (the freshly placed terminus).
+        // Its index in EdgeBulges is drafting.Points.Count - 2.
+        arcApexEdgeIndex = drafting.Points.Count - 2;
+        drafting.EdgeBulges.Add(0);
+        awaitingArcApex = true;
+        lastArcClickAt = DateTime.UtcNow;
+        return true;
+    }
+
+    /// <summary>
+    /// Live-updates the bulge of the edge under construction while the user is in apex-pick
+    /// mode (issue #130). Called from <see cref="OnPointerMove"/> when
+    /// <see cref="awaitingArcApex"/> is set.
+    /// </summary>
+    /// <param name="cursorX">Cursor x (feet).</param>
+    /// <param name="cursorY">Cursor y (feet).</param>
+    private void UpdateArcApexFromCursor(double cursorX, double cursorY)
+    {
+        if (!awaitingArcApex || drafting is null || drafting.EdgeBulges is null)
+        {
+            return;
+        }
+
+        if (arcApexEdgeIndex < 0 || arcApexEdgeIndex >= drafting.EdgeBulges.Count)
+        {
+            return;
+        }
+
+        if (drafting.Points.Count < 2)
+        {
+            return;
+        }
+
+        Point start = drafting.Points[^2];
+        Point end = drafting.Points[^1];
+        drafting.EdgeBulges[arcApexEdgeIndex] = EdgeArcGeometry.BulgeFromDraggedMidpoint(
+            start, end, new Point(cursorX, cursorY), snapToLineFt: 0);
+    }
+
+    /// <summary>
+    /// Toggles the latched arc mode for the in-progress polygon / polyline (issue #130).
+    /// Honoured both when a draft is already in flight AND when the user arms the mode
+    /// BEFORE the first click — pressing A while the Polygon or Polyline tool is selected
+    /// arms arc mode so the very first edge of the new shape uses the two-click arc flow.
+    /// If toggled off while <see cref="awaitingArcApex"/> is set the apex pick is cancelled
+    /// (the current edge reverts to a line and a fresh trailing tracker is added).
+    /// </summary>
+    /// <summary>
+    /// Issue #130 — predicate identifying the click-by-vertex tools that support arc
+    /// drawing. Centralised so the ToggleArcMode guard, the toolbar badge visibility,
+    /// and the SetTool reset path all agree on the set.
+    /// </summary>
+    private bool IsArcCapableTool =>
+        currentTool is Tool.Polygon or Tool.Polyline
+        || (currentTool == Tool.GroundCover && groundCoverSubMode == GroundCoverSubMode.Polygon);
+
+    internal void ToggleArcMode()
+    {
+        Console.WriteLine($"[#130] ToggleArcMode entered: currentTool={currentTool} drafting={(drafting != null ? "yes" : "no")} buildingPolygon={buildingPolygon} arcModeArmed(before)={arcModeArmed} awaitingArcApex={awaitingArcApex}");
+
+        // Arc mode only makes sense for the click-by-vertex tools that produce closed
+        // FreeDraw polygons — Polygon, Polyline, and the GroundCover Polygon sub-mode
+        // (which the user typically picks for curved-bed pathway designs).
+        if (!IsArcCapableTool)
+        {
+            Console.WriteLine($"[#130] ToggleArcMode bailed: tool is {currentTool}");
+            return;
+        }
+
+        bool inDraft = drafting is not null && buildingPolygon && drafting.Kind == ShapeKind.FreeDraw;
+
+        if (inDraft && awaitingArcApex)
+        {
+            // Cancel apex pick: zero the bulge for the in-progress edge and restore the
+            // trailing tracker so the next click resumes line drawing.
+            if (drafting!.EdgeBulges is not null
+                && arcApexEdgeIndex >= 0
+                && arcApexEdgeIndex < drafting.EdgeBulges.Count)
+            {
+                drafting.EdgeBulges[arcApexEdgeIndex] = 0;
+            }
+
+            var terminus = drafting.Points[^1];
+            drafting.Points.Add(new Point(terminus.X, terminus.Y));
+            awaitingArcApex = false;
+            arcApexEdgeIndex = -1;
+            lastArcClickAt = null;
+            arcModeArmed = false;
+        }
+        else
+        {
+            arcModeArmed = !arcModeArmed;
+        }
+
+        Console.WriteLine($"[#130] ToggleArcMode exit: arcModeArmed(after)={arcModeArmed} awaitingArcApex={awaitingArcApex}");
+        StateHasChanged();
+
+        // Return focus to the canvas so the next A press fires OnKeyDown there instead
+        // of bouncing off whatever button/input had focus.
+        _ = canvasRef.FocusAsync(preventScroll: true).AsTask();
+    }
+
+    /// <summary>
+    /// Strips trailing tracker artefacts from <see cref="Shape.EdgeBulges"/> when a draft
+    /// polygon is committed via double-click (issue #130). Drops the trailing entry that
+    /// was appended for the in-progress edge if there's one too many, and nulls out the
+    /// list when every entry is a line (so the renderer keeps using cheaper polygon /
+    /// polyline elements for line-only shapes).
+    /// </summary>
+    /// <param name="shape">The freshly committed shape.</param>
+    private static void NormalizeEdgeBulgesOnCommit(Shape shape)
+    {
+        if (shape.EdgeBulges is null)
+        {
+            return;
+        }
+
+        int expected = Math.Max(0, shape.Points.Count - 1);
+        while (shape.EdgeBulges.Count > expected)
+        {
+            shape.EdgeBulges.RemoveAt(shape.EdgeBulges.Count - 1);
+        }
+
+        if (!ArcPolygonPathBuilder.HasAnyArc(shape.EdgeBulges))
+        {
+            shape.EdgeBulges = null;
+        }
+    }
+
+    /// <summary>
+    /// Issue #130 — mirrors the selected shapes across their geometric centre along the
+    /// requested axis. For arc-sided FreeDraw polygons every <see cref="Shape.EdgeBulges"/>
+    /// entry is negated and the walk order reversed so the arcs preserve their original
+    /// curvature after the flip. Rectangle / Oval / BedKit shapes negate their rotation
+    /// so they appear mirrored when rotation is non-zero.
+    /// </summary>
+    /// <param name="horizontal">When <see langword="true"/>, flips across the vertical axis (x mirrored); otherwise flips across the horizontal axis (y mirrored).</param>
+    private async Task MirrorSelected(bool horizontal)
+    {
+        if (currentPlot is null || selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        var targets = SelectedShapes().ToList();
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        foreach (var shape in targets)
+        {
+            MirrorShape(shape, horizontal);
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Mirrors a single shape in-place. Public for the unit tests; never reassigns
+    /// <paramref name="shape"/>.
+    /// </summary>
+    /// <param name="shape">The shape to mirror.</param>
+    /// <param name="horizontal">When <see langword="true"/>, flips the x coordinate.</param>
+    internal static void MirrorShape(Shape shape, bool horizontal)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+
+        if (shape.Kind == ShapeKind.FreeDraw && shape.Points.Count >= 2)
+        {
+            (double minX, double minY, double maxX, double maxY) = PointsBounds(shape.Points);
+            double axis = horizontal ? (minX + maxX) / 2.0 : (minY + maxY) / 2.0;
+            for (int i = 0; i < shape.Points.Count; i++)
+            {
+                Point p = shape.Points[i];
+                shape.Points[i] = horizontal
+                    ? new Point((2.0 * axis) - p.X, p.Y)
+                    : new Point(p.X, (2.0 * axis) - p.Y);
+            }
+
+            // Mirroring the points (without reversing the walk order) flips the polygon
+            // winding direction. Every existing arc now sits on the OPPOSITE side of its
+            // chord relative to the walking direction, which in the AutoCAD bulge
+            // convention is exactly a sign flip. No index shift is needed because the
+            // points list isn't reordered.
+            if (shape.EdgeBulges is not null)
+            {
+                for (int i = 0; i < shape.EdgeBulges.Count; i++)
+                {
+                    shape.EdgeBulges[i] = -shape.EdgeBulges[i];
+                }
+
+                if (!ArcPolygonPathBuilder.HasAnyArc(shape.EdgeBulges))
+                {
+                    shape.EdgeBulges = null;
+                }
+            }
+        }
+        else
+        {
+            // For axis-aligned primitives (Rectangle, Oval, BedKit), mirroring is purely a
+            // rotation flip when rotation is non-zero; the bounding box itself is symmetric.
+            shape.Rotation = -shape.Rotation;
+        }
+    }
+
+    private static (double MinX, double MinY, double MaxX, double MaxY) PointsBounds(IReadOnlyList<Point> points)
+    {
+        double minX = points[0].X, minY = points[0].Y, maxX = points[0].X, maxY = points[0].Y;
+        for (int i = 1; i < points.Count; i++)
+        {
+            Point p = points[i];
+            if (p.X < minX) minX = p.X;
+            else if (p.X > maxX) maxX = p.X;
+            if (p.Y < minY) minY = p.Y;
+            else if (p.Y > maxY) maxY = p.Y;
+        }
+
+        return (minX, minY, maxX, maxY);
+    }
+
+    /// <summary>
+    /// Issue #130 — pointer-down on a per-edge midpoint handle of a selected FreeDraw
+    /// polygon. The cursor's perpendicular offset from the chord midpoint becomes the
+    /// edge's bulge while the pointer is held. Releasing the pointer commits the bulge
+    /// (already in <see cref="Shape.EdgeBulges"/> from the drag) and persists via
+    /// <see cref="SaveAsync"/>.
+    /// </summary>
+    /// <param name="e">The pointer event.</param>
+    /// <param name="shapeId">Id of the shape whose edge is being dragged.</param>
+    /// <param name="edgeIndex">Edge index (start vertex index) being dragged.</param>
+    internal void OnEdgeBulgePointerDown(
+        Microsoft.AspNetCore.Components.Web.PointerEventArgs e,
+        Guid shapeId,
+        int edgeIndex)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (currentPlot is null || e.Button != 0 || currentTool != Tool.Select)
+        {
+            return;
+        }
+
+        Shape? shape = currentPlot.Shapes.FirstOrDefault(s => s.Id == shapeId);
+        if (shape is null || edgeIndex < 0 || shape.Points.Count < 2)
+        {
+            return;
+        }
+
+        ClearIdleRenderSuppression();
+        RecordUndoState();
+        shape.EdgeBulges ??= new List<double>();
+        while (shape.EdgeBulges.Count <= edgeIndex)
+        {
+            shape.EdgeBulges.Add(0);
+        }
+
+        isEdgeBulgeDragging = true;
+        edgeBulgeDragShapeId = shapeId;
+        edgeBulgeDragEdgeIndex = edgeIndex;
+    }
+
+    /// <summary>
+    /// Live update for the edge-bulge midpoint drag (issue #130). Maps the cursor's
+    /// perpendicular offset from the chord midpoint into a signed bulge via
+    /// <see cref="EdgeArcGeometry.BulgeFromDraggedMidpoint"/>; the helper snaps the bulge
+    /// back to <c>0</c> when the offset drops below the line-snap tolerance.
+    /// </summary>
+    /// <param name="cursorX">Cursor x (feet).</param>
+    /// <param name="cursorY">Cursor y (feet).</param>
+    private void ApplyEdgeBulgeFromCursor(double cursorX, double cursorY)
+    {
+        if (!isEdgeBulgeDragging || currentPlot is null)
+        {
+            return;
+        }
+
+        Shape? shape = currentPlot.Shapes.FirstOrDefault(s => s.Id == edgeBulgeDragShapeId);
+        if (shape is null || shape.EdgeBulges is null)
+        {
+            return;
+        }
+
+        if (edgeBulgeDragEdgeIndex < 0
+            || edgeBulgeDragEdgeIndex >= shape.EdgeBulges.Count
+            || shape.Points.Count < 2)
+        {
+            return;
+        }
+
+        Point start = shape.Points[edgeBulgeDragEdgeIndex];
+        Point end = shape.Points[(edgeBulgeDragEdgeIndex + 1) % shape.Points.Count];
+        shape.EdgeBulges[edgeBulgeDragEdgeIndex] = EdgeArcGeometry.BulgeFromDraggedMidpoint(
+            start, end, new Point(cursorX, cursorY));
+    }
+
+    /// <summary>
+    /// Issue #130 — pointer-down on a per-vertex square handle of a selected FreeDraw
+    /// polygon. Mirrors <see cref="OnEdgeBulgePointerDown"/> but for vertex repositioning:
+    /// the dragged vertex updates live during pointer-move; the bulges stay attached to
+    /// their (now shifted) endpoints so curvature follows the drag.
+    /// </summary>
+    /// <param name="e">The pointer event.</param>
+    /// <param name="shapeId">Id of the shape whose vertex is being dragged.</param>
+    /// <param name="vertexIndex">Vertex index being dragged.</param>
+    internal void OnShapeVertexPointerDown(
+        Microsoft.AspNetCore.Components.Web.PointerEventArgs e,
+        Guid shapeId,
+        int vertexIndex)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (currentPlot is null || e.Button != 0 || currentTool != Tool.Select)
+        {
+            return;
+        }
+
+        Shape? shape = currentPlot.Shapes.FirstOrDefault(s => s.Id == shapeId);
+        if (shape is null || vertexIndex < 0 || vertexIndex >= shape.Points.Count)
+        {
+            return;
+        }
+
+        ClearIdleRenderSuppression();
+        RecordUndoState();
+        isShapeVertexDragging = true;
+        shapeVertexDragShapeId = shapeId;
+        shapeVertexDragIndex = vertexIndex;
+    }
+
+    /// <summary>
+    /// Live update for the committed-shape vertex drag (issue #130). Mutates only the
+    /// dragged vertex's position; bulges stay attached to the same endpoint indices, so
+    /// the arc on either side of the vertex follows the new chord.
+    /// </summary>
+    /// <param name="cursorX">Cursor x (feet).</param>
+    /// <param name="cursorY">Cursor y (feet).</param>
+    private void ApplyShapeVertexDragFromCursor(double cursorX, double cursorY)
+    {
+        if (!isShapeVertexDragging || currentPlot is null)
+        {
+            return;
+        }
+
+        Shape? shape = currentPlot.Shapes.FirstOrDefault(s => s.Id == shapeVertexDragShapeId);
+        if (shape is null || shapeVertexDragIndex < 0 || shapeVertexDragIndex >= shape.Points.Count)
+        {
+            return;
+        }
+
+        shape.Points[shapeVertexDragIndex] = new Point(
+            Math.Clamp(cursorX, 0, PlotWidthFt),
+            Math.Clamp(cursorY, 0, PlotHeightFt));
+    }
+
+    /// <summary>
     /// Handler for pointer-down on a draft-polygon vertex handle (issue #129).
     /// Starts a vertex-drag that mutates only <c>drafting.Points[<paramref name="vertexIndex"/>]</c>;
     /// the trailing cursor-tracker is left frozen so the HUD's "candidate next vertex"
@@ -9371,6 +9960,10 @@ public partial class GardenPlot
             buildingPolygon = false;
             isDraftVertexDragging = false;
             draftVertexIndex = -1;
+            arcModeArmed = false;
+            awaitingArcApex = false;
+            arcApexEdgeIndex = -1;
+            lastArcClickAt = null;
         }
     }
 
@@ -9408,6 +10001,13 @@ public partial class GardenPlot
     {
         ClearIdleRenderSuppression();
         var kb = KeyBindings;
+
+        // Issue #130 — diagnostic logging so the user can share browser console output
+        // when reporting hotkey issues. Logs every key + modifier + current tool, and a
+        // ✓ when the ToggleArcSegment binding matches.
+        bool arcMatch = IsBindingMatch(e, kb.ToggleArcSegment) || IsArcToggleFallback(e, kb.ToggleArcSegment);
+        Console.WriteLine($"[#130] OnKeyDown key='{e.Key}' ctrl={e.CtrlKey} shift={e.ShiftKey} alt={e.AltKey} tool={currentTool} arcArmed={arcModeArmed} arcBinding='{kb.ToggleArcSegment}' arcMatch={arcMatch}");
+        lastKeyDebug = $"{e.Key}{(e.CtrlKey ? "+Ctrl" : "")}{(e.ShiftKey ? "+Shift" : "")}{(e.AltKey ? "+Alt" : "")} {(arcMatch ? "(arc!)" : "")}";
 
         if (IsConceptMode)
         {
@@ -9516,6 +10116,21 @@ public partial class GardenPlot
             var delta = IsBindingMatch(e, kb.RotateGroupOrientationCounterClockwise) ? -15.0 : 15.0;
             await RotateSelectedGroupOrientations(delta);
         }
+        else if (IsBindingMatch(e, kb.ToggleArcSegment) || IsArcToggleFallback(e, kb.ToggleArcSegment))
+        {
+            // Issue #130 — toggle latched arc mode while drawing a polygon / polyline.
+            // The fallback matches a bare 'a' / 'A' (no modifiers) so users whose persisted
+            // KeyBindings predate this field don't get locked out.
+            ToggleArcMode();
+        }
+        else if (IsBindingMatch(e, kb.MirrorHorizontal))
+        {
+            await MirrorSelected(horizontal: true);
+        }
+        else if (IsBindingMatch(e, kb.MirrorVertical))
+        {
+            await MirrorSelected(horizontal: false);
+        }
         else if (IsBindingMatch(e, kb.Escape))
         {
             // Cancel drafting and return to select mode.
@@ -9529,6 +10144,10 @@ public partial class GardenPlot
             buildingPolygon = false;
             isDraftVertexDragging = false;
             draftVertexIndex = -1;
+            arcModeArmed = false;
+            awaitingArcApex = false;
+            arcApexEdgeIndex = -1;
+            lastArcClickAt = null;
             ClearSelection();
         }
     }
