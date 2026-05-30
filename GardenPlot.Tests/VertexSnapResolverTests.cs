@@ -108,4 +108,43 @@ public sealed class VertexSnapResolverTests
         Assert.Throws<ArgumentNullException>(() =>
             VertexSnapResolver.Resolve(cursor, null!, snapRadiusFt: 1.0, altHeld: false));
     }
+
+    [Fact]
+    public void Resolve_FirstClick_NoActiveDraft_SnapsToExistingShapeVertex()
+    {
+        // End-to-end first-click integration: simulate the state during the
+        // FIRST click of a new polygon (no drafting yet). The cursor is near
+        // an existing rectangle's NE corner. Snap MUST engage exactly as it
+        // does for subsequent clicks. Regression guard for PR #149 follow-up
+        // (user reported "second click has gravity, first doesn't").
+        var rectId = Guid.NewGuid();
+        var rect = new Shape { Id = rectId, Kind = ShapeKind.Rectangle, X = 0, Y = 0, W = 10, H = 6 };
+        var candidates = ShapeVertexEnumerator.Enumerate(rect).ToList();
+
+        // Cursor near the NE corner (10, 0), well within snapRadius.
+        var cursor = new Point(9.7, 0.3);
+        var result = VertexSnapResolver.Resolve(cursor, candidates, snapRadiusFt: 1.0, altHeld: false);
+
+        Assert.True(result.IsSnapped);
+        Assert.NotNull(result.Target);
+        Assert.Equal(rectId, result.Target!.Value.ShapeId);
+        Assert.Equal(10, result.Position.X, 6);
+        Assert.Equal(0, result.Position.Y, 6);
+    }
+
+    [Fact]
+    public void Resolve_FirstClick_AltHeld_DisablesSnapEvenWithVertexNearby()
+    {
+        // Mirrors the issue's promise: Alt held during the FIRST click bypasses
+        // snap so the user can place a vertex very close to an existing corner
+        // without the cursor sticking.
+        var rect = new Shape { Kind = ShapeKind.Rectangle, X = 0, Y = 0, W = 10, H = 6 };
+        var candidates = ShapeVertexEnumerator.Enumerate(rect).ToList();
+
+        var cursor = new Point(9.7, 0.3);
+        var result = VertexSnapResolver.Resolve(cursor, candidates, snapRadiusFt: 1.0, altHeld: true);
+
+        Assert.False(result.IsSnapped);
+        Assert.Equal(cursor, result.Position);
+    }
 }

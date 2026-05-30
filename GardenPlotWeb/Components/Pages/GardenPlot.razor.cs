@@ -1,4 +1,4 @@
-﻿// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
+// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -2823,10 +2823,12 @@ public partial class GardenPlot
 
     // Issue #133 — corner-snap state. snapPreview is what the renderer draws as the
     // visible "snapped here" glyph; null means no snap is engaged for the current
-    // pointer move. The default 8 CSS-pixel radius matches the user's request; the
-    // value is converted to plot-space feet at the current zoom inside ResolveCornerSnap.
+    // pointer move. 14 CSS-pixel radius is forgiving enough that a casual click
+    // near a corner snaps without requiring sub-pixel aim, while small enough that
+    // it doesn't pull cursors from across the canvas. The value is converted to
+    // plot-space feet at the current zoom inside ResolveCornerSnap.
     private SnapResult? snapPreview;
-    private const double SnapRadiusPx = 8.0;
+    private const double SnapRadiusPx = 14.0;
 
     private sealed class DragSnap
     {
