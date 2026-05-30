@@ -49,6 +49,18 @@ public enum FillAnchorMode
     Custom,
 }
 
+/// <summary>
+/// HUD text size for the in-progress polygon size readout (issue #129). Append-only
+/// per the change-discipline rule in README §9 — adding values here must not break
+/// existing persisted payloads.
+/// </summary>
+public enum DraftHudFontSize
+{
+    Small,
+    Medium,
+    Large,
+}
+
 /// <summary>Persisted UI state (panel positions, etc.). Stored alongside <see cref="PlotLibrary"/>.</summary>
 public class UiPreferences
 {
@@ -144,6 +156,12 @@ public class UiPreferences
 
     /// <summary>Last-selected palette category (sticky across sessions).</summary>
     public PaletteCategory? LastPaletteCategory { get; set; }
+
+    /// <summary>
+    /// HUD text size for the in-progress polygon size readout (issue #129).
+    /// Defaults to <see cref="DraftHudFontSize.Medium"/>.
+    /// </summary>
+    public DraftHudFontSize DraftHudFontSize { get; set; } = DraftHudFontSize.Medium;
 
     /// <summary>Whether to show the clip hatch overlay for clipped areas. Default off — the
     /// overlay runs polygon-clipping per affected shape on every render, so we leave it as an
