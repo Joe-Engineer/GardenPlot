@@ -1,4 +1,4 @@
-// <copyright file="ShapeCohortFingerprintTests.cs" company="Garden Plot">
+﻿// <copyright file="ShapeCohortFingerprintTests.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -203,6 +203,29 @@ public sealed class ShapeCohortFingerprintTests
         long hashB = ShapeCohortFingerprint.Compute(new[] { a, b }, null, withB, false, 0);
 
         Assert.NotEqual(hashA, hashB);
+    }
+
+    [Fact]
+    public void EdgeBulgesMutation_ChangesHash()
+    {
+        // Issue #130 — live midpoint-drag of an arc bulge mutates Shape.EdgeBulges in
+        // place. The fingerprint MUST include EdgeBulges so ShouldRender re-runs the
+        // cohort's render path and the curve visibly tracks the cursor.
+        Shape s = MakeShape();
+        s.Kind = ShapeKind.FreeDraw;
+        s.Points = new List<Point> { new(0, 0), new(1, 0), new(1, 1) };
+        s.CloseEdge = true;
+
+        long noBulges = ShapeCohortFingerprint.Compute(new[] { s }, null, EmptySel, false, 0);
+
+        s.EdgeBulges = new List<double> { 0.4, 0, 0 };
+        long withBulges = ShapeCohortFingerprint.Compute(new[] { s }, null, EmptySel, false, 0);
+
+        s.EdgeBulges[0] = 0.6;
+        long differentBulge = ShapeCohortFingerprint.Compute(new[] { s }, null, EmptySel, false, 0);
+
+        Assert.NotEqual(noBulges, withBulges);
+        Assert.NotEqual(withBulges, differentBulge);
     }
 
     [Fact]

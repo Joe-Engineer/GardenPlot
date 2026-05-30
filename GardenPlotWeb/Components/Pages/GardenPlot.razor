@@ -181,13 +181,14 @@ else
 
             <div class="toolbar-group zoom-group">
                 <span class="small text-muted">Tool: <strong>@currentTool</strong></span>
-                @* Issue #130 — arc-mode badge. Visible only while drafting a polygon /
-                   polyline. Click toggles the mode (mirrors the A hotkey). *@
-                @if (drafting is not null && buildingPolygon && drafting.Kind == ShapeKind.FreeDraw)
+                @* Issue #130 — arc-mode badge. Visible whenever Polygon / Polyline is the
+                   active tool (including BEFORE the first click) so the user can arm arc
+                   mode up front. Click toggles the mode (mirrors the A hotkey). *@
+                @if (currentTool is Tool.Polygon or Tool.Polyline)
                 {
                     <button class="btn btn-sm @(arcModeArmed ? "btn-warning" : "btn-outline-secondary") ms-1"
                             @onclick="ToggleArcMode"
-                            title="Toggle arc segments. When ON, each new side is an arc — click terminus, then apex.">
+                            title="Toggle arc segments. When ON, each side is a 3-click flow: start, terminus, apex (sets curvature).">
                         @(arcModeArmed ? "\u25DC Arc on" : "Line")
                     </button>
                 }

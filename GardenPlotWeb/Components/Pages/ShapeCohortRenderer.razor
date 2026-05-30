@@ -226,11 +226,29 @@
                   fill="none" stroke="#0d6efd" stroke-width="0.05"
                   stroke-dasharray="0.15,0.1" pointer-events="none" />
 
-            @* Issue #130: per-edge midpoint handles on selected FreeDraw polygons. Dragging
-               a handle live-updates the edge's bulge via OnEdgeBulgePointerDown; dropping it
-               within the snap-to-line tolerance restores the edge as a straight line. *@
+            @* Issue #130: per-vertex SQUARE handles + per-edge CIRCLE midpoint handles on
+               selected FreeDraw polygons. Vertices reposition with no effect on bulges
+               (the arc on either side follows the new endpoints). Midpoints adjust the
+               bulge of their edge; releasing within snap tolerance of the chord restores
+               a straight line. Different shapes/colors keep the two affordances visually
+               distinct: squares + blue for vertices, circles + cream/amber for arcs. *@
             @if (CurrentTool == GardenPlot.Tool.Select && s.Kind == ShapeKind.FreeDraw && s.Points.Count >= 2)
             {
+                var capturedShapeId = s.Id;
+                @for (int vIdx = 0; vIdx < s.Points.Count; vIdx++)
+                {
+                    var localVertexIdx = vIdx;
+                    var vp = s.Points[localVertexIdx];
+                    <rect x="@GardenPlot.F(vp.X - 0.1)" y="@GardenPlot.F(vp.Y - 0.1)"
+                          width="0.2" height="0.2"
+                          fill="#e7f1ff" stroke="#0d6efd" stroke-width="0.04" cursor="move"
+                          pointer-events="auto"
+                          @onpointerdown="@(e => Parent!.OnShapeVertexPointerDown(e, capturedShapeId, localVertexIdx))"
+                          @onpointerdown:stopPropagation="true">
+                        <title>Drag to move this vertex</title>
+                    </rect>
+                }
+
                 var edgeCount = s.CloseEdge ? s.Points.Count : s.Points.Count - 1;
                 @for (int edgeIdx = 0; edgeIdx < edgeCount; edgeIdx++)
                 {
@@ -241,7 +259,6 @@
                         ? s.EdgeBulges[localEdgeIdx]
                         : 0;
                     var handle = EdgeArcGeometry.MidpointOnEdge(edgeStart, edgeEnd, edgeBulge);
-                    var capturedShapeId = s.Id;
                     <circle cx="@GardenPlot.F(handle.X)" cy="@GardenPlot.F(handle.Y)" r="0.1"
                             fill="#fffbe6" stroke="#b58105" stroke-width="0.04" cursor="ns-resize"
                             pointer-events="auto"

@@ -2848,6 +2848,14 @@ public partial class GardenPlot
     private Guid edgeBulgeDragShapeId;
     private int edgeBulgeDragEdgeIndex = -1;
 
+    // Issue #130 — vertex-drag for committed FreeDraw polygons. The square handles
+    // rendered by ShapeCohortRenderer when a polygon is selected use this state to
+    // reposition a single vertex without affecting any of the polygon's other points
+    // or its bulges. Records undo on pointer-down so the whole drag is one undo step.
+    private bool isShapeVertexDragging;
+    private Guid shapeVertexDragShapeId;
+    private int shapeVertexDragIndex = -1;
+
     // Issue #133 — corner-snap state. snapPreview is what the renderer draws as the
     // visible "snapped here" glyph; null means no snap is engaged for the current
     // pointer move. 14 CSS-pixel radius is forgiving enough that a casual click
@@ -5213,10 +5221,17 @@ public partial class GardenPlot
             buildingPolygon = false;
             isDraftVertexDragging = false;
             draftVertexIndex = -1;
-            arcModeArmed = false;
             awaitingArcApex = false;
             arcApexEdgeIndex = -1;
             lastArcClickAt = null;
+        }
+
+        // Issue #130 — arc mode is only meaningful for the click-by-vertex tools.
+        // Switching to any other tool disarms it so a stale "Arc on" state doesn't
+        // surprise the user later.
+        if (t is not Tool.Polygon and not Tool.Polyline)
+        {
+            arcModeArmed = false;
         }
 
         if (t != Tool.Select)
@@ -8278,7 +8293,8 @@ public partial class GardenPlot
             || isDragging
             || drafting is not null
             || isVertexToolAwaitingFirstClick
-            || isEdgeBulgeDragging;
+            || isEdgeBulgeDragging
+            || isShapeVertexDragging;
 
         if (!isInteractiveMove && !IsConceptMode)
         {
@@ -8409,12 +8425,19 @@ public partial class GardenPlot
             return;
         }
 
-        if (drafting is null && !isEdgeBulgeDragging) return;
+        if (drafting is null && !isEdgeBulgeDragging && !isShapeVertexDragging) return;
 
         // Issue #130 — midpoint-drag of a committed polygon's edge bulge.
         if (isEdgeBulgeDragging)
         {
             ApplyEdgeBulgeFromCursor(x, y);
+            return;
+        }
+
+        // Issue #130 — vertex-drag of a committed polygon.
+        if (isShapeVertexDragging)
+        {
+            ApplyShapeVertexDragFromCursor(x, y);
             return;
         }
 
@@ -8581,6 +8604,18 @@ public partial class GardenPlot
                 draggedShape.EdgeBulges = null;
             }
 
+            await SaveAsync();
+            return;
+        }
+
+        if (isShapeVertexDragging)
+        {
+            // Issue #130 — finish a committed-polygon vertex drag. The drag mutated the
+            // live shape; persist via SaveAsync (undo state was already snapshotted at
+            // pointer-down).
+            isShapeVertexDragging = false;
+            shapeVertexDragShapeId = Guid.Empty;
+            shapeVertexDragIndex = -1;
             await SaveAsync();
             return;
         }
@@ -9524,22 +9559,27 @@ public partial class GardenPlot
 
     /// <summary>
     /// Toggles the latched arc mode for the in-progress polygon / polyline (issue #130).
-    /// Pressing the hotkey while NOT drawing is a no-op. If toggled off while
-    /// <see cref="awaitingArcApex"/> is set the apex pick is cancelled (the current edge
-    /// reverts to a line and a fresh trailing tracker is added).
+    /// Honoured both when a draft is already in flight AND when the user arms the mode
+    /// BEFORE the first click — pressing A while the Polygon or Polyline tool is selected
+    /// arms arc mode so the very first edge of the new shape uses the two-click arc flow.
+    /// If toggled off while <see cref="awaitingArcApex"/> is set the apex pick is cancelled
+    /// (the current edge reverts to a line and a fresh trailing tracker is added).
     /// </summary>
     internal void ToggleArcMode()
     {
-        if (drafting is null || !buildingPolygon || drafting.Kind != ShapeKind.FreeDraw)
+        // Arc mode only makes sense for the click-by-vertex tools.
+        if (currentTool is not Tool.Polygon and not Tool.Polyline)
         {
             return;
         }
 
-        if (awaitingArcApex)
+        bool inDraft = drafting is not null && buildingPolygon && drafting.Kind == ShapeKind.FreeDraw;
+
+        if (inDraft && awaitingArcApex)
         {
             // Cancel apex pick: zero the bulge for the in-progress edge and restore the
             // trailing tracker so the next click resumes line drawing.
-            if (drafting.EdgeBulges is not null
+            if (drafting!.EdgeBulges is not null
                 && arcApexEdgeIndex >= 0
                 && arcApexEdgeIndex < drafting.EdgeBulges.Count)
             {
@@ -9751,6 +9791,64 @@ public partial class GardenPlot
         Point end = shape.Points[(edgeBulgeDragEdgeIndex + 1) % shape.Points.Count];
         shape.EdgeBulges[edgeBulgeDragEdgeIndex] = EdgeArcGeometry.BulgeFromDraggedMidpoint(
             start, end, new Point(cursorX, cursorY));
+    }
+
+    /// <summary>
+    /// Issue #130 — pointer-down on a per-vertex square handle of a selected FreeDraw
+    /// polygon. Mirrors <see cref="OnEdgeBulgePointerDown"/> but for vertex repositioning:
+    /// the dragged vertex updates live during pointer-move; the bulges stay attached to
+    /// their (now shifted) endpoints so curvature follows the drag.
+    /// </summary>
+    /// <param name="e">The pointer event.</param>
+    /// <param name="shapeId">Id of the shape whose vertex is being dragged.</param>
+    /// <param name="vertexIndex">Vertex index being dragged.</param>
+    internal void OnShapeVertexPointerDown(
+        Microsoft.AspNetCore.Components.Web.PointerEventArgs e,
+        Guid shapeId,
+        int vertexIndex)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (currentPlot is null || e.Button != 0 || currentTool != Tool.Select)
+        {
+            return;
+        }
+
+        Shape? shape = currentPlot.Shapes.FirstOrDefault(s => s.Id == shapeId);
+        if (shape is null || vertexIndex < 0 || vertexIndex >= shape.Points.Count)
+        {
+            return;
+        }
+
+        ClearIdleRenderSuppression();
+        RecordUndoState();
+        isShapeVertexDragging = true;
+        shapeVertexDragShapeId = shapeId;
+        shapeVertexDragIndex = vertexIndex;
+    }
+
+    /// <summary>
+    /// Live update for the committed-shape vertex drag (issue #130). Mutates only the
+    /// dragged vertex's position; bulges stay attached to the same endpoint indices, so
+    /// the arc on either side of the vertex follows the new chord.
+    /// </summary>
+    /// <param name="cursorX">Cursor x (feet).</param>
+    /// <param name="cursorY">Cursor y (feet).</param>
+    private void ApplyShapeVertexDragFromCursor(double cursorX, double cursorY)
+    {
+        if (!isShapeVertexDragging || currentPlot is null)
+        {
+            return;
+        }
+
+        Shape? shape = currentPlot.Shapes.FirstOrDefault(s => s.Id == shapeVertexDragShapeId);
+        if (shape is null || shapeVertexDragIndex < 0 || shapeVertexDragIndex >= shape.Points.Count)
+        {
+            return;
+        }
+
+        shape.Points[shapeVertexDragIndex] = new Point(
+            Math.Clamp(cursorX, 0, PlotWidthFt),
+            Math.Clamp(cursorY, 0, PlotHeightFt));
     }
 
     /// <summary>
