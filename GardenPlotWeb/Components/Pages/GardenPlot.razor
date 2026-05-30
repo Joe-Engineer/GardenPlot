@@ -571,6 +571,45 @@ else
                 </span>
             }
 
+            @* Issue #138 — "Draw as" widget for drawing sets. Mirrors the Ground Cover
+               sub-mode picker above. Each button switches both the underlying drawing
+               tool AND the drawingSetSubMode. *@
+            @if (selectedDrawingSetId is not null && GetSelectedDrawingSet() is { } activeDs)
+            {
+                <span class="drawing-set-controls">
+                    <span class="badge text-bg-primary">Drawing Set</span>
+                    <span class="small text-muted">@activeDs.Name (@activeDs.Rows.Count rows)</span>
+                    <label class="small text-muted">Draw as</label>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Drawing set shape">
+                        <button type="button"
+                                class="btn @(drawingSetSubMode == DrawingSetSubMode.Polygon ? "btn-primary" : "btn-outline-secondary")"
+                                title="Click to add vertices, double-click to finish"
+                                @onclick="() => SetDrawingSetSubMode(DrawingSetSubMode.Polygon)">Polygon</button>
+                        <button type="button"
+                                class="btn @(drawingSetSubMode == DrawingSetSubMode.Rectangle ? "btn-primary" : "btn-outline-secondary")"
+                                title="Drag to draw a rectangle"
+                                @onclick="() => SetDrawingSetSubMode(DrawingSetSubMode.Rectangle)">Rectangle</button>
+                        <button type="button"
+                                class="btn @(drawingSetSubMode == DrawingSetSubMode.Oval ? "btn-primary" : "btn-outline-secondary")"
+                                title="Drag to draw an oval"
+                                @onclick="() => SetDrawingSetSubMode(DrawingSetSubMode.Oval)">Oval</button>
+                        <button type="button"
+                                class="btn @(drawingSetSubMode == DrawingSetSubMode.FreehandArea ? "btn-primary" : "btn-outline-secondary")"
+                                title="Click and drag to sketch a freeform area"
+                                @onclick="() => SetDrawingSetSubMode(DrawingSetSubMode.FreehandArea)">Freehand Area</button>
+                        <button type="button"
+                                class="btn @(drawingSetSubMode == DrawingSetSubMode.Polyline ? "btn-primary" : "btn-outline-secondary")"
+                                title="Click vertices to lay out a path; double-click to finish"
+                                @onclick="() => SetDrawingSetSubMode(DrawingSetSubMode.Polyline)">Polyline</button>
+                        <button type="button"
+                                class="btn @(drawingSetSubMode == DrawingSetSubMode.Freehand ? "btn-primary" : "btn-outline-secondary")"
+                                title="Click and drag to sketch a freeform path"
+                                @onclick="() => SetDrawingSetSubMode(DrawingSetSubMode.Freehand)">Freehand</button>
+                    </div>
+                    <span class="small text-muted ms-2">Draws the assembly along your shape when you finish.</span>
+                </span>
+            }
+
             <span class="toolbar-group toolbar-group-right">
                 <button class="toolbar-icon-btn @(showLayersPanel ? "active" : string.Empty)"
                         @onclick="ToggleLayersPanel"
@@ -1083,8 +1122,9 @@ else
                             <span title="Spacing between adjacent copies of this row's plant when the row fills along the path. 0 = footprints touching, positive widens the spacing, negative overlaps (after which the slide-forward collision rule may skip samples).">Gap (ft)</span>
                             <span title="Perpendicular distance from the path when the row is drawn along it. Negative places the row on the LEFT of the path's draw direction, positive on the RIGHT, zero sits on the path centerline. Multiple rows with different offsets represent different garden layers and may overlap freely in screen space.">Offset (ft)</span>
                             <span title="Distance along the path where this row's first plant lands, measured from the start of the path. 0 = first plant at the path's start. A captured set populates this from each item's along-axis position so the original arrangement reproduces when applied to a straight path.">Phase (ft)</span>
-                            <span title="Issue #138 — per-row width override in feet. Blank uses the catalog/captured width. Use this to widen a paver-edge row from its catalog default without editing the catalog item.">Width (ft)</span>
+                            <span title="Issue #138 — per-row width override in feet. Blank uses the catalog/captured width. Use this to widen a paver-edge row from its catalog default without editing the catalog item. Disabled when Fill is checked.">Width (ft)</span>
                             <span title="Issue #138 — per-row depth override in feet. Blank uses the catalog/captured depth.">Depth (ft)</span>
+                            <span title="Issue #138 — when checked, this row FILLS the interior of the drawn area shape (Rectangle / Oval / closed Polygon) instead of drawing as a ribbon along the path. Width is disabled. For stripe rows this becomes a single solid polygon; stamp-row fill (use Fill-with-plants) is a follow-up.">Fill</span>
                             <span></span>
                         </div>
                         @for (int i = 0; i < editingDrawingSet.Rows.Count; i++)
@@ -1143,7 +1183,7 @@ else
                                 {
                                     <span class="drawing-set-editor-na" title="Phase isn't meaningful for continuous ribbons (ground cover, edging) — they always start at the path start.">—</span>
                                 }
-                                <input class="form-control form-control-sm" type="number" min="0" step="0.1" placeholder="@F(row.CapturedWidthFt)" value="@(row.WidthOverrideFt is double w ? F(w) : string.Empty)"
+                                <input class="form-control form-control-sm" type="number" min="0" step="0.1" placeholder="@F(row.CapturedWidthFt)" value="@(row.WidthOverrideFt is double w ? F(w) : string.Empty)" disabled="@row.FillArea"
                                        @onchange="async (e) => { var s = e.Value?.ToString(); if (string.IsNullOrWhiteSpace(s)) { row.WidthOverrideFt = null; await OnDrawingSetRowFieldChangedAsync(); } else if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.WidthOverrideFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
                                 @if (showDepth)
                                 {
@@ -1154,6 +1194,10 @@ else
                                 {
                                     <span class="drawing-set-editor-na" title="Depth applies to volumetric materials (mulch, gravel, soil). Plants, trees, and surface-only items don't have a meaningful depth.">—</span>
                                 }
+                                <span class="drawing-set-editor-fill-cell" title="When checked, fill the source area (Rectangle / Oval / closed Polygon) with this row instead of drawing as a ribbon along the path.">
+                                    <input type="checkbox" checked="@row.FillArea"
+                                           @onchange="async (e) => { row.FillArea = e.Value is bool v && v; await OnDrawingSetRowFieldChangedAsync(); }" />
+                                </span>
                                 <span class="drawing-set-editor-row-actions">
                                     <button class="btn btn-sm btn-outline-secondary" title="Move row up (towards higher z-order / top)" disabled="@(idx == 0)" @onclick="() => MoveDrawingSetRowAsync(idx, -1)">↑</button>
                                     <button class="btn btn-sm btn-outline-secondary" title="Move row down (towards lower z-order / back)" disabled="@(idx == editingDrawingSet.Rows.Count - 1)" @onclick="() => MoveDrawingSetRowAsync(idx, +1)">↓</button>

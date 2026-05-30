@@ -393,4 +393,20 @@ public sealed class DrawingSetTests
         Assert.Empty(PolylineOffset.Offset(Array.Empty<Point>(), 1));
         Assert.Empty(PolylineOffset.Offset([new(0, 0)], 1));
     }
+
+    [Fact]
+    public void Row_FillArea_DefaultsToFalse()
+    {
+        AlongPathDrawingSetRow row = new();
+        Assert.False(row.FillArea);
+    }
+
+    [Fact]
+    public void Row_FillArea_RoundTrips()
+    {
+        AlongPathDrawingSetRow row = new() { FillArea = true };
+        Assert.True(row.FillArea);
+        row.FillArea = false;
+        Assert.False(row.FillArea);
+    }
 }

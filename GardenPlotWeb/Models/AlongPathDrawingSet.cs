@@ -88,6 +88,16 @@ public sealed class AlongPathDrawingSetRow
     public double? DepthOverrideFt { get; set; }
 
     /// <summary>
+    /// Issue #138 — when true, this row's palette item is applied as a FILL of the source
+    /// area shape (Rectangle / Oval / closed Polygon) instead of as a ribbon stripe along
+    /// the path. For stripe-kind rows (ground cover / volume materials) this becomes a
+    /// single solid polygon matching the source interior. For stamp-kind rows (plants /
+    /// trees / etc.) this will use the existing Fill-with-plants behaviour in a follow-up.
+    /// When true, the Width input is ignored (the source defines the boundary).
+    /// </summary>
+    public bool FillArea { get; set; }
+
+    /// <summary>
     /// Issue #138 — returns the effective row width in feet, preferring
     /// <see cref="WidthOverrideFt"/>, then the resolved palette item's <see cref="PaletteItem.WidthFt"/>,
     /// then <see cref="CapturedWidthFt"/>.

@@ -1027,9 +1027,14 @@
 
 .drawing-set-editor-row {
     display: grid;
-    grid-template-columns: minmax(8rem, 1fr) 4.5rem 4.5rem 4.5rem 4.5rem 4.5rem 6.5rem;
+    grid-template-columns: minmax(8rem, 1fr) 4.5rem 4.5rem 4.5rem 4.5rem 4.5rem 2.5rem 6.5rem;
     gap: 0.35rem;
     align-items: center;
+}
+
+.drawing-set-editor-fill-cell {
+    display: inline-flex;
+    justify-content: center;
 }
 
 .drawing-set-editor-row-actions {

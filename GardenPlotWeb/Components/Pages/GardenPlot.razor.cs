@@ -259,6 +259,9 @@ public partial class GardenPlot
     // When set, the next Along-path application uses this Drawing Set (multi-row) instead of
     // the currently picked single PaletteItem. Cleared when a regular palette item is picked.
     private Guid? selectedDrawingSetId;
+
+    // Issue #138 — "Draw as" sub-mode for drawing-set painting. Mirrors GroundCoverSubMode.
+    private DrawingSetSubMode drawingSetSubMode = DrawingSetSubMode.Polyline;
     // Per-row edit state for the Drawing Set editor dialog (null when dialog is closed).
     private AlongPathDrawingSet? editingDrawingSet;
     private string editingDrawingSetName = string.Empty;
@@ -7299,18 +7302,47 @@ public partial class GardenPlot
         library.Ui.LastAlongPathDrawingSetId = set.Id;
         selectedItem = null;
 
-        // Issue #138 — when the user picks a drawing set, drop them into a drawing tool
-        // so they can immediately start painting. Polyline is the natural default (lets
-        // the user click-by-vertex along the path); Rectangle / Oval / FreeDraw still
-        // work if they switch deliberately. Only auto-switch when not already in a
-        // path-drawing tool so we don't yank them out of (say) Rectangle if they prefer.
+        // Issue #138 — when the user picks a drawing set, switch to the tool that
+        // matches the current drawing-set sub-mode (defaults to Polyline). The user can
+        // change the sub-mode via the "Draw as" widget on toolbar row 2; each click
+        // there re-syncs the tool. Only auto-switch when not already in a
+        // path-drawing tool so we don't yank them out of (say) Rectangle if they
+        // started there deliberately.
         bool inPathTool = currentTool is Tool.Polyline or Tool.Polygon or Tool.FreeDraw
             or Tool.Rectangle or Tool.Oval;
         if (!inPathTool)
         {
-            currentTool = Tool.Polyline;
+            currentTool = ToolForDrawingSetSubMode(drawingSetSubMode);
         }
     }
+
+    /// <summary>Issue #138 — handler for the "Draw as" widget when a drawing set is selected.</summary>
+    private void SetDrawingSetSubMode(DrawingSetSubMode mode)
+    {
+        drawingSetSubMode = mode;
+        currentTool = ToolForDrawingSetSubMode(mode);
+
+        // Clearing any in-flight click-by-vertex draft prevents the new tool from
+        // inheriting a stale polygon from the previous sub-mode.
+        if (drafting is not null && buildingPolygon)
+        {
+            drafting = null;
+            buildingPolygon = false;
+            awaitingArcApex = false;
+            arcApexEdgeIndex = -1;
+        }
+    }
+
+    private static Tool ToolForDrawingSetSubMode(DrawingSetSubMode mode) => mode switch
+    {
+        DrawingSetSubMode.Polygon => Tool.Polygon,
+        DrawingSetSubMode.Rectangle => Tool.Rectangle,
+        DrawingSetSubMode.Oval => Tool.Oval,
+        DrawingSetSubMode.FreehandArea => Tool.FreeDraw,
+        DrawingSetSubMode.Polyline => Tool.Polyline,
+        DrawingSetSubMode.Freehand => Tool.FreeDraw,
+        _ => Tool.Polyline,
+    };
 
     private async Task OnDrawingSetRowFieldChangedAsync()
     {
@@ -7396,6 +7428,72 @@ public partial class GardenPlot
 
         editingDrawingSet.PaintAsDrawn = value;
         await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #138 — internal grouping struct that carries a row's resolved palette item,
+    /// the AlongPathRowSpec used by the stamp pipeline, and the row's FillArea bit so the
+    /// placement code can branch on fill-vs-ribbon without re-looking-up the drawing set.
+    /// </summary>
+    private readonly record struct DrawingSetPlacementRow(PaletteItem Item, AlongPathRowSpec Spec, bool FillArea);
+
+    private bool TryGetFillAreaForRow(PaletteItem item, int idx)
+    {
+        // Convenience: looked up from the active drawing set by row index. Used inside
+        // BuildAlongPathPlacementForRows when callers pass the legacy two-element tuple.
+        var set = GetSelectedDrawingSet();
+        if (set is null || idx < 0 || idx >= set.Rows.Count)
+        {
+            return false;
+        }
+
+        return set.Rows[idx].FillArea;
+    }
+
+    /// <summary>
+    /// Issue #138 — synthesises a single filled-area Shape for a stripe row whose source
+    /// is a CLOSED area shape (Rectangle / Oval / closed FreeDraw). The resulting Shape
+    /// adopts the source's geometry (Kind / X / Y / W / H / Points / EdgeBulges) and is
+    /// stamped with the row's material code, fill, stroke, texture, and depth so the
+    /// downstream takeoff + BOM treat it as a ground-cover instance.
+    /// </summary>
+    private static Shape? BuildFilledAreaShapeForRow(PaletteItem item, Shape sourcePath, bool assignNewIds)
+    {
+        if (sourcePath is null || item is null)
+        {
+            return null;
+        }
+
+        Shape fill = new()
+        {
+            Kind = sourcePath.Kind,
+            X = sourcePath.X,
+            Y = sourcePath.Y,
+            W = sourcePath.W,
+            H = sourcePath.H,
+            Rotation = sourcePath.Rotation,
+            CloseEdge = sourcePath.Kind == ShapeKind.FreeDraw ? true : sourcePath.CloseEdge,
+            Points = sourcePath.Points.Select(p => new Point(p.X, p.Y)).ToList(),
+            EdgeBulges = sourcePath.EdgeBulges is null ? null : new List<double>(sourcePath.EdgeBulges),
+            Fill = item.FillColor,
+            Stroke = item.StrokeColor,
+            TextureKey = item.TextureKey,
+            MaterialCode = item.Code,
+            IsGroundCoverSurface = item.MaterialSoldBy == MaterialSoldBy.Area,
+        };
+
+        if (item.DefaultDepthIn is double d)
+        {
+            fill.DepthIn = d;
+            fill.GroundCoverDepthIn = d;
+        }
+
+        if (!assignNewIds)
+        {
+            fill.Id = Guid.Empty;
+        }
+
+        return fill;
     }
 
     /// <summary>
@@ -7732,24 +7830,44 @@ public partial class GardenPlot
 
         // Issue #138 — partition rows by visual kind. Stripe rows (GroundCover,
         // GroundCoverSurface, Edging) render as continuous ribbon polygons; stamp rows
-        // continue through the existing tile-along-path pipeline below.
+        // continue through the existing tile-along-path pipeline below. FillArea rows
+        // (for stripes) become a single solid polygon matching the source interior.
         var stripeShapes = new List<Shape>();
         var stampRowIndices = new List<int>();
         var stampRowsResolved = new List<(PaletteItem Item, AlongPathRowSpec Spec)>();
         for (int i = 0; i < rows.Count; i++)
         {
             var (item, spec) = rows[i];
+            // FillArea bit isn't on the spec record; consult the source drawing-set row.
+            // Pull it from the page's editingDrawingSet OR the currentlySelected set —
+            // the callers pass rows derived from a real AlongPathDrawingSet; the FillArea
+            // flag is carried via the alignment slot trick below.
             var visualKind = GardenPlotWeb.Models.DrawingSetPreview.VisualKindFor(item.Kind);
+            bool fillArea = TryGetFillAreaForRow(item, i);
             if (visualKind == GardenPlotWeb.Models.DrawingSetPreview.RowVisualKind.Stripe)
             {
-                Shape? stripe = TryBuildStripeShape(item, spec, points, sourcePath.EdgeBulges, closed, assignNewIds);
-                if (stripe is not null)
+                if (fillArea && closed)
                 {
-                    stripeShapes.Add(stripe);
+                    Shape? fill = BuildFilledAreaShapeForRow(item, sourcePath, assignNewIds);
+                    if (fill is not null)
+                    {
+                        stripeShapes.Add(fill);
+                    }
+                }
+                else
+                {
+                    Shape? stripe = TryBuildStripeShape(item, spec, points, sourcePath.EdgeBulges, closed, assignNewIds);
+                    if (stripe is not null)
+                    {
+                        stripeShapes.Add(stripe);
+                    }
                 }
             }
             else
             {
+                // Stamp rows with FillArea will gain Fill-with-plants integration in a
+                // follow-up; for now they fall through to the existing tile-along-path
+                // pipeline so behaviour stays predictable.
                 stampRowIndices.Add(i);
                 stampRowsResolved.Add(rows[i]);
             }
@@ -9309,8 +9427,18 @@ public partial class GardenPlot
             currentPlot.Shapes.Add(drafting);
             added = true;
         }
+
+        // Issue #138 — auto-paint hook for the pointer-up commit path (Rectangle / Oval
+        // / FreeDraw drag). Captures the id BEFORE drafting=null below so we can paint
+        // the assembly along the newly-committed shape.
+        Guid? paintedPathId = added && ShouldAutoPaintWithDrawingSet(drafting) ? drafting.Id : null;
+
         drafting = null;
         if (added) _ = SaveAsync();
+        if (paintedPathId is Guid pid)
+        {
+            _ = PaintWithDrawingSetAfterDrawAsync(pid);
+        }
     }
 
     internal void OnShapePointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, Shape s)
