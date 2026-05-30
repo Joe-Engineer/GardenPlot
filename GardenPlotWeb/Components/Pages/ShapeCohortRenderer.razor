@@ -7,6 +7,7 @@
     var sb = GardenPlot.GetBounds(s);
     var scx = sb.x + sb.w / 2;
     var scy = sb.y + sb.h / 2;
+    var style = Parent!.GetEffectiveStyle(s);
     <g @key="s.Id" class="shape @(SelectedIds.Contains(s.Id) && !IsConceptMode ? "selected" : string.Empty) @(GardenPlot.IsRulerShape(s) ? "concept-ruler" : string.Empty) @(Parent!.UseConceptPlantEffects(s) ? "concept-shadowed" : string.Empty)"
        transform="rotate(@GardenPlot.F(s.Rotation) @GardenPlot.F(scx) @GardenPlot.F(scy))"
        pointer-events="@(!IsConceptMode && CurrentTool == GardenPlot.Tool.Select && Parent!.CanSelectShape(s) && Parent!.CanReceiveShapePointer(s) ? "auto" : "none")"
@@ -24,8 +25,8 @@
             case ShapeKind.Rectangle:
                 var rectClipId = $"tile-clip-{s.Id:N}";
                 <rect class="@((GardenPlot.IsGroundCoverShape(s) && (!string.IsNullOrWhiteSpace(s.TextureKey) || !string.IsNullOrWhiteSpace(s.TextureImageId))) ? "ground-cover-textured" : string.Empty)" x="@GardenPlot.F(s.X)" y="@GardenPlot.F(s.Y)" width="@GardenPlot.F(s.W)" height="@GardenPlot.F(s.H)"
-                      fill="@GardenPlot.EffectiveFill(s)" fill-opacity="@GardenPlot.F(Parent!.EffectiveFillOpacity(s))"
-                      stroke="@GardenPlot.EffectiveStroke(s)" stroke-width="0.06" />
+                      fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
+                      stroke="@style.Stroke" stroke-width="0.06" />
                 var rectImgRef = !string.IsNullOrWhiteSpace(s.TextureImageId) ? s.TextureImageId : s.TileBackgroundImageFileName;
                 @if (!string.IsNullOrWhiteSpace(rectImgRef))
                 {
@@ -43,8 +44,8 @@
                 var ovalClipId = $"tile-clip-{s.Id:N}";
                 <ellipse class="@((GardenPlot.IsGroundCoverShape(s) && (!string.IsNullOrWhiteSpace(s.TextureKey) || !string.IsNullOrWhiteSpace(s.TextureImageId))) ? "ground-cover-textured" : string.Empty)" cx="@GardenPlot.F(s.X + s.W / 2)" cy="@GardenPlot.F(s.Y + s.H / 2)"
                              rx="@GardenPlot.F(s.W / 2)" ry="@GardenPlot.F(s.H / 2)"
-                             fill="@GardenPlot.EffectiveFill(s)" fill-opacity="@GardenPlot.F(Parent!.EffectiveFillOpacity(s))"
-                             stroke="@GardenPlot.EffectiveStroke(s)" stroke-width="0.06" />
+                             fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
+                             stroke="@style.Stroke" stroke-width="0.06" />
                 var ovalImgRef = !string.IsNullOrWhiteSpace(s.TextureImageId) ? s.TextureImageId : s.TileBackgroundImageFileName;
                 @if (!string.IsNullOrWhiteSpace(ovalImgRef))
                 {
@@ -64,8 +65,8 @@
                 {
                     var polyClipId = $"poly-clip-{s.Id:N}";
                     <polygon class="@((!string.IsNullOrWhiteSpace(s.TextureKey) || !string.IsNullOrWhiteSpace(s.TextureImageId)) ? "ground-cover-textured" : string.Empty)" points="@GardenPlot.PointsString(s.Points)"
-                             fill="@GardenPlot.EffectiveFill(s)" fill-opacity="@GardenPlot.F(Parent!.EffectiveFillOpacity(s))"
-                             stroke="@GardenPlot.EffectiveStroke(s)" stroke-width="0.08"
+                             fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
+                             stroke="@style.Stroke" stroke-width="0.08"
                              stroke-linejoin="round" />
                     @if (!string.IsNullOrWhiteSpace(s.TextureImageId))
                     {
@@ -82,7 +83,7 @@
                 else
                 {
                     <polyline points="@GardenPlot.PointsString(s.Points)"
-                              fill="none" stroke="@GardenPlot.EffectiveStroke(s)" stroke-width="0.08"
+                              fill="none" stroke="@style.Stroke" stroke-width="0.08"
                               stroke-linecap="round" stroke-linejoin="round" />
                 }
                 <rect x="@GardenPlot.F(sb.x - 0.1)" y="@GardenPlot.F(sb.y - 0.1)"
@@ -93,13 +94,13 @@
                 @if (s.CloseEdge && s.Points.Count > 1)
                 {
                     <polygon points="@GardenPlot.PointsString(s.Points)"
-                             fill="none" stroke="@GardenPlot.EffectiveStroke(s)" stroke-width="@GardenPlot.F(GardenPlot.EdgeStrokeWidthFt(s))"
+                             fill="none" stroke="@style.Stroke" stroke-width="@GardenPlot.F(GardenPlot.EdgeStrokeWidthFt(s))"
                              stroke-linecap="round" stroke-linejoin="round" />
                 }
                 else
                 {
                     <polyline points="@GardenPlot.PointsString(s.Points)"
-                              fill="none" stroke="@GardenPlot.EffectiveStroke(s)" stroke-width="@GardenPlot.F(GardenPlot.EdgeStrokeWidthFt(s))"
+                              fill="none" stroke="@style.Stroke" stroke-width="@GardenPlot.F(GardenPlot.EdgeStrokeWidthFt(s))"
                               stroke-linecap="round" stroke-linejoin="round" />
                 }
                 <rect x="@GardenPlot.F(sb.x - 0.1)" y="@GardenPlot.F(sb.y - 0.1)"
@@ -108,8 +109,8 @@
                 break;
             case ShapeKind.CircleRuler:
                 <circle cx="@GardenPlot.F(s.X + (s.W / 2))" cy="@GardenPlot.F(s.Y + (s.H / 2))" r="@GardenPlot.F(s.W / 2)"
-                        fill="@GardenPlot.EffectiveFill(s)" fill-opacity="@GardenPlot.F(Parent!.EffectiveFillOpacity(s))"
-                        stroke="@GardenPlot.EffectiveStroke(s)" stroke-width="0.06" />
+                        fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
+                        stroke="@style.Stroke" stroke-width="0.06" />
                 @((MarkupString)GardenPlot.CircleRulerLabelsSvg(s))
                 @if (CurrentTool == GardenPlot.Tool.Select)
                 {
@@ -118,8 +119,8 @@
                 break;
             case ShapeKind.RectRuler:
                 <rect x="@GardenPlot.F(s.X)" y="@GardenPlot.F(s.Y)" width="@GardenPlot.F(s.W)" height="@GardenPlot.F(s.H)"
-                      fill="@GardenPlot.EffectiveFill(s)" fill-opacity="@GardenPlot.F(Parent!.EffectiveFillOpacity(s))"
-                      stroke="@GardenPlot.EffectiveStroke(s)" stroke-width="0.06" />
+                      fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
+                      stroke="@style.Stroke" stroke-width="0.06" />
                 @((MarkupString)GardenPlot.RectRulerLabelsSvg(s))
                 @if (CurrentTool == GardenPlot.Tool.Select)
                 {
@@ -128,12 +129,12 @@
                 break;
             case ShapeKind.Ruler:
                 <polyline points="@GardenPlot.PointsString(s.Points)"
-                          fill="none" stroke="@GardenPlot.EffectiveStroke(s)" stroke-width="0.06"
+                          fill="none" stroke="@style.Stroke" stroke-width="0.06"
                           stroke-linecap="round" stroke-linejoin="round" />
                 @foreach (var p in s.Points)
                 {
                     <circle cx="@GardenPlot.F(p.X)" cy="@GardenPlot.F(p.Y)" r="0.08"
-                            fill="#fff" stroke="@GardenPlot.EffectiveStroke(s)" stroke-width="0.04" />
+                            fill="#fff" stroke="@style.Stroke" stroke-width="0.04" />
                 }
                 @((MarkupString)GardenPlot.RulerLabelsSvg(s))
                 <rect x="@GardenPlot.F(sb.x - 0.1)" y="@GardenPlot.F(sb.y - 0.1)"
@@ -145,11 +146,11 @@
                     <rect x="0" y="0" width="@GardenPlot.F(s.W)" height="@GardenPlot.F(s.H)"
                           rx="@GardenPlot.F(Math.Min(s.W, s.H) / 3.0)"
                           ry="@GardenPlot.F(Math.Min(s.W, s.H) / 3.0)"
-                          fill="@GardenPlot.EffectiveFill(s)" fill-opacity="@GardenPlot.F(Parent!.EffectiveFillOpacity(s))"
-                          stroke="@GardenPlot.EffectiveStroke(s)" stroke-width="0.08" />
+                          fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
+                          stroke="@style.Stroke" stroke-width="0.08" />
                     <text x="@GardenPlot.F(s.W / 2)" y="@GardenPlot.F(s.H / 2)"
                           text-anchor="middle" dominant-baseline="middle"
-                          font-size="@GardenPlot.F((Math.Min(s.W, s.H) * 0.18) * GardenPlot.EffectiveFontScale(s))" fill="#3d1c10"
+                          font-size="@GardenPlot.F((Math.Min(s.W, s.H) * 0.18) * style.FontScale)" fill="#3d1c10"
                           style="font-family: sans-serif; pointer-events:none;">@s.Label</text>
                 </g>
                 break;
@@ -163,7 +164,7 @@
                 @((MarkupString)PlantRendering.PlantSpriteSvg(s.X + s.W / 2, s.Y + s.H / 2, s.W, s.Trait))
                 break;
             case ShapeKind.SoilMarker:
-                @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, GardenPlot.EffectiveFill(s), GardenPlot.EffectiveStroke(s)))
+                @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, style.Fill, style.Stroke))
                 break;
         }
         @if (!IsConceptMode && SelectedIds.Contains(s.Id))

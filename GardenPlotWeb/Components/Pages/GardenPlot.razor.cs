@@ -156,6 +156,13 @@ public partial class GardenPlot
     private bool hoverFlushScheduled;
 
     /// <summary>
+    /// Per-render memoization for <see cref="ShapeRenderStyle"/> bundles — see issue #114
+    /// and <see cref="PerRenderShapeStyleCache"/> for rationale. Reset at the start of
+    /// every render (see <see cref="ShouldRender"/>).
+    /// </summary>
+    private readonly PerRenderShapeStyleCache shapeStyleCachePerRender = new();
+
+    /// <summary>
     /// Called from the top of every non-pointer-move event handler so a pending
     /// "idle move suppress" flag can't accidentally swallow that handler's render.
     /// Also clears the hover-render pending signal so the handler's substantive
@@ -2583,12 +2590,14 @@ public partial class GardenPlot
                 return false;
             }
 
+            shapeStyleCachePerRender.Reset();
             return true;
         }
 
         // Substantive render path: reset the throttle window so the user's next hover
         // renders immediately rather than waiting on a stale gap from the prior burst.
         hoverRenderThrottle.NoteSubstantiveRender(Environment.TickCount64);
+        shapeStyleCachePerRender.Reset();
         return true;
     }
 
@@ -10288,6 +10297,25 @@ public partial class GardenPlot
     };
 
     internal static string EffectiveStroke(Shape s) => s.Stroke ?? DefaultStroke(s);
+
+    /// <summary>
+    /// Returns the bundle of <see cref="ShapeRenderStyle"/> values for <paramref name="s"/>,
+    /// memoized for the lifetime of the current render pass via
+    /// <see cref="shapeStyleCachePerRender"/>. The Razor templates call this once per shape
+    /// per render and read <c>style.Fill</c> / <c>style.Stroke</c> / <c>style.FillOpacity</c> /
+    /// <c>style.FontScale</c> directly thereafter, eliminating the 2–3× redundant computations
+    /// each shape paid before this change (issue #114).
+    /// </summary>
+    /// <param name="s">The shape whose effective style is requested.</param>
+    /// <returns>The cached (or freshly computed) style bundle.</returns>
+    internal ShapeRenderStyle GetEffectiveStyle(Shape s)
+    {
+        return shapeStyleCachePerRender.GetOrAdd(s, shape => new ShapeRenderStyle(
+            Fill: EffectiveFill(shape),
+            Stroke: EffectiveStroke(shape),
+            FillOpacity: EffectiveFillOpacity(shape),
+            FontScale: EffectiveFontScale(shape)));
+    }
 
     internal static string EffectiveFill(Shape s)
     {
