@@ -2069,76 +2069,39 @@ else
     var primaryShape = currentPlot is not null && PrimarySelectedId is { } pid
         ? currentPlot.Shapes.FirstOrDefault(z => z.Id == pid)
         : null;
-    // Issue #129: surface live polygon stats in the info panel from the moment
-    // the click-by-vertex tool is active, not just once a vertex has been placed.
-    // The panel shows tool name on tool selection (empty body), starting
-    // measurements once Points.Count >= 2, and full vertex/perimeter/area from 3+.
-    var isVertexTool = currentTool == Tool.Polygon || currentTool == Tool.Polyline;
+    // Issue #129: a draft FreeDraw shape (Polygon / Polyline / Ground Cover polygon)
+    // should be surfaced in the info panel as if it were the selected shape — with
+    // live measurements (path length, area, volume) filling in as the user places
+    // vertices. The shape is a real Shape instance, so the existing rich panel's
+    // material / depth / waste / texture controls write back to drafting directly
+    // and survive the eventual commit unchanged.
     var draftPanelShape = drafting is not null
-        && drafting.Kind == ShapeKind.FreeDraw
         && !IsRulerShape(drafting)
+        && drafting.Kind == ShapeKind.FreeDraw
         ? drafting
         : null;
-    var hasDraftPanelContent = isVertexTool || draftPanelShape is not null;
+    var hasDraftPanel = draftPanelShape is not null;
 }
 
-@if (!IsConceptMode && (selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null) || infoRuler is not null || hasDraftPanelContent) && currentPlot is not null)
+@if (!IsConceptMode && (selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null) || infoRuler is not null || hasDraftPanel) && currentPlot is not null)
 {
     var forceRulerMode = infoRuler is not null && (drafting is not null || selectedIds.Count <= 1);
-    var draftPanelOnly = !forceRulerMode
-        && selectedIds.Count == 0
-        && !(currentTool == Tool.Stamp && selectedItem is not null)
-        && hasDraftPanelContent;
-
-    if (draftPanelOnly)
-    {
-        var draftPositioned = library.Ui.InfoPanelX is double && library.Ui.InfoPanelY is double;
-        var hudClosed = draftPanelShape is not null
-            && (draftPanelShape.CloseEdge || IsGroundCoverShape(draftPanelShape));
-        var draftReadout = draftPanelShape is null
-            ? DraftHudReadout.Empty
-            : DraftPolygonHud.Compute(draftPanelShape.Points, hudClosed, includeTrailerSegment: !isDraftVertexDragging);
-        var draftTitle = currentTool == Tool.Polygon ? "Polygon · drawing"
-            : currentTool == Tool.Polyline ? "Polyline · drawing"
-            : (draftPanelShape is not null && draftPanelShape.CloseEdge) ? "Polygon · drawing"
-            : "Polyline · drawing";
-        var committedVertexCount = draftPanelShape is null ? 0 : Math.Max(0, draftPanelShape.Points.Count - (buildingPolygon ? 1 : 0));
-
-        <div class="floating-panel info-panel @(draftPositioned ? "" : "default-info-pos")"
-             @ref="infoPanelRef"
-             style="@(draftPositioned ? $"left:{library.Ui.InfoPanelX!.Value}px;top:{library.Ui.InfoPanelY!.Value}px;" : "")"
-             @onpointermove="OnPanelDragMove"
-             @onpointerup="OnPanelDragEnd"
-             @onpointercancel="OnPanelDragEnd">
-            <div class="panel-header"
-                 @onpointerdown="StartInfoPanelDrag">
-                <span class="panel-title">@draftTitle</span>
-                <span class="drag-grip" aria-hidden="true">⠿</span>
-            </div>
-            <div class="panel-body">
-                <div class="small"><span class="text-muted">Vertices:</span> <strong>@committedVertexCount</strong></div>
-                @if (draftReadout.SegmentLengthFt is double segLenFt)
-                {
-                    <div class="small"><span class="text-muted">Current segment:</span> <strong>@($"{segLenFt:0.##} ft")</strong></div>
-                }
-                <div class="small"><span class="text-muted">Perimeter:</span> <strong>@($"{draftReadout.PerimeterFt:0.##} ft")</strong></div>
-                @if (draftReadout.AreaFt2 is double draftAreaFt2)
-                {
-                    <div class="small"><span class="text-muted">Area:</span> <strong>@($"{draftAreaFt2:0.##} ft²")</strong></div>
-                }
-                <div class="x-small text-muted mt-1">Click to add a vertex · drag a handle to move · double-click to finish · Esc to cancel</div>
-            </div>
-        </div>
-    }
-    else
-    {
-
-    var stampPreview = (!forceRulerMode && selectedIds.Count == 0 && currentTool == Tool.Stamp && selectedItem is not null)
+    var draftPreview = (!forceRulerMode && selectedIds.Count == 0 && currentTool != Tool.Stamp && draftPanelShape is not null)
+        ? draftPanelShape
+        : null;
+    var stampPreview = (!forceRulerMode && selectedIds.Count == 0 && currentTool == Tool.Stamp && selectedItem is not null && draftPreview is null)
         ? PreviewShapeFromItem(selectedItem)
         : null;
     var isPreview = stampPreview is not null;
+    // Issue #129: isDraftMode flags the new "treat drafting as the synthetic single
+    // selection" path. The shape IS real and mutable, but the rotation editor /
+    // task binding / clip-by panel all assume the shape exists in currentPlot.Shapes
+    // (it doesn't yet) so those sub-panels are suppressed while drafting.
+    var isDraftMode = draftPreview is not null;
     var selShapes = forceRulerMode
         ? new List<Shape> { infoRuler! }
+        : draftPreview is not null
+        ? new List<Shape> { draftPreview }
         : stampPreview is not null
         ? new List<Shape> { stampPreview }
         : SelectedShapes().ToList();
@@ -2164,10 +2127,10 @@ else
     var singleDropGroup = (!isPreview && isSingle && single?.GroupId is Guid singleGroupId)
         ? currentPlot.DropGroups.FirstOrDefault(g => g.Id == singleGroupId)
         : null;
-    IReadOnlyList<GardenTask> singleShapeTasks = !isPreview && isSingle && single is not null && CanBindTasks(single)
+    IReadOnlyList<GardenTask> singleShapeTasks = !isPreview && !isDraftMode && isSingle && single is not null && CanBindTasks(single)
         ? TasksForShape(single.Id)
         : [];
-    IReadOnlyList<GardenTaskTemplate> singleTaskTemplates = !isPreview && isSingle && single is not null && CanBindTasks(single)
+    IReadOnlyList<GardenTaskTemplate> singleTaskTemplates = !isPreview && !isDraftMode && isSingle && single is not null && CanBindTasks(single)
         ? GardenTaskTemplates.GetTemplatesForShape(single)
         : [];
     var groupMembers = selectedDropGroup is null ? new List<Shape>() : GroupShapesOrdered(selectedDropGroup.Id);
@@ -2228,7 +2191,7 @@ else
                     <div class="x-small text-muted mt-1">Click to finish · Ctrl+click to add a vertex</div>
                 }
 
-                @if (!isPreview)
+                @if (!isPreview && !isDraftMode)
                 {
                     <div class="rotation-editor mt-2 pt-2 border-top">
                         <div class="small fw-semibold mb-1">Rotation</div>
@@ -3107,7 +3070,6 @@ else
             }
         </div>
     </div>
-    }
 }
 
 @if (showNewPlotDialog)
