@@ -285,6 +285,16 @@ else
                         title="Merge the selected polygons into a single combined shape (boolean union). Touching shapes become one outline; overlapping shapes lose their shared interior. Arc edges are tessellated to polylines in the result.">
                     Merge
                 </button>
+                @* Issue #136 — Material picker toolbar button. Opens the existing
+                   well-organized Material Picker dialog (with search, grouping by kind,
+                   and the full union of catalog materials) for every fillable area shape
+                   in the selection. Disabled unless the selection contains at least one
+                   area shape (Rectangle / Oval / closed FreeDraw, excluding tiles). *@
+                <button class="btn btn-sm btn-outline-secondary" @onclick="OpenMaterialPickerForSelection"
+                        disabled="@(!CanChangeSelectionMaterial)"
+                        title="Change the material applied to the selected area shapes (mulch, gravel, seed mix, living ground cover, etc.). Opens the same picker shown in the shape inspector.">
+                    Material
+                </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="PlaceSelectedItemAlongPath" disabled="@(!CanPlaceAlongPath)" title="Place copies of the selected palette stamp (plant, tree, etc.) evenly along a selected path. Path can be a Polyline, Free Draw, Edge, Rectangle perimeter, or Oval perimeter. Pick a stamp item or a Drawing Set from the palette.">
                     Along path
                 </button>
@@ -737,6 +747,10 @@ else
         </div>
     </div>
 }
+
+@* Issue #136 — the toolbar 'Material' button reuses the existing OpenMaterialPicker
+   dialog defined further down (around the showMaterialPicker block). No bespoke dialog
+   markup is needed here. *@
 
     <div class="plot-workspace @(IsConceptMode ? "concept-workspace" : string.Empty)">
             @if (!IsConceptMode)

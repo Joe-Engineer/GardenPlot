@@ -10118,6 +10118,33 @@ public partial class GardenPlot
     private List<Shape>? pendingMergeSources;
     private List<Shape>? pendingMergeMaterialOptions;
 
+    // Issue #136 — Material Picker toolbar gate. The actual picker dialog
+    // (showMaterialPicker / OpenMaterialPicker) is the existing well-organized one used
+    // by the shape inspector's 'Change…' button — we just route the toolbar button to it
+    // so plain area shapes that don't yet have a material can also be assigned one.
+    private bool CanChangeSelectionMaterial =>
+        selectedIds.Count > 0
+        && SelectedShapes().Any(GardenPlotMaterialPicker.CanWearMaterial);
+
+    /// <summary>
+    /// Issue #136 — opens the existing Material Picker dialog for every fillable area
+    /// shape in the current selection. Unlike <see cref="ShowMaterialPickerForSelection"/>
+    /// (which only opens for shapes that already have a material), this entry point also
+    /// accepts plain Rectangle / Oval / FreeDraw shapes so first-time material assignment
+    /// works.
+    /// </summary>
+    private void OpenMaterialPickerForSelection()
+    {
+        var targets = GardenPlotMaterialPicker.FillableTargets(SelectedShapes().ToList());
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        OpenMaterialPicker(targets);
+    }
+
+
     /// <summary>
     /// Issue #134 — runs the boolean-union pipeline on the current selection. Source
     /// shapes are removed; the resulting outer ring(s) are added as new closed
