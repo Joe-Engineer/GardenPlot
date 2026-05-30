@@ -126,6 +126,16 @@ public static class PolygonClipping
     /// Unions a set of polygons. This is the hot path for clipper-clipper overlap handling, so the
     /// method fast-paths 0/1 polygons and otherwise delegates the robust overlay work to NTS.
     /// </summary>
+    /// <remarks>
+    /// Tessellated arc polygons (issue #134 merge pipeline) and freehand-drawn ribbons can
+    /// produce polygons that NTS flags as invalid — duplicate vertices, near-zero-length
+    /// edges from sampling, or boundary self-touches at bevel joins. The first attempt
+    /// runs <c>UnaryUnionOp.Union</c> directly; on a <see cref="TopologyException"/>
+    /// the inputs are sanitized via the standard NTS <c>Buffer(0)</c> trick (which forces
+    /// each polygon through the robust intersection-and-rebuild path), then unioned again.
+    /// If that still fails we surface the original exception so the caller can show an
+    /// error message instead of silently dropping shapes.
+    /// </remarks>
     public static List<IReadOnlyList<Point>> Union(IEnumerable<IReadOnlyList<Point>> polygons)
     {
         ArgumentNullException.ThrowIfNull(polygons);
@@ -145,7 +155,32 @@ public static class PolygonClipping
         }
 
         List<Geometry> geometries = normalized.Select(CreatePolygonGeometry).Cast<Geometry>().ToList();
-        Geometry unioned = UnaryUnionOp.Union(geometries);
+
+        Geometry unioned;
+        try
+        {
+            unioned = UnaryUnionOp.Union(geometries);
+        }
+        catch (NetTopologySuite.Geometries.TopologyException)
+        {
+            // Sanitize each input via Buffer(0) — the canonical NTS workaround for "side
+            // location conflict" failures caused by self-touching or near-duplicate vertex
+            // pathological geometry. Buffer(0) routes each polygon through the robust
+            // overlay path and rebuilds a valid representation.
+            var sanitized = geometries.Select(g =>
+            {
+                try
+                {
+                    return g.Buffer(0);
+                }
+                catch (NetTopologySuite.Geometries.TopologyException)
+                {
+                    return g;
+                }
+            }).ToList();
+            unioned = UnaryUnionOp.Union(sanitized);
+        }
+
         List<IReadOnlyList<Point>> result = new();
         CollectPolygons(unioned, result);
         return result;

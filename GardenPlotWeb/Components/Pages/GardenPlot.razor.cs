@@ -10116,6 +10116,14 @@ public partial class GardenPlot
     /// FreeDraw polygons carrying material / fill from the first selected source. The
     /// new shape(s) are selected so the user can immediately apply further commands.
     /// </summary>
+    /// <remarks>
+    /// Defensive try/catch — if NTS still throws after the <c>Buffer(0)</c> recovery in
+    /// <see cref="PolygonClipping.Union"/>, we leave the selection unchanged and log the
+    /// reason rather than letting a NetTopologySuite exception bubble up to Blazor's
+    /// error boundary and unmount the canvas. Real-world pathological inputs (heavily
+    /// tessellated freehand ribbons with near-duplicate vertices) can defeat even the
+    /// sanitize pass; the user can re-try by simplifying or adjusting the inputs.
+    /// </remarks>
     private async Task MergeSelectedShapes()
     {
         if (!CanMergeSelectedShapes || currentPlot is null)
@@ -10132,7 +10140,20 @@ public partial class GardenPlot
             return;
         }
 
-        var merged = PolygonMergeUtility.MergeShapes(targets);
+        IReadOnlyList<Shape> merged;
+        try
+        {
+            merged = PolygonMergeUtility.MergeShapes(targets);
+        }
+        catch (Exception ex)
+        {
+            // NetTopologySuite or downstream math threw despite the Buffer(0) recovery.
+            // Surface to the browser console so the user can report it, but keep the
+            // canvas alive — losing the selection state would be worse than no-op.
+            Console.Error.WriteLine($"[#134] MergeShapes failed: {ex.GetType().Name}: {ex.Message}");
+            return;
+        }
+
         if (merged.Count == 0)
         {
             return;
