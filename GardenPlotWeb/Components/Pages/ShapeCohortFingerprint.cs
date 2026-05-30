@@ -162,6 +162,13 @@ internal static class ShapeCohortFingerprint
             h = Mix(h, 0);
         }
 
+        // Issue #31 Phase A — sprinkler coverage arc. Without this, changing the
+        // ArcDegrees in the inspector dropdown mutates the shape but the cohort's
+        // hash stays identical and Blazor reuses the cached render. The wedge then
+        // only updates when something else forces a re-render (e.g. clicking off the
+        // dropdown which triggers a focus-out diff).
+        h = MixD(h, s.ArcDegrees ?? 360.0);
+
         return h;
     }
 
