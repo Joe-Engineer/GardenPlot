@@ -1,4 +1,4 @@
-// <copyright file="GardenPlotRotationHelper.cs" company="Garden Plot">
+﻿// <copyright file="GardenPlotRotationHelper.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -46,6 +46,129 @@ public static class GardenPlotRotationHelper
         }
 
         return shift;
+    }
+
+    /// <summary>
+    /// Issue #135 — rotates a shape as part of a multi-shape group selection. Where the
+    /// single-shape <see cref="RotateShape"/> spins each shape around its own bbox center,
+    /// this helper rotates the shape's <em>anchor point</em> around an external <paramref name="pivot"/>
+    /// and ALSO adds <paramref name="deltaDegrees"/> to the shape's own rotation so the
+    /// visible result is a rigid-body rotation of the whole group.
+    /// <list type="bullet">
+    ///   <item><description><see cref="ShapeKind.Rectangle"/>, <see cref="ShapeKind.Oval"/>,
+    ///   <see cref="ShapeKind.BedKit"/>, <see cref="ShapeKind.Plant"/>, <see cref="ShapeKind.Tree"/>,
+    ///   <see cref="ShapeKind.Bush"/>, <see cref="ShapeKind.SoilMarker"/>, <see cref="ShapeKind.CircleRuler"/>,
+    ///   <see cref="ShapeKind.RectRuler"/> — bbox center rotates around the pivot; X/Y recomputed; Rotation += delta.</description></item>
+    ///   <item><description><see cref="ShapeKind.FreeDraw"/>, <see cref="ShapeKind.Edge"/>,
+    ///   <see cref="ShapeKind.Ruler"/> — every <see cref="Shape.Points"/> entry rotates
+    ///   around the pivot. If <see cref="Shape.Rotation"/> was non-zero, it is BAKED into
+    ///   the points first (apply local rotation to all points around the local bbox center,
+    ///   reset <c>Rotation</c> to 0). Baking is needed because the polygon's local center
+    ///   is computed from its points and isn't generally rotation-equivariant.</description></item>
+    /// </list>
+    /// </summary>
+    /// <param name="shape">The shape to rotate.</param>
+    /// <param name="pivot">The pivot point in plot-space feet (typically the selection bbox center).</param>
+    /// <param name="deltaDegrees">Rotation delta in degrees, positive = visually clockwise in y-down.</param>
+    public static void GroupRotateShape(Shape shape, Point pivot, double deltaDegrees)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+        if (Math.Abs(deltaDegrees) < 1e-9)
+        {
+            return;
+        }
+
+        double radians = deltaDegrees * Math.PI / 180.0;
+        double cos = Math.Cos(radians);
+        double sin = Math.Sin(radians);
+
+        bool isPointsBased = shape.Kind is ShapeKind.FreeDraw or ShapeKind.Edge or ShapeKind.Ruler;
+        if (isPointsBased && shape.Points.Count >= 1)
+        {
+            // Bake any local rotation into the raw points first so the visible polygon
+            // and the raw points coincide. After baking, Rotation is zero and the bbox
+            // of Points equals the visible bbox.
+            if (Math.Abs(shape.Rotation) > 1e-9 && shape.Points.Count >= 2)
+            {
+                Point localCenter = ComputeBboxCenter(shape.Points);
+                double localRadians = shape.Rotation * Math.PI / 180.0;
+                double lcos = Math.Cos(localRadians);
+                double lsin = Math.Sin(localRadians);
+                for (int i = 0; i < shape.Points.Count; i++)
+                {
+                    Point p = shape.Points[i];
+                    double dx = p.X - localCenter.X;
+                    double dy = p.Y - localCenter.Y;
+                    shape.Points[i] = new Point(
+                        localCenter.X + (dx * lcos) - (dy * lsin),
+                        localCenter.Y + (dx * lsin) + (dy * lcos));
+                }
+
+                shape.Rotation = 0;
+            }
+
+            for (int i = 0; i < shape.Points.Count; i++)
+            {
+                Point p = shape.Points[i];
+                double dx = p.X - pivot.X;
+                double dy = p.Y - pivot.Y;
+                shape.Points[i] = new Point(
+                    pivot.X + (dx * cos) - (dy * sin),
+                    pivot.Y + (dx * sin) + (dy * cos));
+            }
+
+            return;
+        }
+
+        // Bbox-parameterised shapes (Rectangle, Oval, BedKit, Plant, Tree, Bush,
+        // SoilMarker, CircleRuler, RectRuler). Rotate the bbox center around the
+        // pivot, recompute X/Y from the new center, add delta to Rotation.
+        double cx = shape.X + (shape.W / 2.0);
+        double cy = shape.Y + (shape.H / 2.0);
+        double bdx = cx - pivot.X;
+        double bdy = cy - pivot.Y;
+        double newCx = pivot.X + (bdx * cos) - (bdy * sin);
+        double newCy = pivot.Y + (bdx * sin) + (bdy * cos);
+        shape.X = newCx - (shape.W / 2.0);
+        shape.Y = newCy - (shape.H / 2.0);
+        shape.Rotation = NormalizeDegrees(shape.Rotation + deltaDegrees);
+    }
+
+    /// <summary>
+    /// Issue #135 — computes the selection bbox center used as the default pivot for
+    /// group rotation. Iterates each shape's full visible footprint (rotated AABB for
+    /// bbox-parameterised shapes, points list for path-based shapes) and returns the
+    /// midpoint of the union AABB.
+    /// </summary>
+    /// <param name="shapes">The selected shapes.</param>
+    /// <returns>The pivot point in plot-space feet. <see cref="Point"/>(0,0) when the selection is empty.</returns>
+    public static Point ComputeGroupPivot(IReadOnlyList<Shape> shapes)
+    {
+        ArgumentNullException.ThrowIfNull(shapes);
+        if (shapes.Count == 0)
+        {
+            return new Point(0, 0);
+        }
+
+        var aabb = GetUnionAabb(shapes);
+        return new Point(
+            (aabb.minX + aabb.maxX) / 2.0,
+            (aabb.minY + aabb.maxY) / 2.0);
+    }
+
+    private static Point ComputeBboxCenter(List<Point> points)
+    {
+        double minX = points[0].X, minY = points[0].Y, maxX = points[0].X, maxY = points[0].Y;
+        for (int i = 1; i < points.Count; i++)
+        {
+            Point p = points[i];
+            if (p.X < minX) minX = p.X;
+            else if (p.X > maxX) maxX = p.X;
+            if (p.Y < minY) minY = p.Y;
+            else if (p.Y > maxY) maxY = p.Y;
+        }
+
+        return new Point((minX + maxX) / 2.0, (minY + maxY) / 2.0);
     }
 
     /// <summary>
