@@ -9577,7 +9577,9 @@ public partial class GardenPlot
             }
         }
 
-        if (drafting.Points.Count >= 3 || (drafting.Points.Count >= 2 && !IsGroundCoverShape(drafting)))
+        if (drafting.Points.Count >= 3
+            || (drafting.Points.Count >= 2 && !IsGroundCoverShape(drafting))
+            || (drafting.Points.Count >= 2 && currentTool == Tool.GroundCover && groundCoverSubMode == GroundCoverSubMode.Ribbon))
         {
             // Issue #132 — Ground-Cover Ribbon submode commits as a CLOSED offset polygon
             // rather than the open centerline. The user clicks the centerline; the
@@ -9585,6 +9587,11 @@ public partial class GardenPlot
             // Points + EdgeBulges in place so the rest of the commit pipeline
             // (NormalizeEdgeBulgesOnCommit, undo, save) handles the ribbon shape exactly
             // like any other FreeDraw + CloseEdge=true polygon.
+            //
+            // Single-segment ribbons (a 2-point centerline — straight chord or single
+            // arc) are valid: a line becomes a rectangle ribbon, an arc becomes an
+            // annular-sector ribbon. The commit guard above explicitly allows
+            // Points.Count == 2 for the GC-Ribbon submode for that reason.
             if (currentTool == Tool.GroundCover
                 && groundCoverSubMode == GroundCoverSubMode.Ribbon
                 && drafting.Points.Count >= 2)
