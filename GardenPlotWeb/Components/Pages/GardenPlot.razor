@@ -1075,10 +1075,7 @@ else
                                 </optgroup>
                             }
                         </select>
-                        <label class="small mb-0 ms-auto" title="When checked, finishing a path drawing with this drawing set selected automatically runs Along-path. Lets you 'paint' sidewalks + flanking flowers + edges in one brush motion.">
-                            <input type="checkbox" checked="@editingDrawingSet.PaintAsDrawn" @onchange="async (e) => await OnDrawingSetPaintAsDrawnChangedAsync(e.Value is bool v && v)" />
-                            Paint as drawn
-                        </label>
+                        <span class="small text-muted ms-auto" title="Selecting this drawing set in the palette enters Polyline mode. Drawing a path then paints the assembly automatically.">Auto-paints when set is the active palette selection</span>
                     </div>
                     <div class="drawing-set-editor-rows">
                         <div class="drawing-set-editor-row drawing-set-editor-row-head">
@@ -1478,13 +1475,12 @@ else
                 }
 
                 @* Issue #138 — ghost preview of the active drawing set's placement while
-                   the user drafts a path. When a set is selected AND PaintAsDrawn is on
-                   AND the draft has enough points to be a usable path, we run the same
-                   along-path placement that the final commit will use, then render its
-                   shapes at reduced opacity so the user can preview "sidewalk + flanking
-                   flowers" forming as they click. *@
+                   the user drafts a path. When a set is selected AND the draft has enough
+                   points to be a usable path, we run the same along-path placement that
+                   the final commit will use, then render its shapes at reduced opacity so
+                   the user can preview "sidewalk + flanking flowers" forming as they click. *@
                 @if (!IsConceptMode && drafting is not null && GetSelectedDrawingSet() is { } ghostSet
-                    && ghostSet.PaintAsDrawn && ghostSet.Rows.Count > 0
+                    && ghostSet.Rows.Count > 0
                     && BuildDrawingSetGhostShapes(drafting, ghostSet) is { Count: > 0 } ghostShapes)
                 {
                     <g class="drawing-set-ghost" opacity="0.45" pointer-events="none">

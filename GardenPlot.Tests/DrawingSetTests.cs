@@ -327,4 +327,70 @@ public sealed class DrawingSetTests
     {
         Assert.Equal(DrawingSetPreview.RowItemKind.Area, DrawingSetPreview.ItemKindFor(PaletteKind.GroundCoverSurface, null));
     }
+
+    [Fact]
+    public void PolylineOffset_StraightHorizontal_ShiftsByPerpendicular()
+    {
+        // Horizontal walk from (0,0) to (10,0) in screen y-down. "Right" perpendicular is
+        // +Y (downward on screen). Offset 1 ft right should produce (0,1) -> (10,1).
+        Point[] src = [new(0, 0), new(10, 0)];
+
+        List<Point> result = PolylineOffset.Offset(src, 1.0);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(0, result[0].X, 6);
+        Assert.Equal(1, result[0].Y, 6);
+        Assert.Equal(10, result[1].X, 6);
+        Assert.Equal(1, result[1].Y, 6);
+    }
+
+    [Fact]
+    public void PolylineOffset_NegativeOffset_ShiftsLeft()
+    {
+        Point[] src = [new(0, 0), new(10, 0)];
+
+        List<Point> result = PolylineOffset.Offset(src, -2.0);
+
+        Assert.Equal(-2.0, result[0].Y, 6);
+        Assert.Equal(-2.0, result[1].Y, 6);
+    }
+
+    [Fact]
+    public void PolylineOffset_ZeroOffset_LeavesPointsUnchanged()
+    {
+        Point[] src = [new(1, 2), new(3, 4), new(5, 6)];
+
+        List<Point> result = PolylineOffset.Offset(src, 0);
+
+        Assert.Equal(3, result.Count);
+        for (int i = 0; i < 3; i++)
+        {
+            Assert.Equal(src[i].X, result[i].X, 6);
+            Assert.Equal(src[i].Y, result[i].Y, 6);
+        }
+    }
+
+    [Fact]
+    public void PolylineOffset_RightAngleCorner_OffsetsMiterAlongBisector()
+    {
+        // L-shape: (0,0) -> (10,0) -> (10,10). Outgoing-tangent perpendiculars at the
+        // corner are (0,1) for the horizontal leg and (-1,0) for the vertical leg. The
+        // angle bisector right-perpendicular is normalized (-0.707, 0.707). For offset
+        // 1, the corner should land at (10 + (-1), 0 + 1) = (9, 1) using a unit miter.
+        Point[] src = [new(0, 0), new(10, 0), new(10, 10)];
+
+        List<Point> result = PolylineOffset.Offset(src, 1.0);
+
+        // Corner offset to the right of walking direction. The horizontal-leg right is
+        // (0,1), vertical-leg right is (-1, 0). The miter places the corner at (9, 1).
+        Assert.Equal(9.0, result[1].X, 5);
+        Assert.Equal(1.0, result[1].Y, 5);
+    }
+
+    [Fact]
+    public void PolylineOffset_FewerThan2Points_ReturnsEmpty()
+    {
+        Assert.Empty(PolylineOffset.Offset(Array.Empty<Point>(), 1));
+        Assert.Empty(PolylineOffset.Offset([new(0, 0)], 1));
+    }
 }
