@@ -202,17 +202,6 @@ else
                 </div>
             }
 
-            @* Issue #130 — ALWAYS-VISIBLE diagnostic badge using inline styles only so it
-               renders even if my custom CSS is being cache-blocked. Shows tool, arc state,
-               last key pressed. Remove once the arc-mode flow is confirmed working. *@
-            <div style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.25rem 0.55rem; border-radius:0.3rem; font-size:0.78rem; font-family:monospace; border:2px solid @(arcModeArmed ? "#b58105" : "#6c757d"); background:@(arcModeArmed ? "#fff3cd" : "#f8f9fa"); color:#2a2a2a;">
-                <span><strong>DBG</strong></span>
-                <span>tool=@currentTool</span>
-                <span style="color:@(arcModeArmed ? "#b58105" : "#6c757d"); font-weight:700;">arc=@(arcModeArmed ? "ON" : "off")</span>
-                @if (awaitingArcApex) { <span style="color:#b58105;">apex-pick</span> }
-                <span>lastKey=<code>@(lastKeyDebug ?? "—")</code></span>
-            </div>
-
             <div class="toolbar-group zoom-group">
                 <span class="small text-muted">Tool: <strong>@currentTool</strong></span>
                 <span class="zoom-controls">
@@ -1519,6 +1508,15 @@ else
                     <span class="status-item status-pos"><strong>X:</strong> <span id="garden-status-x">@(lastCanvasX is double statusX ? F(statusX) : "--")</span></span>
                     <span class="status-item status-pos"><strong>Y:</strong> <span id="garden-status-y">@(lastCanvasY is double statusY ? F(statusY) : "--")</span></span>
                     <span class="status-item"><strong>Action:</strong> @CurrentMouseActionLabel()</span>
+                    @* Issue #130 diagnostic — tool, arc-mode state, last key. Stays here
+                       until the arc-mode flow is confirmed stable across all tools. *@
+                    <span class="status-item" style="font-family:monospace; font-size:0.78rem; padding:0.1rem 0.45rem; border-radius:0.25rem; border:1px solid @(arcModeArmed ? "#b58105" : "#adb5bd"); background:@(arcModeArmed ? "#fff3cd" : "#f8f9fa");">
+                        <strong>DBG</strong>
+                        tool=@currentTool
+                        <span style="color:@(arcModeArmed ? "#b58105" : "#6c757d"); font-weight:700;">arc=@(arcModeArmed ? "ON" : "off")</span>
+                        @if (awaitingArcApex) { <span style="color:#b58105;">apex-pick</span> }
+                        lastKey=<code>@(lastKeyDebug ?? "—")</code>
+                    </span>
                     <span class="status-item ms-auto d-inline-flex align-items-center gap-3">
                         <label class="clip-hatch-toggle">
                             <input type="checkbox" checked="@library.Ui.ShowClipHatch" @onchange="OnClipHatchPreferenceChanged" />
