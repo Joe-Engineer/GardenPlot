@@ -269,6 +269,14 @@ else
                         title="Mirror selection vertically (Shift+V)" aria-label="Mirror vertical">
                     <svg viewBox="0 0 24 24"><path d="M4 12H20" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2" /><path d="M8 4L8 10L16 10L16 4Z" fill="currentColor" fill-opacity="0.6" /><path d="M8 20L8 14L16 14L16 20Z" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
                 </button>
+                @* Issue #132 — Path → Ribbon. Offsets the selected open polyline / arc-chain
+                   path by ±half-width into a closed ribbon polygon (pathway, walkway, etc.).
+                   Disabled unless a single open FreeDraw shape is selected. *@
+                <button class="btn btn-sm btn-outline-secondary" @onclick="OpenRibbonDialog"
+                        disabled="@(!CanOpenRibbonDialog)"
+                        title="Offset the selected open path into a closed ribbon polygon of a given width (pathway, walkway, garden border).">
+                    Path → Ribbon
+                </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="PlaceSelectedItemAlongPath" disabled="@(!CanPlaceAlongPath)" title="Place copies of the selected palette stamp (plant, tree, etc.) evenly along a selected path. Path can be a Polyline, Free Draw, Edge, Rectangle perimeter, or Oval perimeter. Pick a stamp item or a Drawing Set from the palette.">
                     Along path
                 </button>
@@ -463,7 +471,47 @@ else
                                 class="btn @(groundCoverSubMode == GroundCoverSubMode.FreehandArea ? "btn-primary" : "btn-outline-secondary")"
                                 title="Click and drag to sketch a freeform area"
                                 @onclick="() => { groundCoverSubMode = GroundCoverSubMode.FreehandArea; CancelPolygonInProgress(); }">Freehand Area</button>
+                        @* Issue #132 — Ribbon sub-modes for ground cover. Two input methods
+                           that both produce a closed offset polygon for area + volume calc:
+                             • Polyline = click vertices like the Polyline tool (A=arc, T=tangent)
+                             • Freehand = drag the cursor to sketch a freeform centerline *@
+                        <button type="button"
+                                class="btn @(groundCoverSubMode == GroundCoverSubMode.PolylineRibbon ? "btn-primary" : "btn-outline-secondary")"
+                                title="Polyline Ribbon — click vertices to lay out a pathway centerline (or edge), see the ribbon being drawn live, double-click to finish. Width / alignment / end-cap to the right."
+                                @onclick="() => { groundCoverSubMode = GroundCoverSubMode.PolylineRibbon; CancelPolygonInProgress(); }">Polyline</button>
+                        <button type="button"
+                                class="btn @(groundCoverSubMode == GroundCoverSubMode.FreehandRibbon ? "btn-primary" : "btn-outline-secondary")"
+                                title="Freehand Ribbon — click and drag to sketch a freeform pathway centerline; release to commit. Same width / alignment / end-cap controls apply."
+                                @onclick="() => { groundCoverSubMode = GroundCoverSubMode.FreehandRibbon; CancelPolygonInProgress(); }">Freehand</button>
                     </div>
+                    @if (groundCoverSubMode is GroundCoverSubMode.PolylineRibbon or GroundCoverSubMode.FreehandRibbon)
+                    {
+                        @* Inline ribbon controls — width / alignment / end cap. Persist via
+                           UiPreferences so the user's preferred path width sticks. *@
+                        <span class="ribbon-controls d-inline-flex align-items-center gap-1 ms-2">
+                            <label class="small text-muted">Width</label>
+                            <input type="text" class="form-control form-control-sm gc-ribbon-width"
+                                   value="@library.Ui.LastRibbonWidthFt.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                                   @oninput="OnRibbonWidthInputChanged"
+                                   placeholder="3 ft"
+                                   title="Ribbon width. Accepts 3, 3 ft, 36 in." />
+                            <select class="form-select form-select-sm gc-ribbon-align"
+                                    value="@library.Ui.LastRibbonAlignment"
+                                    @onchange="OnRibbonAlignmentChanged"
+                                    title="Where the source path sits within the ribbon">
+                                <option value="@RibbonGeometry.Alignment.Center">Center</option>
+                                <option value="@RibbonGeometry.Alignment.Left">Left edge</option>
+                                <option value="@RibbonGeometry.Alignment.Right">Right edge</option>
+                            </select>
+                            <select class="form-select form-select-sm gc-ribbon-cap"
+                                    value="@library.Ui.LastRibbonEndCap"
+                                    @onchange="OnRibbonEndCapChanged"
+                                    title="End cap style">
+                                <option value="@RibbonGeometry.EndCap.Square">Square cap</option>
+                                <option value="@RibbonGeometry.EndCap.Round">Round cap</option>
+                            </select>
+                        </span>
+                    }
                     @if (selectedItem is null || (selectedItem.Kind != PaletteKind.GroundCover && selectedItem.Kind != PaletteKind.GroundCoverSurface))
                     {
                         <span class="small text-warning ms-2">Pick a Ground Cover material or surface from the palette.</span>
@@ -491,6 +539,14 @@ else
                             else if (groundCoverSubMode == GroundCoverSubMode.FreehandArea)
                             {
                                 <span class="text-muted ms-2">Click and drag to sketch</span>
+                            }
+                            else if (groundCoverSubMode == GroundCoverSubMode.PolylineRibbon)
+                            {
+                                <span class="text-muted ms-2">Click vertices · A=arc · T=tangent · double-click to finish</span>
+                            }
+                            else if (groundCoverSubMode == GroundCoverSubMode.FreehandRibbon)
+                            {
+                                <span class="text-muted ms-2">Click and drag to sketch · release to finish</span>
                             }
                         </span>
                     }
@@ -565,6 +621,61 @@ else
                 <div class="modal-footer">
                     <button class="btn btn-sm btn-outline-secondary" @onclick="ResetDefaultKeyBindings">Reset defaults</button>
                     <button class="btn btn-sm btn-primary" @onclick="SaveAndCloseKeyBindingsDialog">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Issue #132 — Path → Ribbon dialog. Live preview renders as a faded overlay on the
+   canvas (see the canvas SVG block below) while this modal is open. *@
+@if (showRibbonDialog)
+{
+    var preview = RibbonPreviewShape;
+    var parseValid = WidthInputParser.ParseFeet(ribbonDialogWidthInput) is not null;
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Path → Ribbon</h5>
+                    <button type="button" class="btn-close" @onclick="CloseRibbonDialog"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="x-small text-muted mb-2">Offsets the selected open path by half-width on each side and stitches the result into a closed ribbon polygon. Watch the faded preview on the canvas as you change inputs.</div>
+                    <div class="mb-2">
+                        <label class="form-label small">Width</label>
+                        <input class="form-control form-control-sm @(parseValid ? string.Empty : "is-invalid")"
+                               @bind="ribbonDialogWidthInput" @bind:event="oninput"
+                               placeholder="e.g. 3, 3 ft, 36 in" />
+                        @if (!parseValid)
+                        {
+                            <div class="invalid-feedback small">Enter a positive width with optional unit (<code>ft</code>, <code>'</code>, <code>in</code>, <code>&quot;</code>).</div>
+                        }
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Source alignment</label>
+                        <select class="form-select form-select-sm" @bind="ribbonDialogAlignment">
+                            <option value="@RibbonGeometry.Alignment.Center">Center (source is the ribbon centerline)</option>
+                            <option value="@RibbonGeometry.Alignment.Left">Left (source is the left edge)</option>
+                            <option value="@RibbonGeometry.Alignment.Right">Right (source is the right edge)</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">End cap</label>
+                        <select class="form-select form-select-sm" @bind="ribbonDialogEndCap">
+                            <option value="@RibbonGeometry.EndCap.Square">Square (straight chord)</option>
+                            <option value="@RibbonGeometry.EndCap.Round">Round (semicircle)</option>
+                        </select>
+                    </div>
+                    @if (preview is not null)
+                    {
+                        <div class="small text-muted">Preview area: <strong>@F(GroundCoverMath.AreaFt2(preview))</strong> ft²</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="CloseRibbonDialog">Cancel</button>
+                    <button class="btn btn-sm btn-primary" @onclick="ApplyRibbon" disabled="@(preview is null)">Create ribbon</button>
                 </div>
             </div>
         </div>
@@ -1389,6 +1500,48 @@ else
                             <title>Tangent snap</title>
                         }
                     </g>
+                }
+
+                @* Issue #132 — live Path → Ribbon preview. Renders the ribbon polygon as
+                   a faded amber overlay so the user can see the result of the dialog's
+                   width / alignment / end-cap choices without committing. *@
+                @if (!IsConceptMode && showRibbonDialog && RibbonPreviewShape is { } ribbonPreview)
+                {
+                    @if (ArcPolygonPathBuilder.HasAnyArc(ribbonPreview.EdgeBulges))
+                    {
+                        <path d="@ArcPolygonPathBuilder.Build(ribbonPreview.Points, ribbonPreview.EdgeBulges, close: true)"
+                              fill="rgba(255,193,7,0.25)" stroke="#b58105" stroke-width="0.08"
+                              stroke-dasharray="0.25,0.15" pointer-events="none" />
+                    }
+                    else
+                    {
+                        <polygon points="@PointsString(ribbonPreview.Points)"
+                                 fill="rgba(255,193,7,0.25)" stroke="#b58105" stroke-width="0.08"
+                                 stroke-dasharray="0.25,0.15" pointer-events="none" />
+                    }
+                }
+
+                @* Issue #132 — live ribbon preview while drawing in the Ground-Cover
+                   Ribbon submode. Source palette colors carry through so the preview
+                   feels like a faded version of what the committed shape will look like. *@
+                @if (!IsConceptMode && GroundCoverRibbonDraftPreview is { } gcRibbonPreview)
+                {
+                    var gcFill = drafting?.Fill ?? "#8a8276";
+                    var gcStroke = drafting?.Stroke ?? "#3f3a30";
+                    @if (ArcPolygonPathBuilder.HasAnyArc(gcRibbonPreview.EdgeBulges))
+                    {
+                        <path d="@ArcPolygonPathBuilder.Build(gcRibbonPreview.Points, gcRibbonPreview.EdgeBulges, close: true)"
+                              fill="@gcFill" fill-opacity="0.35"
+                              stroke="@gcStroke" stroke-width="0.08"
+                              stroke-dasharray="0.25,0.15" pointer-events="none" />
+                    }
+                    else
+                    {
+                        <polygon points="@PointsString(gcRibbonPreview.Points)"
+                                 fill="@gcFill" fill-opacity="0.35"
+                                 stroke="@gcStroke" stroke-width="0.08"
+                                 stroke-dasharray="0.25,0.15" pointer-events="none" />
+                    }
                 }
                 @if (!IsConceptMode && currentTool == Tool.Select && isBoxSelecting)
                 {

@@ -187,6 +187,15 @@ public class UiPreferences
     /// <summary>Anchor location for the <c>Fill with plants</c> lattice. Default is the shape's center.</summary>
     public FillAnchorMode FillAnchorMode { get; set; } = FillAnchorMode.Center;
 
+    /// <summary>Issue #132: last-used Path → Ribbon width (feet). Pre-fills the dialog on reopen.</summary>
+    public double LastRibbonWidthFt { get; set; } = 3.0;
+
+    /// <summary>Issue #132: last-used Path → Ribbon alignment. Pre-selects the dropdown on reopen.</summary>
+    public RibbonGeometry.Alignment LastRibbonAlignment { get; set; } = RibbonGeometry.Alignment.Center;
+
+    /// <summary>Issue #132: last-used Path → Ribbon end cap. Pre-selects the dropdown on reopen.</summary>
+    public RibbonGeometry.EndCap LastRibbonEndCap { get; set; } = RibbonGeometry.EndCap.Square;
+
     /// <summary>Last-used plot sizes, stored in feet and shown as quick-picks in the new-plot flow.</summary>
     [JsonConverter(typeof(RecentPlotSizesJsonConverter))]
     public List<(double WidthFt, double HeightFt)> RecentPlotSizes { get; set; } = new();

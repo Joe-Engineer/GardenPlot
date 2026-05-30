@@ -182,7 +182,7 @@ public partial class GardenPlot
     private enum EdgeSubMode { StraightSegments, Freehand }
 
     /// <summary>Ground-cover drawing sub-mode (selected when Tool.GroundCover is active).</summary>
-    private enum GroundCoverSubMode { Polygon, Rectangle, Oval, FreehandArea }
+    private enum GroundCoverSubMode { Polygon, Rectangle, Oval, FreehandArea, PolylineRibbon, FreehandRibbon }
 
     private EdgeSubMode edgeSubMode = EdgeSubMode.StraightSegments;
     private GroundCoverSubMode groundCoverSubMode = GroundCoverSubMode.Polygon;
@@ -1776,6 +1776,84 @@ public partial class GardenPlot
         }
     }
 
+    /// <summary>
+    /// Issue #132 — width input for the Ground-Cover Ribbon submode toolbar. Parses
+    /// unit-aware text (3, 3 ft, 36 in) and persists to UiPreferences so the live
+    /// preview updates immediately and the value survives across sessions.
+    /// </summary>
+    private void OnRibbonWidthInputChanged(ChangeEventArgs e)
+    {
+        double? parsed = WidthInputParser.ParseFeet(e.Value?.ToString());
+        if (parsed is not null)
+        {
+            library.Ui.LastRibbonWidthFt = parsed.Value;
+        }
+    }
+
+    private void OnRibbonAlignmentChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<RibbonGeometry.Alignment>(e.Value?.ToString(), out var a))
+        {
+            library.Ui.LastRibbonAlignment = a;
+        }
+    }
+
+    private void OnRibbonEndCapChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<RibbonGeometry.EndCap>(e.Value?.ToString(), out var cap))
+        {
+            library.Ui.LastRibbonEndCap = cap;
+        }
+    }
+
+    /// <summary>
+    /// Issue #132 — live ribbon preview shape derived from the in-progress GroundCover
+    /// Ribbon centerline (either Polyline submode or Freehand submode). Returns
+    /// <see langword="null"/> when not in a ribbon submode or the current draft has too
+    /// few points. For PolylineRibbon the trailing cursor-tracker is included so the
+    /// preview reaches the cursor; for FreehandRibbon the draft IS the live path being
+    /// drag-built so no tracker exists.
+    /// </summary>
+    internal Shape? GroundCoverRibbonDraftPreview
+    {
+        get
+        {
+            if (currentTool != Tool.GroundCover
+                || drafting is null
+                || drafting.Points.Count < 2)
+            {
+                return null;
+            }
+
+            bool isPolylineRibbon = groundCoverSubMode == GroundCoverSubMode.PolylineRibbon && buildingPolygon;
+            bool isFreehandRibbon = groundCoverSubMode == GroundCoverSubMode.FreehandRibbon;
+            if (!isPolylineRibbon && !isFreehandRibbon)
+            {
+                return null;
+            }
+
+            double widthFt = library.Ui.LastRibbonWidthFt;
+            if (!(widthFt > 0))
+            {
+                return null;
+            }
+
+            try
+            {
+                return RibbonGeometry.BuildRibbon(
+                    drafting.Points,
+                    drafting.EdgeBulges,
+                    widthFt,
+                    library.Ui.LastRibbonAlignment,
+                    library.Ui.LastRibbonEndCap);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+        }
+    }
+
     private void OnGroundCoverTextureChanged(Shape s, string? value)
     {
         RecordUndoState();
@@ -2842,6 +2920,16 @@ public partial class GardenPlot
     // handlers and the trailing-tracker update. Composes with arc mode: snap affects only
     // the terminus position, not the apex pick.
     internal bool tangentSnapArmed;
+
+    // Issue #132 — Path → Ribbon dialog state. Open when showRibbonDialog is true;
+    // the source is fixed at dialog-open time (ribbonDialogSourceShapeId) so the user
+    // can deselect / re-select without disturbing the live preview. Width input is kept
+    // as the raw string so unit-aware parsing happens fresh on every edit.
+    private bool showRibbonDialog;
+    private Guid ribbonDialogSourceShapeId;
+    private string ribbonDialogWidthInput = "3";
+    private RibbonGeometry.Alignment ribbonDialogAlignment = RibbonGeometry.Alignment.Center;
+    private RibbonGeometry.EndCap ribbonDialogEndCap = RibbonGeometry.EndCap.Square;
 
     // Issue #130 — guards against the browser's natural double-click producing TWO
     // terminus commits in a row. When the second pointer-down lands within this many
@@ -5281,12 +5369,12 @@ public partial class GardenPlot
         }
 
         // Issue #130 — arc mode is only meaningful for the click-by-vertex tools
-        // (Polygon, Polyline, or GroundCover-Polygon submode). Switching to any
+        // (Polygon, Polyline, or GroundCover Polygon / Ribbon submodes). Switching to any
         // non-arc-capable tool disarms it so a stale "Arc on" state doesn't surprise
         // the user later.
         bool newToolIsArcCapable =
             t is Tool.Polygon or Tool.Polyline
-            || (t == Tool.GroundCover && groundCoverSubMode == GroundCoverSubMode.Polygon);
+            || (t == Tool.GroundCover && groundCoverSubMode is GroundCoverSubMode.Polygon or GroundCoverSubMode.PolylineRibbon);
         if (!newToolIsArcCapable)
         {
             arcModeArmed = false;
@@ -8197,6 +8285,62 @@ public partial class GardenPlot
                         };
                         drafting.Points.Add(new Point(x, y));
                     }
+                    else if (groundCoverSubMode == GroundCoverSubMode.FreehandRibbon)
+                    {
+                        // Issue #132 — Freehand Ribbon submode. Mirrors FreehandArea (drag
+                        // to sketch a centerline) but commits as a closed ribbon polygon
+                        // in OnPointerUp via the same RibbonGeometry pipeline used by the
+                        // PolylineRibbon submode.
+                        drafting = new Shape
+                        {
+                            Kind = ShapeKind.FreeDraw,
+                            Trait = surfaceTrait,
+                            Label = gcItem.Code,
+                            Stroke = gcItem.StrokeColor,
+                            Fill = gcItem.FillColor,
+                            MaterialCode = gcItem.Code,
+                            DepthIn = depthOverride,
+                            GroundCoverCode = gcItem.Code,
+                            GroundCoverDepthIn = legacyDepth,
+                            IsGroundCoverSurface = isSurface,
+                            TextureKey = gcItem.TextureKey,
+                        };
+                        drafting.Points.Add(new Point(x, y));
+                    }
+                    else if (groundCoverSubMode == GroundCoverSubMode.PolylineRibbon)
+                    {
+                        // Issue #132 GC-Ribbon submode. Identical click-by-vertex flow to
+                        // the Polygon submode (TryHandleArcClick lights up A + T just like
+                        // there), but the DRAFT shape is an open centerline. Double-click
+                        // commit converts it to the ribbon polygon — see OnCanvasDoubleClick.
+                        if (drafting is null || !buildingPolygon)
+                        {
+                            drafting = new Shape
+                            {
+                                Kind = ShapeKind.FreeDraw,
+                                Trait = surfaceTrait,
+                                Label = gcItem.Code,
+                                Stroke = gcItem.StrokeColor,
+                                Fill = gcItem.FillColor,
+                                MaterialCode = gcItem.Code,
+                                DepthIn = depthOverride,
+                                GroundCoverCode = gcItem.Code,
+                                GroundCoverDepthIn = legacyDepth,
+                                IsGroundCoverSurface = isSurface,
+                                TextureKey = gcItem.TextureKey,
+                            };
+                            drafting.Points.Add(new Point(x, y));
+                            drafting.Points.Add(new Point(x, y));
+                            buildingPolygon = true;
+                            awaitingArcApex = false;
+                            arcApexEdgeIndex = -1;
+                        }
+                        else if (!TryHandleArcClick(x, y))
+                        {
+                            drafting.Points[^1] = new Point(x, y);
+                            drafting.Points.Add(new Point(x, y));
+                        }
+                    }
                     else
                     {
                         drafting = new Shape
@@ -8747,6 +8891,37 @@ public partial class GardenPlot
         {
             if (drafting.Points.Count >= 2)
             {
+                // Issue #132 — Freehand Ribbon submode commits as a CLOSED offset polygon
+                // derived from the freehand centerline, mirroring what the PolylineRibbon
+                // submode does in OnCanvasDoubleClick. The drag path becomes the source
+                // path; RibbonGeometry stitches it into a ribbon outline carrying the
+                // palette item's MaterialCode + DepthIn so area + volume readouts work.
+                if (currentTool == Tool.GroundCover
+                    && groundCoverSubMode == GroundCoverSubMode.FreehandRibbon)
+                {
+                    double widthFt = library.Ui.LastRibbonWidthFt;
+                    if (widthFt > 0)
+                    {
+                        try
+                        {
+                            var ribbon = RibbonGeometry.BuildRibbon(
+                                drafting.Points,
+                                drafting.EdgeBulges,
+                                widthFt,
+                                library.Ui.LastRibbonAlignment,
+                                library.Ui.LastRibbonEndCap);
+                            drafting.Points = ribbon.Points;
+                            drafting.EdgeBulges = ribbon.EdgeBulges;
+                            drafting.CloseEdge = true;
+                        }
+                        catch (ArgumentException)
+                        {
+                            // Bad inputs (degenerate freehand path) — fall back to committing
+                            // the centerline as-is rather than losing the user's work.
+                        }
+                    }
+                }
+
                 RecordUndoState();
                 currentPlot.Shapes.Add(drafting);
                 added = true;
@@ -9462,8 +9637,48 @@ public partial class GardenPlot
             }
         }
 
-        if (drafting.Points.Count >= 3 || (drafting.Points.Count >= 2 && !IsGroundCoverShape(drafting)))
+        if (drafting.Points.Count >= 3
+            || (drafting.Points.Count >= 2 && !IsGroundCoverShape(drafting))
+            || (drafting.Points.Count >= 2 && currentTool == Tool.GroundCover && groundCoverSubMode == GroundCoverSubMode.PolylineRibbon))
         {
+            // Issue #132 — Ground-Cover Ribbon submode commits as a CLOSED offset polygon
+            // rather than the open centerline. The user clicks the centerline; the
+            // committed shape is the ribbon outline derived from RibbonGeometry. We swap
+            // Points + EdgeBulges in place so the rest of the commit pipeline
+            // (NormalizeEdgeBulgesOnCommit, undo, save) handles the ribbon shape exactly
+            // like any other FreeDraw + CloseEdge=true polygon.
+            //
+            // Single-segment ribbons (a 2-point centerline — straight chord or single
+            // arc) are valid: a line becomes a rectangle ribbon, an arc becomes an
+            // annular-sector ribbon. The commit guard above explicitly allows
+            // Points.Count == 2 for the GC-Ribbon submode for that reason.
+            if (currentTool == Tool.GroundCover
+                && groundCoverSubMode == GroundCoverSubMode.PolylineRibbon
+                && drafting.Points.Count >= 2)
+            {
+                double? widthFt = library.Ui.LastRibbonWidthFt > 0 ? library.Ui.LastRibbonWidthFt : (double?)null;
+                if (widthFt is not null)
+                {
+                    try
+                    {
+                        var ribbon = RibbonGeometry.BuildRibbon(
+                            drafting.Points,
+                            drafting.EdgeBulges,
+                            widthFt.Value,
+                            library.Ui.LastRibbonAlignment,
+                            library.Ui.LastRibbonEndCap);
+                        drafting.Points = ribbon.Points;
+                        drafting.EdgeBulges = ribbon.EdgeBulges;
+                        drafting.CloseEdge = true;
+                    }
+                    catch (ArgumentException)
+                    {
+                        // Bad inputs (zero/negative width, single-point source) — fall back
+                        // to committing the centerline as-is so the user doesn't lose work.
+                    }
+                }
+            }
+
             NormalizeEdgeBulgesOnCommit(drafting); // issue #130
             RecordUndoState();
             currentPlot.Shapes.Add(drafting);
@@ -9652,7 +9867,7 @@ public partial class GardenPlot
     /// </summary>
     private bool IsArcCapableTool =>
         currentTool is Tool.Polygon or Tool.Polyline
-        || (currentTool == Tool.GroundCover && groundCoverSubMode == GroundCoverSubMode.Polygon);
+        || (currentTool == Tool.GroundCover && groundCoverSubMode is GroundCoverSubMode.Polygon or GroundCoverSubMode.PolylineRibbon);
 
     internal void ToggleArcMode()
     {
@@ -9847,6 +10062,140 @@ public partial class GardenPlot
         {
             MirrorShape(shape, horizontal);
         }
+
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #132 — predicate gating the "Path → Ribbon" toolbar button. Currently a
+    /// single open FreeDraw shape (Polyline tool output, or any unclosed click-by-vertex
+    /// path) with at least two points qualifies. Closed polygons and other kinds are
+    /// rejected — they need either a different offset algorithm or fall outside this
+    /// PR's scope.
+    /// </summary>
+    private bool CanOpenRibbonDialog
+    {
+        get
+        {
+            if (currentPlot is null || selectedIds.Count != 1)
+            {
+                return false;
+            }
+
+            Shape? s = SelectedShapes().FirstOrDefault();
+            return s is { Kind: ShapeKind.FreeDraw, CloseEdge: false } && s.Points.Count >= 2;
+        }
+    }
+
+    /// <summary>
+    /// Issue #132 — opens the Path → Ribbon dialog, pre-filling width / alignment /
+    /// end-cap from the user's last persisted choices.
+    /// </summary>
+    private void OpenRibbonDialog()
+    {
+        if (!CanOpenRibbonDialog || currentPlot is null)
+        {
+            return;
+        }
+
+        Shape source = SelectedShapes().First();
+        ribbonDialogSourceShapeId = source.Id;
+        ribbonDialogWidthInput = library.Ui.LastRibbonWidthFt.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        ribbonDialogAlignment = library.Ui.LastRibbonAlignment;
+        ribbonDialogEndCap = library.Ui.LastRibbonEndCap;
+        showRibbonDialog = true;
+    }
+
+    private void CloseRibbonDialog()
+    {
+        showRibbonDialog = false;
+        ribbonDialogSourceShapeId = Guid.Empty;
+    }
+
+    /// <summary>
+    /// Issue #132 — live-preview the ribbon polygon for the current dialog inputs.
+    /// Returns <see langword="null"/> when the dialog is closed, the source is missing,
+    /// or the width input parses to an invalid value. The result is rendered as a
+    /// faded overlay alongside the source so the user can refine the inputs without
+    /// committing.
+    /// </summary>
+    internal Shape? RibbonPreviewShape
+    {
+        get
+        {
+            if (!showRibbonDialog || currentPlot is null)
+            {
+                return null;
+            }
+
+            Shape? source = currentPlot.Shapes.FirstOrDefault(s => s.Id == ribbonDialogSourceShapeId);
+            if (source is null || source.Points.Count < 2)
+            {
+                return null;
+            }
+
+            double? widthFt = WidthInputParser.ParseFeet(ribbonDialogWidthInput);
+            if (widthFt is null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return RibbonGeometry.BuildRibbon(
+                    source.Points,
+                    source.EdgeBulges,
+                    widthFt.Value,
+                    ribbonDialogAlignment,
+                    ribbonDialogEndCap);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Issue #132 — commits the live-previewed ribbon as a new shape, persists the
+    /// dialog's choices for next time, and closes the dialog. No-ops when the preview
+    /// can't be computed (the Apply button is disabled in that case in the markup, so
+    /// the only way to hit this guard is a race).
+    /// </summary>
+    private async Task ApplyRibbon()
+    {
+        Shape? preview = RibbonPreviewShape;
+        if (preview is null || currentPlot is null)
+        {
+            return;
+        }
+
+        double? widthFt = WidthInputParser.ParseFeet(ribbonDialogWidthInput);
+        if (widthFt is null)
+        {
+            return;
+        }
+
+        // Pull a forward-facing stroke / fill from the source so the ribbon doesn't
+        // arrive looking like a completely unrelated shape.
+        Shape? source = currentPlot.Shapes.FirstOrDefault(s => s.Id == ribbonDialogSourceShapeId);
+        if (source is not null)
+        {
+            preview.Stroke = source.Stroke;
+            preview.Fill = source.Fill;
+            preview.FillOpacity = source.FillOpacity;
+        }
+
+        RecordUndoState();
+        currentPlot.Shapes.Add(preview);
+        SelectOnly(preview.Id);
+
+        library.Ui.LastRibbonWidthFt = widthFt.Value;
+        library.Ui.LastRibbonAlignment = ribbonDialogAlignment;
+        library.Ui.LastRibbonEndCap = ribbonDialogEndCap;
+
+        showRibbonDialog = false;
+        ribbonDialogSourceShapeId = Guid.Empty;
 
         await SaveAsync();
     }
