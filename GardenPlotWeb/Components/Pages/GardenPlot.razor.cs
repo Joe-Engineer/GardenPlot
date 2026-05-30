@@ -10425,9 +10425,17 @@ public partial class GardenPlot
 
     /// <summary>
     /// Returns "good" / "partial" / "crowded" based on the worst overlap of <paramref name="plant"/>
-    /// with any other plant in <paramref name="all"/>. Uses center-to-center distance vs. summed spacing radii.
+    /// with any other plant in <paramref name="neighborhood"/>. Uses center-to-center distance vs.
+    /// summed spacing radii.
     /// </summary>
-    private static string ComputeSpacingStatus(Shape plant, IReadOnlyList<Shape> all)
+    /// <param name="plant">The plant whose spacing status is being computed.</param>
+    /// <param name="neighborhood">
+    /// Plants close enough to potentially overlap <paramref name="plant"/>. Callers using a
+    /// <see cref="SpatialGridIndex{T}"/> should pass only the cells around <paramref name="plant"/>'s
+    /// AABB; legacy callers can pass the full plant set and get identical results at higher cost.
+    /// </param>
+    /// <returns>One of "good", "partial", "crowded".</returns>
+    private static string ComputeSpacingStatus(Shape plant, IEnumerable<Shape> neighborhood)
     {
         if (IsFocalPointTrait(plant.Trait))
         {
@@ -10438,7 +10446,7 @@ public partial class GardenPlot
         var pcy = plant.Y + plant.H / 2;
         var pr = plant.W / 2;
         double worst = 0;
-        foreach (var q in all)
+        foreach (var q in neighborhood)
         {
             if (ReferenceEquals(q, plant) || IsFocalPointTrait(q.Trait))
             {
@@ -10465,6 +10473,11 @@ public partial class GardenPlot
     // runs on every pointer-move; recomputing this O(N^2) overlay each time makes the ghost lag
     // behind the mouse on densely-planted beds. Cache the result and only rebuild when the plant
     // set's fingerprint changes (count + per-plant Id/X/Y/W hash).
+    //
+    // When the cache misses, a SpatialGridIndex<Shape> is built so the per-plant neighbor lookup
+    // collapses from O(N) to O(k) where k is the small constant number of plants in the 3x3 cell
+    // neighborhood around the plant. Issue #117 — at 1299 plants the rebuild cost drops from
+    // ~1.7M distance computations to ~1299 * ~10 = ~13K, a >100x reduction.
     private Dictionary<Guid, string>? plantSpacingStatusesCache;
     private long plantSpacingStatusesCacheKey;
 
@@ -10488,9 +10501,42 @@ public partial class GardenPlot
         }
 
         var result = new Dictionary<Guid, string>(plants.Count);
+        if (plants.Count == 0)
+        {
+            plantSpacingStatusesCache = result;
+            plantSpacingStatusesCacheKey = key;
+            return result;
+        }
+
+        // Cell size = 2 * (largest plant radius). At this scale, any pair of plants that
+        // could overlap (centers within sumR <= 2*maxR apart) lies in the same or adjacent
+        // cell — so a 3x3 cell-neighborhood query catches every overlap candidate exactly.
+        double maxRadius = 0;
         foreach (var p in plants)
         {
-            result[p.Id] = ComputeSpacingStatus(p, plants);
+            double r = p.W / 2;
+            if (r > maxRadius) maxRadius = r;
+        }
+
+        double cellSize = Math.Max(maxRadius * 2.0, 0.25);
+        var grid = new SpatialGridIndex<Shape>(cellSize);
+        foreach (var p in plants)
+        {
+            double r = p.W / 2;
+            double cx = p.X + p.W / 2;
+            double cy = p.Y + p.H / 2;
+            grid.Insert(p, cx - r, cy - r, cx + r, cy + r);
+        }
+
+        foreach (var p in plants)
+        {
+            double r = p.W / 2;
+            double cx = p.X + p.W / 2;
+            double cy = p.Y + p.H / 2;
+            // Query radius = own radius + max possible neighbor radius. Catches every plant
+            // whose AABB lies within sumR distance — exact same set the legacy O(N) loop saw.
+            double queryRadius = r + maxRadius;
+            result[p.Id] = ComputeSpacingStatus(p, grid.QueryRadius(cx, cy, queryRadius));
         }
 
         plantSpacingStatusesCache = result;
