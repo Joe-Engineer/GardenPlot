@@ -11437,9 +11437,23 @@ public partial class GardenPlot
         var primaryShapeId = rotated[0].Id;
         var primaryBefore = ShapeCenter(rotated[0]);
 
-        foreach (var shape in rotated)
+        if (rotated.Count == 1)
         {
-            GardenPlotRotationHelper.RotateShape(shape, delta, PlotWidthFt, PlotHeightFt, autoShiftEnabled);
+            // Single-shape rotation — keep the existing in-place spin behaviour.
+            GardenPlotRotationHelper.RotateShape(rotated[0], delta, PlotWidthFt, PlotHeightFt, autoShiftEnabled);
+        }
+        else
+        {
+            // Issue #135 — multi-shape group rotation. Each selected shape rotates
+            // around the SELECTION's collective bbox center as if the whole selection
+            // were a rigid body. Per-shape rotation auto-shift doesn't make sense for
+            // a group rotation (each shape's bounds are no longer the natural unit),
+            // so we route through GroupRotateShape unconditionally.
+            Point pivot = GardenPlotRotationHelper.ComputeGroupPivot(rotated);
+            foreach (var shape in rotated)
+            {
+                GardenPlotRotationHelper.GroupRotateShape(shape, pivot, delta);
+            }
         }
 
         if (autoShiftEnabled)
