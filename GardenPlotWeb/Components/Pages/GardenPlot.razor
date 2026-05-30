@@ -179,19 +179,30 @@ else
                 </button>
             </div>
 
+            @* Issue #130 — arc-mode toggle, in its own toolbar group so the active state
+               is unmissable. Visible whenever Polygon / Polyline is the active tool. *@
+            @if (currentTool is Tool.Polygon or Tool.Polyline)
+            {
+                <div class="toolbar-group" role="toolbar" aria-label="Arc mode">
+                    <button class="@(arcModeArmed ? "arc-toggle-active" : "arc-toggle-inactive")"
+                            @onclick="ToggleArcMode"
+                            title="Toggle arc-side drawing (hotkey: A). When ON, each side is a 3-click flow: start, terminus, apex (sets curvature).">
+                        @if (arcModeArmed)
+                        {
+                            <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:middle"><path d="M3 18 Q 12 2 21 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" /></svg>
+                            <span>ARC mode (A to switch off)</span>
+                        }
+                        else
+                        {
+                            <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:middle"><path d="M3 18 L 21 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" /></svg>
+                            <span>Line mode (A for arc)</span>
+                        }
+                    </button>
+                </div>
+            }
+
             <div class="toolbar-group zoom-group">
                 <span class="small text-muted">Tool: <strong>@currentTool</strong></span>
-                @* Issue #130 — arc-mode badge. Visible whenever Polygon / Polyline is the
-                   active tool (including BEFORE the first click) so the user can arm arc
-                   mode up front. Click toggles the mode (mirrors the A hotkey). *@
-                @if (currentTool is Tool.Polygon or Tool.Polyline)
-                {
-                    <button class="btn btn-sm @(arcModeArmed ? "btn-warning" : "btn-outline-secondary") ms-1"
-                            @onclick="ToggleArcMode"
-                            title="Toggle arc segments. When ON, each side is a 3-click flow: start, terminus, apex (sets curvature).">
-                        @(arcModeArmed ? "\u25DC Arc on" : "Line")
-                    </button>
-                }
                 <span class="zoom-controls">
                     <button class="toolbar-icon-btn zoom-btn" @onclick="ZoomOut" title="Zoom out (−10%)" aria-label="Zoom out">
                         <svg viewBox="0 0 24 24"><path d="M6 12H18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="2" /><path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>

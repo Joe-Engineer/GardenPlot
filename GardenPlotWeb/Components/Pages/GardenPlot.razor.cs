@@ -3022,6 +3022,24 @@ public partial class GardenPlot
         return string.Equals(e.Key, keyPart, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Issue #130 — fallback for the arc-toggle hotkey. Returns <see langword="true"/> for
+    /// a bare 'A' or 'a' key with no modifiers, but only when the persisted keybinding
+    /// string is missing / blank (e.g. older preference payloads predating this field).
+    /// Without this guard, users would be locked out of arc mode until they manually
+    /// reset keybindings.
+    /// </summary>
+    private static bool IsArcToggleFallback(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, string? binding)
+    {
+        if (!string.IsNullOrWhiteSpace(binding))
+        {
+            return false;
+        }
+
+        return !e.CtrlKey && !e.AltKey && !e.ShiftKey
+            && (string.Equals(e.Key, "a", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static KeyBindingSettings CloneKeyBindings(KeyBindingSettings source) => new()
     {
         StampSpacingLeft = source.StampSpacingLeft,
@@ -3047,6 +3065,13 @@ public partial class GardenPlot
         PanDown = source.PanDown,
         RotateGroupOrientationCounterClockwise = source.RotateGroupOrientationCounterClockwise,
         RotateGroupOrientationClockwise = source.RotateGroupOrientationClockwise,
+
+        // Issue #130 — every persisted KeyBindings round-trip MUST carry the new fields,
+        // otherwise saving the dialog drops them silently and the A / Shift+H / Shift+V
+        // shortcuts stop working until the user resets defaults.
+        ToggleArcSegment = source.ToggleArcSegment,
+        MirrorHorizontal = source.MirrorHorizontal,
+        MirrorVertical = source.MirrorVertical,
     };
 
     private KeyBindingSettings KeyBindings => library.Ui.KeyBindings ??= new KeyBindingSettings();
@@ -10052,10 +10077,11 @@ public partial class GardenPlot
             var delta = IsBindingMatch(e, kb.RotateGroupOrientationCounterClockwise) ? -15.0 : 15.0;
             await RotateSelectedGroupOrientations(delta);
         }
-        else if (IsBindingMatch(e, kb.ToggleArcSegment))
+        else if (IsBindingMatch(e, kb.ToggleArcSegment) || IsArcToggleFallback(e, kb.ToggleArcSegment))
         {
             // Issue #130 — toggle latched arc mode while drawing a polygon / polyline.
-            // Inactive (or a no-op) when not drafting; ignored as a global shortcut.
+            // The fallback matches a bare 'a' / 'A' (no modifiers) so users whose persisted
+            // KeyBindings predate this field don't get locked out.
             ToggleArcMode();
         }
         else if (IsBindingMatch(e, kb.MirrorHorizontal))

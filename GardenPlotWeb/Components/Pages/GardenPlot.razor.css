@@ -98,6 +98,50 @@
     cursor: not-allowed;
 }
 
+/* Issue #130 — arc-mode toggle button. Two visually distinct states so the user
+   can tell at a glance whether the next polygon side will be a line or an arc.
+   Inactive: subtle dotted outline. Active: bright amber fill with a pulsing
+   shadow and bold label, so it can't be missed while drawing. */
+.arc-toggle-inactive,
+.arc-toggle-active {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border: 1.5px solid;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s, box-shadow 0.1s;
+}
+
+.arc-toggle-inactive {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+    color: #495057;
+    border-style: dashed;
+}
+
+.arc-toggle-inactive:hover {
+    background: #e9ecef;
+    border-color: #6c757d;
+}
+
+.arc-toggle-active {
+    background: #ffc107;
+    border-color: #b58105;
+    color: #3d2c00;
+    border-style: solid;
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.35);
+    animation: arc-toggle-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes arc-toggle-glow {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.35); }
+    50%      { box-shadow: 0 0 0 5px rgba(255, 193, 7, 0.5); }
+}
+
 .zoom-controls {
     display: inline-flex;
     align-items: center;
