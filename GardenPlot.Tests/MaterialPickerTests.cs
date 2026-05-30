@@ -8,9 +8,9 @@ using GardenPlotWeb.Models;
 namespace GardenPlot.Tests;
 
 /// <summary>
-/// Issue #136 — first PR of the Material epic. Validates the picker's policy: which
-/// shape kinds can wear a material, which palette categories are pickable, and what
-/// fields get stamped onto the shape when a material is applied.
+/// Issue #136 — validates the toolbar 'Material' gate. The actual picker dialog is
+/// the existing well-organized one in the page; these tests cover the predicate that
+/// decides which selected shapes are eligible targets for that picker.
 /// </summary>
 public sealed class MaterialPickerTests
 {
@@ -69,88 +69,5 @@ public sealed class MaterialPickerTests
     public void FillableTargets_EmptySelection_ReturnsEmpty()
     {
         Assert.Empty(GardenPlotMaterialPicker.FillableTargets(Array.Empty<Shape>()));
-    }
-
-    [Fact]
-    public void IsMaterialCategory_TrueOnlyForGroundCoverCategories()
-    {
-        Assert.True(GardenPlotMaterialPicker.IsMaterialCategory(PaletteCategory.GroundCoverMaterials));
-        Assert.True(GardenPlotMaterialPicker.IsMaterialCategory(PaletteCategory.GroundCoverSurface));
-
-        // Spot-check the rejection set — these should never be material-pickable.
-        Assert.False(GardenPlotMaterialPicker.IsMaterialCategory(PaletteCategory.TreesShade));
-        Assert.False(GardenPlotMaterialPicker.IsMaterialCategory(PaletteCategory.Vegetables));
-        Assert.False(GardenPlotMaterialPicker.IsMaterialCategory(PaletteCategory.BedKits));
-        Assert.False(GardenPlotMaterialPicker.IsMaterialCategory(PaletteCategory.Edging));
-        Assert.False(GardenPlotMaterialPicker.IsMaterialCategory(PaletteCategory.GroundCoverPlants));
-    }
-
-    [Fact]
-    public void ApplyMaterial_VolumeMaterial_StampsCodeFillStrokeTextureAndClearsLegacyCode()
-    {
-        Shape shape = new()
-        {
-            Kind = ShapeKind.Rectangle,
-            Fill = "#000000",
-            Stroke = "#111111",
-            TextureKey = "old-texture",
-            GroundCoverCode = "legacy-mulch", // legacy field that should be cleared
-            IsGroundCoverSurface = true, // should flip to false for a volume material
-        };
-        PaletteItem? mulch = PaletteCatalog.GroundCoverMaterials.FirstOrDefault(p => p.Code == "Hardwood Mulch");
-        Assert.NotNull(mulch);
-
-        bool changed = GardenPlotMaterialPicker.ApplyMaterial(shape, mulch!);
-
-        Assert.True(changed);
-        Assert.Equal("Hardwood Mulch", shape.MaterialCode);
-        Assert.Null(shape.GroundCoverCode);
-        Assert.Equal(mulch!.FillColor, shape.Fill);
-        Assert.Equal(mulch.StrokeColor, shape.Stroke);
-        Assert.Equal(mulch.TextureKey, shape.TextureKey);
-        Assert.False(shape.IsGroundCoverSurface);
-    }
-
-    [Fact]
-    public void ApplyMaterial_SurfaceMaterial_FlipsIsGroundCoverSurfaceToTrue()
-    {
-        Shape shape = new() { Kind = ShapeKind.Rectangle };
-        PaletteItem? seedMix = PaletteCatalog.GroundCoverSurfaceCovers
-            .FirstOrDefault(p => p.MaterialSoldBy == MaterialSoldBy.Area);
-        Assert.NotNull(seedMix);
-
-        bool changed = GardenPlotMaterialPicker.ApplyMaterial(shape, seedMix!);
-
-        Assert.True(changed);
-        Assert.Equal(seedMix!.Code, shape.MaterialCode);
-        Assert.True(shape.IsGroundCoverSurface);
-    }
-
-    [Fact]
-    public void ApplyMaterial_SecondCallWithSameMaterial_ReturnsFalseAndDoesNotMutate()
-    {
-        Shape shape = new() { Kind = ShapeKind.Rectangle };
-        PaletteItem mulch = PaletteCatalog.GroundCoverMaterials.First(p => p.Code == "Hardwood Mulch");
-
-        bool first = GardenPlotMaterialPicker.ApplyMaterial(shape, mulch);
-        bool second = GardenPlotMaterialPicker.ApplyMaterial(shape, mulch);
-
-        Assert.True(first);
-        Assert.False(second); // idempotent — nothing changed the second time
-    }
-
-    [Fact]
-    public void ApplyMaterial_DifferentMaterialOverwritesPrevious()
-    {
-        Shape shape = new() { Kind = ShapeKind.Rectangle };
-        PaletteItem mulch = PaletteCatalog.GroundCoverMaterials.First(p => p.Code == "Hardwood Mulch");
-        PaletteItem gravel = PaletteCatalog.GroundCoverMaterials.First(p => p.Code == "Pea Gravel");
-
-        GardenPlotMaterialPicker.ApplyMaterial(shape, mulch);
-        bool changed = GardenPlotMaterialPicker.ApplyMaterial(shape, gravel);
-
-        Assert.True(changed);
-        Assert.Equal("Pea Gravel", shape.MaterialCode);
-        Assert.Equal(gravel.FillColor, shape.Fill);
     }
 }

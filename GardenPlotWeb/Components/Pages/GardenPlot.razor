@@ -285,14 +285,14 @@ else
                         title="Merge the selected polygons into a single combined shape (boolean union). Touching shapes become one outline; overlapping shapes lose their shared interior. Arc edges are tessellated to polylines in the result.">
                     Merge
                 </button>
-                @* Issue #136 — Material picker. Open a dialog where the user picks a material
-                   from the palette (volume materials like mulch / gravel and surface materials
-                   like seed mixes / living ground covers are selectable; non-material categories
-                   are shown but dimmed). Disabled unless the selection contains at least one
-                   area shape that can wear a material. *@
-                <button class="btn btn-sm btn-outline-secondary" @onclick="OpenChangeMaterialDialog"
+                @* Issue #136 — Material picker toolbar button. Opens the existing
+                   well-organized Material Picker dialog (with search, grouping by kind,
+                   and the full union of catalog materials) for every fillable area shape
+                   in the selection. Disabled unless the selection contains at least one
+                   area shape (Rectangle / Oval / closed FreeDraw, excluding tiles). *@
+                <button class="btn btn-sm btn-outline-secondary" @onclick="OpenMaterialPickerForSelection"
                         disabled="@(!CanChangeSelectionMaterial)"
-                        title="Change the material applied to the selected area shapes (mulch, gravel, seed mix, living ground cover, etc.). Updates fill, stroke, and texture from the material catalog.">
+                        title="Change the material applied to the selected area shapes (mulch, gravel, seed mix, living ground cover, etc.). Opens the same picker shown in the shape inspector.">
                     Material
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="PlaceSelectedItemAlongPath" disabled="@(!CanPlaceAlongPath)" title="Place copies of the selected palette stamp (plant, tree, etc.) evenly along a selected path. Path can be a Polyline, Free Draw, Edge, Rectangle perimeter, or Oval perimeter. Pick a stamp item or a Drawing Set from the palette.">
@@ -748,76 +748,9 @@ else
     </div>
 }
 
-@* Issue #136 — Material Picker dialog. Re-uses the existing palette pattern (category
-   dropdown + grid of palette items) but scoped to materials only. Non-material categories
-   appear in the dropdown as disabled options so the full familiar palette structure is
-   visible but only area-bearing materials are pickable. *@
-@if (showChangeMaterialDialog)
-{
-    var pickerCategories = GardenPlotWeb.Models.PaletteCatalog.For(changeMaterialCategory);
-    <div class="modal-backdrop fade show"></div>
-    <div class="modal d-block" tabindex="-1" role="dialog">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Apply material to selection</h5>
-                    <button type="button" class="btn-close" @onclick="CancelChangeMaterialDialog"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="x-small text-muted mb-2">
-                        @changeMaterialTargetCount area shape@(changeMaterialTargetCount == 1 ? string.Empty : "s") will receive the picked material (fill, stroke, and texture). Non-material categories are shown for context but cannot be picked.
-                    </div>
-                    <div class="mb-2 d-flex align-items-center gap-2">
-                        <label class="small mb-0">Category:</label>
-                        <select class="form-select form-select-sm" style="max-width: 24em;"
-                                value="@changeMaterialCategory"
-                                @onchange="OnChangeMaterialCategoryChanged">
-                            @foreach (var cat in System.Enum.GetValues<GardenPlotWeb.Models.PaletteCategory>())
-                            {
-                                var isMat = GardenPlotMaterialPicker.IsMaterialCategory(cat);
-                                <option value="@cat" disabled="@(!isMat)">
-                                    @(isMat ? CategoryLabel(cat) : $"{CategoryLabel(cat)} (not a material)")
-                                </option>
-                            }
-                        </select>
-                    </div>
-                    @if (pickerCategories.Count == 0)
-                    {
-                        <div class="x-small text-muted">No items in this category.</div>
-                    }
-                    else
-                    {
-                        <div class="palette-grid" style="max-height: 24em; overflow: auto;">
-                            @foreach (var item in pickerCategories)
-                            {
-                                var captured = item;
-                                var fill = item.FillColor ?? "#8a8276";
-                                var stroke = item.StrokeColor ?? "#3f3a30";
-                                var detail = item.MaterialSoldBy switch
-                                {
-                                    GardenPlotWeb.Models.MaterialSoldBy.Volume => item.DefaultDepthIn is double dd ? $"volume · {dd:0.#}\" deep" : "volume",
-                                    GardenPlotWeb.Models.MaterialSoldBy.Area => "area · seed / living cover",
-                                    _ => item.Trait,
-                                };
-                                <button type="button" class="palette-item" @onclick="@(() => ApplyMaterialToSelection(captured))" title="@item.Code — @detail">
-                                    <svg viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet">
-                                        <rect x="0.08" y="0.08" width="0.84" height="0.84" rx="0.06"
-                                              fill="@fill" stroke="@stroke" stroke-width="0.04" />
-                                    </svg>
-                                    <div class="small palette-item-name">@item.Code</div>
-                                    <div class="x-small text-muted">@detail</div>
-                                </button>
-                            }
-                        </div>
-                    }
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="CancelChangeMaterialDialog">Cancel</button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
+@* Issue #136 — the toolbar 'Material' button reuses the existing OpenMaterialPicker
+   dialog defined further down (around the showMaterialPicker block). No bespoke dialog
+   markup is needed here. *@
 
     <div class="plot-workspace @(IsConceptMode ? "concept-workspace" : string.Empty)">
             @if (!IsConceptMode)
