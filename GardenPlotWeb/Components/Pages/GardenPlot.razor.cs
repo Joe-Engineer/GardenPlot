@@ -2704,6 +2704,44 @@ public partial class GardenPlot
         Takeoff = item.Kind == PaletteKind.Edging ? GardenPlotWeb.Models.Catalog.CreateTakeoff(item.Code) : null,
     };
 
+    /// <summary>
+    /// Issue #129: produces a synthetic <see cref="Shape"/> that mirrors what the
+    /// first canvas click would create for a ground-cover palette item, but with
+    /// no vertices. Lets the info panel render its material / depth / waste /
+    /// texture controls the moment the user picks the palette item — before a
+    /// single canvas click. Mirrors the field set in the
+    /// <c>Tool.GroundCover when selectedItem ...</c> branch of <c>OnCanvasPointerDown</c>.
+    /// </summary>
+    /// <param name="item">The picked ground-cover palette item.</param>
+    /// <returns>A preview shape for the info panel; never <see langword="null"/>.</returns>
+    private Shape BuildGroundCoverPreviewFromPalette(PaletteItem item)
+    {
+        bool isSurface = item.Kind == PaletteKind.GroundCoverSurface;
+        double? depth = isSurface
+            ? (double?)null
+            : (currentGroundCoverDepthIn ?? item.DefaultDepthIn ?? 3.0);
+        string surfaceTrait = isSurface && !string.IsNullOrWhiteSpace(item.Trait)
+            ? item.Trait
+            : "ground-cover";
+        double? depthOverride = isSurface || depth == item.DefaultDepthIn ? null : depth;
+        double? legacyDepth = isSurface ? (double?)null : (depth ?? item.DefaultDepthIn);
+
+        return new Shape
+        {
+            Kind = ShapeKind.FreeDraw,
+            Trait = surfaceTrait,
+            Label = item.Code,
+            Stroke = item.StrokeColor,
+            Fill = item.FillColor,
+            MaterialCode = item.Code,
+            DepthIn = depthOverride,
+            GroundCoverCode = item.Code,
+            GroundCoverDepthIn = legacyDepth,
+            IsGroundCoverSurface = isSurface,
+            TextureKey = item.TextureKey,
+        };
+    }
+
     /// <summary>Resolves the optional PlantProfile for a placed shape or stamp preview.</summary>
     private PlantProfile? ProfileForShape(Shape s, bool isPreview)
     {

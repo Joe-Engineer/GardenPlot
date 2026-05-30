@@ -2080,23 +2080,38 @@ else
         && drafting.Kind == ShapeKind.FreeDraw
         ? drafting
         : null;
-    var hasDraftPanel = draftPanelShape is not null;
+    // Issue #129 (palette-first): the panel must also show up the moment the user
+    // picks a ground-cover palette item — BEFORE any canvas click. The preview
+    // shape uses the same field set as the on-click drafting initializer so the
+    // rich Material section renders identically; once the user clicks, the
+    // drafting path takes over with real Points data.
+    var palettePreviewShape = (drafting is null
+        && currentTool == Tool.GroundCover
+        && selectedItem is { } gcPaletteItem
+        && (gcPaletteItem.Kind == PaletteKind.GroundCover || gcPaletteItem.Kind == PaletteKind.GroundCoverSurface))
+        ? BuildGroundCoverPreviewFromPalette(gcPaletteItem)
+        : null;
+    var draftOrPreviewPanelShape = draftPanelShape ?? palettePreviewShape;
+    var hasDraftPanel = draftOrPreviewPanelShape is not null;
 }
 
 @if (!IsConceptMode && (selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null) || infoRuler is not null || hasDraftPanel) && currentPlot is not null)
 {
     var forceRulerMode = infoRuler is not null && (drafting is not null || selectedIds.Count <= 1);
-    var draftPreview = (!forceRulerMode && selectedIds.Count == 0 && currentTool != Tool.Stamp && draftPanelShape is not null)
-        ? draftPanelShape
+    var draftPreview = (!forceRulerMode && selectedIds.Count == 0 && currentTool != Tool.Stamp && draftOrPreviewPanelShape is not null)
+        ? draftOrPreviewPanelShape
         : null;
     var stampPreview = (!forceRulerMode && selectedIds.Count == 0 && currentTool == Tool.Stamp && selectedItem is not null && draftPreview is null)
         ? PreviewShapeFromItem(selectedItem)
         : null;
     var isPreview = stampPreview is not null;
-    // Issue #129: isDraftMode flags the new "treat drafting as the synthetic single
-    // selection" path. The shape IS real and mutable, but the rotation editor /
-    // task binding / clip-by panel all assume the shape exists in currentPlot.Shapes
-    // (it doesn't yet) so those sub-panels are suppressed while drafting.
+    // Issue #129: isDraftMode flags the new "treat drafting (or palette preview) as
+    // the synthetic single selection" path. For real drafting, the shape IS mutable
+    // and edits land back on the draft. For palette-only preview, edits would land
+    // on the throwaway preview shape — see palettePreviewIsLive below; we mark
+    // palette-preview as isDraftMode too so rotation / task / clip panels stay
+    // suppressed, and depth/waste edits on the preview shape are harmless because
+    // the next palette pick rebuilds the preview from the palette item.
     var isDraftMode = draftPreview is not null;
     var selShapes = forceRulerMode
         ? new List<Shape> { infoRuler! }
