@@ -6616,14 +6616,34 @@ public partial class GardenPlot
         var drawingSet = GetSelectedDrawingSet();
         if (drawingSet is not null && drawingSet.Rows.Count > 0)
         {
+            // Issue #138 — apply rows in REVERSE order so that the first row in the
+            // list (lowest index) ends up rendered LAST and therefore on top in z-order.
+            // Per-row effective width respects the new WidthOverrideFt field.
             var resolved = new List<(PaletteItem Item, AlongPathRowSpec Spec)>(drawingSet.Rows.Count);
-            foreach (var row in drawingSet.Rows)
+            var renderOrder = DrawingSetPreview.RenderOrder(drawingSet.Rows.Count);
+            foreach (int idx in renderOrder)
             {
-                var item = ResolvePaletteItemForRow(row);
-                if (item is null) continue;
-                resolved.Add((item, new AlongPathRowSpec(item.WidthFt, row.GapFt, row.OffsetFt, row.PhaseAlongFt)));
+                AlongPathDrawingSetRow row = drawingSet.Rows[idx];
+                PaletteItem? item = ResolvePaletteItemForRow(row);
+                if (item is null)
+                {
+                    continue;
+                }
+
+                double width = row.EffectiveWidthFt(item);
+                if (width <= 0)
+                {
+                    width = item.WidthFt;
+                }
+
+                resolved.Add((item, new AlongPathRowSpec(width, row.GapFt, row.OffsetFt, row.PhaseAlongFt)));
             }
-            if (resolved.Count == 0) return;
+
+            if (resolved.Count == 0)
+            {
+                return;
+            }
+
             placement = BuildAlongPathPlacementForRows(resolved, sourcePath, assignNewIds: true);
         }
         else if (selectedItem is { } item && IsStampablePaletteItem(item))
@@ -7288,6 +7308,155 @@ public partial class GardenPlot
         }
         editingDrawingSet.Rows.RemoveAt(index);
         await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #138 — moves a row up or down in the drawing set. The list order is the
+    /// z-order: lower index = drawn on top, higher index = drawn behind.
+    /// </summary>
+    private async Task MoveDrawingSetRowAsync(int index, int delta)
+    {
+        if (editingDrawingSet is null)
+        {
+            return;
+        }
+
+        int target = index + delta;
+        if (index < 0 || index >= editingDrawingSet.Rows.Count
+            || target < 0 || target >= editingDrawingSet.Rows.Count
+            || delta == 0)
+        {
+            return;
+        }
+
+        (editingDrawingSet.Rows[index], editingDrawingSet.Rows[target]) =
+            (editingDrawingSet.Rows[target], editingDrawingSet.Rows[index]);
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #138 — appends a fresh row to the editing drawing set, populated from the
+    /// supplied palette item code (looked up via PaletteCatalog). Used by the new 'Add
+    /// item' dropdown in the editor.
+    /// </summary>
+    private async Task AddDrawingSetRowAsync(string paletteItemCode)
+    {
+        if (editingDrawingSet is null || string.IsNullOrWhiteSpace(paletteItemCode))
+        {
+            return;
+        }
+
+        PaletteItem? item = PaletteCatalog.FindByCode(paletteItemCode);
+        if (item is null)
+        {
+            return;
+        }
+
+        editingDrawingSet.Rows.Add(new AlongPathDrawingSetRow
+        {
+            PaletteItemCode = item.Code,
+            PaletteItemKind = item.Kind,
+            GapFt = 0,
+            OffsetFt = 0,
+            PhaseAlongFt = 0,
+            CapturedWidthFt = item.WidthFt,
+            CapturedHeightFt = item.HeightFt,
+            CapturedTrait = item.Trait,
+            CapturedFill = item.FillColor,
+            CapturedStroke = item.StrokeColor,
+        });
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #138 — toggle the per-set 'paint as drawn' flag from the editor.</summary>
+    private async Task OnDrawingSetPaintAsDrawnChangedAsync(bool value)
+    {
+        if (editingDrawingSet is null)
+        {
+            return;
+        }
+
+        editingDrawingSet.PaintAsDrawn = value;
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #138 — returns true when finishing the just-drawn shape should trigger an
+    /// automatic Along-path placement: a drawing set is the active selection AND that
+    /// set has <see cref="AlongPathDrawingSet.PaintAsDrawn"/> = true AND the drawn shape
+    /// is a usable path.
+    /// </summary>
+    private bool ShouldAutoPaintWithDrawingSet(Shape drawn)
+    {
+        if (drawn is null)
+        {
+            return false;
+        }
+
+        AlongPathDrawingSet? set = GetSelectedDrawingSet();
+        if (set is null || !set.PaintAsDrawn || set.Rows.Count == 0)
+        {
+            return false;
+        }
+
+        return IsPathShape(drawn);
+    }
+
+    /// <summary>
+    /// Issue #138 — runs Along-path placement using <paramref name="pathShapeId"/> as the
+    /// source path. Selects the path first so the existing entrypoint
+    /// <see cref="PlaceSelectedItemAlongPath"/> picks it up; restores the prior selection
+    /// after.
+    /// </summary>
+    private async Task PaintWithDrawingSetAfterDrawAsync(Guid pathShapeId)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        Shape? path = currentPlot.Shapes.FirstOrDefault(s => s.Id == pathShapeId);
+        if (path is null)
+        {
+            return;
+        }
+
+        // Hand the path to the existing Along-path pipeline (which already understands
+        // the active drawing set, row resolution, z-order, etc.).
+        SelectOnly(pathShapeId);
+        await PlaceSelectedItemAlongPath();
+    }
+
+    /// <summary>
+    /// Issue #138 — list of every palette item code, grouped by kind, for the 'Add item'
+    /// dropdown in the drawing-set editor. Includes edging materials so a designer can
+    /// build a sidewalk-with-steel-edging assembly.
+    /// </summary>
+    private static IReadOnlyList<(string GroupLabel, IReadOnlyList<PaletteItem> Items)> AddItemGroupsForDrawingSet()
+    {
+        // Pull from each category bucket; skip CustomTiles and assemblies since those
+        // are user-extended and don't make sense as drawing-set rows.
+        var groups = new List<(string Label, IReadOnlyList<PaletteItem> Items)>();
+
+        void Add(string label, IReadOnlyList<PaletteItem> items)
+        {
+            if (items.Count > 0)
+            {
+                groups.Add((label, items));
+            }
+        }
+
+        Add("Trees", PaletteCatalog.Trees);
+        Add("Shrubs & Bushes", PaletteCatalog.Bushes);
+        Add("Plants", PaletteCatalog.Plants);
+        Add("Edging materials", PaletteCatalog.Edging);
+        Add("Ground cover (volume)", PaletteCatalog.GroundCoverMaterials);
+        Add("Ground cover (surface)", PaletteCatalog.GroundCoverSurfaceCovers);
+        Add("Bed kits", PaletteCatalog.BedKits);
+        Add("Soil markers", PaletteCatalog.SoilMarkers);
+
+        return groups;
     }
 
     private static bool IsStampablePaletteItem(PaletteItem item)
@@ -9685,7 +9854,16 @@ public partial class GardenPlot
             NormalizeEdgeBulgesOnCommit(drafting); // issue #130
             RecordUndoState();
             currentPlot.Shapes.Add(drafting);
+            // Issue #138 — if a drawing set is active AND it has PaintAsDrawn=true, run
+            // Along-path placement against the freshly drawn path. Capture the id before
+            // resetting drafting state below.
+            Guid? paintedPathId = ShouldAutoPaintWithDrawingSet(drafting) ? drafting.Id : null;
             _ = SaveAsync();
+            if (paintedPathId is Guid pid)
+            {
+                // Defer the placement to after current draw state is fully reset.
+                _ = PaintWithDrawingSetAfterDrawAsync(pid);
+            }
         }
 
         drafting = null;

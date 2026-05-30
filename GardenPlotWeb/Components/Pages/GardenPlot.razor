@@ -1008,12 +1008,69 @@ else
                     <div class="drawing-set-editor-header">
                         <input class="form-control form-control-sm" value="@editingDrawingSetName" @oninput="(e) => editingDrawingSetName = e.Value?.ToString() ?? string.Empty" placeholder="Drawing set name" />
                     </div>
+                    @* Issue #138 — mini-canvas preview. Shows each row as a coloured strip at
+                       its perpendicular offset from the path centerline, drawn in reverse
+                       row order so the first row in the list ends up on top (matching the
+                       "lower in list = higher z" rule used at apply time). *@
+                    @{
+                        var previewRows = editingDrawingSet.Rows;
+                        var previewExtent = GardenPlotWeb.Models.DrawingSetPreview.ComputeYExtent(previewRows, r => ResolvePaletteItemForRow(r));
+                        var previewLen = GardenPlotWeb.Models.DrawingSetPreview.PreviewPathLengthFt;
+                        var previewHeight = previewExtent.maxY - previewExtent.minY;
+                        var previewRenderOrder = GardenPlotWeb.Models.DrawingSetPreview.RenderOrder(previewRows.Count);
+                    }
+                    <div class="drawing-set-editor-preview">
+                        <svg viewBox="@($"{(-0.5).ToString(System.Globalization.CultureInfo.InvariantCulture)} {previewExtent.minY.ToString(System.Globalization.CultureInfo.InvariantCulture)} {(previewLen + 1).ToString(System.Globalization.CultureInfo.InvariantCulture)} {previewHeight.ToString(System.Globalization.CultureInfo.InvariantCulture)}")"
+                             preserveAspectRatio="xMidYMid meet"
+                             style="width: 100%; height: 96px; background: #f5f4ef; border: 1px solid #d3cfc4; border-radius: 4px;">
+                            <line x1="0" y1="0" x2="@previewLen.ToString(System.Globalization.CultureInfo.InvariantCulture)" y2="0" stroke="#8a8276" stroke-width="0.05" stroke-dasharray="0.4 0.2" />
+                            @foreach (int idx in previewRenderOrder)
+                            {
+                                var row = previewRows[idx];
+                                var resolved = ResolvePaletteItemForRow(row);
+                                var w = row.EffectiveWidthFt(resolved);
+                                if (w <= 0) { w = 0.5; }
+                                var fill = row.CapturedFill ?? resolved?.FillColor ?? "#8a8276";
+                                var stroke = row.CapturedStroke ?? resolved?.StrokeColor ?? "#3f3a30";
+                                var y = (row.OffsetFt - (w / 2)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                                var h = w.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                                <rect x="0" y="@y" width="@previewLen.ToString(System.Globalization.CultureInfo.InvariantCulture)" height="@h"
+                                      fill="@fill" stroke="@stroke" stroke-width="0.04" opacity="0.85" />
+                            }
+                        </svg>
+                        <div class="x-small text-muted mt-1">Mini-preview · centerline dashed · top-to-bottom render reverses list order (first row sits on top).</div>
+                    </div>
+                    @* Issue #138 — Add Item dropdown. Picks from any palette bucket
+                       (including edging materials) and appends a new row to the set. *@
+                    <div class="drawing-set-editor-add d-flex align-items-center gap-2 mt-2 mb-1">
+                        <label class="small mb-0">Add item:</label>
+                        <select class="form-select form-select-sm" style="max-width: 24em;"
+                                value=""
+                                @onchange="async (e) => { var code = e.Value?.ToString(); if (!string.IsNullOrWhiteSpace(code)) { await AddDrawingSetRowAsync(code); } }">
+                            <option value="">(pick a palette item…)</option>
+                            @foreach (var group in AddItemGroupsForDrawingSet())
+                            {
+                                <optgroup label="@group.GroupLabel">
+                                    @foreach (var pi in group.Items)
+                                    {
+                                        <option value="@pi.Code">@pi.Code</option>
+                                    }
+                                </optgroup>
+                            }
+                        </select>
+                        <label class="small mb-0 ms-auto" title="When checked, finishing a path drawing with this drawing set selected automatically runs Along-path. Lets you 'paint' sidewalks + flanking flowers + edges in one brush motion.">
+                            <input type="checkbox" checked="@editingDrawingSet.PaintAsDrawn" @onchange="async (e) => await OnDrawingSetPaintAsDrawnChangedAsync(e.Value is bool v && v)" />
+                            Paint as drawn
+                        </label>
+                    </div>
                     <div class="drawing-set-editor-rows">
                         <div class="drawing-set-editor-row drawing-set-editor-row-head">
                             <span>Item</span>
                             <span title="Spacing between adjacent copies of this row's plant when the row fills along the path. 0 = footprints touching, positive widens the spacing, negative overlaps (after which the slide-forward collision rule may skip samples).">Gap (ft)</span>
                             <span title="Perpendicular distance from the path when the row is drawn along it. Negative places the row on the LEFT of the path's draw direction, positive on the RIGHT, zero sits on the path centerline. Multiple rows with different offsets represent different garden layers and may overlap freely in screen space.">Offset (ft)</span>
                             <span title="Distance along the path where this row's first plant lands, measured from the start of the path. 0 = first plant at the path's start. A captured set populates this from each item's along-axis position so the original arrangement reproduces when applied to a straight path.">Phase (ft)</span>
+                            <span title="Issue #138 — per-row width override in feet. Blank uses the catalog/captured width. Use this to widen a paver-edge row from its catalog default without editing the catalog item.">Width (ft)</span>
+                            <span title="Issue #138 — per-row depth override in feet. Blank uses the catalog/captured depth.">Depth (ft)</span>
                             <span></span>
                         </div>
                         @for (int i = 0; i < editingDrawingSet.Rows.Count; i++)
@@ -1028,7 +1085,15 @@ else
                                        @onchange="async (e) => { if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.OffsetFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
                                 <input class="form-control form-control-sm" type="number" step="0.25" value="@F(row.PhaseAlongFt)"
                                        @onchange="async (e) => { if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.PhaseAlongFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
-                                <button class="btn btn-sm btn-outline-danger" title="Remove row" @onclick="() => RemoveDrawingSetRowAsync(idx)">×</button>
+                                <input class="form-control form-control-sm" type="number" min="0" step="0.1" placeholder="@F(row.CapturedWidthFt)" value="@(row.WidthOverrideFt is double w ? F(w) : string.Empty)"
+                                       @onchange="async (e) => { var s = e.Value?.ToString(); if (string.IsNullOrWhiteSpace(s)) { row.WidthOverrideFt = null; await OnDrawingSetRowFieldChangedAsync(); } else if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.WidthOverrideFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
+                                <input class="form-control form-control-sm" type="number" min="0" step="0.1" placeholder="@F(row.CapturedHeightFt)" value="@(row.DepthOverrideFt is double dv ? F(dv) : string.Empty)"
+                                       @onchange="async (e) => { var s = e.Value?.ToString(); if (string.IsNullOrWhiteSpace(s)) { row.DepthOverrideFt = null; await OnDrawingSetRowFieldChangedAsync(); } else if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.DepthOverrideFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
+                                <span class="drawing-set-editor-row-actions">
+                                    <button class="btn btn-sm btn-outline-secondary" title="Move row up (towards higher z-order / top)" disabled="@(idx == 0)" @onclick="() => MoveDrawingSetRowAsync(idx, -1)">↑</button>
+                                    <button class="btn btn-sm btn-outline-secondary" title="Move row down (towards lower z-order / back)" disabled="@(idx == editingDrawingSet.Rows.Count - 1)" @onclick="() => MoveDrawingSetRowAsync(idx, +1)">↓</button>
+                                    <button class="btn btn-sm btn-outline-danger" title="Remove row" @onclick="() => RemoveDrawingSetRowAsync(idx)">×</button>
+                                </span>
                             </div>
                         }
                     </div>

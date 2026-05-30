@@ -1,0 +1,89 @@
+﻿// <copyright file="DrawingSetPreview.cs" company="Garden Plot">
+// Copyright (c) Garden Plot. All rights reserved.
+// </copyright>
+
+namespace GardenPlotWeb.Models;
+
+/// <summary>
+/// Issue #138 — pure helpers for the drawing-set editor mini-canvas preview. The preview
+/// shows each row as a coloured strip at its <see cref="AlongPathDrawingSetRow.OffsetFt"/>
+/// from the path centerline, with width = <see cref="AlongPathDrawingSetRow.EffectiveWidthFt"/>.
+/// Rows are drawn in REVERSE order so that the earlier-in-list rows render on top, matching
+/// the "lower in list = higher z-order" semantic.
+/// </summary>
+public static class DrawingSetPreview
+{
+    /// <summary>Length of the simulated path centerline used by the preview (feet).</summary>
+    public const double PreviewPathLengthFt = 20.0;
+
+    /// <summary>
+    /// Computes the y-axis extent (min, max) in feet of the preview, given the rows'
+    /// offset/width pairs and a small padding. Used to scale the SVG viewBox.
+    /// </summary>
+    /// <param name="rows">The drawing-set rows to span.</param>
+    /// <param name="resolver">Resolves a row to its catalog PaletteItem (may return null).</param>
+    /// <param name="paddingFt">Padding above and below the row band (feet).</param>
+    /// <returns>(minY, maxY) extent in feet. Returns (-padding, +padding) for empty rows.</returns>
+    public static (double minY, double maxY) ComputeYExtent(
+        IReadOnlyList<AlongPathDrawingSetRow> rows,
+        Func<AlongPathDrawingSetRow, PaletteItem?> resolver,
+        double paddingFt = 1.0)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        ArgumentNullException.ThrowIfNull(resolver);
+
+        if (rows.Count == 0)
+        {
+            return (-paddingFt, paddingFt);
+        }
+
+        double minY = double.PositiveInfinity;
+        double maxY = double.NegativeInfinity;
+        foreach (AlongPathDrawingSetRow row in rows)
+        {
+            PaletteItem? resolved = resolver(row);
+            double width = row.EffectiveWidthFt(resolved);
+            if (width <= 0)
+            {
+                width = 0.5; // fallback so the row is at least visible in the preview
+            }
+
+            double rowMinY = row.OffsetFt - (width / 2.0);
+            double rowMaxY = row.OffsetFt + (width / 2.0);
+            if (rowMinY < minY)
+            {
+                minY = rowMinY;
+            }
+
+            if (rowMaxY > maxY)
+            {
+                maxY = rowMaxY;
+            }
+        }
+
+        return (minY - paddingFt, maxY + paddingFt);
+    }
+
+    /// <summary>
+    /// Returns the row indices in render order (back-to-front). Rows later in the list
+    /// render FIRST (so they sit at the back); rows earlier in the list render LAST
+    /// (so they sit on top). Matches the issue #138 "lower in list = higher z" rule.
+    /// </summary>
+    /// <param name="rowCount">Number of rows in the drawing set.</param>
+    /// <returns>Indices in render order (n-1, n-2, ..., 1, 0).</returns>
+    public static IReadOnlyList<int> RenderOrder(int rowCount)
+    {
+        if (rowCount <= 0)
+        {
+            return Array.Empty<int>();
+        }
+
+        var order = new int[rowCount];
+        for (int i = 0; i < rowCount; i++)
+        {
+            order[i] = rowCount - 1 - i;
+        }
+
+        return order;
+    }
+}
