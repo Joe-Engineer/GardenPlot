@@ -497,4 +497,73 @@ public sealed class DrawingSetTests
 
         Assert.Single(result);
     }
+
+    [Fact]
+    public void ArcPathDensifier_NoBulges_ReturnsCopyUnchanged()
+    {
+        Point[] src = [new(0, 0), new(10, 0), new(10, 10)];
+
+        List<Point> result = ArcPathDensifier.Densify(src, edgeBulges: null, closed: false);
+
+        Assert.Equal(3, result.Count);
+        for (int i = 0; i < 3; i++)
+        {
+            Assert.Equal(src[i].X, result[i].X, 6);
+            Assert.Equal(src[i].Y, result[i].Y, 6);
+        }
+    }
+
+    [Fact]
+    public void ArcPathDensifier_ZeroBulgeArray_ReturnsCopyUnchanged()
+    {
+        Point[] src = [new(0, 0), new(10, 0)];
+        double[] bulges = [0.0];
+
+        List<Point> result = ArcPathDensifier.Densify(src, bulges, closed: false);
+
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public void ArcPathDensifier_SingleArcEdge_ProducesIntermediatePoints()
+    {
+        // Two-vertex arc edge with bulge 1 (semicircle) at default 24 segments per arc:
+        // expect 25 output vertices spanning the arc start to end.
+        Point[] src = [new(0, 0), new(10, 0)];
+        double[] bulges = [1.0]; // semicircle
+
+        List<Point> result = ArcPathDensifier.Densify(src, bulges, closed: false, segmentsPerArc: 24);
+
+        Assert.Equal(25, result.Count);
+        // First and last vertices must match the source endpoints exactly.
+        Assert.Equal(0, result[0].X, 5);
+        Assert.Equal(0, result[0].Y, 5);
+        Assert.Equal(10, result[^1].X, 5);
+        Assert.Equal(0, result[^1].Y, 5);
+        // The midpoint of a semicircle from (0,0) to (10,0) with bulge>0 (bows screen-LEFT
+        // = up in y-down) lies at (5, -5). Our index ~12 should be near there.
+        Point mid = result[12];
+        Assert.Equal(5, mid.X, 1);
+        Assert.True(Math.Abs(mid.Y - (-5)) < 0.5, $"expected y near -5, got {mid.Y}");
+    }
+
+    [Fact]
+    public void ArcPathDensifier_MixedStraightAndArcEdges_KeepsStraightSegmentsAsIs()
+    {
+        // Three-vertex path: straight from (0,0) to (10,0), then arc from (10,0) to (10,10).
+        Point[] src = [new(0, 0), new(10, 0), new(10, 10)];
+        double[] bulges = [0.0, 0.5];
+
+        List<Point> result = ArcPathDensifier.Densify(src, bulges, closed: false, segmentsPerArc: 8);
+
+        // First two vertices from the straight edge, then 8 chord points across the arc,
+        // ending at the arc endpoint. Total = 2 + 8 = 10 (the arc segment count INCLUDES
+        // the start vertex which is shared with the previous straight edge).
+        Assert.True(result.Count >= 9, $"expected at least 9 points, got {result.Count}");
+        // Confirm endpoints are preserved exactly.
+        Assert.Equal(0, result[0].X, 5);
+        Assert.Equal(0, result[0].Y, 5);
+        Assert.Equal(10, result[^1].X, 5);
+        Assert.Equal(10, result[^1].Y, 5);
+    }
 }

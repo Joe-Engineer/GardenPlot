@@ -7886,13 +7886,22 @@ public partial class GardenPlot
             specs[i] = stampRowsResolved[i].Spec;
         }
 
-        var samples = AlongPathBuilder.BuildSamples(points, closed, specs, alignToTangent: true);
+        // Issue #138 — densify any arc-bulged edges before sampling so stamps follow the
+        // actual curve rather than the chord between vertices. Stripe rows already
+        // consume the original points + bulges through RibbonGeometry which handles
+        // bulges natively; only the stamp path needed this.
+        IReadOnlyList<Point> stampPath = GardenPlotWeb.Models.ArcPathDensifier.Densify(
+            points,
+            sourcePath.EdgeBulges,
+            closed);
+
+        var samples = AlongPathBuilder.BuildSamples(stampPath, closed, specs, alignToTangent: true);
 
         // Issue #138 — drop stamps whose centre is closer than |OffsetFt| to any other
         // path segment. Without this, negative-offset rows on closed shapes (Rectangle,
         // Oval, closed Polygon) crowd extras at the corners because the inward miter
         // brings adjacent segments inside the stamp's intended exclusion radius.
-        samples = (IReadOnlyList<AlongPathSample>)GardenPlotWeb.Models.AlongPathProximityFilter.Filter(samples, points, closed);
+        samples = (IReadOnlyList<AlongPathSample>)GardenPlotWeb.Models.AlongPathProximityFilter.Filter(samples, stampPath, closed);
         if (samples.Count == 0 && stripeShapes.Count == 0)
         {
             return new StampPlacement();
