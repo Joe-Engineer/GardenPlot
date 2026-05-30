@@ -180,8 +180,9 @@ else
             </div>
 
             @* Issue #130 — arc-mode toggle, in its own toolbar group so the active state
-               is unmissable. Visible whenever Polygon / Polyline is the active tool. *@
-            @if (currentTool is Tool.Polygon or Tool.Polyline)
+               is unmissable. Visible whenever a click-by-vertex polygon tool is active
+               (Polygon, Polyline, or GroundCover in Polygon sub-mode). *@
+            @if (IsArcCapableTool)
             {
                 <div class="toolbar-group" role="toolbar" aria-label="Arc mode">
                     <button class="@(arcModeArmed ? "arc-toggle-active" : "arc-toggle-inactive")"

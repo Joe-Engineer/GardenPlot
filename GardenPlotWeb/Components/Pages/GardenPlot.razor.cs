@@ -5255,10 +5255,14 @@ public partial class GardenPlot
             lastArcClickAt = null;
         }
 
-        // Issue #130 — arc mode is only meaningful for the click-by-vertex tools.
-        // Switching to any other tool disarms it so a stale "Arc on" state doesn't
-        // surprise the user later.
-        if (t is not Tool.Polygon and not Tool.Polyline)
+        // Issue #130 — arc mode is only meaningful for the click-by-vertex tools
+        // (Polygon, Polyline, or GroundCover-Polygon submode). Switching to any
+        // non-arc-capable tool disarms it so a stale "Arc on" state doesn't surprise
+        // the user later.
+        bool newToolIsArcCapable =
+            t is Tool.Polygon or Tool.Polyline
+            || (t == Tool.GroundCover && groundCoverSubMode == GroundCoverSubMode.Polygon);
+        if (!newToolIsArcCapable)
         {
             arcModeArmed = false;
         }
@@ -8113,7 +8117,8 @@ public partial class GardenPlot
                     {
                         // Click-by-vertex polygon. First click: start the shape with an
                         // anchor + cursor-tracking endpoint. Subsequent clicks add vertices.
-                        // Double-click finalizes (see OnCanvasDoubleClick).
+                        // Double-click finalizes (see OnCanvasDoubleClick). Issue #130 wires
+                        // the two-click arc apex flow in via TryHandleArcClick.
                         if (drafting is null || !buildingPolygon)
                         {
                             drafting = new Shape
@@ -8133,8 +8138,10 @@ public partial class GardenPlot
                             drafting.Points.Add(new Point(x, y));
                             drafting.Points.Add(new Point(x, y));
                             buildingPolygon = true;
+                            awaitingArcApex = false;
+                            arcApexEdgeIndex = -1;
                         }
-                        else
+                        else if (!TryHandleArcClick(x, y))
                         {
                             // Commit the previous cursor-tracking endpoint as a real vertex,
                             // then add a new trailing endpoint at the same spot.
@@ -9594,12 +9601,23 @@ public partial class GardenPlot
     /// If toggled off while <see cref="awaitingArcApex"/> is set the apex pick is cancelled
     /// (the current edge reverts to a line and a fresh trailing tracker is added).
     /// </summary>
+    /// <summary>
+    /// Issue #130 — predicate identifying the click-by-vertex tools that support arc
+    /// drawing. Centralised so the ToggleArcMode guard, the toolbar badge visibility,
+    /// and the SetTool reset path all agree on the set.
+    /// </summary>
+    private bool IsArcCapableTool =>
+        currentTool is Tool.Polygon or Tool.Polyline
+        || (currentTool == Tool.GroundCover && groundCoverSubMode == GroundCoverSubMode.Polygon);
+
     internal void ToggleArcMode()
     {
         Console.WriteLine($"[#130] ToggleArcMode entered: currentTool={currentTool} drafting={(drafting != null ? "yes" : "no")} buildingPolygon={buildingPolygon} arcModeArmed(before)={arcModeArmed} awaitingArcApex={awaitingArcApex}");
 
-        // Arc mode only makes sense for the click-by-vertex tools.
-        if (currentTool is not Tool.Polygon and not Tool.Polyline)
+        // Arc mode only makes sense for the click-by-vertex tools that produce closed
+        // FreeDraw polygons — Polygon, Polyline, and the GroundCover Polygon sub-mode
+        // (which the user typically picks for curved-bed pathway designs).
+        if (!IsArcCapableTool)
         {
             Console.WriteLine($"[#130] ToggleArcMode bailed: tool is {currentTool}");
             return;
