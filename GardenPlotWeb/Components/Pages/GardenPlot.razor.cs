@@ -2836,6 +2836,13 @@ public partial class GardenPlot
     private bool awaitingArcApex;
     private int arcApexEdgeIndex = -1;
 
+    // Issue #131 — tangent-snap mode (latched, toggled by T). When armed AND the in-progress
+    // polygon has at least two committed vertices, the cursor is projected perpendicularly
+    // onto the tangent line at the previous segment's end before being passed to the click
+    // handlers and the trailing-tracker update. Composes with arc mode: snap affects only
+    // the terminus position, not the apex pick.
+    internal bool tangentSnapArmed;
+
     // Issue #130 — guards against the browser's natural double-click producing TWO
     // terminus commits in a row. When the second pointer-down lands within this many
     // milliseconds of the first, TryHandleArcClick discards it so the subsequent
@@ -3044,6 +3051,20 @@ public partial class GardenPlot
             && (string.Equals(e.Key, "a", StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// Issue #131 — fallback for the tangent-snap hotkey, mirroring the arc-toggle fallback.
+    /// </summary>
+    private static bool IsTangentSnapFallback(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, string? binding)
+    {
+        if (!string.IsNullOrWhiteSpace(binding))
+        {
+            return false;
+        }
+
+        return !e.CtrlKey && !e.AltKey && !e.ShiftKey
+            && (string.Equals(e.Key, "t", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static KeyBindingSettings CloneKeyBindings(KeyBindingSettings source) => new()
     {
         StampSpacingLeft = source.StampSpacingLeft,
@@ -3076,6 +3097,10 @@ public partial class GardenPlot
         ToggleArcSegment = source.ToggleArcSegment,
         MirrorHorizontal = source.MirrorHorizontal,
         MirrorVertical = source.MirrorVertical,
+
+        // Issue #131 — tangent-snap hotkey. Same persistence concern as the #130 fields:
+        // forgetting to clone strips the binding on the next Save.
+        ToggleTangentSnap = source.ToggleTangentSnap,
     };
 
     private KeyBindingSettings KeyBindings => library.Ui.KeyBindings ??= new KeyBindingSettings();
@@ -5265,6 +5290,7 @@ public partial class GardenPlot
         if (!newToolIsArcCapable)
         {
             arcModeArmed = false;
+            tangentSnapArmed = false; // issue #131
         }
 
         if (t != Tool.Select)
@@ -7871,6 +7897,10 @@ public partial class GardenPlot
             y = snapDown.Position.Y;
         }
 
+        // Issue #131 — tangent snap on click. Mirrors the pointer-move snap so the
+        // committed terminus lands exactly where the live preview showed it.
+        (x, y) = ApplyTangentSnapIfArmed(x, y);
+
         snapPreview = null; // Click commits the position; clear glyph until next move.
         lastCanvasX = x;
         lastCanvasY = y;
@@ -8367,6 +8397,18 @@ public partial class GardenPlot
             snapPreview = snapResult;
         }
         else
+        {
+            snapPreview = null;
+        }
+
+        // Issue #131 — tangent snap. Applies AFTER corner snap so the explicit T-armed
+        // mode overrides corner snapping. When armed and a previous segment exists, the
+        // cursor is projected onto the tangent line at the previous vertex. If tangent
+        // actually changed the cursor position, clear the (now-stale) corner snap glyph
+        // so the user doesn't see two contradictory "snapped here" indicators.
+        double preTangentX = x, preTangentY = y;
+        (x, y) = ApplyTangentSnapIfArmed(x, y);
+        if (snapPreview is not null && (Math.Abs(x - preTangentX) > 1e-9 || Math.Abs(y - preTangentY) > 1e-9))
         {
             snapPreview = null;
         }
@@ -9379,6 +9421,7 @@ public partial class GardenPlot
             awaitingArcApex = false;
             arcApexEdgeIndex = -1;
             lastArcClickAt = null;
+            tangentSnapArmed = false; // issue #131
             StateHasChanged();
             return;
         }
@@ -9434,6 +9477,7 @@ public partial class GardenPlot
         arcModeArmed = false;
         awaitingArcApex = false;
         arcApexEdgeIndex = -1;
+        tangentSnapArmed = false; // issue #131
         StateHasChanged();
     }
 
@@ -9681,6 +9725,100 @@ public partial class GardenPlot
         {
             shape.EdgeBulges = null;
         }
+    }
+
+    /// <summary>
+    /// Issue #131 — toggles latched tangent-snap mode. Honoured whenever an arc-capable
+    /// tool is selected; the snap only does anything once a segment exists to inherit
+    /// tangent from, but arming up-front is fine (the snap silently no-ops until the
+    /// second click of the polygon).
+    /// </summary>
+    internal void ToggleTangentSnap()
+    {
+        if (!IsArcCapableTool)
+        {
+            return;
+        }
+
+        tangentSnapArmed = !tangentSnapArmed;
+        StateHasChanged();
+
+        // Return focus to the canvas so the next T press fires OnKeyDown there.
+        _ = canvasRef.FocusAsync(preventScroll: true).AsTask();
+    }
+
+    /// <summary>
+    /// Issue #131 — computes the outgoing tangent direction at the last committed vertex
+    /// of the in-progress polygon, so the cursor can be snapped onto the tangent line.
+    /// Returns <see langword="null"/> when there is no previous segment to inherit from
+    /// (first click, no draft, degenerate chord).
+    /// </summary>
+    internal (Point Anchor, Point Direction)? GetTangentSnapBaseline()
+    {
+        if (drafting is null || !buildingPolygon)
+        {
+            return null;
+        }
+
+        // The polygon draft list is [v0, v1, ..., v_{n-1}, tracker]. The most recently
+        // committed vertex is Points[^2] (the anchor). The previous segment runs from
+        // Points[^3] to Points[^2]. We need both to compute the tangent direction.
+        if (drafting.Points.Count < 3)
+        {
+            // First segment in the polygon — no prior tangent to inherit.
+            return null;
+        }
+
+        Point prev = drafting.Points[^3];
+        Point anchor = drafting.Points[^2];
+        double bulge = 0;
+        if (drafting.EdgeBulges is { Count: > 0 })
+        {
+            int edgeIndex = drafting.Points.Count - 3;
+            if (edgeIndex >= 0 && edgeIndex < drafting.EdgeBulges.Count)
+            {
+                bulge = drafting.EdgeBulges[edgeIndex];
+            }
+        }
+
+        Point? tangent = EdgeArcGeometry.EdgeOutgoingTangent(prev, anchor, bulge);
+        if (tangent is null)
+        {
+            return null;
+        }
+
+        return (anchor, tangent.Value);
+    }
+
+    /// <summary>
+    /// Issue #131 — applies tangent-snap to the supplied cursor position when
+    /// <see cref="tangentSnapArmed"/> is set and a previous segment exists. Returns the
+    /// original cursor when the snap is unavailable. Deliberately NO-OPs while
+    /// <see cref="awaitingArcApex"/> is true — during apex pick the cursor controls the
+    /// arc's curvature (perpendicular offset from chord), so projecting it onto the
+    /// prior tangent would lock the apex to the chord and make every arc collapse to
+    /// a line.
+    /// </summary>
+    private (double X, double Y) ApplyTangentSnapIfArmed(double x, double y)
+    {
+        if (!tangentSnapArmed || awaitingArcApex)
+        {
+            return (x, y);
+        }
+
+        var baseline = GetTangentSnapBaseline();
+        if (baseline is null)
+        {
+            return (x, y);
+        }
+
+        Point snapped = EdgeArcGeometry.ProjectOntoLine(baseline.Value.Anchor, baseline.Value.Direction, new Point(x, y));
+
+        // Don't clamp X/Y independently — that would move a diagonal-tangent projection
+        // off the tangent line near plot edges. Let the cursor float off-canvas if needed;
+        // the SVG viewport clips the visual and the click handler will reject placements
+        // outside the plot via downstream clamping in its own flow.
+        return (snapped.X, snapped.Y);
     }
 
     /// <summary>
@@ -9964,6 +10102,7 @@ public partial class GardenPlot
             awaitingArcApex = false;
             arcApexEdgeIndex = -1;
             lastArcClickAt = null;
+            tangentSnapArmed = false; // issue #131
         }
     }
 
@@ -10123,6 +10262,12 @@ public partial class GardenPlot
             // KeyBindings predate this field don't get locked out.
             ToggleArcMode();
         }
+        else if (IsBindingMatch(e, kb.ToggleTangentSnap) || IsTangentSnapFallback(e, kb.ToggleTangentSnap))
+        {
+            // Issue #131 — toggle latched tangent-snap mode. Same blank-binding fallback
+            // pattern as the arc toggle so users with stale preferences still get the hotkey.
+            ToggleTangentSnap();
+        }
         else if (IsBindingMatch(e, kb.MirrorHorizontal))
         {
             await MirrorSelected(horizontal: true);
@@ -10148,6 +10293,7 @@ public partial class GardenPlot
             awaitingArcApex = false;
             arcApexEdgeIndex = -1;
             lastArcClickAt = null;
+            tangentSnapArmed = false; // issue #131
             ClearSelection();
         }
     }

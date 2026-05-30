@@ -247,6 +247,9 @@ public class KeyBindingSettings
 
     /// <summary>Issue #130: mirror selected shapes vertically (flip across horizontal axis). Default <c>Shift+V</c>.</summary>
     public string MirrorVertical { get; set; } = "Shift+V";
+
+    /// <summary>Issue #131: toggles latched tangent-snap mode while drawing a polygon / polyline. Default <c>T</c>.</summary>
+    public string ToggleTangentSnap { get; set; } = "t";
 }
 
 internal sealed class RecentPlotSizesJsonConverter : JsonConverter<List<(double WidthFt, double HeightFt)>>

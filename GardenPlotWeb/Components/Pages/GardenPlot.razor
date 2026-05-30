@@ -199,6 +199,14 @@ else
                             <span>Line mode (A for arc)</span>
                         }
                     </button>
+                    @* Issue #131 — tangent-snap toggle, sibling to arc mode. Locks the next
+                       terminus to the previous segment's tangent line. Hotkey: T. *@
+                    <button class="@(tangentSnapArmed ? "tangent-toggle-active" : "tangent-toggle-inactive")"
+                            @onclick="ToggleTangentSnap"
+                            title="Toggle tangent-snap (hotkey: T). Locks the cursor onto the tangent line of the previous segment's end so the next terminus extends smoothly.">
+                        <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:middle"><path d="M3 20 Q 14 4 21 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /><circle cx="14" cy="9" r="1.6" fill="currentColor" /><path d="M14 9 L 22 4" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 1.5" /></svg>
+                        <span>@(tangentSnapArmed ? "Tangent ON (T off)" : "Tangent (T)")</span>
+                    </button>
                 </div>
             }
 
@@ -551,6 +559,7 @@ else
                         <label title="Issue #130 — toggles arc mode while drawing a polygon / polyline.">Toggle arc side</label><input class="form-control form-control-sm" @bind="kb.ToggleArcSegment" />
                         <label title="Issue #130 — mirror selected shapes horizontally; arc bulges flip.">Mirror horizontal</label><input class="form-control form-control-sm" @bind="kb.MirrorHorizontal" />
                         <label title="Issue #130 — mirror selected shapes vertically; arc bulges flip.">Mirror vertical</label><input class="form-control form-control-sm" @bind="kb.MirrorVertical" />
+                        <label title="Issue #131 — toggles tangent-snap mode while drawing. Locks the next terminus to the tangent line of the previous segment.">Toggle tangent snap</label><input class="form-control form-control-sm" @bind="kb.ToggleTangentSnap" />
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1356,6 +1365,31 @@ else
                         <title>Snapped to @snapTarget.Label</title>
                     </g>
                 }
+
+                @* Issue #131 — tangent-snap guide line. Drawn whenever tangent mode is
+                   armed and a previous segment exists. The line extends far enough in both
+                   directions to feel like an infinite reference; the snap glyph marks the
+                   exact projected cursor position. *@
+                @if (!IsConceptMode && tangentSnapArmed && GetTangentSnapBaseline() is { } tangentBase)
+                {
+                    var ta = tangentBase.Anchor;
+                    var td = tangentBase.Direction;
+                    var guideLen = Math.Max(PlotWidthFt, PlotHeightFt) * 2;
+                    var gx1 = ta.X - (td.X * guideLen);
+                    var gy1 = ta.Y - (td.Y * guideLen);
+                    var gx2 = ta.X + (td.X * guideLen);
+                    var gy2 = ta.Y + (td.Y * guideLen);
+                    <g pointer-events="none" class="tangent-guide">
+                        <line x1="@F(gx1)" y1="@F(gy1)" x2="@F(gx2)" y2="@F(gy2)"
+                              stroke="#5e35b1" stroke-width="0.04" stroke-dasharray="0.25,0.18" opacity="0.7" />
+                        @if (lastCanvasX is double tx && lastCanvasY is double ty)
+                        {
+                            <circle cx="@F(tx)" cy="@F(ty)" r="0.14" fill="none" stroke="#5e35b1" stroke-width="0.05" />
+                            <circle cx="@F(tx)" cy="@F(ty)" r="0.05" fill="#5e35b1" />
+                            <title>Tangent snap</title>
+                        }
+                    </g>
+                }
                 @if (!IsConceptMode && currentTool == Tool.Select && isBoxSelecting)
                 {
                     var bx = Math.Min(boxSelectStartX, boxSelectCurrentX);
@@ -1510,10 +1544,11 @@ else
                     <span class="status-item"><strong>Action:</strong> @CurrentMouseActionLabel()</span>
                     @* Issue #130 diagnostic — tool, arc-mode state, last key. Stays here
                        until the arc-mode flow is confirmed stable across all tools. *@
-                    <span class="status-item" style="font-family:monospace; font-size:0.78rem; padding:0.1rem 0.45rem; border-radius:0.25rem; border:1px solid @(arcModeArmed ? "#b58105" : "#adb5bd"); background:@(arcModeArmed ? "#fff3cd" : "#f8f9fa");">
+                    <span class="status-item" style="font-family:monospace; font-size:0.78rem; padding:0.1rem 0.45rem; border-radius:0.25rem; border:1px solid @(arcModeArmed ? "#b58105" : (tangentSnapArmed ? "#5e35b1" : "#adb5bd")); background:@(arcModeArmed ? "#fff3cd" : (tangentSnapArmed ? "#ede7f6" : "#f8f9fa"));">
                         <strong>DBG</strong>
                         tool=@currentTool
                         <span style="color:@(arcModeArmed ? "#b58105" : "#6c757d"); font-weight:700;">arc=@(arcModeArmed ? "ON" : "off")</span>
+                        <span style="color:@(tangentSnapArmed ? "#5e35b1" : "#6c757d"); font-weight:700;">tan=@(tangentSnapArmed ? "ON" : "off")</span>
                         @if (awaitingArcApex) { <span style="color:#b58105;">apex-pick</span> }
                         lastKey=<code>@(lastKeyDebug ?? "—")</code>
                     </span>
