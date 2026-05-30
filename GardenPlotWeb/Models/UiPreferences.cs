@@ -259,6 +259,9 @@ public class KeyBindingSettings
 
     /// <summary>Issue #131: toggles latched tangent-snap mode while drawing a polygon / polyline. Default <c>T</c>.</summary>
     public string ToggleTangentSnap { get; set; } = "t";
+
+    /// <summary>Issue #134: merges 2+ selected closed polygons into a single boolean-union shape. Default <c>Ctrl+Shift+M</c>.</summary>
+    public string MergeSelected { get; set; } = "Ctrl+Shift+M";
 }
 
 internal sealed class RecentPlotSizesJsonConverter : JsonConverter<List<(double WidthFt, double HeightFt)>>

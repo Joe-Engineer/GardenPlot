@@ -3189,6 +3189,9 @@ public partial class GardenPlot
         // Issue #131 — tangent-snap hotkey. Same persistence concern as the #130 fields:
         // forgetting to clone strips the binding on the next Save.
         ToggleTangentSnap = source.ToggleTangentSnap,
+
+        // Issue #134 — Merge Selected hotkey. Same defensive clone discipline.
+        MergeSelected = source.MergeSelected,
     };
 
     private KeyBindingSettings KeyBindings => library.Ui.KeyBindings ??= new KeyBindingSettings();
@@ -10088,6 +10091,74 @@ public partial class GardenPlot
     }
 
     /// <summary>
+    /// Issue #134 — predicate gating the "Merge" toolbar button. At least two of the
+    /// selected shapes must be area-capable (so the boolean union has something to
+    /// chew on). Open paths, points, rulers, etc. are skipped silently by the merge
+    /// helper but the button stays disabled until two valid candidates are picked.
+    /// </summary>
+    private bool CanMergeSelectedShapes
+    {
+        get
+        {
+            if (currentPlot is null || selectedIds.Count < 2)
+            {
+                return false;
+            }
+
+            int areaCount = SelectedShapes().Count(GroundCoverMath.IsAreaShape);
+            return areaCount >= 2;
+        }
+    }
+
+    /// <summary>
+    /// Issue #134 — runs the boolean-union pipeline on the current selection. Source
+    /// shapes are removed; the resulting outer ring(s) are added as new closed
+    /// FreeDraw polygons carrying material / fill from the first selected source. The
+    /// new shape(s) are selected so the user can immediately apply further commands.
+    /// </summary>
+    private async Task MergeSelectedShapes()
+    {
+        if (!CanMergeSelectedShapes || currentPlot is null)
+        {
+            return;
+        }
+
+        // Snapshot the targets BEFORE undo — RecordUndoState may rebuild collection refs.
+        var targets = SelectedShapes()
+            .Where(GroundCoverMath.IsAreaShape)
+            .ToList();
+        if (targets.Count < 2)
+        {
+            return;
+        }
+
+        var merged = PolygonMergeUtility.MergeShapes(targets);
+        if (merged.Count == 0)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        foreach (Shape source in targets)
+        {
+            currentPlot.Shapes.Remove(source);
+        }
+
+        foreach (Shape result in merged)
+        {
+            currentPlot.Shapes.Add(result);
+        }
+
+        SelectionClear();
+        foreach (Shape result in merged)
+        {
+            SelectionAdd(result.Id);
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>
     /// Issue #132 — opens the Path → Ribbon dialog, pre-filling width / alignment /
     /// end-cap from the user's last persisted choices.
     /// </summary>
@@ -10624,6 +10695,12 @@ public partial class GardenPlot
         else if (IsBindingMatch(e, kb.MirrorVertical))
         {
             await MirrorSelected(horizontal: false);
+        }
+        else if (IsBindingMatch(e, kb.MergeSelected))
+        {
+            // Issue #134 — boolean-union of 2+ selected closed polygons. No-ops when
+            // the selection has fewer than two area shapes.
+            await MergeSelectedShapes();
         }
         else if (IsBindingMatch(e, kb.Escape))
         {

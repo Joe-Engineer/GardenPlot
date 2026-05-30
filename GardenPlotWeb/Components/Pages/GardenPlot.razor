@@ -277,6 +277,14 @@ else
                         title="Offset the selected open path into a closed ribbon polygon of a given width (pathway, walkway, garden border).">
                     Path → Ribbon
                 </button>
+                @* Issue #134 — Merge / boolean-union of selected closed polygons.
+                   Disabled unless 2 or more area shapes (Rectangle, Oval, BedKit, closed
+                   FreeDraw) are selected. *@
+                <button class="btn btn-sm btn-outline-secondary" @onclick="MergeSelectedShapes"
+                        disabled="@(!CanMergeSelectedShapes)"
+                        title="Merge the selected polygons into a single combined shape (boolean union). Touching shapes become one outline; overlapping shapes lose their shared interior. Arc edges are tessellated to polylines in the result.">
+                    Merge
+                </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="PlaceSelectedItemAlongPath" disabled="@(!CanPlaceAlongPath)" title="Place copies of the selected palette stamp (plant, tree, etc.) evenly along a selected path. Path can be a Polyline, Free Draw, Edge, Rectangle perimeter, or Oval perimeter. Pick a stamp item or a Drawing Set from the palette.">
                     Along path
                 </button>
@@ -616,6 +624,7 @@ else
                         <label title="Issue #130 — mirror selected shapes horizontally; arc bulges flip.">Mirror horizontal</label><input class="form-control form-control-sm" @bind="kb.MirrorHorizontal" />
                         <label title="Issue #130 — mirror selected shapes vertically; arc bulges flip.">Mirror vertical</label><input class="form-control form-control-sm" @bind="kb.MirrorVertical" />
                         <label title="Issue #131 — toggles tangent-snap mode while drawing. Locks the next terminus to the tangent line of the previous segment.">Toggle tangent snap</label><input class="form-control form-control-sm" @bind="kb.ToggleTangentSnap" />
+                        <label title="Issue #134 — merges 2+ selected closed polygons into a single boolean-union shape.">Merge selected</label><input class="form-control form-control-sm" @bind="kb.MergeSelected" />
                     </div>
                 </div>
                 <div class="modal-footer">
