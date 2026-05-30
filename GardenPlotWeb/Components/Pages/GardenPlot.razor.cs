@@ -5586,13 +5586,18 @@ public partial class GardenPlot
 
     private static bool CategorySupportsClimateFilter(PaletteCategory category)
     {
+        // Climate filters (region / native / lifecycle / container / pollinator / cut
+        // flower / deciduous) only make sense for living-plant categories. Equipment,
+        // materials, and irrigation hardware never carry these traits.
         return category is not (PaletteCategory.BedKits
             or PaletteCategory.FocalPoint
             or PaletteCategory.GroundCoverMaterials
             or PaletteCategory.GroundCoverSurface
+            or PaletteCategory.GroundCoverAssemblies
             or PaletteCategory.Edging
             or PaletteCategory.SoilMarkers
-            or PaletteCategory.CustomTiles);
+            or PaletteCategory.CustomTiles
+            or PaletteCategory.IrrigationHeads);
     }
 
     private IReadOnlyList<PaletteItem> PaletteItemsForCurrentCategory()
