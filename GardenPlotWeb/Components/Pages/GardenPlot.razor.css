@@ -1002,7 +1002,7 @@
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: min(680px, 92vw);
+    width: min(880px, 96vw);
     max-height: 80vh;
     background: #fff;
     border-radius: 0.5rem;
@@ -1027,9 +1027,31 @@
 
 .drawing-set-editor-row {
     display: grid;
-    grid-template-columns: minmax(8rem, 1fr) 5rem 5rem 5rem 2rem;
+    grid-template-columns: minmax(8rem, 1fr) 4.5rem 4.5rem 4.5rem 4.5rem 4.5rem 2.5rem 6.5rem;
     gap: 0.35rem;
     align-items: center;
+}
+
+.drawing-set-editor-fill-cell {
+    display: inline-flex;
+    justify-content: center;
+}
+
+.drawing-set-editor-row-actions {
+    display: inline-flex;
+    gap: 0.2rem;
+    justify-content: flex-end;
+}
+
+.drawing-set-editor-na {
+    text-align: center;
+    color: #b8b3a3;
+    font-size: 0.85rem;
+    cursor: help;
+}
+
+.drawing-set-editor-preview {
+    padding: 0.4rem 0;
 }
 
 .drawing-set-editor-row-head {
@@ -1039,12 +1061,25 @@
     letter-spacing: 0.03em;
 }
 
+.drawing-set-editor-item-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    overflow: hidden;
+}
+
 .drawing-set-editor-item-code {
     font-size: 0.85rem;
     color: #35523c;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.drawing-set-kind-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
 }
 
 .drawing-set-editor-footer {

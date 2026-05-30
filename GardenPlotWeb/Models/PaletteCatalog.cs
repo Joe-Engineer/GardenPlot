@@ -661,6 +661,43 @@ public static class PaletteCatalog
         return MaterialItems.FirstOrDefault(item => string.Equals(item.Code, code, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// Issue #138 — finds a palette item by code across every catalog bucket (Trees,
+    /// Bushes, Plants, BedKits, SoilMarkers, FocalPoints, GroundCoverMaterials,
+    /// GroundCoverSurfaceCovers, Edging). Returns null when nothing matches.
+    /// </summary>
+    public static PaletteItem? FindByCode(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return null;
+        }
+
+        PaletteItem[][] buckets =
+        [
+            BedKits,
+            Trees,
+            Bushes,
+            Plants,
+            FocalPoints,
+            SoilMarkers,
+            GroundCoverMaterials,
+            GroundCoverSurfaceCovers,
+            Edging,
+        ];
+
+        foreach (PaletteItem[] bucket in buckets)
+        {
+            PaletteItem? hit = bucket.FirstOrDefault(item => string.Equals(item.Code, code, StringComparison.OrdinalIgnoreCase));
+            if (hit is not null)
+            {
+                return hit;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>Filters items by user-facing palette category (combobox option).</summary>
     public static IReadOnlyList<PaletteItem> For(PaletteCategory category)
     {

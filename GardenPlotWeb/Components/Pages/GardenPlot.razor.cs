@@ -259,6 +259,9 @@ public partial class GardenPlot
     // When set, the next Along-path application uses this Drawing Set (multi-row) instead of
     // the currently picked single PaletteItem. Cleared when a regular palette item is picked.
     private Guid? selectedDrawingSetId;
+
+    // Issue #138 — "Draw as" sub-mode for drawing-set painting. Mirrors GroundCoverSubMode.
+    private DrawingSetSubMode drawingSetSubMode = DrawingSetSubMode.Polyline;
     // Per-row edit state for the Drawing Set editor dialog (null when dialog is closed).
     private AlongPathDrawingSet? editingDrawingSet;
     private string editingDrawingSetName = string.Empty;
@@ -6616,14 +6619,34 @@ public partial class GardenPlot
         var drawingSet = GetSelectedDrawingSet();
         if (drawingSet is not null && drawingSet.Rows.Count > 0)
         {
+            // Issue #138 — apply rows in REVERSE order so that the first row in the
+            // list (lowest index) ends up rendered LAST and therefore on top in z-order.
+            // Per-row effective width respects the new WidthOverrideFt field.
             var resolved = new List<(PaletteItem Item, AlongPathRowSpec Spec)>(drawingSet.Rows.Count);
-            foreach (var row in drawingSet.Rows)
+            var renderOrder = DrawingSetPreview.RenderOrder(drawingSet.Rows.Count);
+            foreach (int idx in renderOrder)
             {
-                var item = ResolvePaletteItemForRow(row);
-                if (item is null) continue;
-                resolved.Add((item, new AlongPathRowSpec(item.WidthFt, row.GapFt, row.OffsetFt, row.PhaseAlongFt)));
+                AlongPathDrawingSetRow row = drawingSet.Rows[idx];
+                PaletteItem? item = ResolvePaletteItemForRow(row);
+                if (item is null)
+                {
+                    continue;
+                }
+
+                double width = row.EffectiveWidthFt(item);
+                if (width <= 0)
+                {
+                    width = item.WidthFt;
+                }
+
+                resolved.Add((item, new AlongPathRowSpec(width, row.GapFt, row.OffsetFt, row.PhaseAlongFt)));
             }
-            if (resolved.Count == 0) return;
+
+            if (resolved.Count == 0)
+            {
+                return;
+            }
+
             placement = BuildAlongPathPlacementForRows(resolved, sourcePath, assignNewIds: true);
         }
         else if (selectedItem is { } item && IsStampablePaletteItem(item))
@@ -6669,10 +6692,15 @@ public partial class GardenPlot
             PaletteKind.Plant => PaletteCatalog.Plants.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.FocalPoint => PaletteCatalog.FocalPoints.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.SoilMarker => PaletteCatalog.SoilMarkers.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
-            PaletteKind.BedKit => null,
-            PaletteKind.Edging => null,
-            PaletteKind.GroundCover => null,
-            PaletteKind.GroundCoverSurface => null,
+            PaletteKind.BedKit => PaletteCatalog.BedKits.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            // Issue #138 — volume materials (mulch / gravel / soil / rock) live in
+            // GroundCoverMaterials and carry MaterialSoldBy.Volume + DefaultDepthIn.
+            // Resolving them properly is what makes the editor's Depth column show.
+            PaletteKind.GroundCover => PaletteCatalog.GroundCoverMaterials.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            // Surface materials (seed mixes, living covers) live in GroundCoverSurfaceCovers.
+            PaletteKind.GroundCoverSurface => PaletteCatalog.GroundCoverSurfaceCovers.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            // Linear edging materials.
+            PaletteKind.Edging => PaletteCatalog.Edging.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.CustomTile => null,
             _ => null,
         };
@@ -7273,7 +7301,48 @@ public partial class GardenPlot
         selectedDrawingSetId = set.Id;
         library.Ui.LastAlongPathDrawingSetId = set.Id;
         selectedItem = null;
+
+        // Issue #138 — when the user picks a drawing set, switch to the tool that
+        // matches the current drawing-set sub-mode (defaults to Polyline). The user can
+        // change the sub-mode via the "Draw as" widget on toolbar row 2; each click
+        // there re-syncs the tool. Only auto-switch when not already in a
+        // path-drawing tool so we don't yank them out of (say) Rectangle if they
+        // started there deliberately.
+        bool inPathTool = currentTool is Tool.Polyline or Tool.Polygon or Tool.FreeDraw
+            or Tool.Rectangle or Tool.Oval;
+        if (!inPathTool)
+        {
+            currentTool = ToolForDrawingSetSubMode(drawingSetSubMode);
+        }
     }
+
+    /// <summary>Issue #138 — handler for the "Draw as" widget when a drawing set is selected.</summary>
+    private void SetDrawingSetSubMode(DrawingSetSubMode mode)
+    {
+        drawingSetSubMode = mode;
+        currentTool = ToolForDrawingSetSubMode(mode);
+
+        // Clearing any in-flight click-by-vertex draft prevents the new tool from
+        // inheriting a stale polygon from the previous sub-mode.
+        if (drafting is not null && buildingPolygon)
+        {
+            drafting = null;
+            buildingPolygon = false;
+            awaitingArcApex = false;
+            arcApexEdgeIndex = -1;
+        }
+    }
+
+    private static Tool ToolForDrawingSetSubMode(DrawingSetSubMode mode) => mode switch
+    {
+        DrawingSetSubMode.Polygon => Tool.Polygon,
+        DrawingSetSubMode.Rectangle => Tool.Rectangle,
+        DrawingSetSubMode.Oval => Tool.Oval,
+        DrawingSetSubMode.FreehandArea => Tool.FreeDraw,
+        DrawingSetSubMode.Polyline => Tool.Polyline,
+        DrawingSetSubMode.Freehand => Tool.FreeDraw,
+        _ => Tool.Polyline,
+    };
 
     private async Task OnDrawingSetRowFieldChangedAsync()
     {
@@ -7288,6 +7357,290 @@ public partial class GardenPlot
         }
         editingDrawingSet.Rows.RemoveAt(index);
         await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #138 — moves a row up or down in the drawing set. The list order is the
+    /// z-order: lower index = drawn on top, higher index = drawn behind.
+    /// </summary>
+    private async Task MoveDrawingSetRowAsync(int index, int delta)
+    {
+        if (editingDrawingSet is null)
+        {
+            return;
+        }
+
+        int target = index + delta;
+        if (index < 0 || index >= editingDrawingSet.Rows.Count
+            || target < 0 || target >= editingDrawingSet.Rows.Count
+            || delta == 0)
+        {
+            return;
+        }
+
+        (editingDrawingSet.Rows[index], editingDrawingSet.Rows[target]) =
+            (editingDrawingSet.Rows[target], editingDrawingSet.Rows[index]);
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #138 — appends a fresh row to the editing drawing set, populated from the
+    /// supplied palette item code (looked up via PaletteCatalog). Used by the new 'Add
+    /// item' dropdown in the editor.
+    /// </summary>
+    private async Task AddDrawingSetRowAsync(string paletteItemCode)
+    {
+        if (editingDrawingSet is null || string.IsNullOrWhiteSpace(paletteItemCode))
+        {
+            return;
+        }
+
+        PaletteItem? item = PaletteCatalog.FindByCode(paletteItemCode);
+        if (item is null)
+        {
+            return;
+        }
+
+        editingDrawingSet.Rows.Add(new AlongPathDrawingSetRow
+        {
+            PaletteItemCode = item.Code,
+            PaletteItemKind = item.Kind,
+            GapFt = 0,
+            OffsetFt = 0,
+            PhaseAlongFt = 0,
+            CapturedWidthFt = item.WidthFt,
+            CapturedHeightFt = item.HeightFt,
+            CapturedTrait = item.Trait,
+            CapturedFill = item.FillColor,
+            CapturedStroke = item.StrokeColor,
+        });
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #138 — toggle the per-set 'paint as drawn' flag from the editor.</summary>
+    private async Task OnDrawingSetPaintAsDrawnChangedAsync(bool value)
+    {
+        if (editingDrawingSet is null)
+        {
+            return;
+        }
+
+        editingDrawingSet.PaintAsDrawn = value;
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #138 — internal grouping struct that carries a row's resolved palette item,
+    /// the AlongPathRowSpec used by the stamp pipeline, and the row's FillArea bit so the
+    /// placement code can branch on fill-vs-ribbon without re-looking-up the drawing set.
+    /// </summary>
+    private readonly record struct DrawingSetPlacementRow(PaletteItem Item, AlongPathRowSpec Spec, bool FillArea);
+
+    private bool TryGetFillAreaForRow(PaletteItem item, int idx)
+    {
+        // Convenience: looked up from the active drawing set by row index. Used inside
+        // BuildAlongPathPlacementForRows when callers pass the legacy two-element tuple.
+        var set = GetSelectedDrawingSet();
+        if (set is null || idx < 0 || idx >= set.Rows.Count)
+        {
+            return false;
+        }
+
+        return set.Rows[idx].FillArea;
+    }
+
+    /// <summary>
+    /// Issue #138 — synthesises a single filled-area Shape for a stripe row whose source
+    /// is a CLOSED area shape (Rectangle / Oval / closed FreeDraw). The resulting Shape
+    /// adopts the source's geometry (Kind / X / Y / W / H / Points / EdgeBulges) and is
+    /// stamped with the row's material code, fill, stroke, texture, and depth so the
+    /// downstream takeoff + BOM treat it as a ground-cover instance.
+    /// </summary>
+    private static Shape? BuildFilledAreaShapeForRow(PaletteItem item, Shape sourcePath, bool assignNewIds)
+    {
+        if (sourcePath is null || item is null)
+        {
+            return null;
+        }
+
+        Shape fill = new()
+        {
+            Kind = sourcePath.Kind,
+            X = sourcePath.X,
+            Y = sourcePath.Y,
+            W = sourcePath.W,
+            H = sourcePath.H,
+            Rotation = sourcePath.Rotation,
+            CloseEdge = sourcePath.Kind == ShapeKind.FreeDraw ? true : sourcePath.CloseEdge,
+            Points = sourcePath.Points.Select(p => new Point(p.X, p.Y)).ToList(),
+            EdgeBulges = sourcePath.EdgeBulges is null ? null : new List<double>(sourcePath.EdgeBulges),
+            Fill = item.FillColor,
+            Stroke = item.StrokeColor,
+            TextureKey = item.TextureKey,
+            MaterialCode = item.Code,
+            IsGroundCoverSurface = item.MaterialSoldBy == MaterialSoldBy.Area,
+        };
+
+        if (item.DefaultDepthIn is double d)
+        {
+            fill.DepthIn = d;
+            fill.GroundCoverDepthIn = d;
+        }
+
+        if (!assignNewIds)
+        {
+            fill.Id = Guid.Empty;
+        }
+
+        return fill;
+    }
+
+    /// <summary>
+    /// Issue #138 — builds a non-committal preview of where the active drawing set would
+    /// place its rows along the current draft path. Returns the synthesised stamp/stripe
+    /// Shapes for the renderer to draw at reduced opacity. Null when the draft isn't a
+    /// usable path yet (single point, wrong kind, etc.).
+    /// </summary>
+    private IReadOnlyList<Shape>? BuildDrawingSetGhostShapes(Shape draft, AlongPathDrawingSet set)
+    {
+        if (draft is null || set is null)
+        {
+            return null;
+        }
+
+        if (!IsPathShape(draft))
+        {
+            return null;
+        }
+
+        // For points-based drafts, need at least 2 points to form a path. (Polyline tool
+        // produces a FreeDraw ShapeKind; CloseEdge distinguishes open vs closed.)
+        if (draft.Kind == ShapeKind.FreeDraw && draft.Points.Count < 2)
+        {
+            return null;
+        }
+
+        // Resolve rows in render order (reverse) and synthesise the placement.
+        var resolved = new List<(PaletteItem Item, AlongPathRowSpec Spec)>(set.Rows.Count);
+        var renderOrder = GardenPlotWeb.Models.DrawingSetPreview.RenderOrder(set.Rows.Count);
+        foreach (int idx in renderOrder)
+        {
+            AlongPathDrawingSetRow row = set.Rows[idx];
+            PaletteItem? item = ResolvePaletteItemForRow(row);
+            if (item is null)
+            {
+                continue;
+            }
+
+            double width = row.EffectiveWidthFt(item);
+            if (width <= 0)
+            {
+                width = item.WidthFt;
+            }
+
+            resolved.Add((item, new AlongPathRowSpec(width, row.GapFt, row.OffsetFt, row.PhaseAlongFt)));
+        }
+
+        if (resolved.Count == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            // assignNewIds:false so the ghost shapes don't accidentally collide with
+            // anything in the plot if they leak through somewhere (they shouldn't —
+            // we never add them to currentPlot.Shapes).
+            StampPlacement placement = BuildAlongPathPlacementForRows(resolved, draft, assignNewIds: false);
+            return placement.Shapes;
+        }
+        catch
+        {
+            // Defensive: a malformed draft (degenerate ribbon, near-zero length) might
+            // throw inside the placement builder. The ghost preview is purely visual, so
+            // swallow and skip rendering rather than blowing up the page.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Issue #138 — returns true when finishing the just-drawn shape should trigger an
+    /// automatic Along-path placement: a drawing set is the active palette selection AND
+    /// the drawn shape is a usable path. The per-set <c>PaintAsDrawn</c> flag remains in
+    /// the model for future per-set opt-outs but is no longer required (selection IS the
+    /// opt-in).
+    /// </summary>
+    private bool ShouldAutoPaintWithDrawingSet(Shape drawn)
+    {
+        if (drawn is null)
+        {
+            return false;
+        }
+
+        AlongPathDrawingSet? set = GetSelectedDrawingSet();
+        if (set is null || set.Rows.Count == 0)
+        {
+            return false;
+        }
+
+        return IsPathShape(drawn);
+    }
+
+    /// <summary>
+    /// Issue #138 — runs Along-path placement using <paramref name="pathShapeId"/> as the
+    /// source path. Selects the path first so the existing entrypoint
+    /// <see cref="PlaceSelectedItemAlongPath"/> picks it up; restores the prior selection
+    /// after.
+    /// </summary>
+    private async Task PaintWithDrawingSetAfterDrawAsync(Guid pathShapeId)
+    {
+        if (currentPlot is null)
+        {
+            return;
+        }
+
+        Shape? path = currentPlot.Shapes.FirstOrDefault(s => s.Id == pathShapeId);
+        if (path is null)
+        {
+            return;
+        }
+
+        // Hand the path to the existing Along-path pipeline (which already understands
+        // the active drawing set, row resolution, z-order, etc.).
+        SelectOnly(pathShapeId);
+        await PlaceSelectedItemAlongPath();
+    }
+
+    /// <summary>
+    /// Issue #138 — list of every palette item code, grouped by kind, for the 'Add item'
+    /// dropdown in the drawing-set editor. Includes edging materials so a designer can
+    /// build a sidewalk-with-steel-edging assembly.
+    /// </summary>
+    private static IReadOnlyList<(string GroupLabel, IReadOnlyList<PaletteItem> Items)> AddItemGroupsForDrawingSet()
+    {
+        // Pull from each category bucket; skip CustomTiles and assemblies since those
+        // are user-extended and don't make sense as drawing-set rows.
+        var groups = new List<(string Label, IReadOnlyList<PaletteItem> Items)>();
+
+        void Add(string label, IReadOnlyList<PaletteItem> items)
+        {
+            if (items.Count > 0)
+            {
+                groups.Add((label, items));
+            }
+        }
+
+        Add("Trees", PaletteCatalog.Trees);
+        Add("Shrubs & Bushes", PaletteCatalog.Bushes);
+        Add("Plants", PaletteCatalog.Plants);
+        Add("Edging materials", PaletteCatalog.Edging);
+        Add("Ground cover (volume)", PaletteCatalog.GroundCoverMaterials);
+        Add("Ground cover (surface)", PaletteCatalog.GroundCoverSurfaceCovers);
+        Add("Bed kits", PaletteCatalog.BedKits);
+        Add("Soil markers", PaletteCatalog.SoilMarkers);
+
+        return groups;
     }
 
     private static bool IsStampablePaletteItem(PaletteItem item)
@@ -7475,14 +7828,81 @@ public partial class GardenPlot
             return new StampPlacement();
         }
 
-        var specs = new AlongPathRowSpec[rows.Count];
+        // Issue #138 — partition rows by visual kind. Stripe rows (GroundCover,
+        // GroundCoverSurface, Edging) render as continuous ribbon polygons; stamp rows
+        // continue through the existing tile-along-path pipeline below. FillArea rows
+        // (for stripes) become a single solid polygon matching the source interior.
+        var stripeShapes = new List<Shape>();
+        var stampRowIndices = new List<int>();
+        var stampRowsResolved = new List<(PaletteItem Item, AlongPathRowSpec Spec)>();
         for (int i = 0; i < rows.Count; i++)
         {
-            specs[i] = rows[i].Spec;
+            var (item, spec) = rows[i];
+            // FillArea bit isn't on the spec record; consult the source drawing-set row.
+            // Pull it from the page's editingDrawingSet OR the currentlySelected set —
+            // the callers pass rows derived from a real AlongPathDrawingSet; the FillArea
+            // flag is carried via the alignment slot trick below.
+            var visualKind = GardenPlotWeb.Models.DrawingSetPreview.VisualKindFor(item.Kind);
+            bool fillArea = TryGetFillAreaForRow(item, i);
+            if (visualKind == GardenPlotWeb.Models.DrawingSetPreview.RowVisualKind.Stripe)
+            {
+                if (fillArea && closed)
+                {
+                    Shape? fill = BuildFilledAreaShapeForRow(item, sourcePath, assignNewIds);
+                    if (fill is not null)
+                    {
+                        stripeShapes.Add(fill);
+                    }
+                }
+                else
+                {
+                    Shape? stripe = TryBuildStripeShape(item, spec, points, sourcePath.EdgeBulges, closed, assignNewIds);
+                    if (stripe is not null)
+                    {
+                        stripeShapes.Add(stripe);
+                    }
+                }
+            }
+            else
+            {
+                // Stamp rows with FillArea will gain Fill-with-plants integration in a
+                // follow-up; for now they fall through to the existing tile-along-path
+                // pipeline so behaviour stays predictable.
+                stampRowIndices.Add(i);
+                stampRowsResolved.Add(rows[i]);
+            }
         }
 
-        var samples = AlongPathBuilder.BuildSamples(points, closed, specs, alignToTangent: true);
-        if (samples.Count == 0)
+        if (stampRowsResolved.Count == 0)
+        {
+            // Pure stripe set — short-circuit; no DropGroups needed for stripes (they're
+            // single shapes, not repeating placements).
+            return new StampPlacement { Shapes = stripeShapes };
+        }
+
+        var specs = new AlongPathRowSpec[stampRowsResolved.Count];
+        for (int i = 0; i < stampRowsResolved.Count; i++)
+        {
+            specs[i] = stampRowsResolved[i].Spec;
+        }
+
+        // Issue #138 — densify any arc-bulged edges before sampling so stamps follow the
+        // actual curve rather than the chord between vertices. Stripe rows already
+        // consume the original points + bulges through RibbonGeometry which handles
+        // bulges natively; only the stamp path needed this.
+        IReadOnlyList<Point> stampPath = GardenPlotWeb.Models.ArcPathDensifier.Densify(
+            points,
+            sourcePath.EdgeBulges,
+            closed);
+
+        var samples = AlongPathBuilder.BuildSamples(stampPath, closed, specs, alignToTangent: true);
+
+        // Issue #138 — drop stamps whose centre is closer than |OffsetFt| to any other
+        // path segment. Without this, negative-offset rows on closed shapes (Rectangle,
+        // Oval, closed Polygon) crowd extras at the corners because the inward miter
+        // brings adjacent segments inside the stamp's intended exclusion radius.
+        samples = (IReadOnlyList<AlongPathSample>)GardenPlotWeb.Models.AlongPathProximityFilter.Filter(samples, stampPath, closed);
+        if (samples.Count == 0 && stripeShapes.Count == 0)
         {
             return new StampPlacement();
         }
@@ -7490,9 +7910,9 @@ public partial class GardenPlot
         // One DropGroup per row, anchored at the row's first placed sample. Existing along-path
         // tools work group-by-group (move / resize / reflow), so per-row grouping keeps those
         // operations intact for layered borders.
-        var groups = new DropGroup[rows.Count];
-        var groupIndices = new int[rows.Count];
-        for (int i = 0; i < rows.Count; i++)
+        var groups = new DropGroup[stampRowsResolved.Count];
+        var groupIndices = new int[stampRowsResolved.Count];
+        for (int i = 0; i < stampRowsResolved.Count; i++)
         {
             groups[i] = new DropGroup
             {
@@ -7501,16 +7921,19 @@ public partial class GardenPlot
                 SourcePathShapeId = sourcePath.Id,
                 Anchor = AlongPathAnchor.Start,
                 AlignToTangent = true,
-                CenterSpacingYFt = rows[i].Item.HeightFt,
-                CenterSpacingXFt = rows[i].Spec.WidthFt + rows[i].Spec.GapFt,
-                OffsetIn = rows[i].Spec.OffsetFt * 12.0,
+                CenterSpacingYFt = stampRowsResolved[i].Item.HeightFt,
+                CenterSpacingXFt = stampRowsResolved[i].Spec.WidthFt + stampRowsResolved[i].Spec.GapFt,
+                OffsetIn = stampRowsResolved[i].Spec.OffsetFt * 12.0,
             };
         }
 
-        var shapes = new List<Shape>(samples.Count);
+        var shapes = new List<Shape>(samples.Count + stripeShapes.Count);
+        // Stripe shapes first so stamps render on top (matches "lower in list = higher z"
+        // when stripes are placed as background plates under stamps).
+        shapes.AddRange(stripeShapes);
         foreach (var s in samples)
         {
-            var (item, _) = rows[s.RowIndex];
+            var (item, _) = stampRowsResolved[s.RowIndex];
             var group = groups[s.RowIndex];
             int index = groupIndices[s.RowIndex]++;
             var shape = BuildStampShapeAt(item, s.Pos.X, s.Pos.Y, s.AngleDeg, group.Id, index);
@@ -7518,7 +7941,10 @@ public partial class GardenPlot
             {
                 shape.Id = Guid.Empty;
             }
-            shape.AlongPathRowIndex = s.RowIndex;
+
+            // Restore the ORIGINAL drawing-set row index so cross-row coordination still
+            // works (the stamp pipeline used compacted indices; this maps back).
+            shape.AlongPathRowIndex = stampRowIndices[s.RowIndex];
             shape.AlongPathArcLengthFt = s.ArcLengthFt;
             shape.AlongPathOffsetFt = s.OffsetFt;
             shape.AlongPathSlideFt = s.SlideFt;
@@ -7528,6 +7954,7 @@ public partial class GardenPlot
                 group.AnchorCenterX = s.Pos.X;
                 group.AnchorCenterY = s.Pos.Y;
             }
+
             group.ItemCount = index + 1;
         }
 
@@ -7540,6 +7967,85 @@ public partial class GardenPlot
             }
         }
         return placement;
+    }
+
+    /// <summary>
+    /// Issue #138 — builds a single ribbon polygon for a stripe-kind row (GroundCover,
+    /// GroundCoverSurface, Edging) along <paramref name="points"/> with width and
+    /// perpendicular offset taken from <paramref name="spec"/>. Returns null when the
+    /// inputs are degenerate (closed source path, width &lt;= 0, ribbon builder threw).
+    /// </summary>
+    private static Shape? TryBuildStripeShape(
+        PaletteItem item,
+        AlongPathRowSpec spec,
+        IReadOnlyList<Point> points,
+        IReadOnlyList<double>? edgeBulges,
+        bool closed,
+        bool assignNewIds)
+    {
+        if (closed)
+        {
+            // Closed source paths (Rectangle perimeter, Oval perimeter, closed FreeDraw)
+            // need ribbon-around-perimeter which RibbonGeometry doesn't yet support.
+            // Skip for now; a follow-up can add Buffer-based perimeter stripes.
+            return null;
+        }
+
+        double width = spec.WidthFt;
+        if (width <= 0)
+        {
+            width = item.WidthFt;
+        }
+
+        if (width <= 0 || points.Count < 2)
+        {
+            return null;
+        }
+
+        // Apply perpendicular offset to the source polyline FIRST, then build a centered
+        // ribbon of `width`. Arc bulges are treated as straight chords here; downstream
+        // accuracy on heavily-curved drafts can improve in a follow-up if needed.
+        IReadOnlyList<Point> offsetPath = Math.Abs(spec.OffsetFt) > 1e-9
+            ? PolylineOffset.Offset(points, spec.OffsetFt)
+            : points;
+
+        if (offsetPath.Count < 2)
+        {
+            return null;
+        }
+
+        try
+        {
+            Shape ribbon = RibbonGeometry.BuildRibbon(
+                offsetPath,
+                edgeBulges,
+                width,
+                RibbonGeometry.Alignment.Center,
+                RibbonGeometry.EndCap.Square);
+
+            ribbon.Fill = item.FillColor;
+            ribbon.Stroke = item.StrokeColor;
+            ribbon.TextureKey = item.TextureKey;
+            ribbon.MaterialCode = item.Code;
+            ribbon.IsGroundCoverSurface = item.MaterialSoldBy == MaterialSoldBy.Area;
+            if (item.DefaultDepthIn is double d)
+            {
+                ribbon.DepthIn = d;
+                ribbon.GroundCoverDepthIn = d;
+            }
+
+            if (!assignNewIds)
+            {
+                ribbon.Id = Guid.Empty;
+            }
+
+            return ribbon;
+        }
+        catch (ArgumentException)
+        {
+            // Degenerate width or vertices — skip this stripe row rather than blow up.
+            return null;
+        }
     }
 
     private List<Shape> RebuildAlongPathShapes(DropGroup group, Shape sourcePath, Shape template)
@@ -8936,8 +9442,18 @@ public partial class GardenPlot
             currentPlot.Shapes.Add(drafting);
             added = true;
         }
+
+        // Issue #138 — auto-paint hook for the pointer-up commit path (Rectangle / Oval
+        // / FreeDraw drag). Captures the id BEFORE drafting=null below so we can paint
+        // the assembly along the newly-committed shape.
+        Guid? paintedPathId = added && ShouldAutoPaintWithDrawingSet(drafting) ? drafting.Id : null;
+
         drafting = null;
         if (added) _ = SaveAsync();
+        if (paintedPathId is Guid pid)
+        {
+            _ = PaintWithDrawingSetAfterDrawAsync(pid);
+        }
     }
 
     internal void OnShapePointerDown(Microsoft.AspNetCore.Components.Web.PointerEventArgs e, Shape s)
@@ -9685,7 +10201,16 @@ public partial class GardenPlot
             NormalizeEdgeBulgesOnCommit(drafting); // issue #130
             RecordUndoState();
             currentPlot.Shapes.Add(drafting);
+            // Issue #138 — if a drawing set is active AND it has PaintAsDrawn=true, run
+            // Along-path placement against the freshly drawn path. Capture the id before
+            // resetting drafting state below.
+            Guid? paintedPathId = ShouldAutoPaintWithDrawingSet(drafting) ? drafting.Id : null;
             _ = SaveAsync();
+            if (paintedPathId is Guid pid)
+            {
+                // Defer the placement to after current draw state is fully reset.
+                _ = PaintWithDrawingSetAfterDrawAsync(pid);
+            }
         }
 
         drafting = null;
