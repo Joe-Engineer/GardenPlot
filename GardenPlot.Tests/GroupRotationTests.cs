@@ -216,6 +216,88 @@ public sealed class GroupRotationTests
         return (minX, minY, maxX, maxY);
     }
 
+    [Fact]
+    public void ComputeGroupPivot_FreeDrawAwayFromOrigin_PivotIsAtPolygonCenterNotOrigin()
+    {
+        // Regression: FreeDraw shapes have X=Y=W=H=0 by default and store their
+        // geometry in Points. The legacy GetUnionAabb only looked at X/Y/W/H, which
+        // would pin the contribution to the origin and yank the group pivot off-page
+        // whenever a FreeDraw was in the selection.
+        Shape free = new()
+        {
+            Kind = ShapeKind.FreeDraw,
+            CloseEdge = true,
+            Points = new List<Point>
+            {
+                new(100, 50),
+                new(110, 50),
+                new(110, 60),
+                new(100, 60),
+            },
+        };
+
+        Point pivot = GardenPlotRotationHelper.ComputeGroupPivot(new[] { free });
+
+        // Bbox of points: (100,50)-(110,60), center (105, 55).
+        Assert.Equal(105.0, pivot.X, 6);
+        Assert.Equal(55.0, pivot.Y, 6);
+    }
+
+    [Fact]
+    public void ComputeGroupPivot_FreeDrawPlusRectangle_PivotIsAtUnionCenter()
+    {
+        // FreeDraw at (0,0)-(10,10) + Rectangle at (20,0)-(30,10) -> union (0,0)-(30,10),
+        // center (15, 5). Before the fix this returned (10, 0) (FreeDraw pinned to origin
+        // contributed (0,0,0,0), rectangle contributed (20,0,30,10), midpoint (15, 5) only
+        // by coincidence on X — but tested with FreeDraw moved away to make the bug visible).
+        Shape free = new()
+        {
+            Kind = ShapeKind.FreeDraw,
+            CloseEdge = true,
+            Points = new List<Point>
+            {
+                new(0, 0),
+                new(10, 0),
+                new(10, 10),
+                new(0, 10),
+            },
+        };
+        Shape rect = new() { Kind = ShapeKind.Rectangle, X = 20, Y = 0, W = 10, H = 10 };
+
+        Point pivot = GardenPlotRotationHelper.ComputeGroupPivot(new[] { free, rect });
+
+        Assert.Equal(15.0, pivot.X, 6);
+        Assert.Equal(5.0, pivot.Y, 6);
+    }
+
+    [Fact]
+    public void ComputeGroupPivot_FreeDrawWithLocalRotation_UsesVisibleBboxNotPointsBbox()
+    {
+        // A 10x2 strip of points, but with the shape's local Rotation = 90. After local
+        // rotation around the points' bbox center (5, 1), the visible shape is a 2x10
+        // strip centered at (5, 1). The pivot should be at (5, 1), unchanged from the
+        // unrotated case (a 90-degree rotation around the bbox center preserves the
+        // bbox center).
+        Shape free = new()
+        {
+            Kind = ShapeKind.FreeDraw,
+            CloseEdge = true,
+            Points = new List<Point>
+            {
+                new(0, 0),
+                new(10, 0),
+                new(10, 2),
+                new(0, 2),
+            },
+            Rotation = 90,
+        };
+
+        Point pivot = GardenPlotRotationHelper.ComputeGroupPivot(new[] { free });
+
+        Assert.Equal(5.0, pivot.X, 6);
+        Assert.Equal(1.0, pivot.Y, 6);
+    }
+
     private static Point Round(Point p, int decimals)
         => new(Math.Round(p.X, decimals), Math.Round(p.Y, decimals));
 }

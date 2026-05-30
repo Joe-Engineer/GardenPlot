@@ -137,8 +137,8 @@ public static class GardenPlotRotationHelper
     /// <summary>
     /// Issue #135 — computes the selection bbox center used as the default pivot for
     /// group rotation. Iterates each shape's full visible footprint (rotated AABB for
-    /// bbox-parameterised shapes, points list for path-based shapes) and returns the
-    /// midpoint of the union AABB.
+    /// bbox-parameterised shapes, rotated points list for path-based shapes) and
+    /// returns the midpoint of the union AABB.
     /// </summary>
     /// <param name="shapes">The selected shapes.</param>
     /// <returns>The pivot point in plot-space feet. <see cref="Point"/>(0,0) when the selection is empty.</returns>
@@ -150,10 +150,114 @@ public static class GardenPlotRotationHelper
             return new Point(0, 0);
         }
 
-        var aabb = GetUnionAabb(shapes);
+        var aabb = GetSelectionVisibleAabb(shapes);
         return new Point(
             (aabb.minX + aabb.maxX) / 2.0,
             (aabb.minY + aabb.maxY) / 2.0);
+    }
+
+    /// <summary>
+    /// Union AABB over the VISIBLE footprint of each shape. Points-based shapes
+    /// (<see cref="ShapeKind.FreeDraw"/>, <see cref="ShapeKind.Edge"/>,
+    /// <see cref="ShapeKind.Ruler"/>) compute their bounds from rotated Points; all
+    /// other shape kinds use the rotated X/Y/W/H. Critical for #135 group rotation:
+    /// the legacy <see cref="GetUnionAabb"/> ignores Points and returns the origin
+    /// for path-based shapes, which would yank the pivot wildly off-page.
+    /// </summary>
+    private static (double minX, double minY, double maxX, double maxY) GetSelectionVisibleAabb(IReadOnlyList<Shape> shapes)
+    {
+        double minX = double.PositiveInfinity;
+        double minY = double.PositiveInfinity;
+        double maxX = double.NegativeInfinity;
+        double maxY = double.NegativeInfinity;
+
+        foreach (Shape s in shapes)
+        {
+            var (sMinX, sMinY, sMaxX, sMaxY) = GetVisibleAabb(s);
+            if (sMinX < minX)
+            {
+                minX = sMinX;
+            }
+
+            if (sMinY < minY)
+            {
+                minY = sMinY;
+            }
+
+            if (sMaxX > maxX)
+            {
+                maxX = sMaxX;
+            }
+
+            if (sMaxY > maxY)
+            {
+                maxY = sMaxY;
+            }
+        }
+
+        if (double.IsInfinity(minX))
+        {
+            return (0, 0, 0, 0);
+        }
+
+        return (minX, minY, maxX, maxY);
+    }
+
+    private static (double minX, double minY, double maxX, double maxY) GetVisibleAabb(Shape shape)
+    {
+        bool isPointsBased = shape.Kind is ShapeKind.FreeDraw or ShapeKind.Edge or ShapeKind.Ruler;
+        if (isPointsBased && shape.Points.Count >= 1)
+        {
+            // Apply the local Rotation around the points' bbox center to get the
+            // visible vertices, then take the AABB of those.
+            List<Point> visible = shape.Points;
+            if (Math.Abs(shape.Rotation) > 1e-9 && shape.Points.Count >= 2)
+            {
+                Point localCenter = ComputeBboxCenter(shape.Points);
+                double radians = shape.Rotation * Math.PI / 180.0;
+                double cos = Math.Cos(radians);
+                double sin = Math.Sin(radians);
+                visible = new List<Point>(shape.Points.Count);
+                foreach (Point p in shape.Points)
+                {
+                    double dx = p.X - localCenter.X;
+                    double dy = p.Y - localCenter.Y;
+                    visible.Add(new Point(
+                        localCenter.X + (dx * cos) - (dy * sin),
+                        localCenter.Y + (dx * sin) + (dy * cos)));
+                }
+            }
+
+            double pMinX = visible[0].X, pMinY = visible[0].Y, pMaxX = visible[0].X, pMaxY = visible[0].Y;
+            for (int i = 1; i < visible.Count; i++)
+            {
+                Point p = visible[i];
+                if (p.X < pMinX)
+                {
+                    pMinX = p.X;
+                }
+
+                if (p.X > pMaxX)
+                {
+                    pMaxX = p.X;
+                }
+
+                if (p.Y < pMinY)
+                {
+                    pMinY = p.Y;
+                }
+
+                if (p.Y > pMaxY)
+                {
+                    pMaxY = p.Y;
+                }
+            }
+
+            return (pMinX, pMinY, pMaxX, pMaxY);
+        }
+
+        // Bbox-parameterised shapes — use the existing rotated AABB helper.
+        return GetRotatedAabb(shape);
     }
 
     private static Point ComputeBboxCenter(List<Point> points)
