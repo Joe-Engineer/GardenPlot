@@ -207,6 +207,78 @@ public static class EdgeArcGeometry
         bool sweep = bulge > 0;
         return new SvgArcParams(radius, radius, 0, largeArc, sweep, end);
     }
+
+    /// <summary>
+    /// Issue #131 — outgoing tangent (unit vector) at the END of an edge. For a line edge
+    /// this is the chord direction; for an arc it is the chord direction rotated by half
+    /// the included angle in the bulge's handedness. Returns <see langword="null"/> when
+    /// the chord is degenerate (start ≈ end).
+    /// </summary>
+    /// <param name="start">Edge start vertex.</param>
+    /// <param name="end">Edge end vertex.</param>
+    /// <param name="bulge">Edge bulge value (0 = line).</param>
+    /// <returns>Unit tangent at the edge's end, or <see langword="null"/> for a degenerate chord.</returns>
+    public static Point? EdgeOutgoingTangent(Point start, Point end, double bulge)
+    {
+        double dx = end.X - start.X;
+        double dy = end.Y - start.Y;
+        double chord = Math.Sqrt((dx * dx) + (dy * dy));
+        if (chord < GeometryEpsilon)
+        {
+            return null;
+        }
+
+        // Chord unit vector — the line-segment tangent at every point along the chord.
+        double cx = dx / chord;
+        double cy = dy / chord;
+
+        if (Math.Abs(bulge) < LineThreshold)
+        {
+            return new Point(cx, cy);
+        }
+
+        // For an arc, the tangent at the END rotates relative to the chord by half the
+        // included angle, in the same screen-handedness as the bulge. theta = 4*atan(|b|),
+        // so half = 2*atan(|b|). Sign convention: positive bulge bulges screen-LEFT of
+        // walking, meaning as we traverse the arc the tangent rotates VISUALLY CLOCKWISE
+        // (in screen y-down coords). In math y-up coords that's a +alpha rotation, which
+        // the standard 2D rotation matrix R(+alpha) implements as (cos*cx - sin*cy,
+        // sin*cx + cos*cy). Verified against an explicit parameterisation of the chord
+        // (0,0)->(1,0) with bulge tan(pi/8): incoming tangent at start is (√2/2, -√2/2)
+        // and outgoing tangent at end is (√2/2, √2/2).
+        double halfTheta = 2.0 * Math.Atan(Math.Abs(bulge));
+        double signedAlpha = Math.Sign(bulge) * halfTheta;
+        double cos = Math.Cos(signedAlpha);
+        double sin = Math.Sin(signedAlpha);
+
+        double rotatedX = (cos * cx) - (sin * cy);
+        double rotatedY = (sin * cx) + (cos * cy);
+        return new Point(rotatedX, rotatedY);
+    }
+
+    /// <summary>
+    /// Issue #131 — projects <paramref name="point"/> perpendicularly onto the infinite line
+    /// through <paramref name="linePoint"/> in <paramref name="lineDirection"/>. The direction
+    /// vector does not need to be unit length; it just needs to be non-zero. Returns
+    /// <paramref name="point"/> unchanged when the direction is degenerate.
+    /// </summary>
+    /// <param name="linePoint">A point on the line (typically the previous segment's endpoint).</param>
+    /// <param name="lineDirection">The line direction (will be normalised internally).</param>
+    /// <param name="point">The point to project.</param>
+    /// <returns>The foot of the perpendicular from <paramref name="point"/> onto the line.</returns>
+    public static Point ProjectOntoLine(Point linePoint, Point lineDirection, Point point)
+    {
+        double dx = lineDirection.X;
+        double dy = lineDirection.Y;
+        double lenSq = (dx * dx) + (dy * dy);
+        if (lenSq < GeometryEpsilon)
+        {
+            return point;
+        }
+
+        double t = (((point.X - linePoint.X) * dx) + ((point.Y - linePoint.Y) * dy)) / lenSq;
+        return new Point(linePoint.X + (t * dx), linePoint.Y + (t * dy));
+    }
 }
 
 /// <summary>

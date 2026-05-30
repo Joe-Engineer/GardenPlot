@@ -142,6 +142,48 @@
     50%      { box-shadow: 0 0 0 5px rgba(255, 193, 7, 0.5); }
 }
 
+/* Issue #131 — tangent-snap toggle. Same shape as the arc toggle but in violet so the
+   two armed states stay visually distinct (you can have both on simultaneously). */
+.tangent-toggle-inactive,
+.tangent-toggle-active {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border: 1.5px solid;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s, box-shadow 0.1s;
+}
+
+.tangent-toggle-inactive {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+    color: #495057;
+    border-style: dashed;
+}
+
+.tangent-toggle-inactive:hover {
+    background: #e9ecef;
+    border-color: #6c757d;
+}
+
+.tangent-toggle-active {
+    background: #d1c4e9;
+    border-color: #5e35b1;
+    color: #2d1b4e;
+    border-style: solid;
+    box-shadow: 0 0 0 3px rgba(94, 53, 177, 0.35);
+    animation: tangent-toggle-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes tangent-toggle-glow {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(94, 53, 177, 0.35); }
+    50%      { box-shadow: 0 0 0 5px rgba(94, 53, 177, 0.55); }
+}
+
 .zoom-controls {
     display: inline-flex;
     align-items: center;
