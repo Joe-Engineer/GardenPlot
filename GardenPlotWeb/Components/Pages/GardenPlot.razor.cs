@@ -7887,6 +7887,12 @@ public partial class GardenPlot
         }
 
         var samples = AlongPathBuilder.BuildSamples(points, closed, specs, alignToTangent: true);
+
+        // Issue #138 — drop stamps whose centre is closer than |OffsetFt| to any other
+        // path segment. Without this, negative-offset rows on closed shapes (Rectangle,
+        // Oval, closed Polygon) crowd extras at the corners because the inward miter
+        // brings adjacent segments inside the stamp's intended exclusion radius.
+        samples = (IReadOnlyList<AlongPathSample>)GardenPlotWeb.Models.AlongPathProximityFilter.Filter(samples, points, closed);
         if (samples.Count == 0 && stripeShapes.Count == 0)
         {
             return new StampPlacement();

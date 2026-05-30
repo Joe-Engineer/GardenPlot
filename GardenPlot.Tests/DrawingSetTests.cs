@@ -424,4 +424,77 @@ public sealed class DrawingSetTests
     {
         Assert.Equal(expected, DrawingSetPreview.HasGap(kind));
     }
+
+    [Fact]
+    public void ProximityFilter_PositiveOffsetSamples_PassThroughUntouched()
+    {
+        // Closed rectangle path; one sample at positive offset (outside) should always
+        // survive since the corner-crowding rule only applies to negative offsets.
+        Point[] rect = [new(0, 0), new(10, 0), new(10, 5), new(0, 5)];
+        AlongPathSample[] samples =
+        [
+            new(0, 0, new Point(5, -2), 0, false, 5, 2, 0),
+        ];
+
+        var result = AlongPathProximityFilter.Filter(samples, rect, closed: true);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void ProximityFilter_NegativeOffsetNearCorner_GetsDropped()
+    {
+        // Closed 10x10 rectangle. A sample at the (1, 1) position with row offset -3
+        // requires a 3 ft clearance from all segments. The top edge (y=0) is at distance
+        // 1 — well within the required 3 — so this sample must be dropped.
+        Point[] rect = [new(0, 0), new(10, 0), new(10, 10), new(0, 10)];
+        AlongPathSample[] samples =
+        [
+            new(0, 0, new Point(1, 1), 0, false, 1, -3, 0),
+        ];
+
+        var result = AlongPathProximityFilter.Filter(samples, rect, closed: true);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ProximityFilter_NegativeOffsetAtCorrectDistance_Survives()
+    {
+        // Same rectangle; sample at (3, 3) with row offset -3 requires 3 ft from all
+        // segments. Distance to top edge = 3, to left edge = 3, to right = 7, to bottom = 7.
+        // The minimum is exactly 3 — passes the threshold.
+        Point[] rect = [new(0, 0), new(10, 0), new(10, 10), new(0, 10)];
+        AlongPathSample[] samples =
+        [
+            new(0, 0, new Point(3, 3), 0, false, 1, -3, 0),
+        ];
+
+        var result = AlongPathProximityFilter.Filter(samples, rect, closed: true);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void ProximityFilter_EmptySamples_ReturnsEmpty()
+    {
+        Point[] rect = [new(0, 0), new(10, 0)];
+        Assert.Empty(AlongPathProximityFilter.Filter(Array.Empty<AlongPathSample>(), rect, closed: false));
+    }
+
+    [Fact]
+    public void ProximityFilter_NegativeOffsetOnOpenLine_DoesNotDropMiddleSamples()
+    {
+        // Open horizontal path from (0,0) to (10,0); a sample at (5, -2) with offset -2
+        // is exactly the required distance from the one segment of the path. Passes.
+        Point[] line = [new(0, 0), new(10, 0)];
+        AlongPathSample[] samples =
+        [
+            new(0, 0, new Point(5, -2), 0, false, 5, -2, 0),
+        ];
+
+        var result = AlongPathProximityFilter.Filter(samples, line, closed: false);
+
+        Assert.Single(result);
+    }
 }
