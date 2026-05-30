@@ -58,6 +58,13 @@ public static class DrawingSetPreview
     public static bool HasPhase(PaletteKind kind) => VisualKindFor(kind) == RowVisualKind.Stamp;
 
     /// <summary>
+    /// Returns true when a gap-between-stamps input makes sense for this row. Gap is the
+    /// extra spacing between adjacent stamp copies; meaningless for continuous-stripe
+    /// rows which lay down a single ribbon rather than discrete copies.
+    /// </summary>
+    public static bool HasGap(PaletteKind kind) => VisualKindFor(kind) == RowVisualKind.Stamp;
+
+    /// <summary>
     /// Returns true when a depth input makes sense for this row. Depth applies to
     /// volumetric materials (mulch, gravel, soil) where the user buys yards-of-material
     /// to fill an area. Stamps (plants / trees / bushes / etc.), surface ground covers

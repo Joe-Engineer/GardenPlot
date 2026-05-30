@@ -409,4 +409,19 @@ public sealed class DrawingSetTests
         row.FillArea = false;
         Assert.False(row.FillArea);
     }
+
+    [Theory]
+    [InlineData(PaletteKind.Plant, true)]
+    [InlineData(PaletteKind.Tree, true)]
+    [InlineData(PaletteKind.Bush, true)]
+    [InlineData(PaletteKind.BedKit, true)]
+    [InlineData(PaletteKind.FocalPoint, true)]
+    [InlineData(PaletteKind.SoilMarker, true)]
+    [InlineData(PaletteKind.GroundCover, false)]
+    [InlineData(PaletteKind.GroundCoverSurface, false)]
+    [InlineData(PaletteKind.Edging, false)]
+    public void HasGap_OnlyForStampKinds(PaletteKind kind, bool expected)
+    {
+        Assert.Equal(expected, DrawingSetPreview.HasGap(kind));
+    }
 }

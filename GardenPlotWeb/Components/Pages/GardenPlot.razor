@@ -1133,6 +1133,7 @@ else
                             var row = editingDrawingSet.Rows[idx];
                             var resolvedForRow = ResolvePaletteItemForRow(row);
                             var showPhase = GardenPlotWeb.Models.DrawingSetPreview.HasPhase(row.PaletteItemKind);
+                            var showGap = GardenPlotWeb.Models.DrawingSetPreview.HasGap(row.PaletteItemKind);
                             var showDepth = GardenPlotWeb.Models.DrawingSetPreview.HasDepth(resolvedForRow);
                             <div class="drawing-set-editor-row">
                             <span class="drawing-set-editor-item-cell" title="@row.PaletteItemKind">
@@ -1170,8 +1171,15 @@ else
                                 }
                                 <span class="drawing-set-editor-item-code">@row.PaletteItemCode</span>
                             </span>
-                                <input class="form-control form-control-sm" type="number" step="0.05" value="@F(row.GapFt)"
-                                       @onchange="async (e) => { if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.GapFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
+                                @if (showGap)
+                                {
+                                    <input class="form-control form-control-sm" type="number" step="0.05" value="@F(row.GapFt)"
+                                           @onchange="async (e) => { if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.GapFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
+                                }
+                                else
+                                {
+                                    <span class="drawing-set-editor-na" title="Gap isn't meaningful for continuous ribbons (ground cover, edging) — they lay down a single strip, not discrete copies.">—</span>
+                                }
                                 <input class="form-control form-control-sm" type="number" step="0.25" value="@F(row.OffsetFt)"
                                        @onchange="async (e) => { if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.OffsetFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
                                 @if (showPhase)
