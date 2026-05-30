@@ -10118,6 +10118,93 @@ public partial class GardenPlot
     private List<Shape>? pendingMergeSources;
     private List<Shape>? pendingMergeMaterialOptions;
 
+    // Issue #136 — Material Picker dialog state. Re-uses the existing palette pattern to
+    // let users assign a material (mulch, gravel, seed mix, living ground cover, etc.) to
+    // every fillable area shape in the current selection.
+    private bool showChangeMaterialDialog;
+    private PaletteCategory changeMaterialCategory = PaletteCategory.GroundCoverMaterials;
+    private int changeMaterialTargetCount;
+
+    private bool CanChangeSelectionMaterial =>
+        selectedIds.Count > 0
+        && SelectedShapes().Any(GardenPlotMaterialPicker.CanWearMaterial);
+
+    /// <summary>Issue #136 — opens the Material Picker dialog.</summary>
+    private void OpenChangeMaterialDialog()
+    {
+        var targets = GardenPlotMaterialPicker.FillableTargets(SelectedShapes().ToList());
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        changeMaterialTargetCount = targets.Count;
+        // Default to the volume-materials category — most common case (mulch, gravel, soil).
+        changeMaterialCategory = PaletteCategory.GroundCoverMaterials;
+        showChangeMaterialDialog = true;
+    }
+
+    /// <summary>Issue #136 — closes the Material Picker without applying anything.</summary>
+    private void CancelChangeMaterialDialog()
+    {
+        showChangeMaterialDialog = false;
+        changeMaterialTargetCount = 0;
+    }
+
+    /// <summary>Issue #136 — handles a category-dropdown change inside the dialog.</summary>
+    private void OnChangeMaterialCategoryChanged(ChangeEventArgs e)
+    {
+        if (e.Value is string raw && Enum.TryParse<PaletteCategory>(raw, out var picked))
+        {
+            // The disabled <option>s in the dropdown can't be picked by users, but a
+            // defensive guard here keeps the contract clear.
+            if (GardenPlotMaterialPicker.IsMaterialCategory(picked))
+            {
+                changeMaterialCategory = picked;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Issue #136 — applies <paramref name="material"/> to every fillable shape in the
+    /// current selection, then persists. Records an undo step before mutating so a single
+    /// Ctrl+Z restores all previous materials.
+    /// </summary>
+    private async Task ApplyMaterialToSelection(PaletteItem material)
+    {
+        if (currentPlot is null || material is null)
+        {
+            return;
+        }
+
+        var targets = GardenPlotMaterialPicker.FillableTargets(SelectedShapes().ToList());
+        if (targets.Count == 0)
+        {
+            CancelChangeMaterialDialog();
+            return;
+        }
+
+        RecordUndoState();
+
+        bool anyChanged = false;
+        foreach (Shape s in targets)
+        {
+            if (GardenPlotMaterialPicker.ApplyMaterial(s, material))
+            {
+                anyChanged = true;
+            }
+        }
+
+        showChangeMaterialDialog = false;
+        changeMaterialTargetCount = 0;
+
+        if (anyChanged)
+        {
+            await SaveAsync();
+        }
+    }
+
+
     /// <summary>
     /// Issue #134 — runs the boolean-union pipeline on the current selection. Source
     /// shapes are removed; the resulting outer ring(s) are added as new closed
