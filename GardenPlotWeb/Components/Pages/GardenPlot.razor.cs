@@ -2843,6 +2843,16 @@ public partial class GardenPlot
     // the terminus position, not the apex pick.
     internal bool tangentSnapArmed;
 
+    // Issue #132 — Path → Ribbon dialog state. Open when showRibbonDialog is true;
+    // the source is fixed at dialog-open time (ribbonDialogSourceShapeId) so the user
+    // can deselect / re-select without disturbing the live preview. Width input is kept
+    // as the raw string so unit-aware parsing happens fresh on every edit.
+    private bool showRibbonDialog;
+    private Guid ribbonDialogSourceShapeId;
+    private string ribbonDialogWidthInput = "3";
+    private RibbonGeometry.Alignment ribbonDialogAlignment = RibbonGeometry.Alignment.Center;
+    private RibbonGeometry.EndCap ribbonDialogEndCap = RibbonGeometry.EndCap.Square;
+
     // Issue #130 — guards against the browser's natural double-click producing TWO
     // terminus commits in a row. When the second pointer-down lands within this many
     // milliseconds of the first, TryHandleArcClick discards it so the subsequent
@@ -9847,6 +9857,140 @@ public partial class GardenPlot
         {
             MirrorShape(shape, horizontal);
         }
+
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #132 — predicate gating the "Path → Ribbon" toolbar button. Currently a
+    /// single open FreeDraw shape (Polyline tool output, or any unclosed click-by-vertex
+    /// path) with at least two points qualifies. Closed polygons and other kinds are
+    /// rejected — they need either a different offset algorithm or fall outside this
+    /// PR's scope.
+    /// </summary>
+    private bool CanOpenRibbonDialog
+    {
+        get
+        {
+            if (currentPlot is null || selectedIds.Count != 1)
+            {
+                return false;
+            }
+
+            Shape? s = SelectedShapes().FirstOrDefault();
+            return s is { Kind: ShapeKind.FreeDraw, CloseEdge: false } && s.Points.Count >= 2;
+        }
+    }
+
+    /// <summary>
+    /// Issue #132 — opens the Path → Ribbon dialog, pre-filling width / alignment /
+    /// end-cap from the user's last persisted choices.
+    /// </summary>
+    private void OpenRibbonDialog()
+    {
+        if (!CanOpenRibbonDialog || currentPlot is null)
+        {
+            return;
+        }
+
+        Shape source = SelectedShapes().First();
+        ribbonDialogSourceShapeId = source.Id;
+        ribbonDialogWidthInput = library.Ui.LastRibbonWidthFt.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        ribbonDialogAlignment = library.Ui.LastRibbonAlignment;
+        ribbonDialogEndCap = library.Ui.LastRibbonEndCap;
+        showRibbonDialog = true;
+    }
+
+    private void CloseRibbonDialog()
+    {
+        showRibbonDialog = false;
+        ribbonDialogSourceShapeId = Guid.Empty;
+    }
+
+    /// <summary>
+    /// Issue #132 — live-preview the ribbon polygon for the current dialog inputs.
+    /// Returns <see langword="null"/> when the dialog is closed, the source is missing,
+    /// or the width input parses to an invalid value. The result is rendered as a
+    /// faded overlay alongside the source so the user can refine the inputs without
+    /// committing.
+    /// </summary>
+    internal Shape? RibbonPreviewShape
+    {
+        get
+        {
+            if (!showRibbonDialog || currentPlot is null)
+            {
+                return null;
+            }
+
+            Shape? source = currentPlot.Shapes.FirstOrDefault(s => s.Id == ribbonDialogSourceShapeId);
+            if (source is null || source.Points.Count < 2)
+            {
+                return null;
+            }
+
+            double? widthFt = WidthInputParser.ParseFeet(ribbonDialogWidthInput);
+            if (widthFt is null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return RibbonGeometry.BuildRibbon(
+                    source.Points,
+                    source.EdgeBulges,
+                    widthFt.Value,
+                    ribbonDialogAlignment,
+                    ribbonDialogEndCap);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Issue #132 — commits the live-previewed ribbon as a new shape, persists the
+    /// dialog's choices for next time, and closes the dialog. No-ops when the preview
+    /// can't be computed (the Apply button is disabled in that case in the markup, so
+    /// the only way to hit this guard is a race).
+    /// </summary>
+    private async Task ApplyRibbon()
+    {
+        Shape? preview = RibbonPreviewShape;
+        if (preview is null || currentPlot is null)
+        {
+            return;
+        }
+
+        double? widthFt = WidthInputParser.ParseFeet(ribbonDialogWidthInput);
+        if (widthFt is null)
+        {
+            return;
+        }
+
+        // Pull a forward-facing stroke / fill from the source so the ribbon doesn't
+        // arrive looking like a completely unrelated shape.
+        Shape? source = currentPlot.Shapes.FirstOrDefault(s => s.Id == ribbonDialogSourceShapeId);
+        if (source is not null)
+        {
+            preview.Stroke = source.Stroke;
+            preview.Fill = source.Fill;
+            preview.FillOpacity = source.FillOpacity;
+        }
+
+        RecordUndoState();
+        currentPlot.Shapes.Add(preview);
+        SelectOnly(preview.Id);
+
+        library.Ui.LastRibbonWidthFt = widthFt.Value;
+        library.Ui.LastRibbonAlignment = ribbonDialogAlignment;
+        library.Ui.LastRibbonEndCap = ribbonDialogEndCap;
+
+        showRibbonDialog = false;
+        ribbonDialogSourceShapeId = Guid.Empty;
 
         await SaveAsync();
     }

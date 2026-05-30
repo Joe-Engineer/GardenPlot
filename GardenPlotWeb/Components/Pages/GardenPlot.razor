@@ -269,6 +269,14 @@ else
                         title="Mirror selection vertically (Shift+V)" aria-label="Mirror vertical">
                     <svg viewBox="0 0 24 24"><path d="M4 12H20" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2" /><path d="M8 4L8 10L16 10L16 4Z" fill="currentColor" fill-opacity="0.6" /><path d="M8 20L8 14L16 14L16 20Z" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
                 </button>
+                @* Issue #132 — Path → Ribbon. Offsets the selected open polyline / arc-chain
+                   path by ±half-width into a closed ribbon polygon (pathway, walkway, etc.).
+                   Disabled unless a single open FreeDraw shape is selected. *@
+                <button class="btn btn-sm btn-outline-secondary" @onclick="OpenRibbonDialog"
+                        disabled="@(!CanOpenRibbonDialog)"
+                        title="Offset the selected open path into a closed ribbon polygon of a given width (pathway, walkway, garden border).">
+                    Path → Ribbon
+                </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="PlaceSelectedItemAlongPath" disabled="@(!CanPlaceAlongPath)" title="Place copies of the selected palette stamp (plant, tree, etc.) evenly along a selected path. Path can be a Polyline, Free Draw, Edge, Rectangle perimeter, or Oval perimeter. Pick a stamp item or a Drawing Set from the palette.">
                     Along path
                 </button>
@@ -565,6 +573,61 @@ else
                 <div class="modal-footer">
                     <button class="btn btn-sm btn-outline-secondary" @onclick="ResetDefaultKeyBindings">Reset defaults</button>
                     <button class="btn btn-sm btn-primary" @onclick="SaveAndCloseKeyBindingsDialog">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Issue #132 — Path → Ribbon dialog. Live preview renders as a faded overlay on the
+   canvas (see the canvas SVG block below) while this modal is open. *@
+@if (showRibbonDialog)
+{
+    var preview = RibbonPreviewShape;
+    var parseValid = WidthInputParser.ParseFeet(ribbonDialogWidthInput) is not null;
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Path → Ribbon</h5>
+                    <button type="button" class="btn-close" @onclick="CloseRibbonDialog"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="x-small text-muted mb-2">Offsets the selected open path by half-width on each side and stitches the result into a closed ribbon polygon. Watch the faded preview on the canvas as you change inputs.</div>
+                    <div class="mb-2">
+                        <label class="form-label small">Width</label>
+                        <input class="form-control form-control-sm @(parseValid ? string.Empty : "is-invalid")"
+                               @bind="ribbonDialogWidthInput" @bind:event="oninput"
+                               placeholder="e.g. 3, 3 ft, 36 in" />
+                        @if (!parseValid)
+                        {
+                            <div class="invalid-feedback small">Enter a positive width with optional unit (<code>ft</code>, <code>'</code>, <code>in</code>, <code>&quot;</code>).</div>
+                        }
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Source alignment</label>
+                        <select class="form-select form-select-sm" @bind="ribbonDialogAlignment">
+                            <option value="@RibbonGeometry.Alignment.Center">Center (source is the ribbon centerline)</option>
+                            <option value="@RibbonGeometry.Alignment.Left">Left (source is the left edge)</option>
+                            <option value="@RibbonGeometry.Alignment.Right">Right (source is the right edge)</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">End cap</label>
+                        <select class="form-select form-select-sm" @bind="ribbonDialogEndCap">
+                            <option value="@RibbonGeometry.EndCap.Square">Square (straight chord)</option>
+                            <option value="@RibbonGeometry.EndCap.Round">Round (semicircle)</option>
+                        </select>
+                    </div>
+                    @if (preview is not null)
+                    {
+                        <div class="small text-muted">Preview area: <strong>@F(GroundCoverMath.AreaFt2(preview))</strong> ft²</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="CloseRibbonDialog">Cancel</button>
+                    <button class="btn btn-sm btn-primary" @onclick="ApplyRibbon" disabled="@(preview is null)">Create ribbon</button>
                 </div>
             </div>
         </div>
@@ -1389,6 +1452,25 @@ else
                             <title>Tangent snap</title>
                         }
                     </g>
+                }
+
+                @* Issue #132 — live Path → Ribbon preview. Renders the ribbon polygon as
+                   a faded amber overlay so the user can see the result of the dialog's
+                   width / alignment / end-cap choices without committing. *@
+                @if (!IsConceptMode && showRibbonDialog && RibbonPreviewShape is { } ribbonPreview)
+                {
+                    @if (ArcPolygonPathBuilder.HasAnyArc(ribbonPreview.EdgeBulges))
+                    {
+                        <path d="@ArcPolygonPathBuilder.Build(ribbonPreview.Points, ribbonPreview.EdgeBulges, close: true)"
+                              fill="rgba(255,193,7,0.25)" stroke="#b58105" stroke-width="0.08"
+                              stroke-dasharray="0.25,0.15" pointer-events="none" />
+                    }
+                    else
+                    {
+                        <polygon points="@PointsString(ribbonPreview.Points)"
+                                 fill="rgba(255,193,7,0.25)" stroke="#b58105" stroke-width="0.08"
+                                 stroke-dasharray="0.25,0.15" pointer-events="none" />
+                    }
                 }
                 @if (!IsConceptMode && currentTool == Tool.Select && isBoxSelecting)
                 {
