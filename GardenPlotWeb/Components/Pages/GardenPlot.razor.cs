@@ -131,11 +131,42 @@ public partial class GardenPlot
     private bool suppressNextRender;
 
     /// <summary>
+    /// Set to <c>true</c> by the interactive-hover branches of <see cref="OnPointerMove"/>
+    /// (stamp-ghost preview, paste-mode preview) when the only thing the move changed is
+    /// a ghost's follow-the-cursor position. <see cref="ShouldRender"/> consumes the flag
+    /// and consults <see cref="hoverRenderThrottle"/>: if the throttle window has elapsed
+    /// the render proceeds normally; if it hasn't, the render is suppressed and a single
+    /// trailing flush is scheduled so the final hover state still reaches the screen.
+    /// See issue #112 for the rationale (sweeping a cursor across a 1000-shape plot used
+    /// to trigger a full render-diff per pointer event).
+    /// </summary>
+    private bool pendingHoverRender;
+
+    /// <summary>
+    /// Caps hover-driven renders at ~60 fps (issue #112). Reset on disposal so a late
+    /// callback can't see a stale baseline.
+    /// </summary>
+    private readonly HoverRenderThrottle hoverRenderThrottle = new();
+
+    /// <summary>
+    /// True while a trailing hover flush is scheduled via <see cref="Task.Delay(int)"/>.
+    /// Prevents stacking up multiple flushes when many hover events arrive inside a
+    /// single throttle window.
+    /// </summary>
+    private bool hoverFlushScheduled;
+
+    /// <summary>
     /// Called from the top of every non-pointer-move event handler so a pending
     /// "idle move suppress" flag can't accidentally swallow that handler's render.
-    /// Cheap (single store); safe to call even when the flag is already false.
+    /// Also clears the hover-render pending signal so the handler's substantive
+    /// render isn't gated by the hover-throttle window (issue #112). Cheap
+    /// (two stores); safe to call even when the flags are already false.
     /// </summary>
-    private void ClearIdleRenderSuppression() => suppressNextRender = false;
+    private void ClearIdleRenderSuppression()
+    {
+        suppressNextRender = false;
+        pendingHoverRender = false;
+    }
 
     private enum NewPlotDialogStep { ImageFirst, Configure }
     private enum DropActivationMode { ClickToggle, HoldKey }
@@ -2501,6 +2532,16 @@ public partial class GardenPlot
     /// (see <c>updateStatusPos</c>). On a 2000+ shape canvas this kills the dominant render-storm:
     /// every mouse-move was paying for a full <c>visibleShapes</c> cull + cohort fingerprint
     /// pass just to redraw the status bar.</para>
+    ///
+    /// <para>Finally (issue #112) throttles hover-only renders (stamp-ghost / paste-hover) to
+    /// ~60 fps via <see cref="hoverRenderThrottle"/>. The race-mitigation contract: the
+    /// hover branches in <see cref="OnPointerMove"/> always update the underlying ghost
+    /// state BEFORE setting <see cref="pendingHoverRender"/>, so the next "substantive"
+    /// render (click, drag, undo) reads the latest ghost position automatically — the
+    /// throttle gates the <i>render</i>, never the data. <see cref="ClearIdleRenderSuppression"/>
+    /// also clears the hover flag at the top of every non-move handler so a substantive
+    /// event never gets swallowed by a hover-throttle window. A trailing flush via
+    /// <see cref="Task.Delay(int)"/> guarantees the final hover state of a burst still lands.</para>
     /// </summary>
     protected override bool ShouldRender()
     {
@@ -2525,7 +2566,59 @@ public partial class GardenPlot
             return false;
         }
 
+        if (pendingHoverRender)
+        {
+            pendingHoverRender = false;
+
+            long now = Environment.TickCount64;
+            if (!hoverRenderThrottle.ShouldRenderNow(now))
+            {
+                renderStartTimestamp = 0;
+                if (perfStats is not null)
+                {
+                    perfStats.RecordSuppressed();
+                }
+
+                _ = ScheduleHoverTrailingFlushAsync(hoverRenderThrottle.MsUntilNextAllowed(now));
+                return false;
+            }
+
+            return true;
+        }
+
+        // Substantive render path: reset the throttle window so the user's next hover
+        // renders immediately rather than waiting on a stale gap from the prior burst.
+        hoverRenderThrottle.NoteSubstantiveRender(Environment.TickCount64);
         return true;
+    }
+
+    /// <summary>
+    /// Schedules a single trailing render after the hover-throttle window elapses so the
+    /// final hover state of a burst is not stuck on screen at the previous frame. Idempotent:
+    /// repeated calls while a flush is already pending are no-ops.
+    /// </summary>
+    private async Task ScheduleHoverTrailingFlushAsync(int delayMs)
+    {
+        if (hoverFlushScheduled)
+        {
+            return;
+        }
+
+        hoverFlushScheduled = true;
+        try
+        {
+            await Task.Delay(delayMs).ConfigureAwait(false);
+            await InvokeAsync(() =>
+            {
+                hoverFlushScheduled = false;
+                hoverRenderThrottle.NoteSubstantiveRender(Environment.TickCount64);
+                StateHasChanged();
+            }).ConfigureAwait(false);
+        }
+        catch
+        {
+            hoverFlushScheduled = false;
+        }
     }
 
     private void OnCanvasContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
@@ -4088,6 +4181,7 @@ public partial class GardenPlot
 
         // Drop any pending viewport flush so a late callback after dispose is a no-op.
         viewportCoalescer.Reset();
+        hoverRenderThrottle.Reset();
     }
 
     /// <summary>
@@ -8077,6 +8171,9 @@ public partial class GardenPlot
         {
             pasteHoverX = x;
             pasteHoverY = y;
+
+            // Pure preview update — flag for hover-throttle treatment in ShouldRender.
+            pendingHoverRender = true;
         }
 
         if (isBoxSelecting)
@@ -8102,6 +8199,9 @@ public partial class GardenPlot
         {
             ghostX = x;
             ghostY = y;
+
+            // Pure preview update — flag for hover-throttle treatment in ShouldRender.
+            pendingHoverRender = true;
         }
 
         if (isDragging && selectedIds.Count > 0 && currentPlot is not null)
