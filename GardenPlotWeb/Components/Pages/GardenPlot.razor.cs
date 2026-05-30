@@ -6689,10 +6689,15 @@ public partial class GardenPlot
             PaletteKind.Plant => PaletteCatalog.Plants.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.FocalPoint => PaletteCatalog.FocalPoints.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.SoilMarker => PaletteCatalog.SoilMarkers.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
-            PaletteKind.BedKit => null,
-            PaletteKind.Edging => null,
-            PaletteKind.GroundCover => null,
-            PaletteKind.GroundCoverSurface => null,
+            PaletteKind.BedKit => PaletteCatalog.BedKits.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            // Issue #138 — volume materials (mulch / gravel / soil / rock) live in
+            // GroundCoverMaterials and carry MaterialSoldBy.Volume + DefaultDepthIn.
+            // Resolving them properly is what makes the editor's Depth column show.
+            PaletteKind.GroundCover => PaletteCatalog.GroundCoverMaterials.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            // Surface materials (seed mixes, living covers) live in GroundCoverSurfaceCovers.
+            PaletteKind.GroundCoverSurface => PaletteCatalog.GroundCoverSurfaceCovers.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            // Linear edging materials.
+            PaletteKind.Edging => PaletteCatalog.Edging.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.CustomTile => null,
             _ => null,
         };
@@ -7293,6 +7298,18 @@ public partial class GardenPlot
         selectedDrawingSetId = set.Id;
         library.Ui.LastAlongPathDrawingSetId = set.Id;
         selectedItem = null;
+
+        // Issue #138 — when the user picks a drawing set, drop them into a drawing tool
+        // so they can immediately start painting. Polyline is the natural default (lets
+        // the user click-by-vertex along the path); Rectangle / Oval / FreeDraw still
+        // work if they switch deliberately. Only auto-switch when not already in a
+        // path-drawing tool so we don't yank them out of (say) Rectangle if they prefer.
+        bool inPathTool = currentTool is Tool.Polyline or Tool.Polygon or Tool.FreeDraw
+            or Tool.Rectangle or Tool.Oval;
+        if (!inPathTool)
+        {
+            currentTool = Tool.Polyline;
+        }
     }
 
     private async Task OnDrawingSetRowFieldChangedAsync()
@@ -7379,6 +7396,74 @@ public partial class GardenPlot
 
         editingDrawingSet.PaintAsDrawn = value;
         await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #138 — builds a non-committal preview of where the active drawing set would
+    /// place its rows along the current draft path. Returns the synthesised stamp/stripe
+    /// Shapes for the renderer to draw at reduced opacity. Null when the draft isn't a
+    /// usable path yet (single point, wrong kind, etc.).
+    /// </summary>
+    private IReadOnlyList<Shape>? BuildDrawingSetGhostShapes(Shape draft, AlongPathDrawingSet set)
+    {
+        if (draft is null || set is null)
+        {
+            return null;
+        }
+
+        if (!IsPathShape(draft))
+        {
+            return null;
+        }
+
+        // For points-based drafts, need at least 2 points to form a path. (Polyline tool
+        // produces a FreeDraw ShapeKind; CloseEdge distinguishes open vs closed.)
+        if (draft.Kind == ShapeKind.FreeDraw && draft.Points.Count < 2)
+        {
+            return null;
+        }
+
+        // Resolve rows in render order (reverse) and synthesise the placement.
+        var resolved = new List<(PaletteItem Item, AlongPathRowSpec Spec)>(set.Rows.Count);
+        var renderOrder = GardenPlotWeb.Models.DrawingSetPreview.RenderOrder(set.Rows.Count);
+        foreach (int idx in renderOrder)
+        {
+            AlongPathDrawingSetRow row = set.Rows[idx];
+            PaletteItem? item = ResolvePaletteItemForRow(row);
+            if (item is null)
+            {
+                continue;
+            }
+
+            double width = row.EffectiveWidthFt(item);
+            if (width <= 0)
+            {
+                width = item.WidthFt;
+            }
+
+            resolved.Add((item, new AlongPathRowSpec(width, row.GapFt, row.OffsetFt, row.PhaseAlongFt)));
+        }
+
+        if (resolved.Count == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            // assignNewIds:false so the ghost shapes don't accidentally collide with
+            // anything in the plot if they leak through somewhere (they shouldn't —
+            // we never add them to currentPlot.Shapes).
+            StampPlacement placement = BuildAlongPathPlacementForRows(resolved, draft, assignNewIds: false);
+            return placement.Shapes;
+        }
+        catch
+        {
+            // Defensive: a malformed draft (degenerate ribbon, near-zero length) might
+            // throw inside the placement builder. The ghost preview is purely visual, so
+            // swallow and skip rendering rather than blowing up the page.
+            return null;
+        }
     }
 
     /// <summary>

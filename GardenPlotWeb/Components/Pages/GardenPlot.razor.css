@@ -1056,12 +1056,25 @@
     letter-spacing: 0.03em;
 }
 
+.drawing-set-editor-item-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    overflow: hidden;
+}
+
 .drawing-set-editor-item-code {
     font-size: 0.85rem;
     color: #35523c;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.drawing-set-kind-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
 }
 
 .drawing-set-editor-footer {

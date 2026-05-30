@@ -275,4 +275,56 @@ public sealed class DrawingSetTests
     {
         Assert.False(DrawingSetPreview.HasDepth(null));
     }
+
+    [Fact]
+    public void ItemKindFor_Edging_IsAlwaysLine()
+    {
+        PaletteItem edge = PaletteCatalog.Edging.First();
+        Assert.Equal(DrawingSetPreview.RowItemKind.Line, DrawingSetPreview.ItemKindFor(PaletteKind.Edging, edge));
+    }
+
+    [Fact]
+    public void ItemKindFor_VolumeMaterial_IsVolume()
+    {
+        // Drainage Rock (#57) lives in GroundCoverMaterials with MaterialSoldBy.Volume.
+        PaletteItem rock = PaletteCatalog.FindByCode("Drainage Rock (#57)")!;
+        Assert.NotNull(rock);
+        Assert.Equal(DrawingSetPreview.RowItemKind.Volume, DrawingSetPreview.ItemKindFor(rock.Kind, rock));
+    }
+
+    [Fact]
+    public void ItemKindFor_AreaSurfaceMaterial_IsArea()
+    {
+        // White Clover lives in GroundCoverSurfaceCovers with MaterialSoldBy.Area.
+        PaletteItem? clover = PaletteCatalog.FindByCode("White Clover");
+        Assert.NotNull(clover);
+        Assert.Equal(DrawingSetPreview.RowItemKind.Area, DrawingSetPreview.ItemKindFor(clover!.Kind, clover));
+    }
+
+    [Theory]
+    [InlineData(PaletteKind.Plant)]
+    [InlineData(PaletteKind.Tree)]
+    [InlineData(PaletteKind.Bush)]
+    [InlineData(PaletteKind.BedKit)]
+    [InlineData(PaletteKind.FocalPoint)]
+    [InlineData(PaletteKind.SoilMarker)]
+    [InlineData(PaletteKind.CustomTile)]
+    public void ItemKindFor_StampKinds_AreIndividual(PaletteKind kind)
+    {
+        Assert.Equal(DrawingSetPreview.RowItemKind.Individual, DrawingSetPreview.ItemKindFor(kind, null));
+    }
+
+    [Fact]
+    public void ItemKindFor_GroundCoverWithNullResolved_DefaultsToVolume()
+    {
+        // Fallback path when the catalog item can't be resolved — pessimistically assume
+        // volume since GroundCover historically maps to mulch/gravel/soil.
+        Assert.Equal(DrawingSetPreview.RowItemKind.Volume, DrawingSetPreview.ItemKindFor(PaletteKind.GroundCover, null));
+    }
+
+    [Fact]
+    public void ItemKindFor_GroundCoverSurfaceWithNullResolved_DefaultsToArea()
+    {
+        Assert.Equal(DrawingSetPreview.RowItemKind.Area, DrawingSetPreview.ItemKindFor(PaletteKind.GroundCoverSurface, null));
+    }
 }

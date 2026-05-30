@@ -1098,7 +1098,41 @@ else
                             var showPhase = GardenPlotWeb.Models.DrawingSetPreview.HasPhase(row.PaletteItemKind);
                             var showDepth = GardenPlotWeb.Models.DrawingSetPreview.HasDepth(resolvedForRow);
                             <div class="drawing-set-editor-row">
-                                <span class="drawing-set-editor-item-code" title="@row.PaletteItemKind">@row.PaletteItemCode</span>
+                            <span class="drawing-set-editor-item-cell" title="@row.PaletteItemKind">
+                                @{
+                                    var itemKind = GardenPlotWeb.Models.DrawingSetPreview.ItemKindFor(row.PaletteItemKind, resolvedForRow);
+                                }
+                                @switch (itemKind)
+                                {
+                                    case GardenPlotWeb.Models.DrawingSetPreview.RowItemKind.Individual:
+                                        <svg class="drawing-set-kind-icon" viewBox="0 0 16 16" aria-label="Individual item — discrete copies placed along the path" title="Individual item — discrete copies placed along the path">
+                                            <circle cx="3" cy="8" r="1.5" fill="#5a7a3a" />
+                                            <circle cx="8" cy="8" r="1.5" fill="#5a7a3a" />
+                                            <circle cx="13" cy="8" r="1.5" fill="#5a7a3a" />
+                                        </svg>
+                                        break;
+                                    case GardenPlotWeb.Models.DrawingSetPreview.RowItemKind.Line:
+                                        <svg class="drawing-set-kind-icon" viewBox="0 0 16 16" aria-label="Line item — linear edging material" title="Line item — linear edging material">
+                                            <line x1="1" y1="8" x2="15" y2="8" stroke="#4f5962" stroke-width="2.5" stroke-linecap="round" />
+                                        </svg>
+                                        break;
+                                    case GardenPlotWeb.Models.DrawingSetPreview.RowItemKind.Area:
+                                        <svg class="drawing-set-kind-icon" viewBox="0 0 16 16" aria-label="Area item — surface material (seed mix, living ground cover)" title="Area item — surface material (seed mix, living ground cover)">
+                                            <rect x="2" y="2" width="12" height="12" fill="#7aa657" stroke="#3f6a2d" stroke-width="1" />
+                                            <line x1="2" y1="6" x2="14" y2="6" stroke="#3f6a2d" stroke-width="0.5" stroke-dasharray="1 1" />
+                                            <line x1="2" y1="10" x2="14" y2="10" stroke="#3f6a2d" stroke-width="0.5" stroke-dasharray="1 1" />
+                                        </svg>
+                                        break;
+                                    case GardenPlotWeb.Models.DrawingSetPreview.RowItemKind.Volume:
+                                        <svg class="drawing-set-kind-icon" viewBox="0 0 16 16" aria-label="Volume item — depth-sold material (mulch, gravel, soil)" title="Volume item — depth-sold material (mulch, gravel, soil)">
+                                            <rect x="3" y="6" width="10" height="8" fill="#a89c8a" stroke="#5e5444" stroke-width="1" />
+                                            <polygon points="3,6 6,3 13,3 13,6" fill="#c8b89a" stroke="#5e5444" stroke-width="1" />
+                                            <polygon points="13,6 13,14 16,11 16,3" fill="#8e8472" stroke="#5e5444" stroke-width="1" />
+                                        </svg>
+                                        break;
+                                }
+                                <span class="drawing-set-editor-item-code">@row.PaletteItemCode</span>
+                            </span>
                                 <input class="form-control form-control-sm" type="number" step="0.05" value="@F(row.GapFt)"
                                        @onchange="async (e) => { if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.GapFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
                                 <input class="form-control form-control-sm" type="number" step="0.25" value="@F(row.OffsetFt)"
@@ -1438,6 +1472,42 @@ else
                                 {
                                     <polygon points="@PointsString(polygon)" fill="url(#clip-hatch)" />
                                 }
+                            }
+                        }
+                    </g>
+                }
+
+                @* Issue #138 — ghost preview of the active drawing set's placement while
+                   the user drafts a path. When a set is selected AND PaintAsDrawn is on
+                   AND the draft has enough points to be a usable path, we run the same
+                   along-path placement that the final commit will use, then render its
+                   shapes at reduced opacity so the user can preview "sidewalk + flanking
+                   flowers" forming as they click. *@
+                @if (!IsConceptMode && drafting is not null && GetSelectedDrawingSet() is { } ghostSet
+                    && ghostSet.PaintAsDrawn && ghostSet.Rows.Count > 0
+                    && BuildDrawingSetGhostShapes(drafting, ghostSet) is { Count: > 0 } ghostShapes)
+                {
+                    <g class="drawing-set-ghost" opacity="0.45" pointer-events="none">
+                        @foreach (var ghost in ghostShapes)
+                        {
+                            var fill = ghost.Fill ?? "#8a8276";
+                            var stroke = ghost.Stroke ?? "#3f3a30";
+                            @switch (ghost.Kind)
+                            {
+                                case ShapeKind.Rectangle:
+                                    <rect x="@F(ghost.X)" y="@F(ghost.Y)" width="@F(Math.Abs(ghost.W))" height="@F(Math.Abs(ghost.H))"
+                                          fill="@fill" stroke="@stroke" stroke-width="0.06"
+                                          transform="@($"rotate({F(ghost.Rotation)} {F(ghost.X + ghost.W / 2)} {F(ghost.Y + ghost.H / 2)})")" />
+                                    break;
+                                case ShapeKind.Oval:
+                                    <ellipse cx="@F(ghost.X + ghost.W / 2)" cy="@F(ghost.Y + ghost.H / 2)"
+                                             rx="@F(Math.Abs(ghost.W) / 2)" ry="@F(Math.Abs(ghost.H) / 2)"
+                                             fill="@fill" stroke="@stroke" stroke-width="0.06"
+                                             transform="@($"rotate({F(ghost.Rotation)} {F(ghost.X + ghost.W / 2)} {F(ghost.Y + ghost.H / 2)})")" />
+                                    break;
+                                case ShapeKind.FreeDraw when ghost.Points.Count >= 2:
+                                    <polygon points="@PointsString(ghost.Points)" fill="@fill" stroke="@stroke" stroke-width="0.06" />
+                                    break;
                             }
                         }
                     </g>

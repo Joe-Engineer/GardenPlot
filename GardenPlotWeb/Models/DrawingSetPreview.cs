@@ -90,6 +90,64 @@ public static class DrawingSetPreview
     }
 
     /// <summary>
+    /// Issue #138 — row-kind classification for the editor's tiny inline icon. Four bins:
+    /// Individual (discrete stamps), Line (linear edging), Area (surface seed / living
+    /// cover), Volume (depth-sold materials).
+    /// </summary>
+    public enum RowItemKind
+    {
+        /// <summary>Discrete copies placed at intervals (plants, trees, bushes, BedKits, etc.).</summary>
+        Individual,
+
+        /// <summary>Linear edging materials (steel edge, brick edge, concrete curb).</summary>
+        Line,
+
+        /// <summary>Surface-sold materials (seed mixes, living ground covers).</summary>
+        Area,
+
+        /// <summary>Volume-sold materials (mulch, gravel, soil, rock).</summary>
+        Volume,
+    }
+
+    /// <summary>
+    /// Issue #138 — classifies a row into one of four kinds for the editor's kind icon.
+    /// Uses the resolved palette item's <see cref="PaletteItem.MaterialSoldBy"/> when
+    /// available to disambiguate Volume vs Area for ground-cover-kind rows.
+    /// </summary>
+    /// <param name="kind">The palette kind from the row.</param>
+    /// <param name="resolved">The resolved palette item (may be null).</param>
+    /// <returns>The row's item kind for icon rendering.</returns>
+    public static RowItemKind ItemKindFor(PaletteKind kind, PaletteItem? resolved)
+    {
+        // Edging is always Line — distinct from other stripes.
+        if (kind == PaletteKind.Edging)
+        {
+            return RowItemKind.Line;
+        }
+
+        // Distinguish Volume vs Area for ground-cover rows using the catalog flag.
+        if (kind is PaletteKind.GroundCover or PaletteKind.GroundCoverSurface)
+        {
+            if (resolved is not null && resolved.MaterialSoldBy == MaterialSoldBy.Volume)
+            {
+                return RowItemKind.Volume;
+            }
+
+            if (resolved is not null && resolved.MaterialSoldBy == MaterialSoldBy.Area)
+            {
+                return RowItemKind.Area;
+            }
+
+            // Fallback: GroundCover kind defaults to Volume (historical bias toward
+            // mulch/gravel/soil items), Surface kind defaults to Area.
+            return kind == PaletteKind.GroundCover ? RowItemKind.Volume : RowItemKind.Area;
+        }
+
+        // Everything else is a discrete stamp.
+        return RowItemKind.Individual;
+    }
+
+    /// <summary>
     /// Computes the centres (along-path positions in feet) of stamp copies for a row,
     /// given the path length, effective stamp width, gap, and phase. Stamps are placed
     /// at stride = <paramref name="widthFt"/> + <paramref name="gapFt"/>, starting at
