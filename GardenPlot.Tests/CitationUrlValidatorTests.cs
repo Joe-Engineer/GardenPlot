@@ -104,9 +104,14 @@ public sealed class CitationUrlValidatorTests
     [Fact]
     public void IsSafeForFetch_RelativeUrl_Rejected()
     {
+        // Note: Uri.TryCreate parsing for "/relative/path" differs across platforms.
+        // On Windows it fails the absolute-URI check ("not an absolute URI").
+        // On Linux it parses as file:///relative/path and fails the scheme check
+        // ("scheme 'file' not allowed"). Either rejection reason is acceptable —
+        // the contract is that the URL is rejected, not the specific message.
         var (allow, reason) = CitationUrlValidator.IsSafeForFetch("/relative/path");
         Assert.False(allow);
-        Assert.Contains("absolute", reason!);
+        Assert.NotNull(reason);
     }
 
     [Fact]
