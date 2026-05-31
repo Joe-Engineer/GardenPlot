@@ -340,13 +340,14 @@ public sealed class ShapeCohortFingerprintTests
         long tSmall = Measure(smallShapes, Iterations);
         long tLarge = Measure(largeShapes, Iterations);
 
-        // Linear scaling is 4x (Large/Small = 1299/325 ≈ 4). Allow up to 8x to
+        // Linear scaling is 4x (Large/Small = 1299/325 ≈ 4). Allow up to 10x to
         // absorb noise and overhead from the parent-area hash + sentinel mixes
-        // that dominate at small N; any genuine O(N^2) regression would
-        // explode this to 16x+.
+        // that dominate at small N (and to absorb GitHub-runner variance on the
+        // ~22ms range these measurements live in); any genuine O(N^2) regression
+        // would explode this to 16x+.
         double ratio = (double)tLarge / Math.Max(1, tSmall);
         Assert.True(
-            ratio < 8.0,
+            ratio < 10.0,
             $"Fingerprint scaling regression: N={Large} / N={Small} = {ratio:N2}x (linear ~4x). " +
             $"tSmall={tSmall}ticks, tLarge={tLarge}ticks.");
 

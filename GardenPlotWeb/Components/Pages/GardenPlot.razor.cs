@@ -2797,6 +2797,15 @@ public partial class GardenPlot
         WaterSourceType = item.Kind == PaletteKind.WaterSource ? ParseWaterSourceType(item.Trait) : null,
         MaxFlowGpm = item.Kind == PaletteKind.WaterSource ? ParseFlowFromNotes(item.Notes) : null,
         PressurePsi = item.Kind == PaletteKind.WaterSource ? ParsePressureFromNotes(item.Notes) : null,
+
+        // Issue #161 — carry the irrigation control's type + capacity so the inspector
+        // preview shows the right Type / Outputs row before the user drops it on canvas.
+        IrrigationControlType = item.Kind == PaletteKind.IrrigationControl ? ParseIrrigationControlType(item.Trait) : null,
+        ZoneOutputs = item.Kind == PaletteKind.IrrigationControl ? ParseZoneOutputsFromNotes(item.Notes) : null,
+
+        // Issue #161 — wire conductor count + gauge from Notes ("5 conductor, 18 AWG").
+        ConductorCount = item.Kind == PaletteKind.IrrigationWire ? ParseConductorCountFromNotes(item.Notes) : null,
+        WireGaugeAwg = item.Kind == PaletteKind.IrrigationWire ? ParseWireGaugeFromNotes(item.Notes) : null,
     };
 
     /// <summary>
@@ -5593,6 +5602,8 @@ public partial class GardenPlot
         PaletteCategory.IrrigationHeads => "Irrigation — Heads",
         PaletteCategory.IrrigationPipes => "Irrigation — Pipes",
         PaletteCategory.WaterSources => "Irrigation — Sources",
+        PaletteCategory.IrrigationControls => "Irrigation — Controls",
+        PaletteCategory.IrrigationWires => "Irrigation — Wire",
         _ => k.ToString(),
     };
 
@@ -5611,7 +5622,9 @@ public partial class GardenPlot
             or PaletteCategory.CustomTiles
             or PaletteCategory.IrrigationHeads
             or PaletteCategory.IrrigationPipes
-            or PaletteCategory.WaterSources);
+            or PaletteCategory.WaterSources
+            or PaletteCategory.IrrigationControls
+            or PaletteCategory.IrrigationWires);
     }
 
     private IReadOnlyList<PaletteItem> PaletteItemsForCurrentCategory()
@@ -6531,6 +6544,11 @@ public partial class GardenPlot
             // behaviour. Auto-switch to Polyline so the user can start drawing immediately.
             currentTool = Tool.Polyline;
         }
+        else if (item.Kind == PaletteKind.IrrigationWire)
+        {
+            // Issue #161 — wires use the same polyline drawing UX as pipes.
+            currentTool = Tool.Polyline;
+        }
         else
         {
             currentTool = Tool.Stamp;
@@ -6725,6 +6743,8 @@ public partial class GardenPlot
             PaletteKind.IrrigationHead => PaletteCatalog.IrrigationHeads.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.IrrigationPipe => PaletteCatalog.IrrigationPipes.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.WaterSource => PaletteCatalog.WaterSources.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.IrrigationControl => PaletteCatalog.IrrigationControls.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.IrrigationWire => PaletteCatalog.IrrigationWires.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.BedKit => PaletteCatalog.BedKits.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             // Issue #138 — volume materials (mulch / gravel / soil / rock) live in
             // GroundCoverMaterials and carry MaterialSoldBy.Volume + DefaultDepthIn.
@@ -7748,6 +7768,8 @@ public partial class GardenPlot
         PaletteKind.IrrigationHead => ShapeKind.IrrigationHead,
         PaletteKind.IrrigationPipe => ShapeKind.IrrigationPipe,
         PaletteKind.WaterSource => ShapeKind.WaterSource,
+        PaletteKind.IrrigationControl => ShapeKind.IrrigationControl,
+        PaletteKind.IrrigationWire => ShapeKind.IrrigationWire,
         _ => ShapeKind.BedKit,
     };
 
@@ -7783,6 +7805,24 @@ public partial class GardenPlot
                 : null,
             PressurePsi = item.Kind == PaletteKind.WaterSource
                 ? ParsePressureFromNotes(item.Notes)
+                : null,
+
+            // Issue #161 — irrigation controls carry the control type + zone capacity so
+            // the future zone calculator can validate "heads per zone ≤ controller capacity".
+            IrrigationControlType = item.Kind == PaletteKind.IrrigationControl
+                ? ParseIrrigationControlType(item.Trait)
+                : null,
+            ZoneOutputs = item.Kind == PaletteKind.IrrigationControl
+                ? ParseZoneOutputsFromNotes(item.Notes)
+                : null,
+
+            // Issue #161 — wires carry conductor count + gauge so the BOM can group by
+            // conductor count and total wire-feet per conductor count.
+            ConductorCount = item.Kind == PaletteKind.IrrigationWire
+                ? ParseConductorCountFromNotes(item.Notes)
+                : null,
+            WireGaugeAwg = item.Kind == PaletteKind.IrrigationWire
+                ? ParseWireGaugeFromNotes(item.Notes)
                 : null,
         };
     }
@@ -7828,6 +7868,67 @@ public partial class GardenPlot
         var match = System.Text.RegularExpressions.Regex.Match(notes, @"(\d+(?:\.\d+)?)\s*PSI", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         return match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double psi)
             ? psi
+            : null;
+    }
+
+    /// <summary>Issue #161 — parses 'Controller' / 'Manifold' / 'Valve' / etc. from the catalog trait.</summary>
+    private static IrrigationControlType? ParseIrrigationControlType(string? trait)
+    {
+        return trait switch
+        {
+            "Controller" => GardenPlotWeb.Models.IrrigationControlType.Controller,
+            "Manifold" => GardenPlotWeb.Models.IrrigationControlType.Manifold,
+            "Valve" => GardenPlotWeb.Models.IrrigationControlType.Valve,
+            "Backflow" => GardenPlotWeb.Models.IrrigationControlType.Backflow,
+            "PressureRegulator" => GardenPlotWeb.Models.IrrigationControlType.PressureRegulator,
+            "Filter" => GardenPlotWeb.Models.IrrigationControlType.Filter,
+            "QuickCoupler" => GardenPlotWeb.Models.IrrigationControlType.QuickCoupler,
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Issue #161 — pulls a zone-output / valve-slot count out of the catalog Notes string.
+    /// Catalog patterns: '4 zones', '6 slots'. Returns null on miss.
+    /// </summary>
+    private static int? ParseZoneOutputsFromNotes(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            return null;
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(notes, @"(\d+)\s*(?:zones?|slots?)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success && int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)
+            ? n
+            : null;
+    }
+
+    /// <summary>Issue #161 — pulls conductor count from a wire's Notes string (e.g., '5 conductor, 18 AWG').</summary>
+    private static int? ParseConductorCountFromNotes(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            return null;
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(notes, @"(\d+)\s*conductor", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success && int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)
+            ? n
+            : null;
+    }
+
+    /// <summary>Issue #161 — pulls AWG gauge from a wire's Notes string (e.g., '18 AWG').</summary>
+    private static int? ParseWireGaugeFromNotes(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            return null;
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(notes, @"(\d+)\s*AWG", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success && int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)
+            ? n
             : null;
     }
 
@@ -8670,12 +8771,13 @@ public partial class GardenPlot
                 // baked in. Snap-to-head is applied to the (x, y) BEFORE seeding.
                 {
                     bool draftingPipe = selectedItem is { Kind: PaletteKind.IrrigationPipe };
+                    bool draftingWire = selectedItem is { Kind: PaletteKind.IrrigationWire };
                     if (draftingPipe)
                     {
                         (x, y) = SnapToIrrigationHeadCenter(x, y);
                     }
 
-                    if (drafting is null || (drafting.Kind != ShapeKind.FreeDraw && drafting.Kind != ShapeKind.IrrigationPipe) || !buildingPolygon)
+                    if (drafting is null || (drafting.Kind != ShapeKind.FreeDraw && drafting.Kind != ShapeKind.IrrigationPipe && drafting.Kind != ShapeKind.IrrigationWire) || !buildingPolygon)
                     {
                         if (draftingPipe && selectedItem is { } pipeItem)
                         {
@@ -8687,6 +8789,21 @@ public partial class GardenPlot
                                 Stroke = pipeItem.StrokeColor,
                                 Fill = pipeItem.FillColor,
                                 PipeDiameterIn = pipeItem.WidthFt * 12.0,
+                            };
+                        }
+                        else if (draftingWire && selectedItem is { } wireItem)
+                        {
+                            // Issue #161 — wires use the same polyline drafting path as pipes.
+                            // Conductor count + gauge come from the catalog Notes.
+                            drafting = new Shape
+                            {
+                                Kind = ShapeKind.IrrigationWire,
+                                Label = wireItem.Code,
+                                Trait = wireItem.Trait,
+                                Stroke = wireItem.StrokeColor,
+                                Fill = wireItem.FillColor,
+                                ConductorCount = ParseConductorCountFromNotes(wireItem.Notes),
+                                WireGaugeAwg = ParseWireGaugeFromNotes(wireItem.Notes),
                             };
                         }
                         else
@@ -12025,6 +12142,129 @@ public partial class GardenPlot
         await SaveAsync();
     }
 
+    /// <summary>Issue #161 — change an irrigation control's type via the inspector dropdown.</summary>
+    private async Task OnIrrigationControlTypeChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw) || !Enum.TryParse<IrrigationControlType>(raw, out var type))
+        {
+            return;
+        }
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationControl)
+            {
+                shape.IrrigationControlType = type;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #161 — change an irrigation control's zone-output / valve-slot count.</summary>
+    private async Task OnIrrigationControlZonesChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        int? value = string.IsNullOrWhiteSpace(raw)
+            ? null
+            : int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ? parsed : (int?)null;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationControl)
+            {
+                shape.ZoneOutputs = value;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #161 — set a valve's zone label (e.g., 'Zone 1', 'Front lawn').</summary>
+    private async Task OnIrrigationControlZoneLabelChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationControl)
+            {
+                shape.ZoneLabel = string.IsNullOrWhiteSpace(raw) ? null : raw;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #161 — change an irrigation wire's conductor count.</summary>
+    private async Task OnIrrigationWireConductorsChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        int? value = string.IsNullOrWhiteSpace(raw)
+            ? null
+            : int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ? parsed : (int?)null;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationWire)
+            {
+                shape.ConductorCount = value;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #161 — change an irrigation wire's AWG gauge.</summary>
+    private async Task OnIrrigationWireGaugeChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        int? value = string.IsNullOrWhiteSpace(raw)
+            ? null
+            : int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ? parsed : (int?)null;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationWire)
+            {
+                shape.WireGaugeAwg = value;
+            }
+        }
+
+        await SaveAsync();
+    }
+
     private async Task SetShapeRotationAsync(IReadOnlyList<Shape> shapes, double normalizedDegrees)
     {
         if (shapes.Count == 0)
@@ -13634,6 +13874,8 @@ public partial class GardenPlot
             ShapeKind.IrrigationHead => $"Irrigation Head · {s.Label}",
             ShapeKind.IrrigationPipe => $"Irrigation Pipe · {s.Label}",
             ShapeKind.WaterSource => $"Water Source · {s.Label}",
+            ShapeKind.IrrigationControl => $"Irrigation Control · {s.Label}",
+            ShapeKind.IrrigationWire => $"Irrigation Wire · {s.Label}",
             _ => "Item",
         };
     }

@@ -182,6 +182,18 @@ internal static class ShapeCohortFingerprint
         h = MixD(h, s.MaxFlowGpm ?? 0.0);
         h = MixD(h, s.PressurePsi ?? 0.0);
 
+        // Issue #161 — irrigation control type / zone capacity / zone label. Inspector edits
+        // (reclassify to another control type, change zone count, rename zone) need to redraw
+        // the canvas icon AND the zone-label badge.
+        h = Mix(h, (int)(s.IrrigationControlType ?? Models.IrrigationControlType.Controller));
+        h = Mix(h, s.ZoneOutputs ?? 0);
+        h = MixS(h, s.ZoneLabel);
+
+        // Issue #161 — wire conductor count / gauge. Changing these in the inspector should
+        // also refresh any badge / hover label rendered on the polyline.
+        h = Mix(h, s.ConductorCount ?? 0);
+        h = Mix(h, s.WireGaugeAwg ?? 0);
+
         return h;
     }
 

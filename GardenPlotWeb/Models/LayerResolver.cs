@@ -103,6 +103,8 @@ public static class LayerResolver
             ShapeKind.IrrigationHead => LayerKeys.Irrigation,
             ShapeKind.IrrigationPipe => LayerKeys.Irrigation,
             ShapeKind.WaterSource => LayerKeys.Irrigation,
+            ShapeKind.IrrigationControl => LayerKeys.Irrigation,
+            ShapeKind.IrrigationWire => LayerKeys.Irrigation,
             _ => LayerKeys.Notes,
         };
     }
@@ -140,6 +142,8 @@ public static class LayerResolver
             PaletteKind.IrrigationHead => LayerKeys.Irrigation,
             PaletteKind.IrrigationPipe => LayerKeys.Irrigation,
             PaletteKind.WaterSource => LayerKeys.Irrigation,
+            PaletteKind.IrrigationControl => LayerKeys.Irrigation,
+            PaletteKind.IrrigationWire => LayerKeys.Irrigation,
             _ => null,
         };
     }

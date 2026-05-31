@@ -181,6 +181,8 @@ public partial class Calendar
             ShapeKind.IrrigationHead => string.IsNullOrWhiteSpace(shape.Label) ? "Irrigation head" : $"Irrigation head · {shape.Label}",
             ShapeKind.IrrigationPipe => string.IsNullOrWhiteSpace(shape.Label) ? "Irrigation pipe" : $"Irrigation pipe · {shape.Label}",
             ShapeKind.WaterSource => string.IsNullOrWhiteSpace(shape.Label) ? "Water source" : $"Water source · {shape.Label}",
+            ShapeKind.IrrigationControl => string.IsNullOrWhiteSpace(shape.Label) ? "Irrigation control" : $"Irrigation control · {shape.Label}",
+            ShapeKind.IrrigationWire => string.IsNullOrWhiteSpace(shape.Label) ? "Irrigation wire" : $"Irrigation wire · {shape.Label}",
             _ => throw new ArgumentOutOfRangeException(nameof(shape), shape.Kind, null),
         };
     }

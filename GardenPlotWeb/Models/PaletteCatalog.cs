@@ -267,6 +267,61 @@ public static class PaletteCatalog
         new("Pump (1 HP)", PaletteKind.WaterSource, 2.0, 2.0, "Pump", Notes: "20 GPM at 80 PSI", StrokeColor: "#5a4a1f", FillColor: "#d9c89a"),
     ];
 
+    /// <summary>
+    /// Issue #161 — irrigation control elements: timers, manifolds, valves, backflow preventers,
+    /// pressure regulators, filters, and quick-couplers. Numeric metadata (zone outputs / valve
+    /// slots) is parsed from the <see cref="PaletteItem.Notes"/> string at stamp time.
+    /// </summary>
+    public static readonly PaletteItem[] IrrigationControls =
+    [
+        // Controllers — brain of the system, zone-output count drives capacity
+        new("Controller (4-zone)", PaletteKind.IrrigationControl, 1.0, 0.6, "Controller", Notes: "4 zones", StrokeColor: "#2c2c2c", FillColor: "#bdbdbd"),
+        new("Controller (6-zone)", PaletteKind.IrrigationControl, 1.0, 0.7, "Controller", Notes: "6 zones", StrokeColor: "#2c2c2c", FillColor: "#bdbdbd"),
+        new("Controller (8-zone)", PaletteKind.IrrigationControl, 1.2, 0.8, "Controller", Notes: "8 zones", StrokeColor: "#2c2c2c", FillColor: "#bdbdbd"),
+        new("Controller (12-zone)", PaletteKind.IrrigationControl, 1.4, 0.9, "Controller", Notes: "12 zones", StrokeColor: "#2c2c2c", FillColor: "#bdbdbd"),
+        new("Controller (16-zone)", PaletteKind.IrrigationControl, 1.6, 1.0, "Controller", Notes: "16 zones", StrokeColor: "#2c2c2c", FillColor: "#bdbdbd"),
+
+        // Manifolds — valve hubs (slot count drives valve capacity)
+        new("Manifold (3-slot)", PaletteKind.IrrigationControl, 1.2, 0.5, "Manifold", Notes: "3 slots", StrokeColor: "#3a3a3a", FillColor: "#c9d6e2"),
+        new("Manifold (4-slot)", PaletteKind.IrrigationControl, 1.5, 0.5, "Manifold", Notes: "4 slots", StrokeColor: "#3a3a3a", FillColor: "#c9d6e2"),
+        new("Manifold (6-slot)", PaletteKind.IrrigationControl, 2.0, 0.5, "Manifold", Notes: "6 slots", StrokeColor: "#3a3a3a", FillColor: "#c9d6e2"),
+
+        // Zone valves — one per irrigation zone
+        new("Zone Valve (¾\")", PaletteKind.IrrigationControl, 0.5, 0.5, "Valve", Notes: "¾\" solenoid", StrokeColor: "#7a3a1f", FillColor: "#e0b89a"),
+        new("Zone Valve (1\")", PaletteKind.IrrigationControl, 0.6, 0.6, "Valve", Notes: "1\" solenoid", StrokeColor: "#7a3a1f", FillColor: "#e0b89a"),
+
+        // Backflow preventers — required on potable supply
+        new("Backflow (PVB)", PaletteKind.IrrigationControl, 1.0, 0.8, "Backflow", Notes: "Pressure Vacuum Breaker", StrokeColor: "#4a1f4a", FillColor: "#c8a8d4"),
+        new("Backflow (RPZ)", PaletteKind.IrrigationControl, 1.2, 0.8, "Backflow", Notes: "Reduced-Pressure Zone", StrokeColor: "#4a1f4a", FillColor: "#c8a8d4"),
+        new("Backflow (Double-Check)", PaletteKind.IrrigationControl, 1.0, 0.6, "Backflow", Notes: "Double-Check Assembly", StrokeColor: "#4a1f4a", FillColor: "#c8a8d4"),
+
+        // Pressure regulators — step source pressure down for drip / micro-spray
+        new("Pressure Regulator (25 PSI)", PaletteKind.IrrigationControl, 0.6, 0.6, "PressureRegulator", Notes: "25 PSI drip", StrokeColor: "#1f5a4a", FillColor: "#a0d4c0"),
+        new("Pressure Regulator (30 PSI)", PaletteKind.IrrigationControl, 0.6, 0.6, "PressureRegulator", Notes: "30 PSI", StrokeColor: "#1f5a4a", FillColor: "#a0d4c0"),
+        new("Pressure Regulator (45 PSI)", PaletteKind.IrrigationControl, 0.6, 0.6, "PressureRegulator", Notes: "45 PSI", StrokeColor: "#1f5a4a", FillColor: "#a0d4c0"),
+
+        // Filters — mesh count protects emitters
+        new("Filter (100 mesh)", PaletteKind.IrrigationControl, 0.6, 0.6, "Filter", Notes: "100 mesh", StrokeColor: "#5a5a1f", FillColor: "#d6d49a"),
+        new("Filter (150 mesh)", PaletteKind.IrrigationControl, 0.6, 0.6, "Filter", Notes: "150 mesh", StrokeColor: "#5a5a1f", FillColor: "#d6d49a"),
+        new("Filter (200 mesh)", PaletteKind.IrrigationControl, 0.6, 0.6, "Filter", Notes: "200 mesh", StrokeColor: "#5a5a1f", FillColor: "#d6d49a"),
+
+        // Quick-couplers — standalone hose outlet
+        new("Quick-Coupler", PaletteKind.IrrigationControl, 0.5, 0.5, "QuickCoupler", Notes: "1\" standard", StrokeColor: "#3a5a7a", FillColor: "#a8c4d6"),
+    ];
+
+    /// <summary>
+    /// Issue #161 — irrigation control wire: multi-conductor low-voltage wire from the
+    /// controller to each zone valve. Drawn as a polyline. Notes carry conductor count + gauge
+    /// for BOM rollup of wire-foot.
+    /// </summary>
+    public static readonly PaletteItem[] IrrigationWires =
+    [
+        new("Wire (5-conductor 18 AWG)", PaletteKind.IrrigationWire, 0.25 / 12.0, 0.25 / 12.0, "Wire", Notes: "5 conductor, 18 AWG", StrokeColor: "#7a1f4a", FillColor: "#d4a8c0"),
+        new("Wire (7-conductor 18 AWG)", PaletteKind.IrrigationWire, 0.30 / 12.0, 0.30 / 12.0, "Wire", Notes: "7 conductor, 18 AWG", StrokeColor: "#7a1f4a", FillColor: "#d4a8c0"),
+        new("Wire (9-conductor 18 AWG)", PaletteKind.IrrigationWire, 0.35 / 12.0, 0.35 / 12.0, "Wire", Notes: "9 conductor, 18 AWG", StrokeColor: "#7a1f4a", FillColor: "#d4a8c0"),
+        new("Wire (13-conductor 18 AWG)", PaletteKind.IrrigationWire, 0.45 / 12.0, 0.45 / 12.0, "Wire", Notes: "13 conductor, 18 AWG", StrokeColor: "#7a1f4a", FillColor: "#d4a8c0"),
+    ];
+
     public static IReadOnlyList<PaletteItem> For(PaletteKind kind)
     {
         return kind switch
@@ -284,6 +339,8 @@ public static class PaletteCatalog
             PaletteKind.IrrigationHead => IrrigationHeads,
             PaletteKind.IrrigationPipe => IrrigationPipes,
             PaletteKind.WaterSource => WaterSources,
+            PaletteKind.IrrigationControl => IrrigationControls,
+            PaletteKind.IrrigationWire => IrrigationWires,
             _ => [],
         };
     }
@@ -766,6 +823,8 @@ public static class PaletteCatalog
             IrrigationHeads,
             IrrigationPipes,
             WaterSources,
+            IrrigationControls,
+            IrrigationWires,
         ];
 
         foreach (PaletteItem[] bucket in buckets)
@@ -824,6 +883,8 @@ public static class PaletteCatalog
             PaletteCategory.IrrigationHeads => IrrigationHeads,
             PaletteCategory.IrrigationPipes => IrrigationPipes,
             PaletteCategory.WaterSources => WaterSources,
+            PaletteCategory.IrrigationControls => IrrigationControls,
+            PaletteCategory.IrrigationWires => IrrigationWires,
             PaletteCategory.GrassesTurf => [.. Grasses.Where(g => g.Kind == PaletteKind.GroundCoverSurface)],
             PaletteCategory.GrassesOrnamental => [.. Grasses.Where(g => string.Equals(g.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(IsOrnamentalGrassSurfaceItem))],
             PaletteCategory.Succulents => [.. Plants.Where(p => string.Equals(p.Trait, "succulent", StringComparison.OrdinalIgnoreCase))],
@@ -905,6 +966,8 @@ public static class PaletteCatalog
             PaletteKind.IrrigationHead => PaletteCategory.IrrigationHeads,
             PaletteKind.IrrigationPipe => PaletteCategory.IrrigationPipes,
             PaletteKind.WaterSource => PaletteCategory.WaterSources,
+            PaletteKind.IrrigationControl => PaletteCategory.IrrigationControls,
+            PaletteKind.IrrigationWire => PaletteCategory.IrrigationWires,
             _ => PaletteCategory.BedKits,
         };
     }

@@ -329,6 +329,106 @@
                 }
 
                 break;
+            case ShapeKind.IrrigationControl:
+                @* Issue #161 — irrigation control: distinct icon per control type. All centered
+                   at the shape's bbox center; W/H = icon footprint from the catalog. *@
+                {
+                    var ctrlCx = s.X + s.W / 2;
+                    var ctrlCy = s.Y + s.H / 2;
+                    var ctrlMin = Math.Min(s.W, s.H);
+                    var ctrlFill = s.Fill ?? "#bdbdbd";
+                    var ctrlStroke = s.Stroke ?? "#2c2c2c";
+                    var ctrlType = s.IrrigationControlType;
+                    if (ctrlType == GardenPlotWeb.Models.IrrigationControlType.Controller)
+                    {
+                        @* Controller: dark housing + display strip + status LED. *@
+                        <rect x="@GardenPlot.F(s.X)" y="@GardenPlot.F(s.Y)"
+                              width="@GardenPlot.F(s.W)" height="@GardenPlot.F(s.H)"
+                              fill="@ctrlFill" stroke="@ctrlStroke" stroke-width="0.06" rx="@GardenPlot.F(ctrlMin * 0.1)" />
+                        <rect x="@GardenPlot.F(s.X + s.W * 0.15)" y="@GardenPlot.F(s.Y + s.H * 0.2)"
+                              width="@GardenPlot.F(s.W * 0.7)" height="@GardenPlot.F(s.H * 0.3)"
+                              fill="#1a1a2a" />
+                        <circle cx="@GardenPlot.F(s.X + s.W * 0.85)" cy="@GardenPlot.F(s.Y + s.H * 0.75)"
+                                r="@GardenPlot.F(ctrlMin * 0.08)" fill="#5cb85c" />
+                    }
+                    else if (ctrlType == GardenPlotWeb.Models.IrrigationControlType.Manifold)
+                    {
+                        @* Manifold: horizontal bar with N circles for valve slots. *@
+                        var slots = s.ZoneOutputs ?? 4;
+                        if (slots < 1) { slots = 1; }
+                        <rect x="@GardenPlot.F(s.X)" y="@GardenPlot.F(s.Y)"
+                              width="@GardenPlot.F(s.W)" height="@GardenPlot.F(s.H)"
+                              fill="@ctrlFill" stroke="@ctrlStroke" stroke-width="0.06" rx="@GardenPlot.F(ctrlMin * 0.15)" />
+                        @for (int slotIdx = 0; slotIdx < slots; slotIdx++)
+                        {
+                            var slotCx = s.X + s.W * ((slotIdx + 0.5) / slots);
+                            <circle cx="@GardenPlot.F(slotCx)" cy="@GardenPlot.F(ctrlCy)"
+                                    r="@GardenPlot.F(ctrlMin * 0.18)" fill="@ctrlStroke" />
+                        }
+                    }
+                    else if (ctrlType == GardenPlotWeb.Models.IrrigationControlType.Valve)
+                    {
+                        @* Valve: solenoid symbol (circle with diagonal slash + small box on top). *@
+                        <circle cx="@GardenPlot.F(ctrlCx)" cy="@GardenPlot.F(ctrlCy)" r="@GardenPlot.F(ctrlMin * 0.45)"
+                                fill="@ctrlFill" stroke="@ctrlStroke" stroke-width="0.06" />
+                        <path d="M @GardenPlot.F(ctrlCx - ctrlMin * 0.3) @GardenPlot.F(ctrlCy - ctrlMin * 0.3) L @GardenPlot.F(ctrlCx + ctrlMin * 0.3) @GardenPlot.F(ctrlCy + ctrlMin * 0.3)"
+                              stroke="@ctrlStroke" stroke-width="0.05" />
+                        <rect x="@GardenPlot.F(ctrlCx - ctrlMin * 0.15)" y="@GardenPlot.F(s.Y)"
+                              width="@GardenPlot.F(ctrlMin * 0.3)" height="@GardenPlot.F(ctrlMin * 0.15)"
+                              fill="@ctrlStroke" />
+                    }
+                    else if (ctrlType == GardenPlotWeb.Models.IrrigationControlType.Backflow)
+                    {
+                        @* Backflow: hourglass / bow-tie shape (matches industry symbol). *@
+                        <path d="M @GardenPlot.F(s.X) @GardenPlot.F(s.Y) L @GardenPlot.F(s.X + s.W) @GardenPlot.F(s.Y + s.H) L @GardenPlot.F(s.X + s.W) @GardenPlot.F(s.Y) L @GardenPlot.F(s.X) @GardenPlot.F(s.Y + s.H) Z"
+                              fill="@ctrlFill" stroke="@ctrlStroke" stroke-width="0.06" />
+                    }
+                    else if (ctrlType == GardenPlotWeb.Models.IrrigationControlType.PressureRegulator)
+                    {
+                        @* Pressure regulator: downward-pointing funnel (high → low pressure). *@
+                        <path d="M @GardenPlot.F(s.X) @GardenPlot.F(s.Y) L @GardenPlot.F(s.X + s.W) @GardenPlot.F(s.Y) L @GardenPlot.F(ctrlCx + ctrlMin * 0.2) @GardenPlot.F(s.Y + s.H * 0.6) L @GardenPlot.F(ctrlCx + ctrlMin * 0.2) @GardenPlot.F(s.Y + s.H) L @GardenPlot.F(ctrlCx - ctrlMin * 0.2) @GardenPlot.F(s.Y + s.H) L @GardenPlot.F(ctrlCx - ctrlMin * 0.2) @GardenPlot.F(s.Y + s.H * 0.6) Z"
+                              fill="@ctrlFill" stroke="@ctrlStroke" stroke-width="0.06" />
+                    }
+                    else if (ctrlType == GardenPlotWeb.Models.IrrigationControlType.Filter)
+                    {
+                        @* Filter: circle with mesh / cross-hatch pattern. *@
+                        <circle cx="@GardenPlot.F(ctrlCx)" cy="@GardenPlot.F(ctrlCy)" r="@GardenPlot.F(ctrlMin * 0.45)"
+                                fill="@ctrlFill" stroke="@ctrlStroke" stroke-width="0.06" />
+                        <path d="M @GardenPlot.F(ctrlCx - ctrlMin * 0.35) @GardenPlot.F(ctrlCy) L @GardenPlot.F(ctrlCx + ctrlMin * 0.35) @GardenPlot.F(ctrlCy) M @GardenPlot.F(ctrlCx) @GardenPlot.F(ctrlCy - ctrlMin * 0.35) L @GardenPlot.F(ctrlCx) @GardenPlot.F(ctrlCy + ctrlMin * 0.35) M @GardenPlot.F(ctrlCx - ctrlMin * 0.25) @GardenPlot.F(ctrlCy - ctrlMin * 0.25) L @GardenPlot.F(ctrlCx + ctrlMin * 0.25) @GardenPlot.F(ctrlCy + ctrlMin * 0.25) M @GardenPlot.F(ctrlCx - ctrlMin * 0.25) @GardenPlot.F(ctrlCy + ctrlMin * 0.25) L @GardenPlot.F(ctrlCx + ctrlMin * 0.25) @GardenPlot.F(ctrlCy - ctrlMin * 0.25)"
+                              stroke="@ctrlStroke" stroke-width="0.04" />
+                    }
+                    else if (ctrlType == GardenPlotWeb.Models.IrrigationControlType.QuickCoupler)
+                    {
+                        @* Quick-coupler: socket — outer ring + inner ring + center dot. *@
+                        <circle cx="@GardenPlot.F(ctrlCx)" cy="@GardenPlot.F(ctrlCy)" r="@GardenPlot.F(ctrlMin * 0.45)"
+                                fill="@ctrlFill" stroke="@ctrlStroke" stroke-width="0.06" />
+                        <circle cx="@GardenPlot.F(ctrlCx)" cy="@GardenPlot.F(ctrlCy)" r="@GardenPlot.F(ctrlMin * 0.28)"
+                                fill="none" stroke="@ctrlStroke" stroke-width="0.04" />
+                        <circle cx="@GardenPlot.F(ctrlCx)" cy="@GardenPlot.F(ctrlCy)" r="@GardenPlot.F(ctrlMin * 0.12)"
+                                fill="@ctrlStroke" />
+                    }
+                    else
+                    {
+                        @* Fallback: plain rounded rect. *@
+                        <rect x="@GardenPlot.F(s.X)" y="@GardenPlot.F(s.Y)"
+                              width="@GardenPlot.F(s.W)" height="@GardenPlot.F(s.H)"
+                              fill="@ctrlFill" stroke="@ctrlStroke" stroke-width="0.06" rx="@GardenPlot.F(ctrlMin * 0.15)" />
+                    }
+                }
+
+                break;
+            case ShapeKind.IrrigationWire:
+                @* Issue #161 — irrigation wire as a thin dashed polyline. Stroke is thinner
+                   than the slimmest pipe so wire doesn't compete visually with plumbing. *@
+                @if (s.Points.Count >= 2)
+                {
+                    string wireColor = s.Stroke ?? "#7a1f4a";
+                    <polyline points="@GardenPlot.PointsString(s.Points)"
+                              fill="none" stroke="@wireColor" stroke-width="0.05"
+                              stroke-dasharray="0.18,0.12" stroke-linecap="round" stroke-linejoin="round" />
+                }
+
+                break;
         }
         @if (!IsConceptMode && SelectedIds.Contains(s.Id))
         {
