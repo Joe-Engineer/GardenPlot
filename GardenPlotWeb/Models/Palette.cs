@@ -24,6 +24,9 @@ public enum ShapeKind
 
     /// <summary>Issue #159 — irrigation pipe (PVC / poly / copper laterals + mains + drip supply).</summary>
     IrrigationPipe,
+
+    /// <summary>Issue #160 — water source anchor (faucet / spring / pump).</summary>
+    WaterSource,
 }
 
 public record struct Point(double X, double Y);
@@ -46,6 +49,9 @@ public enum PaletteKind
 
     /// <summary>Issue #159 — irrigation pipe palette (mains / laterals / drip supply).</summary>
     IrrigationPipe,
+
+    /// <summary>Issue #160 — water source palette (faucet / spring / pump).</summary>
+    WaterSource,
 }
 
 public static class LayerKeys
@@ -112,6 +118,9 @@ public enum PaletteCategory
 
     /// <summary>Issue #159 — irrigation pipe catalog (mains / laterals / drip supply).</summary>
     IrrigationPipes,
+
+    /// <summary>Issue #160 — water source catalog (faucet / spring / pump).</summary>
+    WaterSources,
 }
 
 /// <summary>

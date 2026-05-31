@@ -102,6 +102,7 @@ public static class LayerResolver
             ShapeKind.SoilMarker => LayerKeys.Measurement,
             ShapeKind.IrrigationHead => LayerKeys.Irrigation,
             ShapeKind.IrrigationPipe => LayerKeys.Irrigation,
+            ShapeKind.WaterSource => LayerKeys.Irrigation,
             _ => LayerKeys.Notes,
         };
     }
@@ -138,6 +139,7 @@ public static class LayerResolver
             PaletteKind.CustomTile => ResolveCustomTileLayer(item),
             PaletteKind.IrrigationHead => LayerKeys.Irrigation,
             PaletteKind.IrrigationPipe => LayerKeys.Irrigation,
+            PaletteKind.WaterSource => LayerKeys.Irrigation,
             _ => null,
         };
     }

@@ -2791,6 +2791,12 @@ public partial class GardenPlot
         // Issue #159 — carry the pipe's nominal diameter (catalog WidthFt encodes feet =
         // inches/12) so the inspector preview shows the right Diameter row.
         PipeDiameterIn = item.Kind == PaletteKind.IrrigationPipe ? item.WidthFt * 12 : null,
+
+        // Issue #160 — carry the water-source type + parsed flow/pressure so the
+        // inspector preview shows them before the user drops the source on canvas.
+        WaterSourceType = item.Kind == PaletteKind.WaterSource ? ParseWaterSourceType(item.Trait) : null,
+        MaxFlowGpm = item.Kind == PaletteKind.WaterSource ? ParseFlowFromNotes(item.Notes) : null,
+        PressurePsi = item.Kind == PaletteKind.WaterSource ? ParsePressureFromNotes(item.Notes) : null,
     };
 
     /// <summary>
@@ -5586,6 +5592,7 @@ public partial class GardenPlot
         PaletteCategory.GroundCoverAssemblies => "Materials — Assemblies",
         PaletteCategory.IrrigationHeads => "Irrigation — Heads",
         PaletteCategory.IrrigationPipes => "Irrigation — Pipes",
+        PaletteCategory.WaterSources => "Irrigation — Sources",
         _ => k.ToString(),
     };
 
@@ -5603,7 +5610,8 @@ public partial class GardenPlot
             or PaletteCategory.SoilMarkers
             or PaletteCategory.CustomTiles
             or PaletteCategory.IrrigationHeads
-            or PaletteCategory.IrrigationPipes);
+            or PaletteCategory.IrrigationPipes
+            or PaletteCategory.WaterSources);
     }
 
     private IReadOnlyList<PaletteItem> PaletteItemsForCurrentCategory()
@@ -6716,6 +6724,7 @@ public partial class GardenPlot
             PaletteKind.SoilMarker => PaletteCatalog.SoilMarkers.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.IrrigationHead => PaletteCatalog.IrrigationHeads.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.IrrigationPipe => PaletteCatalog.IrrigationPipes.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.WaterSource => PaletteCatalog.WaterSources.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.BedKit => PaletteCatalog.BedKits.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             // Issue #138 — volume materials (mulch / gravel / soil / rock) live in
             // GroundCoverMaterials and carry MaterialSoldBy.Volume + DefaultDepthIn.
@@ -7738,6 +7747,7 @@ public partial class GardenPlot
         PaletteKind.Edging => ShapeKind.Edge,
         PaletteKind.IrrigationHead => ShapeKind.IrrigationHead,
         PaletteKind.IrrigationPipe => ShapeKind.IrrigationPipe,
+        PaletteKind.WaterSource => ShapeKind.WaterSource,
         _ => ShapeKind.BedKit,
     };
 
@@ -7762,7 +7772,63 @@ public partial class GardenPlot
             // Issue #31 Phase A — irrigation heads carry their coverage arc on the shape
             // so a stamped head can be edited independently of the catalog.
             ArcDegrees = item.ArcDegrees,
+
+            // Issue #160 — water sources carry their type + flow/pressure on the shape
+            // so the future zone calculator can read them per-instance.
+            WaterSourceType = item.Kind == PaletteKind.WaterSource
+                ? ParseWaterSourceType(item.Trait)
+                : null,
+            MaxFlowGpm = item.Kind == PaletteKind.WaterSource
+                ? ParseFlowFromNotes(item.Notes)
+                : null,
+            PressurePsi = item.Kind == PaletteKind.WaterSource
+                ? ParsePressureFromNotes(item.Notes)
+                : null,
         };
+    }
+
+    /// <summary>Issue #160 — parses 'Faucet' / 'Spring' / 'Pump' from the catalog trait.</summary>
+    private static WaterSourceType? ParseWaterSourceType(string? trait)
+    {
+        return trait switch
+        {
+            "Faucet" => GardenPlotWeb.Models.WaterSourceType.Faucet,
+            "Spring" => GardenPlotWeb.Models.WaterSourceType.Spring,
+            "Pump" => GardenPlotWeb.Models.WaterSourceType.Pump,
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Issue #160 — pulls a GPM value out of the catalog Notes string. Catalog uses
+    /// patterns like '10 GPM at 50 PSI', '2 GPM, gravity-fed'. Returns null when no
+    /// number-then-GPM pair is found.
+    /// </summary>
+    private static double? ParseFlowFromNotes(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            return null;
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(notes, @"(\d+(?:\.\d+)?)\s*GPM", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double gpm)
+            ? gpm
+            : null;
+    }
+
+    /// <summary>Issue #160 — pulls a PSI value out of the catalog Notes string.</summary>
+    private static double? ParsePressureFromNotes(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            return null;
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(notes, @"(\d+(?:\.\d+)?)\s*PSI", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double psi)
+            ? psi
+            : null;
     }
 
     private sealed class StampPlacement
@@ -11883,6 +11949,82 @@ public partial class GardenPlot
         await SaveAsync();
     }
 
+    /// <summary>Issue #160 — change a water source's type via the inspector dropdown.</summary>
+    private async Task OnWaterSourceTypeChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        if (!Enum.TryParse<WaterSourceType>(raw, out var type))
+        {
+            return;
+        }
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.WaterSource)
+            {
+                shape.WaterSourceType = type;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #160 — change a water source's max flow (GPM) via the inspector input.</summary>
+    private async Task OnWaterSourceFlowChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        double? value = string.IsNullOrWhiteSpace(raw)
+            ? null
+            : double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) ? parsed : (double?)null;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.WaterSource)
+            {
+                shape.MaxFlowGpm = value;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #160 — change a water source's pressure (PSI) via the inspector input.</summary>
+    private async Task OnWaterSourcePsiChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        double? value = string.IsNullOrWhiteSpace(raw)
+            ? null
+            : double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) ? parsed : (double?)null;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.WaterSource)
+            {
+                shape.PressurePsi = value;
+            }
+        }
+
+        await SaveAsync();
+    }
+
     private async Task SetShapeRotationAsync(IReadOnlyList<Shape> shapes, double normalizedDegrees)
     {
         if (shapes.Count == 0)
@@ -13491,6 +13633,7 @@ public partial class GardenPlot
             ShapeKind.RectRuler => "Rectangle Ruler",
             ShapeKind.IrrigationHead => $"Irrigation Head · {s.Label}",
             ShapeKind.IrrigationPipe => $"Irrigation Pipe · {s.Label}",
+            ShapeKind.WaterSource => $"Water Source · {s.Label}",
             _ => "Item",
         };
     }

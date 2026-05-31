@@ -917,6 +917,7 @@ else
                                 : "linear · lf",
                             PaletteKind.IrrigationHead => $"{item.WidthFt:0.#}' Ø · {item.Trait}",
                             PaletteKind.IrrigationPipe => $"{item.WidthFt * 12:0.##}\" Ø · {item.Trait}",
+                            PaletteKind.WaterSource => $"{item.Trait} · {item.Notes}",
                             _ => $"{item.WidthFt:0.#}' Ø · {item.Trait}",
                         };
                         <button class="palette-item @(isActive ? "active" : "")"
@@ -2981,6 +2982,70 @@ else
                         @if (isPreview)
                         {
                             <div class="x-small text-muted mt-1">Polyline tool is active — click to start drawing this pipe; double-click to finish. Cursor snaps to nearby head centers.</div>
+                        }
+                    </div>
+                }
+
+                @* Issue #160 — water source detail panel. Shows the source type, palette
+                   code, parsed flow + pressure. Type dropdown lets the user swap the
+                   source kind post-stamp; numeric inputs override the parsed values. *@
+                @if (single!.Kind == ShapeKind.WaterSource)
+                {
+                    var srcType = single!.WaterSourceType;
+                    var srcFlow = single!.MaxFlowGpm;
+                    var srcPsi = single!.PressurePsi;
+                    var srcSelectedArray = new[] { single! };
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Water Source</div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Type:</span>
+                            <strong>@(single!.Label ?? "(unnamed source)")</strong>
+                        </div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Notes:</span>
+                            @if (PaletteCatalog.FindByCode(single!.Label ?? string.Empty) is { } srcCatalog && !string.IsNullOrWhiteSpace(srcCatalog.Notes))
+                            {
+                                <strong>@srcCatalog.Notes</strong>
+                            }
+                            else
+                            {
+                                <span class="text-muted">(none)</span>
+                            }
+                        </div>
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Kind:</span>
+                            <select class="form-select form-select-sm" style="max-width: 8rem;"
+                                    value="@(srcType?.ToString() ?? string.Empty)"
+                                    disabled="@isPreview"
+                                    @onchange="(e) => OnWaterSourceTypeChanged(srcSelectedArray, e)">
+                                <option value="@GardenPlotWeb.Models.WaterSourceType.Faucet">Faucet</option>
+                                <option value="@GardenPlotWeb.Models.WaterSourceType.Spring">Spring</option>
+                                <option value="@GardenPlotWeb.Models.WaterSourceType.Pump">Pump</option>
+                            </select>
+                        </div>
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Max flow:</span>
+                            <input type="number" min="0" step="0.5" class="form-control form-control-sm" style="max-width: 6rem;"
+                                   value="@(srcFlow is double f ? F(f) : string.Empty)"
+                                   disabled="@isPreview"
+                                   @onchange="(e) => OnWaterSourceFlowChanged(srcSelectedArray, e)" />
+                            <span class="small text-muted">GPM</span>
+                        </div>
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Pressure:</span>
+                            <input type="number" min="0" step="1" class="form-control form-control-sm" style="max-width: 6rem;"
+                                   value="@(srcPsi is double p ? F(p) : string.Empty)"
+                                   disabled="@isPreview"
+                                   @onchange="(e) => OnWaterSourcePsiChanged(srcSelectedArray, e)" />
+                            <span class="small text-muted">PSI</span>
+                        </div>
+                        @if (isPreview)
+                        {
+                            <div class="x-small text-muted mt-1">Click on the canvas to drop this water source.</div>
+                        }
+                        else
+                        {
+                            <div class="x-small text-muted mt-1">Flow / pressure feed the future zone calculator (#31 Phase C).</div>
                         }
                     </div>
                 }

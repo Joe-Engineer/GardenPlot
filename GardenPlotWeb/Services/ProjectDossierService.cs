@@ -576,6 +576,19 @@ public sealed class ProjectDossierService
                 }
 
                 break;
+            case ShapeKind.WaterSource:
+                // Issue #160 — dossier render: small filled circle with a darker outer ring,
+                // matching the canvas render's "anchor point" feel.
+                {
+                    double srcCx = shape.X + (shape.W / 2);
+                    double srcCy = shape.Y + (shape.H / 2);
+                    double srcOuterR = shape.W / 2;
+                    double srcInnerR = srcOuterR * 0.55;
+                    _ = sb.Append("<circle cx=\"").Append(F(srcCx)).Append("\" cy=\"").Append(F(srcCy)).Append("\" r=\"").Append(F(srcOuterR)).Append("\" fill=\"").Append(fill).Append("\" stroke=\"").Append(stroke).Append("\" stroke-width=\"0.08\" />");
+                    _ = sb.Append("<circle cx=\"").Append(F(srcCx)).Append("\" cy=\"").Append(F(srcCy)).Append("\" r=\"").Append(F(srcInnerR)).Append("\" fill=\"").Append(stroke).Append("\" />");
+                }
+
+                break;
             default:
                 break;
         }
@@ -664,6 +677,7 @@ public sealed class ProjectDossierService
             ShapeKind.SoilMarker => "#6b4b2a",
             ShapeKind.IrrigationHead => "#1f6f8b",
             ShapeKind.IrrigationPipe => "#5a5a5a",
+            ShapeKind.WaterSource => "#1f4e7a",
             _ => "#2f5a3a",
         };
     }
@@ -691,6 +705,7 @@ public sealed class ProjectDossierService
             ShapeKind.SoilMarker => "#d49b52",
             ShapeKind.IrrigationHead => "#5fb0cf",
             ShapeKind.IrrigationPipe => "#cfd0d2",
+            ShapeKind.WaterSource => "#9bc7e0",
             _ => "#9fcf9f",
         };
     }
@@ -713,6 +728,7 @@ public sealed class ProjectDossierService
             ShapeKind.SoilMarker => 1.0,
             ShapeKind.IrrigationHead => 0.18,
             ShapeKind.IrrigationPipe => 1.0,
+            ShapeKind.WaterSource => 1.0,
             _ => 0.6,
         };
     }

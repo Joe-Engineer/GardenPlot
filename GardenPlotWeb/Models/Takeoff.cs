@@ -639,7 +639,7 @@ public static class TakeoffReconciler
                 continue;
             }
 
-            if (shape.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw or ShapeKind.IrrigationHead or ShapeKind.IrrigationPipe)
+            if (shape.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw or ShapeKind.IrrigationHead or ShapeKind.IrrigationPipe or ShapeKind.WaterSource)
             {
                 string name = !string.IsNullOrWhiteSpace(shape.Label)
                     ? shape.Label
@@ -659,6 +659,7 @@ public static class TakeoffReconciler
                         ShapeKind.SoilMarker => shape.Label ?? "Soil marker",
                         ShapeKind.IrrigationHead => shape.Label ?? "Irrigation head",
                         ShapeKind.IrrigationPipe => shape.Label ?? "Irrigation pipe",
+                        ShapeKind.WaterSource => shape.Label ?? "Water source",
                         _ => "(unnamed)",
                     };
 
@@ -687,6 +688,7 @@ public static class TakeoffReconciler
                         ShapeKind.SoilMarker => "Soil Marker",
                         ShapeKind.IrrigationHead => "Irrigation Head",
                         ShapeKind.IrrigationPipe => "Irrigation Pipe",
+                        ShapeKind.WaterSource => "Water Source",
                         _ => shape.Kind.ToString(),
                     },
                     Name = name,
