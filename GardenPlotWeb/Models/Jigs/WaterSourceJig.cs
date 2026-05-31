@@ -9,7 +9,7 @@ namespace GardenPlotWeb.Models.Jigs;
 /// Stamp-placed; counts as 1 each in the takeoff; lives on the Irrigation layer;
 /// no path / area footprint.
 /// </summary>
-public sealed class WaterSourceJig : Jig
+public sealed class WaterSourceJig : KindJig
 {
     /// <inheritdoc/>
     public override ShapeKind Kind => ShapeKind.WaterSource;
