@@ -1,4 +1,4 @@
-// <copyright file="Calendar.razor.cs" company="Garden Plot">
+﻿// <copyright file="Calendar.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -178,6 +178,7 @@ public partial class Calendar
             ShapeKind.Bush => $"Bush · {shape.Label}",
             ShapeKind.Plant => $"Plant · {shape.Label}",
             ShapeKind.SoilMarker => string.IsNullOrWhiteSpace(shape.Label) ? "Soil marker" : $"Soil marker · {shape.Label}",
+            ShapeKind.IrrigationHead => string.IsNullOrWhiteSpace(shape.Label) ? "Irrigation head" : $"Irrigation head · {shape.Label}",
             _ => throw new ArgumentOutOfRangeException(nameof(shape), shape.Kind, null),
         };
     }

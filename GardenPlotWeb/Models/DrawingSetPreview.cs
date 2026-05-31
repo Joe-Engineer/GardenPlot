@@ -46,6 +46,7 @@ public static class DrawingSetPreview
             PaletteKind.FocalPoint => RowVisualKind.Stamp,
             PaletteKind.SoilMarker => RowVisualKind.Stamp,
             PaletteKind.CustomTile => RowVisualKind.Stamp,
+            PaletteKind.IrrigationHead => RowVisualKind.Stamp,
             _ => RowVisualKind.Stamp,
         };
     }

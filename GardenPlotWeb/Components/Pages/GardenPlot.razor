@@ -1925,6 +1925,25 @@ else
                                     case ShapeKind.SoilMarker:
                                         @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, style.Fill, style.Stroke))
                                         break;
+                                    case ShapeKind.IrrigationHead:
+                                        @* Issue #31 Phase A — irrigation head + faint throw halo. The head
+                                           body is a small filled circle (~6 px in plot feet at this scale);
+                                           the throw radius = s.W / 2 (catalog stores diameter as WidthFt).
+                                           Drip emitters draw with a tighter halo since their wetted radius
+                                           is small. *@
+                                        {
+                                            var headCx = s.X + s.W / 2;
+                                            var headCy = s.Y + s.H / 2;
+                                            var throwR = s.W / 2;
+                                            var headBodyR = Math.Max(0.25, Math.Min(0.6, throwR * 0.05));
+                                            <circle cx="@F(headCx)" cy="@F(headCy)" r="@F(throwR)"
+                                                    fill="@(style.Fill ?? "#5fb0cf")" fill-opacity="0.18"
+                                                    stroke="@(style.Stroke ?? "#1f6f8b")" stroke-width="0.06"
+                                                    stroke-dasharray="0.4 0.2" />
+                                            <circle cx="@F(headCx)" cy="@F(headCy)" r="@F(headBodyR)"
+                                                    fill="@(style.Stroke ?? "#1f6f8b")" stroke="#fff" stroke-width="0.04" />
+                                        }
+                                        break;
                                 }
                             </g>
                         }
@@ -1963,6 +1982,20 @@ else
                                         break;
                                     case ShapeKind.SoilMarker:
                                         @((MarkupString)PlantRendering.SoilMarkerSvg(s.X, s.Y, s.W, s.H, s.Label, EffectiveFill(s), EffectiveStroke(s)))
+                                        break;
+                                    case ShapeKind.IrrigationHead:
+                                        {
+                                            var ghostHeadCx = s.X + s.W / 2;
+                                            var ghostHeadCy = s.Y + s.H / 2;
+                                            var ghostThrowR = s.W / 2;
+                                            var ghostHeadBodyR = Math.Max(0.25, Math.Min(0.6, ghostThrowR * 0.05));
+                                            <circle cx="@F(ghostHeadCx)" cy="@F(ghostHeadCy)" r="@F(ghostThrowR)"
+                                                    fill="@(EffectiveFill(s) ?? "#5fb0cf")" fill-opacity="0.18"
+                                                    stroke="@(EffectiveStroke(s) ?? "#1f6f8b")" stroke-width="0.06"
+                                                    stroke-dasharray="0.4 0.2" />
+                                            <circle cx="@F(ghostHeadCx)" cy="@F(ghostHeadCy)" r="@F(ghostHeadBodyR)"
+                                                    fill="@(EffectiveStroke(s) ?? "#1f6f8b")" stroke="#fff" stroke-width="0.04" />
+                                        }
                                         break;
                                 }
                             </g>
@@ -2820,6 +2853,52 @@ else
                     </div>
                 }
 
+                @* Issue #31 Phase A — irrigation head detail panel for the single-shape
+                   inspector. Surfaces the throw radius, palette code, and arc-degree
+                   dropdown. Setting the arc updates this head's ArcDegrees and persists.
+                   Visible for both real selections AND palette-preview shapes so the user
+                   sees the head's data the moment they pick one from the palette. *@
+                @if (single!.Kind == ShapeKind.IrrigationHead)
+                {
+                    var headThrowFt = single!.W / 2;
+                    var headArc = single!.ArcDegrees ?? 360.0;
+                    var headSelectedArray = new[] { single! };
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Irrigation Head</div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Type:</span>
+                            <strong>@(single!.Label ?? "(unnamed head)")</strong>
+                        </div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Throw:</span>
+                            <strong>@F(headThrowFt) ft</strong>
+                            <span class="text-muted ms-2">Ø</span>
+                            <strong>@F(single!.W) ft</strong>
+                        </div>
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Coverage:</span>
+                            <select class="form-select form-select-sm" style="max-width: 8rem;"
+                                    value="@F(headArc)"
+                                    disabled="@isPreview"
+                                    @onchange="(e) => OnSprinklerArcChanged(headSelectedArray, e)">
+                                @foreach (double deg in PaletteCatalog.StandardSprinklerArcDegrees)
+                                {
+                                    <option value="@F(deg)">@F(deg)°</option>
+                                }
+                            </select>
+                            <span class="small text-muted">arc</span>
+                        </div>
+                        @if (isPreview)
+                        {
+                            <div class="x-small text-muted mt-1">Pick from the palette to see other heads, or click on the canvas to drop this one.</div>
+                        }
+                        else
+                        {
+                            <div class="x-small text-muted mt-1">Rotate the head to aim the arc.</div>
+                        }
+                    </div>
+                }
+
                 @if (!isPreview && single!.Kind == ShapeKind.Edge)
                 {
                     <div class="ground-cover-info mt-2 pt-2 border-top">
@@ -3246,6 +3325,31 @@ else
                             <strong>@(materialNames.Count == 1 ? materialNames[0] : "(mixed)")</strong>
                             <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="ShowMaterialPickerForSelection">Change…</button>
                         </div>
+                    </div>
+                }
+
+                @* Issue #31 Phase A — multi-selection coverage-arc dropdown for irrigation
+                   heads. The single-shape branch above has a richer detail panel; this is
+                   for selecting many heads at once and setting them all to the same arc. *@
+                @if (selShapes.Count > 1 && selShapes.All(sh => sh.Kind == ShapeKind.IrrigationHead))
+                {
+                    var arcValues = selShapes.Select(sh => sh.ArcDegrees ?? 360.0).Distinct().ToList();
+                    var arcSingle = arcValues.Count == 1 ? arcValues[0] : (double?)null;
+                    <div class="rotation-edit-row mt-2 pt-2 border-top">
+                        <span class="text-muted small">Coverage:</span>
+                        <select class="form-select form-select-sm" style="max-width: 9rem;"
+                                value="@(arcSingle is double a ? F(a) : string.Empty)"
+                                @onchange="(e) => OnSprinklerArcChanged(selShapes, e)">
+                            @if (arcSingle is null)
+                            {
+                                <option value="">(mixed)</option>
+                            }
+                            @foreach (double deg in PaletteCatalog.StandardSprinklerArcDegrees)
+                            {
+                                <option value="@F(deg)">@F(deg)°</option>
+                            }
+                        </select>
+                        <span class="small text-muted">arc · applies to all @selShapes.Count selected heads</span>
                     </div>
                 }
             }

@@ -1,4 +1,4 @@
-// <copyright file="Takeoff.cs" company="Garden Plot">
+﻿// <copyright file="Takeoff.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -639,7 +639,7 @@ public static class TakeoffReconciler
                 continue;
             }
 
-            if (shape.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
+            if (shape.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw or ShapeKind.IrrigationHead)
             {
                 string name = !string.IsNullOrWhiteSpace(shape.Label)
                     ? shape.Label
@@ -657,6 +657,7 @@ public static class TakeoffReconciler
                         ShapeKind.CircleRuler => "(measurement)",
                         ShapeKind.RectRuler => "(measurement)",
                         ShapeKind.SoilMarker => shape.Label ?? "Soil marker",
+                        ShapeKind.IrrigationHead => shape.Label ?? "Irrigation head",
                         _ => "(unnamed)",
                     };
                 items.Add(new TakeoffItem
@@ -676,6 +677,7 @@ public static class TakeoffReconciler
                         ShapeKind.CircleRuler => "Circle Ruler",
                         ShapeKind.RectRuler => "Rectangle Ruler",
                         ShapeKind.SoilMarker => "Soil Marker",
+                        ShapeKind.IrrigationHead => "Irrigation Head",
                         _ => shape.Kind.ToString(),
                     },
                     Name = name,

@@ -191,6 +191,29 @@ public static class PaletteCatalog
         new("Soil Marker", PaletteKind.SoilMarker, 1.2, 1.6, "soil-marker", StrokeColor: "#6b4b2a", FillColor: "#d49b52"),
     ];
 
+    /// <summary>
+    /// Issue #31 Phase A — irrigation heads. Width / Height encode the throw diameter
+    /// (so Shape.W = WidthFt = 2 × throw radius). Trait carries a short type code that
+    /// drives takeoff grouping; Notes carries the human-friendly description.
+    /// ArcDegrees encodes the coverage arc (15/30/45/90/120/150/180/210/300/360 are the
+    /// standard set; drip emitters use 360 by convention).
+    /// </summary>
+    public static readonly PaletteItem[] IrrigationHeads =
+    [
+        new("Sprinkler 12' Full", PaletteKind.IrrigationHead, 24.0, 24.0, "sprinkler-full", Notes: "12 ft throw, 360°", StrokeColor: "#1f6f8b", FillColor: "#5fb0cf", ArcDegrees: 360),
+        new("Sprinkler 15' Full", PaletteKind.IrrigationHead, 30.0, 30.0, "sprinkler-full", Notes: "15 ft throw, 360°", StrokeColor: "#1f6f8b", FillColor: "#5fb0cf", ArcDegrees: 360),
+        new("Sprinkler 20' Full", PaletteKind.IrrigationHead, 40.0, 40.0, "sprinkler-full", Notes: "20 ft throw, 360°", StrokeColor: "#1f6f8b", FillColor: "#5fb0cf", ArcDegrees: 360),
+        new("Sprinkler 15' Half", PaletteKind.IrrigationHead, 30.0, 30.0, "sprinkler-half", Notes: "15 ft throw, 180°", StrokeColor: "#1f6f8b", FillColor: "#9bd1e0", ArcDegrees: 180),
+        new("Sprinkler 15' Quarter", PaletteKind.IrrigationHead, 30.0, 30.0, "sprinkler-quarter", Notes: "15 ft throw, 90°", StrokeColor: "#1f6f8b", FillColor: "#9bd1e0", ArcDegrees: 90),
+        new("Drip Emitter", PaletteKind.IrrigationHead, 1.0, 1.0, "drip-emitter", Notes: "point emitter, ~1 ft wetted radius", StrokeColor: "#2a4d6a", FillColor: "#8ac4d8", ArcDegrees: 360),
+    ];
+
+    /// <summary>Standard sprinkler arc-coverage choices used by the inspector dropdown.</summary>
+    public static readonly double[] StandardSprinklerArcDegrees =
+    [
+        15, 30, 45, 90, 120, 150, 180, 210, 300, 360,
+    ];
+
     public static IReadOnlyList<PaletteItem> For(PaletteKind kind)
     {
         return kind switch
@@ -205,6 +228,7 @@ public static class PaletteCatalog
             PaletteKind.GroundCover => GroundCoverMaterials,
             PaletteKind.GroundCoverSurface => GroundCoverSurfaceCovers,
             PaletteKind.Edging => Edging,
+            PaletteKind.IrrigationHead => IrrigationHeads,
             _ => [],
         };
     }
@@ -684,6 +708,7 @@ public static class PaletteCatalog
             GroundCoverMaterials,
             GroundCoverSurfaceCovers,
             Edging,
+            IrrigationHeads,
         ];
 
         foreach (PaletteItem[] bucket in buckets)
@@ -739,6 +764,7 @@ public static class PaletteCatalog
             PaletteCategory.CoverCropsForb => [.. Plants.Where(p => string.Equals(p.Trait, PlantTraits.CoverCropForb, StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(g => string.Equals(g.Trait, PlantTraits.CoverCropForb, StringComparison.OrdinalIgnoreCase)))],
             PaletteCategory.GroundCoverPlants => [.. GroundCoverSurfaceCovers.Where(IsGroundCoverPlantSurfaceItem)],
             PaletteCategory.SoilMarkers => SoilMarkers,
+            PaletteCategory.IrrigationHeads => IrrigationHeads,
             PaletteCategory.GrassesTurf => [.. Grasses.Where(g => g.Kind == PaletteKind.GroundCoverSurface)],
             PaletteCategory.GrassesOrnamental => [.. Grasses.Where(g => string.Equals(g.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(IsOrnamentalGrassSurfaceItem))],
             PaletteCategory.Succulents => [.. Plants.Where(p => string.Equals(p.Trait, "succulent", StringComparison.OrdinalIgnoreCase))],
@@ -817,6 +843,7 @@ public static class PaletteCatalog
                 _ => PaletteCategory.GroundCoverSurface,
             },
             PaletteKind.Edging => PaletteCategory.Edging,
+            PaletteKind.IrrigationHead => PaletteCategory.IrrigationHeads,
             _ => PaletteCategory.BedKits,
         };
     }

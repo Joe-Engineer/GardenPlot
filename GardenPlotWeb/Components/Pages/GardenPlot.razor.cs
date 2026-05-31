@@ -2783,6 +2783,10 @@ public partial class GardenPlot
         Fill = item.FillColor,
         TileBackgroundImageFileName = item.TileBackgroundImageFileName,
         Takeoff = item.Kind == PaletteKind.Edging ? GardenPlotWeb.Models.Catalog.CreateTakeoff(item.Code) : null,
+
+        // Issue #31 Phase A — carry the head's coverage arc into the preview so the
+        // inspector shows the correct value AND the canvas ghost halo renders as a wedge.
+        ArcDegrees = item.ArcDegrees,
     };
 
     /// <summary>
@@ -5576,18 +5580,24 @@ public partial class GardenPlot
         PaletteCategory.CoverCropsForb => "Cover Crops — Forb",
         PaletteCategory.CustomTiles => "Custom Tiles",
         PaletteCategory.GroundCoverAssemblies => "Materials — Assemblies",
+        PaletteCategory.IrrigationHeads => "Irrigation — Heads",
         _ => k.ToString(),
     };
 
     private static bool CategorySupportsClimateFilter(PaletteCategory category)
     {
+        // Climate filters (region / native / lifecycle / container / pollinator / cut
+        // flower / deciduous) only make sense for living-plant categories. Equipment,
+        // materials, and irrigation hardware never carry these traits.
         return category is not (PaletteCategory.BedKits
             or PaletteCategory.FocalPoint
             or PaletteCategory.GroundCoverMaterials
             or PaletteCategory.GroundCoverSurface
+            or PaletteCategory.GroundCoverAssemblies
             or PaletteCategory.Edging
             or PaletteCategory.SoilMarkers
-            or PaletteCategory.CustomTiles);
+            or PaletteCategory.CustomTiles
+            or PaletteCategory.IrrigationHeads);
     }
 
     private IReadOnlyList<PaletteItem> PaletteItemsForCurrentCategory()
@@ -6692,6 +6702,7 @@ public partial class GardenPlot
             PaletteKind.Plant => PaletteCatalog.Plants.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.FocalPoint => PaletteCatalog.FocalPoints.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.SoilMarker => PaletteCatalog.SoilMarkers.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.IrrigationHead => PaletteCatalog.IrrigationHeads.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.BedKit => PaletteCatalog.BedKits.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             // Issue #138 — volume materials (mulch / gravel / soil / rock) live in
             // GroundCoverMaterials and carry MaterialSoldBy.Volume + DefaultDepthIn.
@@ -7712,6 +7723,7 @@ public partial class GardenPlot
         PaletteKind.SoilMarker => ShapeKind.SoilMarker,
         PaletteKind.CustomTile => item.StampShapeKind is ShapeKind.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
         PaletteKind.Edging => ShapeKind.Edge,
+        PaletteKind.IrrigationHead => ShapeKind.IrrigationHead,
         _ => ShapeKind.BedKit,
     };
 
@@ -7733,6 +7745,9 @@ public partial class GardenPlot
             TileBackgroundImageFileName = item.TileBackgroundImageFileName,
             GroupId = groupId,
             GroupIndex = groupIndex,
+            // Issue #31 Phase A — irrigation heads carry their coverage arc on the shape
+            // so a stamped head can be edited independently of the catalog.
+            ArcDegrees = item.ArcDegrees,
         };
     }
 
@@ -11690,6 +11705,46 @@ public partial class GardenPlot
     /// <summary>Quick-set button handler: jumps every shape in <paramref name="shapes"/> to <paramref name="degrees"/>.</summary>
     private Task QuickSetShapeRotationAsync(IReadOnlyList<Shape> shapes, double degrees)
         => SetShapeRotationAsync(shapes, NormalizeDegrees(degrees));
+
+    /// <summary>
+    /// Issue #31 Phase A — handler for the sprinkler-arc dropdown in the inspector. Sets
+    /// every selected IrrigationHead's <see cref="Shape.ArcDegrees"/> to the chosen value,
+    /// records an undo step, and persists. No-ops when the selection contains anything
+    /// other than irrigation heads (defensive guard; the dropdown only renders for
+    /// homogeneous head selections).
+    /// </summary>
+    private async Task OnSprinklerArcChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double degrees))
+        {
+            return;
+        }
+
+        // Treat 360 as the "full circle" sentinel (stored as null).
+        double? arcValue = degrees >= 360 - 1e-6 ? null : degrees;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationHead)
+            {
+                shape.ArcDegrees = arcValue;
+            }
+        }
+
+        await SaveAsync();
+    }
 
     private async Task SetShapeRotationAsync(IReadOnlyList<Shape> shapes, double normalizedDegrees)
     {

@@ -1,4 +1,4 @@
-// <copyright file="PlotLibraryLoader.cs" company="Garden Plot">
+﻿// <copyright file="PlotLibraryLoader.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -515,7 +515,7 @@ public sealed class PlotLibraryLoader
         return shape.Kind switch
         {
             ShapeKind.Edge => "lf",
-            ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.SoilMarker => "ea",
+            ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.SoilMarker or ShapeKind.IrrigationHead => "ea",
             ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw => "ea",
             ShapeKind.Ruler or ShapeKind.CircleRuler or ShapeKind.RectRuler => "ea",
             _ => "ea",
