@@ -8,9 +8,16 @@
     <IsTestProject>true</IsTestProject>
     <RootNamespace>GardenPlot.Tests</RootNamespace>
 
-    <!-- Tests focus on behaviour; don't fail the build over style/doc rules. -->
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
+    <!--
+      Tests inherit TreatWarningsAsErrors from Directory.Build.props so any warning
+      that DOES surface becomes an error — local Debug then catches the same SA-rule
+      violations as CI's command-line -warnaserror. Style-rule analysis itself stays
+      off (EnforceCodeStyleInBuild=false, AnalysisMode=None) because tests
+      intentionally use looser patterns (private unused fields for inline
+      documentation, partial switch coverage, etc.) — those would be noise.
+      The targeted NoWarn list below suppresses StyleCop rules that fire in tests
+      but don't add value there. New warnings that DO fire will fail the build.
+    -->
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <AnalysisMode>None</AnalysisMode>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
