@@ -2846,6 +2846,9 @@ public partial class GardenPlot
     private bool customTileCitationLoading;
     private string? lastCustomTileCitationKey;
 
+    // Issue #93 — last resolved citation tile (used by the user-gesture handler).
+    private PaletteItem? currentCustomTileForCitation;
+
     private sealed record WebCitationSummary(string Title, string Extract, string? ImageUrl, string PageUrl);
 
     /// <summary>Stable cache key for a shape's Wikipedia entry (kind + species). Null for non-plant kinds.</summary>
@@ -4172,21 +4175,24 @@ public partial class GardenPlot
             detailCustomTileItem = selectedItem;
         }
 
+        // Issue #93 — stash the resolved item so the user-gesture RequestCitationPreviewAsync
+        // handler can fetch it. Previously this was a local-only value, so the gesture handler
+        // had no way to find the current tile.
+        currentCustomTileForCitation = detailCustomTileItem;
+
         var customTileKey = detailCustomTileItem is null
             ? null
             : $"{detailCustomTileItem.Code}|{detailCustomTileItem.CitationUrl}";
         if (!string.Equals(customTileKey, lastCustomTileCitationKey, StringComparison.Ordinal))
         {
             lastCustomTileCitationKey = customTileKey;
-            if (detailCustomTileItem is not null)
-            {
-                await EnsureCitationSummaryForCustomTile(detailCustomTileItem);
-            }
-            else
-            {
-                customTileCitation = null;
-                customTileCitationLoading = false;
-            }
+
+            // Issue #93 — citation summary is no longer auto-fetched on render. A malicious
+            // imported plot / palette with a CitationUrl pointing at LAN devices would
+            // otherwise trigger a browser-driven probe just by selecting the tile. The user
+            // now clicks "Show preview" to opt-in; see RequestCitationPreviewAsync.
+            customTileCitation = null;
+            customTileCitationLoading = false;
         }
 
         await EnsureFloatingPanelsInViewAsync();
@@ -6252,6 +6258,22 @@ public partial class GardenPlot
         customTileCitationLoading = false;
     }
 
+    /// <summary>
+    /// Issue #93 — user-initiated citation fetch. The previous render-path auto-fetch
+    /// was removed (a malicious imported palette could turn the user's browser into a
+    /// LAN scanner). The user now clicks "Show preview" to opt-in.
+    /// </summary>
+    private async Task RequestCitationPreviewAsync()
+    {
+        if (currentCustomTileForCitation is null)
+        {
+            return;
+        }
+
+        await EnsureCitationSummaryForCustomTile(currentCustomTileForCitation);
+        StateHasChanged();
+    }
+
     private async Task<WebCitationSummary?> FetchCitationSummary(string url)
     {
         try
@@ -6261,6 +6283,9 @@ public partial class GardenPlot
                 return null;
             }
 
+            // Issue #93 — Wikipedia REST is CORS-friendly and trusted, so the wiki
+            // fast-path bypasses the strict validator below. Everything else has to
+            // pass scheme + host-type + blocked-host checks.
             if (uri.Host.Contains("wikipedia.org", StringComparison.OrdinalIgnoreCase))
             {
                 var topic = uri.Segments.LastOrDefault()?.Trim('/');
@@ -6274,9 +6299,48 @@ public partial class GardenPlot
                 }
             }
 
+            // Issue #93 — defense-in-depth URL validation. Rejects http://, IP-literal
+            // hosts, localhost / *.local / *.internal — anything that could turn a
+            // malicious palette / plot import into a browser-driven LAN probe.
+            var (allow, reason) = CitationUrlValidator.IsSafeForFetch(url);
+            if (!allow)
+            {
+                Console.WriteLine($"[#93] citation fetch rejected: {reason} ({url})");
+                return null;
+            }
+
             var client = Http;
             client.Timeout = TimeSpan.FromSeconds(8);
-            var html = await client.GetStringAsync(uri);
+
+            // Issue #93 — read the response headers first so we can reject by content-type
+            // BEFORE pulling the body, and cap the body read at CitationUrlValidator.MaxResponseBytes
+            // so an attacker URL streaming gigabytes of HTML can't exhaust browser memory.
+            using HttpResponseMessage response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            string? mediaType = response.Content.Headers.ContentType?.MediaType;
+            if (mediaType is null || !mediaType.Contains("html", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            string html;
+            await using (Stream stream = await response.Content.ReadAsStreamAsync())
+            {
+                byte[] buffer = new byte[CitationUrlValidator.MaxResponseBytes];
+                int total = 0;
+                int read;
+                while (total < buffer.Length && (read = await stream.ReadAsync(buffer.AsMemory(total, buffer.Length - total))) > 0)
+                {
+                    total += read;
+                }
+
+                html = System.Text.Encoding.UTF8.GetString(buffer, 0, total);
+            }
+
             var title = ExtractMetaContent(html, "og:title")
                         ?? ExtractMetaNameContent(html, "twitter:title")
                         ?? ExtractTitleTag(html)
