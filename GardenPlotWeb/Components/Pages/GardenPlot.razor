@@ -1861,6 +1861,38 @@ else
                     </g>
                 }
 
+                @* Issue #162c — irrigation snap indicator. Visible while drafting a pipe or
+                   wire when the cursor is within snap radius of an irrigation anchor (head,
+                   source, control, fitting, or any pipe / wire vertex). Renders a teal ring +
+                   crosshair at the snap point AND a small label chip above it showing what
+                   the cursor is snapping to. *@
+                @if (!IsConceptMode && irrigationSnap is { } iSnap)
+                {
+                    var snapColor = "#0aa172";
+                    <g pointer-events="none" class="irrigation-snap-glyph">
+                        <circle cx="@F(iSnap.X)" cy="@F(iSnap.Y)" r="0.28" fill="none" stroke="@snapColor" stroke-width="0.05" />
+                        <circle cx="@F(iSnap.X)" cy="@F(iSnap.Y)" r="0.10" fill="@snapColor" />
+                        <line x1="@F(iSnap.X - 0.36)" y1="@F(iSnap.Y)" x2="@F(iSnap.X + 0.36)" y2="@F(iSnap.Y)" stroke="@snapColor" stroke-width="0.04" />
+                        <line x1="@F(iSnap.X)" y1="@F(iSnap.Y - 0.36)" x2="@F(iSnap.X)" y2="@F(iSnap.Y + 0.36)" stroke="@snapColor" stroke-width="0.04" />
+                        @{
+                            var chipFont = Math.Max(0.18, 0.22);
+                            var chipPadX = 0.08;
+                            var chipPadY = 0.05;
+                            var chipW = Math.Max(1.0, (iSnap.Label.Length * chipFont * 0.55) + (chipPadX * 2));
+                            var chipH = chipFont + (chipPadY * 2);
+                            var chipX = iSnap.X - (chipW / 2);
+                            var chipY = iSnap.Y - 0.45 - chipH;
+                            var chipTextY = chipY + chipPadY + (chipFont * 0.85);
+                        }
+                        <rect x="@F(chipX)" y="@F(chipY)" width="@F(chipW)" height="@F(chipH)" rx="0.06"
+                              fill="rgba(255,255,255,0.92)" stroke="@snapColor" stroke-width="0.025" />
+                        <svg:text x="@F(iSnap.X)" y="@F(chipTextY)" text-anchor="middle"
+                                  font-size="@F(chipFont)" fill="#0a4a3a"
+                                  style="font-family: sans-serif; pointer-events: none;">snap → @iSnap.Label</svg:text>
+                        <title>Snap to @iSnap.Label</title>
+                    </g>
+                }
+
                 @* Issue #131 — tangent-snap guide line. Drawn whenever tangent mode is
                    armed and a previous segment exists. The line extends far enough in both
                    directions to feel like an infinite reference; the snap glyph marks the

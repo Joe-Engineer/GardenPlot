@@ -8966,9 +8966,14 @@ public partial class GardenPlot
                 {
                     bool draftingPipe = selectedItem is { Kind: PaletteKind.IrrigationPipe };
                     bool draftingWire = selectedItem is { Kind: PaletteKind.IrrigationWire };
-                    if (draftingPipe)
+                    if (draftingPipe || draftingWire)
                     {
-                        (x, y) = SnapToIrrigationHeadCenter(x, y);
+                        // Issue #162c — snap to any irrigation anchor (head / source / control /
+                        // fitting / existing pipe-or-wire vertex), not just heads. Same call for
+                        // pipes AND wires so wire runs naturally snap to controllers + valves.
+                        var (snappedX, snappedY, _) = SnapToIrrigationAnchor(x, y);
+                        x = snappedX;
+                        y = snappedY;
                     }
 
                     if (drafting is null || (drafting.Kind != ShapeKind.FreeDraw && drafting.Kind != ShapeKind.IrrigationPipe && drafting.Kind != ShapeKind.IrrigationWire) || !buildingPolygon)
@@ -9699,11 +9704,19 @@ public partial class GardenPlot
                 // Issue #162a iteration — mirror the FreeDraw polyline behaviour so the
                 // in-progress pipe / wire shows a live segment from the last committed vertex
                 // to the cursor. Without this the user sees nothing until the second click.
-                // Pipes additionally snap-to-head (commit path); the move path stays unsnapped
-                // so the cursor reflects the actual mouse position.
+                // Issue #162c — also compute snap-to-anchor and apply both the snapped point
+                // AND the snap target descriptor so the renderer can show the visual chip.
                 if (buildingPolygon && drafting.Points.Count >= 1)
                 {
-                    drafting.Points[^1] = new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt));
+                    double rawX = Math.Clamp(x, 0, PlotWidthFt);
+                    double rawY = Math.Clamp(y, 0, PlotHeightFt);
+                    var (snappedX, snappedY, snap) = SnapToIrrigationAnchor(rawX, rawY);
+                    irrigationSnap = snap;
+                    drafting.Points[^1] = new Point(snappedX, snappedY);
+                }
+                else
+                {
+                    irrigationSnap = null;
                 }
                 break;
             case ShapeKind.Ruler:
@@ -10749,62 +10762,61 @@ public partial class GardenPlot
         awaitingArcApex = false;
         arcApexEdgeIndex = -1;
         tangentSnapArmed = false; // issue #131
+        irrigationSnap = null; // issue #162c — clear snap chip when the pipe / wire is committed
         StateHasChanged();
     }
 
     /// <summary>
-    /// Issue #159 — snaps a candidate cursor position to the centre of the nearest
-    /// irrigation head when within a tolerance. Lets the user run pipe polylines from
-    /// head to head without aiming pixel-perfectly. Falls back to the input when no
-    /// head is within range or no plot is open.
+    /// Issue #162c — snap target descriptor for the in-progress pipe / wire draft.
     /// </summary>
-    /// <param name="x">Candidate x in plot feet.</param>
-    /// <param name="y">Candidate y in plot feet.</param>
-    /// <returns>The snapped position, or (<paramref name="x"/>, <paramref name="y"/>) when nothing is within range.</returns>
-    private (double x, double y) SnapToIrrigationHeadCenter(double x, double y)
+    /// <param name="X">Snapped position x (plot-space feet).</param>
+    /// <param name="Y">Snapped position y (plot-space feet).</param>
+    /// <param name="Label">Human-readable label for the visual indicator chip.</param>
+    /// <param name="ShapeId">Id of the snap-target shape (head / source / control / fitting / pipe / wire).</param>
+    private sealed record IrrigationSnapTarget(double X, double Y, string Label, Guid ShapeId);
+
+    /// <summary>
+    /// Live snap-target indicator state. Set by the pipe / wire pointer-move path; cleared
+    /// when drafting ends, the tool changes, or the cursor leaves the snap radius.
+    /// </summary>
+    private IrrigationSnapTarget? irrigationSnap;
+
+    /// <summary>
+    /// Issue #162c — extends snap-to-head from #159 to cover ALL irrigation anchors:
+    /// heads, water sources, irrigation controls (controllers / valves / etc.), pipe
+    /// fittings, and the endpoints of existing pipes and wires. Returns the snapped (x, y)
+    /// AND a descriptor for the visual indicator. Snap radius is 14 px at the current
+    /// zoom — same forgiving feel as the existing head snap.
+    /// </summary>
+    private (double X, double Y, IrrigationSnapTarget? Snap) SnapToIrrigationAnchor(double x, double y)
     {
         if (currentPlot is null)
         {
-            return (x, y);
+            return (x, y, null);
         }
 
         double scale = PxPerFt * zoom;
         if (scale <= 0)
         {
-            return (x, y);
+            return (x, y, null);
         }
 
-        // 14-pixel snap radius — generous enough to "click into" a head without forcing
-        // the user to land on the dot pixel-exactly, tight enough that nearby heads
-        // don't fight each other for the snap.
         const double snapRadiusPx = 14;
         double snapRadiusFt = snapRadiusPx / scale;
-        double snapRadiusFtSquared = snapRadiusFt * snapRadiusFt;
 
-        double bestDistSquared = double.PositiveInfinity;
-        double bestX = x;
-        double bestY = y;
-        foreach (Shape s in currentPlot.Shapes)
-        {
-            if (s.Kind != ShapeKind.IrrigationHead)
-            {
-                continue;
-            }
+        var (sx, sy, target) = IrrigationSnap.ResolveSnap(currentPlot.Shapes, x, y, snapRadiusFt);
+        return (sx, sy, target is null ? null : new IrrigationSnapTarget(target.X, target.Y, target.Label, target.ShapeId));
+    }
 
-            double cx = s.X + (s.W / 2);
-            double cy = s.Y + (s.H / 2);
-            double dx = cx - x;
-            double dy = cy - y;
-            double d2 = (dx * dx) + (dy * dy);
-            if (d2 < bestDistSquared && d2 <= snapRadiusFtSquared)
-            {
-                bestDistSquared = d2;
-                bestX = cx;
-                bestY = cy;
-            }
-        }
-
-        return (bestX, bestY);
+    /// <summary>
+    /// Issue #159 back-compat shim. The pipe click path was originally written against
+    /// SnapToIrrigationHeadCenter; the new entry point also exposes the snap target so
+    /// the cursor can show what's being snapped. Older callers keep their tuple shape.
+    /// </summary>
+    private (double X, double Y) SnapToIrrigationHeadCenter(double x, double y)
+    {
+        var (sx, sy, _) = SnapToIrrigationAnchor(x, y);
+        return (sx, sy);
     }
 
     /// <summary>
@@ -12000,6 +12012,7 @@ public partial class GardenPlot
             tangentSnapArmed = false; // issue #131
             lastFittingStampPos = null; // issue #162a — Escape breaks the auto-pipe chain
             runningFittingPipeId = null;
+            irrigationSnap = null; // issue #162c — drop snap indicator on Escape
             ClearSelection();
         }
     }
