@@ -2899,6 +2899,52 @@ else
                     </div>
                 }
 
+                @* Issue #159 — irrigation pipe detail panel. Shows the pipe's material,
+                   diameter, and (for committed shapes) total length. Diameter dropdown
+                   lets the user swap the nominal diameter post-draw. *@
+                @if (single!.Kind == ShapeKind.IrrigationPipe)
+                {
+                    var pipeDiameter = single!.PipeDiameterIn ?? (single!.W * 12);
+                    var pipeMaterial = single!.Trait;
+                    var pipeLengthFt = single!.Points.Count >= 2 ? PolylineSampler.TotalLengthFt(single!.Points, closed: false) : 0;
+                    var pipeSelectedArray = new[] { single! };
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Irrigation Pipe</div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Type:</span>
+                            <strong>@(single!.Label ?? "(unnamed pipe)")</strong>
+                        </div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Material:</span>
+                            <strong>@(string.IsNullOrWhiteSpace(pipeMaterial) ? "(unknown)" : pipeMaterial)</strong>
+                        </div>
+                        @if (!isPreview && pipeLengthFt > 0)
+                        {
+                            <div class="small mb-1">
+                                <span class="text-muted">Length:</span>
+                                <strong>@F(pipeLengthFt) ft</strong>
+                            </div>
+                        }
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Diameter:</span>
+                            <select class="form-select form-select-sm" style="max-width: 8rem;"
+                                    value="@F(pipeDiameter)"
+                                    disabled="@isPreview"
+                                    @onchange="(e) => OnPipeDiameterChanged(pipeSelectedArray, e)">
+                                @foreach (double dia in PaletteCatalog.StandardPipeDiametersIn)
+                                {
+                                    <option value="@F(dia)">@F(dia)"</option>
+                                }
+                            </select>
+                            <span class="small text-muted">in</span>
+                        </div>
+                        @if (isPreview)
+                        {
+                            <div class="x-small text-muted mt-1">Polyline tool is active — click to start drawing this pipe; double-click to finish. Cursor snaps to nearby head centers.</div>
+                        }
+                    </div>
+                }
+
                 @if (!isPreview && single!.Kind == ShapeKind.Edge)
                 {
                     <div class="ground-cover-info mt-2 pt-2 border-top">

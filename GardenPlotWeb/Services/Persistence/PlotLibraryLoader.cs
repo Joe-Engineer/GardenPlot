@@ -518,6 +518,7 @@ public sealed class PlotLibraryLoader
             ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.SoilMarker or ShapeKind.IrrigationHead => "ea",
             ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw => "ea",
             ShapeKind.Ruler or ShapeKind.CircleRuler or ShapeKind.RectRuler => "ea",
+            ShapeKind.IrrigationPipe => "lf",
             _ => "ea",
         };
     }

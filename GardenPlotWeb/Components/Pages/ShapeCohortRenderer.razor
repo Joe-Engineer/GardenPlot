@@ -250,6 +250,34 @@
                 }
 
                 break;
+            case ShapeKind.IrrigationPipe:
+                @* Issue #159 — irrigation pipe rendered as a polyline whose stroke width
+                   scales with the pipe's nominal diameter (inches → feet via /12 with a
+                   visual amplification factor) and whose stroke color comes from material
+                   (PVC=light grey, Poly=near-black, Copper=copper-orange, DripTubing=dark
+                   grey). Drawn AFTER the head halos so pipes appear over the wedges. *@
+                @if (s.Points.Count >= 2)
+                {
+                    double diameterIn = s.PipeDiameterIn ?? (s.W * 12);
+                    if (diameterIn <= 0) { diameterIn = 0.5; }
+                    // Visual stroke: amplify by 3x so a 1" pipe reads as 0.25 ft on canvas;
+                    // tight enough to follow the polyline accurately, thick enough to feel
+                    // like infrastructure rather than a sketch line.
+                    double strokeFt = (diameterIn / 12.0) * 3.0;
+                    string pipeColor = s.Trait switch
+                    {
+                        "PVC" => "#cfd0d2",
+                        "Poly" => "#2a2a2a",
+                        "Copper" => "#b7521a",
+                        "DripTubing" => "#3a3a3a",
+                        _ => s.Stroke ?? "#5a5a5a",
+                    };
+                    <polyline points="@GardenPlot.PointsString(s.Points)"
+                              fill="none" stroke="@pipeColor" stroke-width="@GardenPlot.F(strokeFt)"
+                              stroke-linecap="round" stroke-linejoin="round" />
+                }
+
+                break;
         }
         @if (!IsConceptMode && SelectedIds.Contains(s.Id))
         {

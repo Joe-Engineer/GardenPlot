@@ -36,6 +36,7 @@ public static class PathGeometry
             ShapeKind.Plant => false,
             ShapeKind.SoilMarker => false,
             ShapeKind.IrrigationHead => false,
+            ShapeKind.IrrigationPipe => false,
             _ => false,
         };
     }
@@ -65,6 +66,7 @@ public static class PathGeometry
             ShapeKind.Plant => (Array.Empty<Point>(), false),
             ShapeKind.SoilMarker => (Array.Empty<Point>(), false),
             ShapeKind.IrrigationHead => (Array.Empty<Point>(), false),
+            ShapeKind.IrrigationPipe => (shape.Points ?? new List<Point>(), false),
             _ => (Array.Empty<Point>(), false),
         };
     }
