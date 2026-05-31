@@ -2836,26 +2836,18 @@ public partial class GardenPlot
     private double panelDragOffsetX, panelDragOffsetY;
     private const double PanelEdgePadding = 4;
 
-    // Wikipedia summary cache + current display state
-    private readonly Dictionary<string, WikiSummary?> wikiCache = new(StringComparer.OrdinalIgnoreCase);
-    private WikiSummary? wikiSummary;
-    private bool wikiLoading;
-    private string? lastWikiKey;
-    private readonly Dictionary<string, WebCitationSummary?> citationCache = new(StringComparer.OrdinalIgnoreCase);
-    private WebCitationSummary? customTileCitation;
-    private bool customTileCitationLoading;
-    private string? lastCustomTileCitationKey;
+    // Issue #95 — citation + Wikipedia concern moved to CitationService. The properties
+    // below are thin shims so the existing razor markup (which reads wikiSummary /
+    // wikiLoading / customTileCitation / customTileCitationLoading directly) keeps
+    // working without any markup-side edits in this PR. The shape-focus and current-tile
+    // tracking is handled by the service via SetFocusedShapeAsync / SetCurrentCustomTile.
+    private WikiSummary? wikiSummary => Citation.CurrentWikiSummary;
 
-    // Issue #93 — last resolved citation tile (used by the user-gesture handler).
-    private PaletteItem? currentCustomTileForCitation;
+    private bool wikiLoading => Citation.IsWikiLoading;
 
-    private sealed record WebCitationSummary(string Title, string Extract, string? ImageUrl, string PageUrl);
+    private WebCitationSummary? customTileCitation => Citation.CurrentCustomTileCitation;
 
-    /// <summary>Stable cache key for a shape's Wikipedia entry (kind + species). Null for non-plant kinds.</summary>
-    private static string? WikiKeyFor(Shape s) =>
-        (s.Kind == ShapeKind.Tree || s.Kind == ShapeKind.Bush) && !string.IsNullOrEmpty(s.Label)
-            ? $"{s.Kind}:{s.Label}"
-            : null;
+    private bool customTileCitationLoading => Citation.IsCustomTileCitationLoading;
 
     /// <summary>Synthesizes a transient Shape from a palette item so the info panel can preview it before placement.</summary>
     private static Shape PreviewShapeFromItem(PaletteItem item) => new()
@@ -3822,6 +3814,10 @@ public partial class GardenPlot
     /// <inheritdoc/>
     protected override void OnInitialized()
     {
+        // Issue #95 — re-render whenever the CitationService resolves a fetch or changes
+        // current-tile context. The page is the renderer; the service owns the data.
+        Citation.OnChanged += OnCitationChanged;
+
         // Opt-in perf HUD: enabled when the page is loaded with ?perf=1 (or perf=true).
         // The HUD is otherwise zero-cost: perfStats stays null and the <PerfHud /> child
         // short-circuits its render path on null. The query-param parse is done once
@@ -4140,6 +4136,7 @@ public partial class GardenPlot
         // After every render: if the species we're showing details for changed, refresh the Wikipedia summary.
         // This covers both a real selected shape and a stamp-mode preview (palette item) so previewing details works
         // before the user clicks to place the item.
+        // Issue #95 — focus tracking + fetch now owned by CitationService.
         Shape? detailShape = null;
         if (PrimarySelectedId is Guid id && currentPlot is not null)
         {
@@ -4150,20 +4147,7 @@ public partial class GardenPlot
             detailShape = PreviewShapeFromItem(selectedItem);
         }
 
-        var key = detailShape is null ? null : WikiKeyFor(detailShape);
-        if (key != lastWikiKey)
-        {
-            lastWikiKey = key;
-            if (detailShape is not null && key is not null)
-            {
-                await EnsureWikiSummaryFor(detailShape);
-            }
-            else
-            {
-                wikiSummary = null;
-                wikiLoading = false;
-            }
-        }
+        await Citation.SetFocusedShapeAsync(detailShape);
 
         PaletteItem? detailCustomTileItem = null;
         if (detailShape is not null)
@@ -4175,25 +4159,9 @@ public partial class GardenPlot
             detailCustomTileItem = selectedItem;
         }
 
-        // Issue #93 — stash the resolved item so the user-gesture RequestCitationPreviewAsync
-        // handler can fetch it. Previously this was a local-only value, so the gesture handler
-        // had no way to find the current tile.
-        currentCustomTileForCitation = detailCustomTileItem;
-
-        var customTileKey = detailCustomTileItem is null
-            ? null
-            : $"{detailCustomTileItem.Code}|{detailCustomTileItem.CitationUrl}";
-        if (!string.Equals(customTileKey, lastCustomTileCitationKey, StringComparison.Ordinal))
-        {
-            lastCustomTileCitationKey = customTileKey;
-
-            // Issue #93 — citation summary is no longer auto-fetched on render. A malicious
-            // imported plot / palette with a CitationUrl pointing at LAN devices would
-            // otherwise trigger a browser-driven probe just by selecting the tile. The user
-            // now clicks "Show preview" to opt-in; see RequestCitationPreviewAsync.
-            customTileCitation = null;
-            customTileCitationLoading = false;
-        }
+        // Issue #93 — set the current custom tile so the user-gesture "Show preview" button
+        // knows which tile to fetch. Issue #95 — tracking moved to CitationService.
+        Citation.SetCurrentCustomTile(detailCustomTileItem);
 
         await EnsureFloatingPanelsInViewAsync();
 
@@ -4544,6 +4512,11 @@ public partial class GardenPlot
     public async ValueTask DisposeAsync()
     {
         isDisposingOrDisposed = true;
+
+        // Issue #95 — unsubscribe from CitationService events so a late fetch resolution
+        // after the page is gone doesn't NRE on StateHasChanged.
+        Citation.OnChanged -= OnCitationChanged;
+
         try { if (wheelHandle is not null) await wheelHandle.InvokeVoidAsync("dispose"); } catch { }
         try { if (wheelHandle is not null) await wheelHandle.DisposeAsync(); } catch { }
         try { if (gestureHandle is not null) await gestureHandle.InvokeVoidAsync("dispose"); } catch { }
@@ -6147,14 +6120,8 @@ public partial class GardenPlot
 
     private async Task<string?> TryGetDefaultWikipediaCitationUrl(string code)
     {
-        var topic = WikipediaTopic(code);
-        if (string.IsNullOrWhiteSpace(topic))
-        {
-            return null;
-        }
-
-        var summary = await FetchWikiSummary(topic);
-        return summary?.PageUrl;
+        // Issue #95 — delegated to CitationService.
+        return await Citation.TryGetDefaultWikipediaCitationUrlAsync(code);
     }
 
     private static bool IsCustomTileShape(Shape s)
@@ -6235,164 +6202,39 @@ public partial class GardenPlot
 
     private async Task EnsureCitationSummaryForCustomTile(PaletteItem item)
     {
-        if (string.IsNullOrWhiteSpace(item.CitationUrl))
+        // Issue #95 — delegates to CitationService. The page still exposes this internal
+        // entry point for any non-render-path caller; the gesture handler uses
+        // Citation.RequestCustomTileCitationAsync directly.
+        Citation.SetCurrentCustomTile(item);
+        await Citation.RequestCustomTileCitationAsync();
+    }
+
+    /// <summary>
+    /// Issue #95 — CitationService change notification handler. Re-renders the page so
+    /// the inspector panels (which read CurrentWikiSummary / CurrentCustomTileCitation
+    /// via property shims) reflect the latest fetch state. Marshalled onto the UI
+    /// dispatcher because OnChanged can fire from background async continuations.
+    /// </summary>
+    private void OnCitationChanged()
+    {
+        if (isDisposingOrDisposed)
         {
-            customTileCitation = null;
-            customTileCitationLoading = false;
             return;
         }
 
-        var key = item.CitationUrl.Trim();
-        if (citationCache.TryGetValue(key, out var cached))
-        {
-            customTileCitation = cached;
-            customTileCitationLoading = false;
-            return;
-        }
-
-        customTileCitationLoading = true;
-        customTileCitation = null;
-        var fetched = await FetchCitationSummary(key);
-        citationCache[key] = fetched;
-        customTileCitation = fetched;
-        customTileCitationLoading = false;
+        _ = InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
     /// Issue #93 — user-initiated citation fetch. The previous render-path auto-fetch
     /// was removed (a malicious imported palette could turn the user's browser into a
     /// LAN scanner). The user now clicks "Show preview" to opt-in.
+    /// Issue #95 — delegated to CitationService.
     /// </summary>
     private async Task RequestCitationPreviewAsync()
     {
-        if (currentCustomTileForCitation is null)
-        {
-            return;
-        }
-
-        await EnsureCitationSummaryForCustomTile(currentCustomTileForCitation);
+        await Citation.RequestCustomTileCitationAsync();
         StateHasChanged();
-    }
-
-    private async Task<WebCitationSummary?> FetchCitationSummary(string url)
-    {
-        try
-        {
-            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
-            {
-                return null;
-            }
-
-            // Issue #93 — Wikipedia REST is CORS-friendly and trusted, so the wiki
-            // fast-path bypasses the strict validator below. Everything else has to
-            // pass scheme + host-type + blocked-host checks.
-            if (uri.Host.Contains("wikipedia.org", StringComparison.OrdinalIgnoreCase))
-            {
-                var topic = uri.Segments.LastOrDefault()?.Trim('/');
-                if (!string.IsNullOrWhiteSpace(topic))
-                {
-                    var wiki = await FetchWikiSummary(Uri.UnescapeDataString(topic));
-                    if (wiki is not null)
-                    {
-                        return new WebCitationSummary(wiki.Title, wiki.Extract, wiki.ThumbnailUrl, wiki.PageUrl);
-                    }
-                }
-            }
-
-            // Issue #93 — defense-in-depth URL validation. Rejects http://, IP-literal
-            // hosts, localhost / *.local / *.internal — anything that could turn a
-            // malicious palette / plot import into a browser-driven LAN probe.
-            var (allow, reason) = CitationUrlValidator.IsSafeForFetch(url);
-            if (!allow)
-            {
-                Console.WriteLine($"[#93] citation fetch rejected: {reason} ({url})");
-                return null;
-            }
-
-            var client = Http;
-            client.Timeout = TimeSpan.FromSeconds(8);
-
-            // Issue #93 — read the response headers first so we can reject by content-type
-            // BEFORE pulling the body, and cap the body read at CitationUrlValidator.MaxResponseBytes
-            // so an attacker URL streaming gigabytes of HTML can't exhaust browser memory.
-            using HttpResponseMessage response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
-            }
-
-            string? mediaType = response.Content.Headers.ContentType?.MediaType;
-            if (mediaType is null || !mediaType.Contains("html", StringComparison.OrdinalIgnoreCase))
-            {
-                return null;
-            }
-
-            string html;
-            await using (Stream stream = await response.Content.ReadAsStreamAsync())
-            {
-                byte[] buffer = new byte[CitationUrlValidator.MaxResponseBytes];
-                int total = 0;
-                int read;
-                while (total < buffer.Length && (read = await stream.ReadAsync(buffer.AsMemory(total, buffer.Length - total))) > 0)
-                {
-                    total += read;
-                }
-
-                html = System.Text.Encoding.UTF8.GetString(buffer, 0, total);
-            }
-
-            var title = ExtractMetaContent(html, "og:title")
-                        ?? ExtractMetaNameContent(html, "twitter:title")
-                        ?? ExtractTitleTag(html)
-                        ?? uri.Host;
-            var extract = ExtractMetaContent(html, "og:description")
-                          ?? ExtractMetaNameContent(html, "description")
-                          ?? ExtractMetaNameContent(html, "twitter:description")
-                          ?? string.Empty;
-            var image = ExtractMetaContent(html, "og:image");
-            if (!string.IsNullOrWhiteSpace(image) && Uri.TryCreate(image, UriKind.RelativeOrAbsolute, out var imageUri) && !imageUri.IsAbsoluteUri)
-            {
-                image = new Uri(uri, imageUri).ToString();
-            }
-
-            extract = WebUtility.HtmlDecode(Regex.Replace(extract, "<.*?>", string.Empty)).Trim();
-            if (extract.Length > 420)
-            {
-                extract = extract[..420] + "…";
-            }
-
-            return new WebCitationSummary(WebUtility.HtmlDecode(title).Trim(), extract, image, uri.ToString());
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static string? ExtractMetaContent(string html, string property)
-    {
-        var match = Regex.Match(html, $"<meta\\s+[^>]*property=[\"']{Regex.Escape(property)}[\"'][^>]*content=[\"'](?<content>[^\"']+)[\"'][^>]*>", RegexOptions.IgnoreCase);
-        if (!match.Success)
-        {
-            match = Regex.Match(html, $"<meta\\s+[^>]*content=[\"'](?<content>[^\"']+)[\"'][^>]*property=[\"']{Regex.Escape(property)}[\"'][^>]*>", RegexOptions.IgnoreCase);
-        }
-        return match.Success ? match.Groups["content"].Value : null;
-    }
-
-    private static string? ExtractMetaNameContent(string html, string name)
-    {
-        var match = Regex.Match(html, $"<meta\\s+[^>]*name=[\"']{Regex.Escape(name)}[\"'][^>]*content=[\"'](?<content>[^\"']+)[\"'][^>]*>", RegexOptions.IgnoreCase);
-        if (!match.Success)
-        {
-            match = Regex.Match(html, $"<meta\\s+[^>]*content=[\"'](?<content>[^\"']+)[\"'][^>]*name=[\"']{Regex.Escape(name)}[\"'][^>]*>", RegexOptions.IgnoreCase);
-        }
-        return match.Success ? match.Groups["content"].Value : null;
-    }
-
-    private static string? ExtractTitleTag(string html)
-    {
-        var match = Regex.Match(html, "<title>(?<title>.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-        return match.Success ? match.Groups["title"].Value : null;
     }
 
     private async Task OnCustomTilePreviewImageSelected(InputFileChangeEventArgs e)
@@ -14519,73 +14361,7 @@ public partial class GardenPlot
 
     private static string Esc(string s) => System.Net.WebUtility.HtmlEncode(s);
 
-    // ===== Wikipedia lookup =====
-
-    private static string WikipediaTopic(string code)
-    {
-        var idx = code.IndexOf('(');
-        return (idx > 0 ? code.Substring(0, idx) : code).Trim();
-    }
-
-    private async Task EnsureWikiSummaryFor(Shape s)
-    {
-        if (s.Kind != ShapeKind.Tree && s.Kind != ShapeKind.Bush && !IsTileShape(s))
-        {
-            wikiSummary = null;
-            wikiLoading = false;
-            return;
-        }
-        var topic = WikipediaTopic(s.Label ?? "");
-        if (string.IsNullOrEmpty(topic)) { wikiSummary = null; return; }
-        if (wikiCache.TryGetValue(topic, out var cached))
-        {
-            wikiSummary = cached;
-            wikiLoading = false;
-            return;
-        }
-        wikiLoading = true;
-        wikiSummary = null;
-        StateHasChanged();
-        var result = await FetchWikiSummary(topic);
-        wikiCache[topic] = result;
-        if (lastWikiKey == WikiKeyFor(s))
-        {
-            wikiSummary = result;
-            wikiLoading = false;
-            StateHasChanged();
-        }
-    }
-
-    private async Task<WikiSummary?> FetchWikiSummary(string topic)
-    {
-        try
-        {
-            var http = Http;
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("GardenPlotWeb/1.0 (+local)");
-            var url = $"https://en.wikipedia.org/api/rest_v1/page/summary/{Uri.EscapeDataString(topic)}";
-            using var resp = await http.GetAsync(url);
-            if (!resp.IsSuccessStatusCode) return null;
-            using var stream = await resp.Content.ReadAsStreamAsync();
-            using var doc = await JsonDocument.ParseAsync(stream);
-            var root = doc.RootElement;
-            var title = root.TryGetProperty("title", out var tEl) ? tEl.GetString() ?? topic : topic;
-            var extract = root.TryGetProperty("extract", out var ex) ? ex.GetString() ?? "" : "";
-            string? thumb = null;
-            if (root.TryGetProperty("thumbnail", out var th) && th.TryGetProperty("source", out var ts))
-                thumb = ts.GetString();
-            string? page = null;
-            if (root.TryGetProperty("content_urls", out var cu)
-                && cu.TryGetProperty("desktop", out var dt)
-                && dt.TryGetProperty("page", out var pg))
-                page = pg.GetString();
-            page ??= $"https://en.wikipedia.org/wiki/{Uri.EscapeDataString(topic)}";
-            return new WikiSummary(title, extract, thumb, page);
-        }
-        catch
-        {
-            return null;
-        }
-    }
+    // Issue #95 — Wikipedia lookup moved to CitationService (see Services/CitationService.cs).
 
     /// <summary>Translates a shape by (dx, dy), handling both bounding-box and point-based kinds.</summary>
     private static void ShiftShape(Shape s, double dx, double dy)

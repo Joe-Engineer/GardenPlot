@@ -1,4 +1,4 @@
-// <copyright file="ServiceCollectionExtensions.cs" company="Garden Plot">
+﻿// <copyright file="ServiceCollectionExtensions.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -48,6 +48,11 @@ public static class ServiceCollectionExtensions
 
         // Project dossier helpers (as-built cloning, PNG export, photo storage via IJSRuntime, catalog suggestions).
         _ = services.AddScoped<ProjectDossierService>();
+
+        // Issue #95 — Wikipedia + OpenGraph citation lookup, extracted from GardenPlot.razor.cs.
+        // Scoped: per-circuit cache + per-circuit "current focus" state. Subscribers (the
+        // page) listen on CitationService.OnChanged to re-render when summaries resolve.
+        _ = services.AddScoped<CitationService>();
 
         return services;
     }
