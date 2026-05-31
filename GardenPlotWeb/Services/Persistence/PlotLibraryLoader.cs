@@ -515,7 +515,7 @@ public sealed class PlotLibraryLoader
         return shape.Kind switch
         {
             ShapeKind.Edge => "lf",
-            ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.SoilMarker or ShapeKind.IrrigationHead or ShapeKind.WaterSource or ShapeKind.IrrigationControl => "ea",
+            ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.SoilMarker or ShapeKind.IrrigationHead or ShapeKind.WaterSource or ShapeKind.IrrigationControl or ShapeKind.IrrigationFitting => "ea",
             ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw => "ea",
             ShapeKind.Ruler or ShapeKind.CircleRuler or ShapeKind.RectRuler => "ea",
             ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire => "lf",

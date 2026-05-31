@@ -429,6 +429,65 @@
                 }
 
                 break;
+            case ShapeKind.IrrigationFitting:
+                @* Issue #162a — pipe fitting: distinct icon per fitting type, sized to the
+                   fitting's diameter (footprint = diameterFt × 1.6 for visual weight). All
+                   centered at the shape's bbox center. *@
+                {
+                    var fitCx = s.X + s.W / 2;
+                    var fitCy = s.Y + s.H / 2;
+                    var fitR = Math.Max(s.W, s.H) * 0.6;
+                    var fitFill = s.Fill ?? "#cfd0d2";
+                    var fitStroke = s.Stroke ?? "#5a5a5a";
+                    var fitType = s.FittingType;
+                    if (fitType == GardenPlotWeb.Models.FittingType.Elbow90)
+                    {
+                        @* 90° elbow: small filled square rotated 45° (diamond) with a corner dot. *@
+                        <rect x="@GardenPlot.F(fitCx - fitR * 0.7)" y="@GardenPlot.F(fitCy - fitR * 0.7)"
+                              width="@GardenPlot.F(fitR * 1.4)" height="@GardenPlot.F(fitR * 1.4)"
+                              fill="@fitFill" stroke="@fitStroke" stroke-width="0.04"
+                              transform="rotate(45 @GardenPlot.F(fitCx) @GardenPlot.F(fitCy))" />
+                    }
+                    else if (fitType == GardenPlotWeb.Models.FittingType.Elbow45)
+                    {
+                        @* 45° elbow: smaller filled square rotated 22.5° for distinction. *@
+                        <rect x="@GardenPlot.F(fitCx - fitR * 0.6)" y="@GardenPlot.F(fitCy - fitR * 0.6)"
+                              width="@GardenPlot.F(fitR * 1.2)" height="@GardenPlot.F(fitR * 1.2)"
+                              fill="@fitFill" stroke="@fitStroke" stroke-width="0.04"
+                              transform="rotate(22.5 @GardenPlot.F(fitCx) @GardenPlot.F(fitCy))" />
+                    }
+                    else if (fitType == GardenPlotWeb.Models.FittingType.Tee)
+                    {
+                        @* Tee: T-shape (horizontal bar + vertical stem). *@
+                        <rect x="@GardenPlot.F(fitCx - fitR * 0.9)" y="@GardenPlot.F(fitCy - fitR * 0.25)"
+                              width="@GardenPlot.F(fitR * 1.8)" height="@GardenPlot.F(fitR * 0.5)"
+                              fill="@fitFill" stroke="@fitStroke" stroke-width="0.04" />
+                        <rect x="@GardenPlot.F(fitCx - fitR * 0.25)" y="@GardenPlot.F(fitCy - fitR * 0.25)"
+                              width="@GardenPlot.F(fitR * 0.5)" height="@GardenPlot.F(fitR * 0.9)"
+                              fill="@fitFill" stroke="@fitStroke" stroke-width="0.04" />
+                    }
+                    else if (fitType == GardenPlotWeb.Models.FittingType.Coupling)
+                    {
+                        @* Coupling: short narrow rectangle (a bushing along the pipe). *@
+                        <rect x="@GardenPlot.F(fitCx - fitR * 0.7)" y="@GardenPlot.F(fitCy - fitR * 0.25)"
+                              width="@GardenPlot.F(fitR * 1.4)" height="@GardenPlot.F(fitR * 0.5)"
+                              fill="@fitFill" stroke="@fitStroke" stroke-width="0.04" />
+                    }
+                    else if (fitType == GardenPlotWeb.Models.FittingType.Adapter)
+                    {
+                        @* Adapter / reducer: trapezoid (wide → narrow). *@
+                        <path d="M @GardenPlot.F(fitCx - fitR * 0.9) @GardenPlot.F(fitCy - fitR * 0.5) L @GardenPlot.F(fitCx + fitR * 0.9) @GardenPlot.F(fitCy - fitR * 0.3) L @GardenPlot.F(fitCx + fitR * 0.9) @GardenPlot.F(fitCy + fitR * 0.3) L @GardenPlot.F(fitCx - fitR * 0.9) @GardenPlot.F(fitCy + fitR * 0.5) Z"
+                              fill="@fitFill" stroke="@fitStroke" stroke-width="0.04" />
+                    }
+                    else
+                    {
+                        @* Fallback: filled circle. *@
+                        <circle cx="@GardenPlot.F(fitCx)" cy="@GardenPlot.F(fitCy)" r="@GardenPlot.F(fitR * 0.6)"
+                                fill="@fitFill" stroke="@fitStroke" stroke-width="0.04" />
+                    }
+                }
+
+                break;
         }
         @if (!IsConceptMode && SelectedIds.Contains(s.Id))
         {

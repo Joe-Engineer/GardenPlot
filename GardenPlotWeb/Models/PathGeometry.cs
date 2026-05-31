@@ -40,6 +40,7 @@ public static class PathGeometry
             ShapeKind.WaterSource => false,
             ShapeKind.IrrigationControl => false,
             ShapeKind.IrrigationWire => false,
+            ShapeKind.IrrigationFitting => false,
             _ => false,
         };
     }
@@ -73,6 +74,7 @@ public static class PathGeometry
             ShapeKind.WaterSource => (Array.Empty<Point>(), false),
             ShapeKind.IrrigationControl => (Array.Empty<Point>(), false),
             ShapeKind.IrrigationWire => (shape.Points ?? new List<Point>(), false),
+            ShapeKind.IrrigationFitting => (Array.Empty<Point>(), false),
             _ => (Array.Empty<Point>(), false),
         };
     }

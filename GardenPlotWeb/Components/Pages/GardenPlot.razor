@@ -920,6 +920,7 @@ else
                             PaletteKind.WaterSource => $"{item.Trait} · {item.Notes}",
                             PaletteKind.IrrigationControl => $"{item.Trait} · {item.Notes}",
                             PaletteKind.IrrigationWire => $"{item.Notes}",
+                            PaletteKind.IrrigationFitting => $"{item.WidthFt * 12:0.##}\" Ø · {item.Notes}",
                             _ => $"{item.WidthFt:0.#}' Ø · {item.Trait}",
                         };
                         <button class="palette-item @(isActive ? "active" : "")"
@@ -3178,6 +3179,65 @@ else
                         @if (isPreview)
                         {
                             <div class="x-small text-muted mt-1">Polyline tool is active — click to draw the wire; double-click to finish.</div>
+                        }
+                    </div>
+                }
+
+                @* Issue #162a — pipe fitting detail panel. Shows type (with reclassify dropdown),
+                   diameter, material. Manually-placed and auto-placed fittings share this UI. *@
+                @if (single!.Kind == ShapeKind.IrrigationFitting)
+                {
+                    var fitType = single!.FittingType;
+                    var fitDiam = single!.FittingDiameterIn;
+                    var fitMat = single!.FittingMaterial;
+                    var fitSelectedArray = new[] { single! };
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Pipe Fitting</div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Code:</span>
+                            <strong>@(single!.Label ?? "(unnamed)")</strong>
+                        </div>
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Type:</span>
+                            <select class="form-select form-select-sm" style="max-width: 9rem;"
+                                    value="@(fitType?.ToString() ?? string.Empty)"
+                                    disabled="@isPreview"
+                                    @onchange="(e) => OnFittingTypeChanged(fitSelectedArray, e)">
+                                <option value="@GardenPlotWeb.Models.FittingType.Elbow90">Elbow 90°</option>
+                                <option value="@GardenPlotWeb.Models.FittingType.Elbow45">Elbow 45°</option>
+                                <option value="@GardenPlotWeb.Models.FittingType.Tee">Tee</option>
+                                <option value="@GardenPlotWeb.Models.FittingType.Coupling">Coupling</option>
+                                <option value="@GardenPlotWeb.Models.FittingType.Adapter">Adapter</option>
+                            </select>
+                        </div>
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Diameter:</span>
+                            <input type="number" min="0" step="0.125" class="form-control form-control-sm" style="max-width: 6rem;"
+                                   value="@(fitDiam is double d ? F(d) : string.Empty)"
+                                   disabled="@isPreview"
+                                   @onchange="(e) => OnFittingDiameterChanged(fitSelectedArray, e)" />
+                            <span class="small text-muted">in</span>
+                        </div>
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Material:</span>
+                            <select class="form-select form-select-sm" style="max-width: 7rem;"
+                                    value="@(fitMat ?? string.Empty)"
+                                    disabled="@isPreview"
+                                    @onchange="(e) => OnFittingMaterialChanged(fitSelectedArray, e)">
+                                <option value="">(none)</option>
+                                <option value="PVC">PVC</option>
+                                <option value="Poly">Poly</option>
+                                <option value="Copper">Copper</option>
+                                <option value="DripTubing">Drip tubing</option>
+                            </select>
+                        </div>
+                        @if (isPreview)
+                        {
+                            <div class="x-small text-muted mt-1">Click on the canvas to drop this fitting.</div>
+                        }
+                        else
+                        {
+                            <div class="x-small text-muted mt-1">Auto-placed fittings appear at sharp pipe vertices when you finish drawing a pipe.</div>
                         }
                     </div>
                 }

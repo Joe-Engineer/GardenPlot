@@ -611,6 +611,18 @@ public sealed class ProjectDossierService
                 }
 
                 break;
+            case ShapeKind.IrrigationFitting:
+                // Issue #162a — dossier render: small filled circle representing the joint.
+                // Fitting type isn't disambiguated in the dossier render (would crowd the
+                // plan view); the canvas render carries the distinct icons.
+                {
+                    double fitCx = shape.X + (shape.W / 2);
+                    double fitCy = shape.Y + (shape.H / 2);
+                    double fitR = Math.Max(shape.W, shape.H) * 0.6;
+                    _ = sb.Append("<circle cx=\"").Append(F(fitCx)).Append("\" cy=\"").Append(F(fitCy)).Append("\" r=\"").Append(F(fitR)).Append("\" fill=\"").Append(fill).Append("\" stroke=\"").Append(stroke).Append("\" stroke-width=\"0.04\" />");
+                }
+
+                break;
             default:
                 break;
         }
@@ -702,6 +714,7 @@ public sealed class ProjectDossierService
             ShapeKind.WaterSource => "#1f4e7a",
             ShapeKind.IrrigationControl => "#2c2c2c",
             ShapeKind.IrrigationWire => "#7a1f4a",
+            ShapeKind.IrrigationFitting => "#5a5a5a",
             _ => "#2f5a3a",
         };
     }
@@ -732,6 +745,7 @@ public sealed class ProjectDossierService
             ShapeKind.WaterSource => "#9bc7e0",
             ShapeKind.IrrigationControl => "#bdbdbd",
             ShapeKind.IrrigationWire => "#d4a8c0",
+            ShapeKind.IrrigationFitting => "#cfd0d2",
             _ => "#9fcf9f",
         };
     }
@@ -757,6 +771,7 @@ public sealed class ProjectDossierService
             ShapeKind.WaterSource => 1.0,
             ShapeKind.IrrigationControl => 1.0,
             ShapeKind.IrrigationWire => 0,
+            ShapeKind.IrrigationFitting => 1.0,
             _ => 0.6,
         };
     }

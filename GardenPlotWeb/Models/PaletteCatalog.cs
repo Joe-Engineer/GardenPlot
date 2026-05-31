@@ -322,6 +322,44 @@ public static class PaletteCatalog
         new("Wire (13-conductor 18 AWG)", PaletteKind.IrrigationWire, 0.45 / 12.0, 0.45 / 12.0, "Wire", Notes: "13 conductor, 18 AWG", StrokeColor: "#7a1f4a", FillColor: "#d4a8c0"),
     ];
 
+    /// <summary>
+    /// Issue #162a — pipe fittings: elbows, tees, couplings, adapters. Each entry encodes the
+    /// fitting type + material + diameter so the takeoff can group counts per (type, material,
+    /// diameter). Auto-placement at pipe vertices reuses these entries by Code lookup; manual
+    /// placement uses the palette stamp tool. The catalog is intentionally compact — most jobs
+    /// use the same 3-4 diameters in 1-2 materials, and exotic sizes can be palette-added later.
+    /// </summary>
+    public static readonly PaletteItem[] IrrigationFittings =
+    [
+        // PVC fittings — schedule 40 sweep & threaded options
+        new("PVC ½\" Elbow 90°", PaletteKind.IrrigationFitting, 0.5 / 12.0, 0.5 / 12.0, "Elbow90", Notes: "PVC ½\" 90° elbow", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC ½\" Elbow 45°", PaletteKind.IrrigationFitting, 0.5 / 12.0, 0.5 / 12.0, "Elbow45", Notes: "PVC ½\" 45° elbow", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC ½\" Tee", PaletteKind.IrrigationFitting, 0.5 / 12.0, 0.5 / 12.0, "Tee", Notes: "PVC ½\" tee", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC ½\" Coupling", PaletteKind.IrrigationFitting, 0.5 / 12.0, 0.5 / 12.0, "Coupling", Notes: "PVC ½\" coupling", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC ¾\" Elbow 90°", PaletteKind.IrrigationFitting, 0.75 / 12.0, 0.75 / 12.0, "Elbow90", Notes: "PVC ¾\" 90° elbow", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC ¾\" Elbow 45°", PaletteKind.IrrigationFitting, 0.75 / 12.0, 0.75 / 12.0, "Elbow45", Notes: "PVC ¾\" 45° elbow", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC ¾\" Tee", PaletteKind.IrrigationFitting, 0.75 / 12.0, 0.75 / 12.0, "Tee", Notes: "PVC ¾\" tee", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC ¾\" Coupling", PaletteKind.IrrigationFitting, 0.75 / 12.0, 0.75 / 12.0, "Coupling", Notes: "PVC ¾\" coupling", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC 1\" Elbow 90°", PaletteKind.IrrigationFitting, 1.0 / 12.0, 1.0 / 12.0, "Elbow90", Notes: "PVC 1\" 90° elbow", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC 1\" Elbow 45°", PaletteKind.IrrigationFitting, 1.0 / 12.0, 1.0 / 12.0, "Elbow45", Notes: "PVC 1\" 45° elbow", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC 1\" Tee", PaletteKind.IrrigationFitting, 1.0 / 12.0, 1.0 / 12.0, "Tee", Notes: "PVC 1\" tee", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC 1\" Coupling", PaletteKind.IrrigationFitting, 1.0 / 12.0, 1.0 / 12.0, "Coupling", Notes: "PVC 1\" coupling", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+
+        // Poly / drip fittings — barbed
+        new("Poly ½\" Elbow 90°", PaletteKind.IrrigationFitting, 0.5 / 12.0, 0.5 / 12.0, "Elbow90", Notes: "Poly ½\" 90° barbed elbow", StrokeColor: "#2a2a2a", FillColor: "#5a5a5a"),
+        new("Poly ½\" Tee", PaletteKind.IrrigationFitting, 0.5 / 12.0, 0.5 / 12.0, "Tee", Notes: "Poly ½\" barbed tee", StrokeColor: "#2a2a2a", FillColor: "#5a5a5a"),
+        new("Poly ½\" Coupling", PaletteKind.IrrigationFitting, 0.5 / 12.0, 0.5 / 12.0, "Coupling", Notes: "Poly ½\" barbed coupling", StrokeColor: "#2a2a2a", FillColor: "#5a5a5a"),
+
+        // Copper fittings — soldered
+        new("Copper ¾\" Elbow 90°", PaletteKind.IrrigationFitting, 0.75 / 12.0, 0.75 / 12.0, "Elbow90", Notes: "Copper ¾\" 90° sweat elbow", StrokeColor: "#b7521a", FillColor: "#d2733a"),
+        new("Copper ¾\" Tee", PaletteKind.IrrigationFitting, 0.75 / 12.0, 0.75 / 12.0, "Tee", Notes: "Copper ¾\" sweat tee", StrokeColor: "#b7521a", FillColor: "#d2733a"),
+        new("Copper ¾\" Coupling", PaletteKind.IrrigationFitting, 0.75 / 12.0, 0.75 / 12.0, "Coupling", Notes: "Copper ¾\" sweat coupling", StrokeColor: "#b7521a", FillColor: "#d2733a"),
+
+        // Adapters / reducers — diameter or material transitions
+        new("PVC ¾\" × ½\" Reducer", PaletteKind.IrrigationFitting, 0.75 / 12.0, 0.75 / 12.0, "Adapter", Notes: "PVC ¾\" × ½\" reducer bushing", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+        new("PVC 1\" × ¾\" Reducer", PaletteKind.IrrigationFitting, 1.0 / 12.0, 1.0 / 12.0, "Adapter", Notes: "PVC 1\" × ¾\" reducer bushing", StrokeColor: "#5a5a5a", FillColor: "#cfd0d2"),
+    ];
+
     public static IReadOnlyList<PaletteItem> For(PaletteKind kind)
     {
         return kind switch
@@ -341,6 +379,7 @@ public static class PaletteCatalog
             PaletteKind.WaterSource => WaterSources,
             PaletteKind.IrrigationControl => IrrigationControls,
             PaletteKind.IrrigationWire => IrrigationWires,
+            PaletteKind.IrrigationFitting => IrrigationFittings,
             _ => [],
         };
     }
@@ -825,6 +864,7 @@ public static class PaletteCatalog
             WaterSources,
             IrrigationControls,
             IrrigationWires,
+            IrrigationFittings,
         ];
 
         foreach (PaletteItem[] bucket in buckets)
@@ -885,6 +925,7 @@ public static class PaletteCatalog
             PaletteCategory.WaterSources => WaterSources,
             PaletteCategory.IrrigationControls => IrrigationControls,
             PaletteCategory.IrrigationWires => IrrigationWires,
+            PaletteCategory.IrrigationFittings => IrrigationFittings,
             PaletteCategory.GrassesTurf => [.. Grasses.Where(g => g.Kind == PaletteKind.GroundCoverSurface)],
             PaletteCategory.GrassesOrnamental => [.. Grasses.Where(g => string.Equals(g.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(IsOrnamentalGrassSurfaceItem))],
             PaletteCategory.Succulents => [.. Plants.Where(p => string.Equals(p.Trait, "succulent", StringComparison.OrdinalIgnoreCase))],
@@ -968,6 +1009,7 @@ public static class PaletteCatalog
             PaletteKind.WaterSource => PaletteCategory.WaterSources,
             PaletteKind.IrrigationControl => PaletteCategory.IrrigationControls,
             PaletteKind.IrrigationWire => PaletteCategory.IrrigationWires,
+            PaletteKind.IrrigationFitting => PaletteCategory.IrrigationFittings,
             _ => PaletteCategory.BedKits,
         };
     }

@@ -41,6 +41,7 @@ public static class PaletteCategoryDefaults
         PaletteCategory.WaterSources,
         PaletteCategory.IrrigationControls,
         PaletteCategory.IrrigationWires,
+        PaletteCategory.IrrigationFittings,
     };
 
     /// <summary>Display grouping for the settings dialog (label + categories in order).</summary>
@@ -62,6 +63,7 @@ public static class PaletteCategoryDefaults
             PaletteCategory.WaterSources,
             PaletteCategory.IrrigationControls,
             PaletteCategory.IrrigationWires,
+            PaletteCategory.IrrigationFittings,
         ]),
         ("Trees",
         [

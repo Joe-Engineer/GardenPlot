@@ -2806,6 +2806,12 @@ public partial class GardenPlot
         // Issue #161 — wire conductor count + gauge from Notes ("5 conductor, 18 AWG").
         ConductorCount = item.Kind == PaletteKind.IrrigationWire ? ParseConductorCountFromNotes(item.Notes) : null,
         WireGaugeAwg = item.Kind == PaletteKind.IrrigationWire ? ParseWireGaugeFromNotes(item.Notes) : null,
+
+        // Issue #162a — pipe fitting type + diameter + material so the inspector preview shows
+        // the right Type / Diameter / Material rows before the user drops the fitting.
+        FittingType = item.Kind == PaletteKind.IrrigationFitting ? ParseFittingType(item.Trait) : null,
+        FittingDiameterIn = item.Kind == PaletteKind.IrrigationFitting ? item.WidthFt * 12.0 : null,
+        FittingMaterial = item.Kind == PaletteKind.IrrigationFitting ? ParseFittingMaterial(item.Notes) : null,
     };
 
     /// <summary>
@@ -5604,6 +5610,7 @@ public partial class GardenPlot
         PaletteCategory.WaterSources => "Irrigation — Sources",
         PaletteCategory.IrrigationControls => "Irrigation — Controls",
         PaletteCategory.IrrigationWires => "Irrigation — Wire",
+        PaletteCategory.IrrigationFittings => "Irrigation — Fittings",
         _ => k.ToString(),
     };
 
@@ -5624,7 +5631,8 @@ public partial class GardenPlot
             or PaletteCategory.IrrigationPipes
             or PaletteCategory.WaterSources
             or PaletteCategory.IrrigationControls
-            or PaletteCategory.IrrigationWires);
+            or PaletteCategory.IrrigationWires
+            or PaletteCategory.IrrigationFittings);
     }
 
     private IReadOnlyList<PaletteItem> PaletteItemsForCurrentCategory()
@@ -6745,6 +6753,7 @@ public partial class GardenPlot
             PaletteKind.WaterSource => PaletteCatalog.WaterSources.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.IrrigationControl => PaletteCatalog.IrrigationControls.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.IrrigationWire => PaletteCatalog.IrrigationWires.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.IrrigationFitting => PaletteCatalog.IrrigationFittings.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.BedKit => PaletteCatalog.BedKits.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             // Issue #138 — volume materials (mulch / gravel / soil / rock) live in
             // GroundCoverMaterials and carry MaterialSoldBy.Volume + DefaultDepthIn.
@@ -7770,6 +7779,7 @@ public partial class GardenPlot
         PaletteKind.WaterSource => ShapeKind.WaterSource,
         PaletteKind.IrrigationControl => ShapeKind.IrrigationControl,
         PaletteKind.IrrigationWire => ShapeKind.IrrigationWire,
+        PaletteKind.IrrigationFitting => ShapeKind.IrrigationFitting,
         _ => ShapeKind.BedKit,
     };
 
@@ -7823,6 +7833,18 @@ public partial class GardenPlot
                 : null,
             WireGaugeAwg = item.Kind == PaletteKind.IrrigationWire
                 ? ParseWireGaugeFromNotes(item.Notes)
+                : null,
+
+            // Issue #162a — pipe fittings carry type + diameter + material on the shape so the
+            // BOM can group counts per (type, material, diameter) without re-reading the catalog.
+            FittingType = item.Kind == PaletteKind.IrrigationFitting
+                ? ParseFittingType(item.Trait)
+                : null,
+            FittingDiameterIn = item.Kind == PaletteKind.IrrigationFitting
+                ? item.WidthFt * 12.0
+                : null,
+            FittingMaterial = item.Kind == PaletteKind.IrrigationFitting
+                ? ParseFittingMaterial(item.Notes)
                 : null,
         };
     }
@@ -7930,6 +7952,38 @@ public partial class GardenPlot
         return match.Success && int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)
             ? n
             : null;
+    }
+
+    /// <summary>Issue #162a — parses 'Elbow90' / 'Elbow45' / 'Tee' / 'Coupling' / 'Adapter' from the catalog trait.</summary>
+    private static FittingType? ParseFittingType(string? trait)
+    {
+        return trait switch
+        {
+            "Elbow90" => GardenPlotWeb.Models.FittingType.Elbow90,
+            "Elbow45" => GardenPlotWeb.Models.FittingType.Elbow45,
+            "Tee" => GardenPlotWeb.Models.FittingType.Tee,
+            "Coupling" => GardenPlotWeb.Models.FittingType.Coupling,
+            "Adapter" => GardenPlotWeb.Models.FittingType.Adapter,
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Issue #162a — pulls the pipe material out of a fitting's Notes string. Catalog patterns
+    /// like "PVC ¾\" tee", "Poly ½\" 90° barbed elbow", "Copper ¾\" sweat coupling".
+    /// </summary>
+    private static string? ParseFittingMaterial(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            return null;
+        }
+
+        if (notes.StartsWith("PVC", StringComparison.OrdinalIgnoreCase)) { return "PVC"; }
+        if (notes.StartsWith("Poly", StringComparison.OrdinalIgnoreCase)) { return "Poly"; }
+        if (notes.StartsWith("Copper", StringComparison.OrdinalIgnoreCase)) { return "Copper"; }
+        if (notes.Contains("drip", StringComparison.OrdinalIgnoreCase)) { return "DripTubing"; }
+        return null;
     }
 
     private sealed class StampPlacement
@@ -10441,6 +10495,19 @@ public partial class GardenPlot
             NormalizeEdgeBulgesOnCommit(drafting); // issue #130
             RecordUndoState();
             currentPlot.Shapes.Add(drafting);
+
+            // Issue #162a — auto-place elbow fittings at sharp interior vertices of a
+            // freshly drawn irrigation pipe. We mutate the plot before SaveAsync so the
+            // committed shape + its derived fittings persist as a single transaction.
+            if (drafting.Kind == ShapeKind.IrrigationPipe)
+            {
+                var autoFittings = FittingPlacement.BuildAutoElbowsForPipe(drafting);
+                foreach (Shape fitting in autoFittings)
+                {
+                    currentPlot.Shapes.Add(fitting);
+                }
+            }
+
             // Issue #138 — if a drawing set is active AND it has PaintAsDrawn=true, run
             // Along-path placement against the freshly drawn path. Capture the id before
             // resetting drafting state below.
@@ -12265,6 +12332,80 @@ public partial class GardenPlot
         await SaveAsync();
     }
 
+    /// <summary>Issue #162a — change a pipe fitting's type via the inspector dropdown.</summary>
+    private async Task OnFittingTypeChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw) || !Enum.TryParse<FittingType>(raw, out var type))
+        {
+            return;
+        }
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationFitting)
+            {
+                shape.FittingType = type;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #162a — change a pipe fitting's nominal diameter (inches).</summary>
+    private async Task OnFittingDiameterChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        double? value = string.IsNullOrWhiteSpace(raw)
+            ? null
+            : double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) ? parsed : (double?)null;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationFitting)
+            {
+                shape.FittingDiameterIn = value;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #162a — change a pipe fitting's material ('PVC' / 'Poly' / 'Copper' / 'DripTubing').</summary>
+    private async Task OnFittingMaterialChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        string? value = string.IsNullOrWhiteSpace(raw) ? null : raw;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationFitting)
+            {
+                shape.FittingMaterial = value;
+            }
+        }
+
+        await SaveAsync();
+    }
+
     private async Task SetShapeRotationAsync(IReadOnlyList<Shape> shapes, double normalizedDegrees)
     {
         if (shapes.Count == 0)
@@ -13876,6 +14017,7 @@ public partial class GardenPlot
             ShapeKind.WaterSource => $"Water Source · {s.Label}",
             ShapeKind.IrrigationControl => $"Irrigation Control · {s.Label}",
             ShapeKind.IrrigationWire => $"Irrigation Wire · {s.Label}",
+            ShapeKind.IrrigationFitting => $"Irrigation Fitting · {s.Label}",
             _ => "Item",
         };
     }
