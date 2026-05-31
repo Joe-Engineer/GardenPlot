@@ -2471,6 +2471,10 @@ else
                                             <td>@row.Kind</td>
                                             <td>
                                                 @row.Name
+                                                @if (!string.IsNullOrWhiteSpace(row.Notes))
+                                                {
+                                                    <div class="x-small text-muted">@row.Notes</div>
+                                                }
                                                 @if (row.Unbound)
                                                 {
                                                     <span class="text-warning-emphasis small ms-1" title="Catalog item not found">(Unbound)</span>
