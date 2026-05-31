@@ -146,7 +146,6 @@ public sealed class JigRegistryTests
     }
 
     // ==== Trait-jig tests (PR 3b) ====
-
     [Fact]
     public void GroundCoverSurfaceJig_MatchesSurface_NotVolume()
     {
