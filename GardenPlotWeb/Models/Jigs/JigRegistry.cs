@@ -99,6 +99,8 @@ public static class JigRegistry
 
             // Kind-jigs (one per ShapeKind).
             new IrrigationHeadJig(),
+            new IrrigationPipeJig(),
+            new IrrigationWireJig(),
             new WaterSourceJig(),
         };
     }

@@ -100,6 +100,18 @@ public abstract class Jig
     /// Default: 1.
     /// </summary>
     public virtual double TakeoffQuantity(Shape shape) => 1;
+
+    /// <summary>
+    /// Optional human-readable notes string for the takeoff row (rendered as a small
+    /// subtitle under the item name, e.g. "3 sticks @ 20 ft · 0.0% waste" for pipes).
+    /// Default: <see langword="null"/> (no notes).
+    /// </summary>
+    /// <remarks>
+    /// When non-null, the live editor's takeoff refresh pass overwrites <see cref="TakeoffItem.Notes"/>
+    /// on each reconcile so the rollup stays current as the underlying shape edits. When null, any
+    /// existing Notes on the row are preserved (so user-authored notes on non-Jig rows aren't wiped).
+    /// </remarks>
+    public virtual string? TakeoffNotes(Shape shape) => null;
 }
 
 /// <summary>
