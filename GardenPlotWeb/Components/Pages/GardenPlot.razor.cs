@@ -7858,179 +7858,42 @@ public partial class GardenPlot
     }
 
     /// <summary>Issue #160 — parses 'Faucet' / 'Spring' / 'Pump' from the catalog trait.</summary>
+    // Issue #95 PR 2/3 — parse helpers extracted to Models/CatalogParse.cs.
+    // The page-level wrappers below stay as one-line delegates to keep the existing
+    // BuildStampShapeAt / PreviewShapeFromItem / inspector handler call sites stable
+    // for this PR. A follow-up can inline-replace the callers and delete the shims.
     private static WaterSourceType? ParseWaterSourceType(string? trait)
-    {
-        return trait switch
-        {
-            "Faucet" => GardenPlotWeb.Models.WaterSourceType.Faucet,
-            "Spring" => GardenPlotWeb.Models.WaterSourceType.Spring,
-            "Pump" => GardenPlotWeb.Models.WaterSourceType.Pump,
-            _ => null,
-        };
-    }
+        => CatalogParse.ParseWaterSourceType(trait);
 
-    /// <summary>
-    /// Issue #160 — pulls a GPM value out of the catalog Notes string. Catalog uses
-    /// patterns like '10 GPM at 50 PSI', '2 GPM, gravity-fed'. Returns null when no
-    /// number-then-GPM pair is found.
-    /// </summary>
     private static double? ParseFlowFromNotes(string? notes)
-    {
-        if (string.IsNullOrWhiteSpace(notes))
-        {
-            return null;
-        }
+        => CatalogParse.ParseFlowFromNotes(notes);
 
-        var match = System.Text.RegularExpressions.Regex.Match(notes, @"(\d+(?:\.\d+)?)\s*GPM", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double gpm)
-            ? gpm
-            : null;
-    }
-
-    /// <summary>Issue #160 — pulls a PSI value out of the catalog Notes string.</summary>
     private static double? ParsePressureFromNotes(string? notes)
-    {
-        if (string.IsNullOrWhiteSpace(notes))
-        {
-            return null;
-        }
+        => CatalogParse.ParsePressureFromNotes(notes);
 
-        var match = System.Text.RegularExpressions.Regex.Match(notes, @"(\d+(?:\.\d+)?)\s*PSI", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double psi)
-            ? psi
-            : null;
-    }
-
-    /// <summary>Issue #161 — parses 'Controller' / 'Manifold' / 'Valve' / etc. from the catalog trait.</summary>
     private static IrrigationControlType? ParseIrrigationControlType(string? trait)
-    {
-        return trait switch
-        {
-            "Controller" => GardenPlotWeb.Models.IrrigationControlType.Controller,
-            "Manifold" => GardenPlotWeb.Models.IrrigationControlType.Manifold,
-            "Valve" => GardenPlotWeb.Models.IrrigationControlType.Valve,
-            "Backflow" => GardenPlotWeb.Models.IrrigationControlType.Backflow,
-            "PressureRegulator" => GardenPlotWeb.Models.IrrigationControlType.PressureRegulator,
-            "Filter" => GardenPlotWeb.Models.IrrigationControlType.Filter,
-            "QuickCoupler" => GardenPlotWeb.Models.IrrigationControlType.QuickCoupler,
-            _ => null,
-        };
-    }
+        => CatalogParse.ParseIrrigationControlType(trait);
 
-    /// <summary>
-    /// Issue #161 — pulls a zone-output / valve-slot count out of the catalog Notes string.
-    /// Catalog patterns: '4 zones', '6 slots'. Returns null on miss.
-    /// </summary>
     private static int? ParseZoneOutputsFromNotes(string? notes)
-    {
-        if (string.IsNullOrWhiteSpace(notes))
-        {
-            return null;
-        }
+        => CatalogParse.ParseZoneOutputsFromNotes(notes);
 
-        var match = System.Text.RegularExpressions.Regex.Match(notes, @"(\d+)\s*(?:zones?|slots?)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return match.Success && int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)
-            ? n
-            : null;
-    }
-
-    /// <summary>Issue #161 — pulls conductor count from a wire's Notes string (e.g., '5 conductor, 18 AWG').</summary>
     private static int? ParseConductorCountFromNotes(string? notes)
-    {
-        if (string.IsNullOrWhiteSpace(notes))
-        {
-            return null;
-        }
+        => CatalogParse.ParseConductorCountFromNotes(notes);
 
-        var match = System.Text.RegularExpressions.Regex.Match(notes, @"(\d+)\s*conductor", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return match.Success && int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)
-            ? n
-            : null;
-    }
-
-    /// <summary>Issue #161 — pulls AWG gauge from a wire's Notes string (e.g., '18 AWG').</summary>
     private static int? ParseWireGaugeFromNotes(string? notes)
-    {
-        if (string.IsNullOrWhiteSpace(notes))
-        {
-            return null;
-        }
+        => CatalogParse.ParseWireGaugeFromNotes(notes);
 
-        var match = System.Text.RegularExpressions.Regex.Match(notes, @"(\d+)\s*AWG", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return match.Success && int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)
-            ? n
-            : null;
-    }
-
-    /// <summary>
-    /// Issue #162a — picks a matching pipe catalog code for an auto-pipe drawn between
-    /// fitting stamps, using the fitting's material + diameter so the new pipe groups
-    /// correctly in the BOM. Falls back to null when no matching catalog row exists
-    /// (caller uses a generic "Auto-pipe" label).
-    /// </summary>
     private static string? ResolveAutoPipeCodeForFitting(Shape fitting)
-    {
-        ArgumentNullException.ThrowIfNull(fitting);
-        if (fitting.FittingMaterial is null || fitting.FittingDiameterIn is not double diameterIn)
-        {
-            return null;
-        }
+        => CatalogParse.ResolveAutoPipeCodeForFitting(fitting);
 
-        double tolerance = diameterIn * 0.01;
-        PaletteItem? match = PaletteCatalog.IrrigationPipes.FirstOrDefault(p =>
-            string.Equals(p.Trait, fitting.FittingMaterial, StringComparison.OrdinalIgnoreCase)
-            && Math.Abs((p.WidthFt * 12.0) - diameterIn) <= tolerance);
-        return match?.Code;
-    }
-
-    /// <summary>
-    /// Issue #162b — looks up the stock-length (feet) for a pipe by its catalog Code, so
-    /// the auto-coupling pass knows how often to drop a coupling along a long run.
-    /// Returns null when the pipe has no Label OR the catalog row has no stock length.
-    /// </summary>
     private static double? ResolveStockLengthFtForPipe(Shape pipe)
-    {
-        ArgumentNullException.ThrowIfNull(pipe);
-        if (string.IsNullOrWhiteSpace(pipe.Label))
-        {
-            return null;
-        }
+        => CatalogParse.ResolveStockLengthFtForPipe(pipe);
 
-        PaletteItem? row = PaletteCatalog.FindByCode(pipe.Label);
-        return row?.StockLengthFt;
-    }
-
-    /// <summary>Issue #162a — parses 'Elbow90' / 'Elbow45' / 'Tee' / 'Coupling' / 'Adapter' from the catalog trait.</summary>
     private static FittingType? ParseFittingType(string? trait)
-    {
-        return trait switch
-        {
-            "Elbow90" => GardenPlotWeb.Models.FittingType.Elbow90,
-            "Elbow45" => GardenPlotWeb.Models.FittingType.Elbow45,
-            "Tee" => GardenPlotWeb.Models.FittingType.Tee,
-            "Coupling" => GardenPlotWeb.Models.FittingType.Coupling,
-            "Adapter" => GardenPlotWeb.Models.FittingType.Adapter,
-            _ => null,
-        };
-    }
+        => CatalogParse.ParseFittingType(trait);
 
-    /// <summary>
-    /// Issue #162a — pulls the pipe material out of a fitting's Notes string. Catalog patterns
-    /// like "PVC ¾\" tee", "Poly ½\" 90° barbed elbow", "Copper ¾\" sweat coupling".
-    /// </summary>
     private static string? ParseFittingMaterial(string? notes)
-    {
-        if (string.IsNullOrWhiteSpace(notes))
-        {
-            return null;
-        }
-
-        if (notes.StartsWith("PVC", StringComparison.OrdinalIgnoreCase)) { return "PVC"; }
-        if (notes.StartsWith("Poly", StringComparison.OrdinalIgnoreCase)) { return "Poly"; }
-        if (notes.StartsWith("Copper", StringComparison.OrdinalIgnoreCase)) { return "Copper"; }
-        if (notes.Contains("drip", StringComparison.OrdinalIgnoreCase)) { return "DripTubing"; }
-        return null;
-    }
+        => CatalogParse.ParseFittingMaterial(notes);
 
     private sealed class StampPlacement
     {
