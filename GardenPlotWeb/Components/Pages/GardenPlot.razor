@@ -4168,7 +4168,18 @@ else
                 }
                 else if (!string.IsNullOrWhiteSpace(customInfo.CitationUrl))
                 {
-                    <a class="x-small" href="@customInfo.CitationUrl" target="_blank" rel="noopener">Open source page →</a>
+                    @* Issue #93 — user gesture replaces the previous render-path auto-fetch.
+                       A malicious imported palette could otherwise turn the user's browser
+                       into a LAN scanner just by selecting the tile. The user opts in to
+                       the fetch; the validator (CitationUrlValidator) blocks http://,
+                       IP-literal hosts, and localhost / *.local / *.internal targets. *@
+                    <div class="d-flex gap-1 align-items-center">
+                        <a class="x-small" href="@customInfo.CitationUrl" target="_blank" rel="noopener noreferrer">Open source page →</a>
+                        <button type="button" class="btn btn-link btn-sm x-small p-0" @onclick="RequestCitationPreviewAsync"
+                                title="Fetch a preview from the source page. Off by default to prevent untrusted palette imports from probing your LAN.">
+                            Show preview
+                        </button>
+                    </div>
                 }
             }
 
