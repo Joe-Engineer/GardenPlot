@@ -786,7 +786,12 @@ public class PlotLibraryLoaderTests
     [Fact]
     public void Load_EmitsLoadMetric_OnHappyPath()
     {
-        var observed = new List<(string Name, long Value, IReadOnlyDictionary<string, object?> Tags)>();
+        // Issue #178 — MeterListener callbacks fire on whatever thread emitted the metric,
+        // and on Linux CI a stray callback occasionally ran AFTER listener.Dispose() returned,
+        // racing with Assert.Contains's enumeration of the list. Two protections layered:
+        // (a) ConcurrentBag is safe for concurrent Add + ToArray
+        // (b) Snapshot the bag into a fixed array before the assertion enumerates it
+        var observed = new System.Collections.Concurrent.ConcurrentBag<(string Name, long Value, IReadOnlyDictionary<string, object?> Tags)>();
         using var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, l) =>
         {
@@ -813,7 +818,10 @@ public class PlotLibraryLoaderTests
 
         listener.Dispose();
 
-        Assert.Contains(observed, m =>
+        // Snapshot AFTER Dispose: ConcurrentBag.ToArray is itself thread-safe under
+        // concurrent Add, so even a stray late callback won't break the snapshot.
+        var snapshot = observed.ToArray();
+        Assert.Contains(snapshot, m =>
             m.Name == "gardenplot.schema.load" &&
             m.Tags.TryGetValue("outcome", out var o) && (o as string) == "loaded" &&
             m.Tags.TryGetValue("source", out var s) && (s as string) == "unit-test" &&
