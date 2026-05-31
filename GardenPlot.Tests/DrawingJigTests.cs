@@ -25,10 +25,11 @@ public class DrawingJigTests
     [Fact]
     public void Registry_For_UnregisteredTool_ReturnsNull()
     {
-        // No DrawingJig registered for Stamp / Oval / etc. yet — page falls back to
-        // its inline switch case. The TryFor pattern exercises the same path.
+        // No DrawingJig registered for Stamp / Polyline / etc. yet — page falls back to
+        // its inline switch case. PR 5 added Oval / CircleRuler / RectRuler / GroundCover
+        // sub-modes, so pick tools still un-Jig'd.
         Assert.Null(DrawingJigRegistry.For(Tool.Stamp, DrawingContext.None));
-        Assert.Null(DrawingJigRegistry.For(Tool.Oval, DrawingContext.None));
+        Assert.Null(DrawingJigRegistry.For(Tool.Polyline, DrawingContext.None));
         Assert.Null(DrawingJigRegistry.For(Tool.Select, DrawingContext.None));
         Assert.False(DrawingJigRegistry.TryFor(Tool.Stamp, DrawingContext.None, out DrawingJig _));
     }
@@ -45,9 +46,8 @@ public class DrawingJigTests
     {
         var jigs = DrawingJigRegistry.All().ToList();
         Assert.Contains(jigs, j => j is RectangleDrawingJig);
-        // PR 4 ships with exactly one DrawingJig — subsequent PRs grow this set
-        // one Tool / sub-mode at a time.
-        Assert.Single(jigs);
+        // PR 5 grew the registry to 6 Jigs (4 simple drag-rect + 2 sub-mode GroundCover).
+        Assert.Equal(6, jigs.Count);
     }
 
     [Fact]
@@ -110,8 +110,8 @@ public class DrawingJigTests
     public void DrawingContext_Equality_IsValueBased()
     {
         // record struct → value equality. Two contexts with the same fields are equal.
-        DrawingContext a = new(null, true, false, true, false);
-        DrawingContext b = new(null, true, false, true, false);
+        DrawingContext a = new(null, null, null, true, false, true, false);
+        DrawingContext b = new(null, null, null, true, false, true, false);
         Assert.Equal(a, b);
         Assert.Equal(a.GetHashCode(), b.GetHashCode());
     }

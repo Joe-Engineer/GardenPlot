@@ -184,8 +184,7 @@ public partial class GardenPlot
 
     private enum EdgeSubMode { StraightSegments, Freehand }
 
-    /// <summary>Ground-cover drawing sub-mode (selected when Tool.GroundCover is active).</summary>
-    private enum GroundCoverSubMode { Polygon, Rectangle, Oval, FreehandArea, PolylineRibbon, FreehandRibbon }
+    // GroundCoverSubMode lifted to GardenPlotWeb.Models.Jigs.GroundCoverSubMode in #95 PR 5.
 
     private EdgeSubMode edgeSubMode = EdgeSubMode.StraightSegments;
     private GroundCoverSubMode groundCoverSubMode = GroundCoverSubMode.Polygon;
@@ -2064,20 +2063,7 @@ public partial class GardenPlot
     /// canvas doesn't show a featureless grey rectangle.
     /// </summary>
     private static Shape CreateAreaAssemblyDraft(CatalogAssembly assembly, PaletteItem? previewItem, ShapeKind kind)
-    {
-        return new Shape
-        {
-            Kind = kind,
-            Label = assembly.DisplayName,
-            Trait = "ground-cover-assembly",
-            Stroke = previewItem?.StrokeColor,
-            Fill = previewItem?.FillColor,
-            TextureKey = previewItem?.TextureKey,
-            AssemblySource = assembly.Source,
-            AssemblyPackId = assembly.PackId,
-            AssemblyCode = assembly.Code,
-        };
-    }
+        => AreaAssemblyDraftBuilder.CreateAreaAssemblyDraft(assembly, previewItem, kind);
 
     private static void AppendEdgePoint(Shape shape, Point point, double minDistanceFt = 0)
     {
@@ -6617,25 +6603,11 @@ public partial class GardenPlot
     /// Returns the dominant visual layer for an assembly preview (last surface layer, fall back
     /// to the last layer with a resolvable catalog item). Used to colour palette swatches and
     /// freshly-drafted assembly shapes so the canvas isn't a featureless grey rectangle.
+    /// Issue #95 PR 5 — delegates to <see cref="AreaAssemblyDraftBuilder.ResolveAssemblyPreviewItem"/>
+    /// so DrawingJig subclasses share the same lookup.
     /// </summary>
     private PaletteItem? ResolveAssemblyPreviewItem(CatalogAssembly assembly)
-    {
-        if (assembly is null || assembly.Layers.Count == 0)
-        {
-            return null;
-        }
-
-        foreach (CatalogAssemblyLayer layer in assembly.Layers.AsEnumerable().Reverse())
-        {
-            PaletteItem? material = PaletteCatalog.FindMaterial(layer.CatalogCode);
-            if (material is not null)
-            {
-                return material;
-            }
-        }
-
-        return null;
-    }
+        => AreaAssemblyDraftBuilder.ResolveAssemblyPreviewItem(assembly);
 
     /// <summary>Formats an assembly's layer stack as a single tooltip line (e.g. "Pea Gravel + Flagstone Paver").</summary>
     private static string FormatAssemblyTooltip(CatalogAssembly assembly)
@@ -7011,12 +6983,20 @@ public partial class GardenPlot
     private bool pointerAltDown;
 
     /// <summary>
-    /// Issue #95 PR 4 — bridge from page modifier state to <see cref="DrawingContext"/>.
+    /// Issue #95 PR 4 / 5 — bridge from page modifier state to <see cref="DrawingContext"/>.
     /// Called by <see cref="DrawingJig"/> dispatch sites. Reads currently captured
-    /// modifier flags + the active palette item + the armed tangent-snap state.
+    /// modifier flags + the active palette item + the selected assembly + the
+    /// ground-cover sub-mode + the armed tangent-snap state.
     /// </summary>
     internal DrawingContext BuildDrawingContext()
-        => new(selectedItem, pointerShiftDown, pointerCtrlDown, pointerAltDown, tangentSnapArmed);
+        => new(
+            selectedItem,
+            selectedAssembly,
+            currentTool == Tool.GroundCover ? groundCoverSubMode : null,
+            pointerShiftDown,
+            pointerCtrlDown,
+            pointerAltDown,
+            tangentSnapArmed);
 
     private bool IsDropModifierDown(bool shift, bool ctrl, bool alt) => dropModifierKey switch
     {
@@ -8884,18 +8864,31 @@ public partial class GardenPlot
                 }
                 break;
             case Tool.Oval:
-                drafting = new Shape { Kind = ShapeKind.Oval, X = x, Y = y, W = 0, H = 0 };
-                dragStartX = x; dragStartY = y;
+                {
+                    // Issue #95 PR 5 — same delegation pattern as Tool.Rectangle from PR 4.
+                    DrawingContext drawCtx = BuildDrawingContext();
+                    drafting = DrawingJigRegistry.For(Tool.Oval, drawCtx)?.BeginDragRect(new Point(x, y), drawCtx)
+                        ?? new Shape { Kind = ShapeKind.Oval, X = x, Y = y, W = 0, H = 0 };
+                    dragStartX = x; dragStartY = y;
+                }
                 break;
             case Tool.CircleRuler:
-                drafting = new Shape { Kind = ShapeKind.CircleRuler, X = x, Y = y, W = 0, H = 0 };
-                dragStartX = x;
-                dragStartY = y;
+                {
+                    DrawingContext drawCtx = BuildDrawingContext();
+                    drafting = DrawingJigRegistry.For(Tool.CircleRuler, drawCtx)?.BeginDragRect(new Point(x, y), drawCtx)
+                        ?? new Shape { Kind = ShapeKind.CircleRuler, X = x, Y = y, W = 0, H = 0 };
+                    dragStartX = x;
+                    dragStartY = y;
+                }
                 break;
             case Tool.RectRuler:
-                drafting = new Shape { Kind = ShapeKind.RectRuler, X = x, Y = y, W = 0, H = 0 };
-                dragStartX = x;
-                dragStartY = y;
+                {
+                    DrawingContext drawCtx = BuildDrawingContext();
+                    drafting = DrawingJigRegistry.For(Tool.RectRuler, drawCtx)?.BeginDragRect(new Point(x, y), drawCtx)
+                        ?? new Shape { Kind = ShapeKind.RectRuler, X = x, Y = y, W = 0, H = 0 };
+                    dragStartX = x;
+                    dragStartY = y;
+                }
                 break;
             case Tool.GroundCover when selectedAssembly is { } areaAssembly && !string.Equals(areaAssembly.TargetKind, "Edge", StringComparison.OrdinalIgnoreCase):
                 {
@@ -8922,14 +8915,22 @@ public partial class GardenPlot
                     }
                     else
                     {
-                        drafting = CreateAreaAssemblyDraft(
-                            areaAssembly,
-                            previewItem,
-                            groundCoverSubMode == GroundCoverSubMode.Oval ? ShapeKind.Oval : ShapeKind.Rectangle);
-                        drafting.X = x;
-                        drafting.Y = y;
-                        drafting.W = 0;
-                        drafting.H = 0;
+                        // Issue #95 PR 5 — GroundCover Rectangle / Oval sub-modes delegated
+                        // to the sub-mode-discriminated DrawingJigs. The fallback (used only
+                        // if no Jig matches) preserves the pre-Jig behaviour for safety.
+                        DrawingContext drawCtx = BuildDrawingContext();
+                        drafting = DrawingJigRegistry.For(Tool.GroundCover, drawCtx)?.BeginDragRect(new Point(x, y), drawCtx);
+                        if (drafting is null)
+                        {
+                            drafting = CreateAreaAssemblyDraft(
+                                areaAssembly,
+                                previewItem,
+                                groundCoverSubMode == GroundCoverSubMode.Oval ? ShapeKind.Oval : ShapeKind.Rectangle);
+                            drafting.X = x;
+                            drafting.Y = y;
+                            drafting.W = 0;
+                            drafting.H = 0;
+                        }
                         dragStartX = x;
                         dragStartY = y;
                     }
