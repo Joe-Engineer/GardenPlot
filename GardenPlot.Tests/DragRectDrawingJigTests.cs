@@ -77,22 +77,22 @@ public class DragRectDrawingJigTests
         CatalogAssembly edgeAssembly = new() { Code = "edge-1", DisplayName = "Test Edge", TargetKind = "Edge" };
 
         // Happy path: GroundCover tool + non-Edge assembly + Rectangle sub-mode.
-        DrawingContext ok = new(null, groundCoverAssembly, GroundCoverSubMode.Rectangle, false, false, false, false);
+        DrawingContext ok = new(null, groundCoverAssembly, GroundCoverSubMode.Rectangle, null, false, false, false, false);
         Assert.True(jig.Matches(Tool.GroundCover, ok));
 
         // Wrong tool: must be GroundCover.
         Assert.False(jig.Matches(Tool.Rectangle, ok));
 
         // Missing assembly.
-        DrawingContext noAsm = new(null, null, GroundCoverSubMode.Rectangle, false, false, false, false);
+        DrawingContext noAsm = new(null, null, GroundCoverSubMode.Rectangle, null, false, false, false, false);
         Assert.False(jig.Matches(Tool.GroundCover, noAsm));
 
         // Edge-targeted assembly excluded.
-        DrawingContext edge = new(null, edgeAssembly, GroundCoverSubMode.Rectangle, false, false, false, false);
+        DrawingContext edge = new(null, edgeAssembly, GroundCoverSubMode.Rectangle, null, false, false, false, false);
         Assert.False(jig.Matches(Tool.GroundCover, edge));
 
         // Wrong sub-mode.
-        DrawingContext oval = new(null, groundCoverAssembly, GroundCoverSubMode.Oval, false, false, false, false);
+        DrawingContext oval = new(null, groundCoverAssembly, GroundCoverSubMode.Oval, null, false, false, false, false);
         Assert.False(jig.Matches(Tool.GroundCover, oval));
     }
 
@@ -101,8 +101,8 @@ public class DragRectDrawingJigTests
     {
         var jig = new GroundCoverOvalDrawingJig();
         CatalogAssembly asm = new() { Code = "gc-2", DisplayName = "Test", TargetKind = "GroundCover" };
-        DrawingContext oval = new(null, asm, GroundCoverSubMode.Oval, false, false, false, false);
-        DrawingContext rect = new(null, asm, GroundCoverSubMode.Rectangle, false, false, false, false);
+        DrawingContext oval = new(null, asm, GroundCoverSubMode.Oval, null, false, false, false, false);
+        DrawingContext rect = new(null, asm, GroundCoverSubMode.Rectangle, null, false, false, false, false);
         Assert.True(jig.Matches(Tool.GroundCover, oval));
         Assert.False(jig.Matches(Tool.GroundCover, rect));
     }
@@ -118,7 +118,7 @@ public class DragRectDrawingJigTests
             TargetKind = "GroundCover",
             Source = CatalogSource.Base,
         };
-        DrawingContext ctx = new(null, asm, GroundCoverSubMode.Rectangle, false, false, false, false);
+        DrawingContext ctx = new(null, asm, GroundCoverSubMode.Rectangle, null, false, false, false, false);
 
         Shape? draft = jig.BeginDragRect(new Point(12, 5), ctx);
         Assert.NotNull(draft);
@@ -138,7 +138,7 @@ public class DragRectDrawingJigTests
     {
         var jig = new GroundCoverOvalDrawingJig();
         CatalogAssembly asm = new() { Code = "gc-oval", DisplayName = "Oval GC", TargetKind = "GroundCover", Source = CatalogSource.Base };
-        DrawingContext ctx = new(null, asm, GroundCoverSubMode.Oval, false, false, false, false);
+        DrawingContext ctx = new(null, asm, GroundCoverSubMode.Oval, null, false, false, false, false);
 
         Shape? draft = jig.BeginDragRect(new Point(0, 0), ctx);
         Assert.NotNull(draft);
@@ -162,15 +162,15 @@ public class DragRectDrawingJigTests
         // Tool.GroundCover so there's no other candidate today, but the order locks in
         // the precedence for when a future generic GroundCoverDrawingJig is added.
         CatalogAssembly asm = new() { Code = "gc", DisplayName = "GC", TargetKind = "GroundCover", Source = CatalogSource.Base };
-        DrawingContext rect = new(null, asm, GroundCoverSubMode.Rectangle, false, false, false, false);
-        DrawingContext oval = new(null, asm, GroundCoverSubMode.Oval, false, false, false, false);
+        DrawingContext rect = new(null, asm, GroundCoverSubMode.Rectangle, null, false, false, false, false);
+        DrawingContext oval = new(null, asm, GroundCoverSubMode.Oval, null, false, false, false, false);
 
         Assert.IsType<GroundCoverRectangleDrawingJig>(DrawingJigRegistry.For(Tool.GroundCover, rect));
         Assert.IsType<GroundCoverOvalDrawingJig>(DrawingJigRegistry.For(Tool.GroundCover, oval));
 
-        // Polygon sub-mode has no Jig yet — returns null so the page's inline polygon
-        // logic still runs.
-        DrawingContext polygon = new(null, asm, GroundCoverSubMode.Polygon, false, false, false, false);
-        Assert.Null(DrawingJigRegistry.For(Tool.GroundCover, polygon));
+        // Polygon sub-mode with an Assembly (non-Edge target) now resolves to
+        // GroundCoverPolygonAssemblyDrawingJig in PR 7.
+        DrawingContext polygon = new(null, asm, GroundCoverSubMode.Polygon, null, false, false, false, false);
+        Assert.IsType<GroundCoverPolygonAssemblyDrawingJig>(DrawingJigRegistry.For(Tool.GroundCover, polygon));
     }
 }

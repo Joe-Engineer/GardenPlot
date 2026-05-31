@@ -25,12 +25,13 @@ public class DrawingJigTests
     [Fact]
     public void Registry_For_UnregisteredTool_ReturnsNull()
     {
-        // No DrawingJig registered for Stamp / Polyline / etc. yet — page falls back to
-        // its inline switch case. PR 5 added Oval / CircleRuler / RectRuler / GroundCover
-        // sub-modes, so pick tools still un-Jig'd.
+        // PR 7 added polyline-by-click Jigs for Polyline / Polygon / Edge / GroundCover variants,
+        // so those have entries now. The tools still un-Jig'd: Stamp (PR 8), Select, FreeDraw
+        // (freehand, PR 9), Ruler (no Jig planned).
         Assert.Null(DrawingJigRegistry.For(Tool.Stamp, DrawingContext.None));
-        Assert.Null(DrawingJigRegistry.For(Tool.Polyline, DrawingContext.None));
+        Assert.Null(DrawingJigRegistry.For(Tool.FreeDraw, DrawingContext.None));
         Assert.Null(DrawingJigRegistry.For(Tool.Select, DrawingContext.None));
+        Assert.Null(DrawingJigRegistry.For(Tool.Ruler, DrawingContext.None));
         Assert.False(DrawingJigRegistry.TryFor(Tool.Stamp, DrawingContext.None, out DrawingJig _));
     }
 
@@ -46,8 +47,8 @@ public class DrawingJigTests
     {
         var jigs = DrawingJigRegistry.All().ToList();
         Assert.Contains(jigs, j => j is RectangleDrawingJig);
-        // PR 5 grew the registry to 6 Jigs (4 simple drag-rect + 2 sub-mode GroundCover).
-        Assert.Equal(6, jigs.Count);
+        // PR 7 grew the registry to 14 Jigs (6 drag-rect + 8 polyline-by-click).
+        Assert.Equal(14, jigs.Count);
     }
 
     [Fact]
@@ -110,8 +111,8 @@ public class DrawingJigTests
     public void DrawingContext_Equality_IsValueBased()
     {
         // record struct → value equality. Two contexts with the same fields are equal.
-        DrawingContext a = new(null, null, null, true, false, true, false);
-        DrawingContext b = new(null, null, null, true, false, true, false);
+        DrawingContext a = new(null, null, null, null, true, false, true, false);
+        DrawingContext b = new(null, null, null, null, true, false, true, false);
         Assert.Equal(a, b);
         Assert.Equal(a.GetHashCode(), b.GetHashCode());
     }

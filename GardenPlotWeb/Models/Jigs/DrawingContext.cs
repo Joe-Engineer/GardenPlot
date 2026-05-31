@@ -17,6 +17,7 @@ namespace GardenPlotWeb.Models.Jigs;
 /// <param name="PaletteItem">Currently selected palette item, when one is active (Stamp, GroundCover, etc.).</param>
 /// <param name="Assembly">Currently selected catalog assembly (for GroundCover and Edge tools).</param>
 /// <param name="GroundCoverSubMode">Active sub-mode when <see cref="Tool.GroundCover"/> is selected; null otherwise.</param>
+/// <param name="EdgeSubMode">Active sub-mode when <see cref="Tool.Edge"/> is selected; null otherwise.</param>
 /// <param name="ShiftPressed">Shift modifier is held — typically axis-lock or aspect-lock.</param>
 /// <param name="CtrlPressed">Ctrl / Cmd modifier is held — typically additive / fine-step.</param>
 /// <param name="AltPressed">Alt / Option modifier is held — typically alternate-mode.</param>
@@ -25,11 +26,12 @@ public readonly record struct DrawingContext(
     PaletteItem? PaletteItem,
     CatalogAssembly? Assembly,
     GroundCoverSubMode? GroundCoverSubMode,
+    EdgeSubMode? EdgeSubMode,
     bool ShiftPressed,
     bool CtrlPressed,
     bool AltPressed,
     bool TangentSnapArmed)
 {
     /// <summary>A no-op context for unit-tests / call sites that don't care about modifiers.</summary>
-    public static DrawingContext None => new(null, null, null, false, false, false, false);
+    public static DrawingContext None => new(null, null, null, null, false, false, false, false);
 }
