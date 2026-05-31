@@ -278,6 +278,57 @@
                 }
 
                 break;
+            case ShapeKind.WaterSource:
+                @* Issue #160 — water source: distinct anchor icon per source type.
+                   Faucet: blue wall-bib (rectangle with spout). Spring: green bubbling
+                   circle with concentric ripples. Pump: amber rounded box with arrow.
+                   All centered at the shape's bbox center; W = icon footprint. *@
+                {
+                    var srcCx = s.X + s.W / 2;
+                    var srcCy = s.Y + s.H / 2;
+                    var srcR = s.W / 2;
+                    var srcFill = s.Fill ?? "#9bc7e0";
+                    var srcStroke = s.Stroke ?? "#1f4e7a";
+                    var srcType = s.WaterSourceType;
+                    if (srcType == GardenPlotWeb.Models.WaterSourceType.Faucet)
+                    {
+                        <rect x="@GardenPlot.F(s.X)" y="@GardenPlot.F(s.Y + s.H * 0.2)"
+                              width="@GardenPlot.F(s.W * 0.65)" height="@GardenPlot.F(s.H * 0.6)"
+                              fill="@srcFill" stroke="@srcStroke" stroke-width="0.08" rx="@GardenPlot.F(srcR * 0.1)" />
+                        <rect x="@GardenPlot.F(s.X + s.W * 0.65)" y="@GardenPlot.F(s.Y + s.H * 0.4)"
+                              width="@GardenPlot.F(s.W * 0.3)" height="@GardenPlot.F(s.H * 0.2)"
+                              fill="@srcStroke" />
+                        <circle cx="@GardenPlot.F(s.X + s.W * 0.3)" cy="@GardenPlot.F(srcCy)" r="@GardenPlot.F(srcR * 0.15)"
+                                fill="@srcStroke" />
+                    }
+                    else if (srcType == GardenPlotWeb.Models.WaterSourceType.Spring)
+                    {
+                        <circle cx="@GardenPlot.F(srcCx)" cy="@GardenPlot.F(srcCy)" r="@GardenPlot.F(srcR)"
+                                fill="@srcFill" stroke="@srcStroke" stroke-width="0.08" />
+                        <circle cx="@GardenPlot.F(srcCx)" cy="@GardenPlot.F(srcCy)" r="@GardenPlot.F(srcR * 0.65)"
+                                fill="none" stroke="@srcStroke" stroke-width="0.05" />
+                        <circle cx="@GardenPlot.F(srcCx)" cy="@GardenPlot.F(srcCy)" r="@GardenPlot.F(srcR * 0.3)"
+                                fill="@srcStroke" />
+                    }
+                    else if (srcType == GardenPlotWeb.Models.WaterSourceType.Pump)
+                    {
+                        <rect x="@GardenPlot.F(s.X)" y="@GardenPlot.F(s.Y)" width="@GardenPlot.F(s.W)" height="@GardenPlot.F(s.H)"
+                              fill="@srcFill" stroke="@srcStroke" stroke-width="0.08" rx="@GardenPlot.F(srcR * 0.15)" />
+                        <circle cx="@GardenPlot.F(srcCx)" cy="@GardenPlot.F(srcCy)" r="@GardenPlot.F(srcR * 0.4)"
+                                fill="@srcStroke" />
+                        <path d="M @GardenPlot.F(s.X + s.W * 0.6) @GardenPlot.F(srcCy) L @GardenPlot.F(s.X + s.W * 0.95) @GardenPlot.F(srcCy)"
+                              stroke="@srcStroke" stroke-width="0.1" />
+                        <path d="M @GardenPlot.F(s.X + s.W * 0.85) @GardenPlot.F(srcCy - srcR * 0.18) L @GardenPlot.F(s.X + s.W * 0.95) @GardenPlot.F(srcCy) L @GardenPlot.F(s.X + s.W * 0.85) @GardenPlot.F(srcCy + srcR * 0.18) Z"
+                              fill="@srcStroke" />
+                    }
+                    else
+                    {
+                        <circle cx="@GardenPlot.F(srcCx)" cy="@GardenPlot.F(srcCy)" r="@GardenPlot.F(srcR)"
+                                fill="@srcFill" stroke="@srcStroke" stroke-width="0.08" />
+                    }
+                }
+
+                break;
         }
         @if (!IsConceptMode && SelectedIds.Contains(s.Id))
         {

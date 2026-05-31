@@ -191,7 +191,8 @@ internal static class ProfileMerger
             PaletteKind.BedKit or PaletteKind.FocalPoint or PaletteKind.SoilMarker
                 or PaletteKind.CustomTile or PaletteKind.GroundCover
                 or PaletteKind.GroundCoverSurface or PaletteKind.Edging
-                or PaletteKind.IrrigationHead or PaletteKind.IrrigationPipe => null,
+                or PaletteKind.IrrigationHead or PaletteKind.IrrigationPipe
+                or PaletteKind.WaterSource => null,
             _ => null,
         };
     }

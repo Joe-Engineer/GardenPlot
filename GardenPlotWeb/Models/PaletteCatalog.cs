@@ -246,6 +246,27 @@ public static class PaletteCatalog
         0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0,
     ];
 
+    /// <summary>
+    /// Issue #160 — water sources. Trait carries the source type code (Faucet / Spring /
+    /// Pump). Notes carries a human description; Width/Height set the icon footprint in
+    /// feet (~1 ft for faucets, slightly larger for pumps).
+    /// </summary>
+    public static readonly PaletteItem[] WaterSources =
+    [
+        // Faucets — potable wall outlets
+        new("Hose Bib (Standard)", PaletteKind.WaterSource, 1.0, 1.0, "Faucet", Notes: "10 GPM at 50 PSI", StrokeColor: "#1f4e7a", FillColor: "#9bc7e0"),
+        new("Frost-Free Faucet", PaletteKind.WaterSource, 1.0, 1.0, "Faucet", Notes: "8 GPM at 45 PSI", StrokeColor: "#1f4e7a", FillColor: "#9bc7e0"),
+
+        // Springs — natural surface sources
+        new("Spring (Low Flow)", PaletteKind.WaterSource, 1.5, 1.5, "Spring", Notes: "2 GPM, gravity-fed", StrokeColor: "#1b5e3a", FillColor: "#7fc09a"),
+        new("Spring (High Flow)", PaletteKind.WaterSource, 1.5, 1.5, "Spring", Notes: "10 GPM, gravity-fed", StrokeColor: "#1b5e3a", FillColor: "#7fc09a"),
+
+        // Pumps — pressurised sources
+        new("Pump (½ HP)", PaletteKind.WaterSource, 2.0, 2.0, "Pump", Notes: "12 GPM at 60 PSI", StrokeColor: "#5a4a1f", FillColor: "#d9c89a"),
+        new("Pump (¾ HP)", PaletteKind.WaterSource, 2.0, 2.0, "Pump", Notes: "15 GPM at 70 PSI", StrokeColor: "#5a4a1f", FillColor: "#d9c89a"),
+        new("Pump (1 HP)", PaletteKind.WaterSource, 2.0, 2.0, "Pump", Notes: "20 GPM at 80 PSI", StrokeColor: "#5a4a1f", FillColor: "#d9c89a"),
+    ];
+
     public static IReadOnlyList<PaletteItem> For(PaletteKind kind)
     {
         return kind switch
@@ -262,6 +283,7 @@ public static class PaletteCatalog
             PaletteKind.Edging => Edging,
             PaletteKind.IrrigationHead => IrrigationHeads,
             PaletteKind.IrrigationPipe => IrrigationPipes,
+            PaletteKind.WaterSource => WaterSources,
             _ => [],
         };
     }
@@ -743,6 +765,7 @@ public static class PaletteCatalog
             Edging,
             IrrigationHeads,
             IrrigationPipes,
+            WaterSources,
         ];
 
         foreach (PaletteItem[] bucket in buckets)
@@ -800,6 +823,7 @@ public static class PaletteCatalog
             PaletteCategory.SoilMarkers => SoilMarkers,
             PaletteCategory.IrrigationHeads => IrrigationHeads,
             PaletteCategory.IrrigationPipes => IrrigationPipes,
+            PaletteCategory.WaterSources => WaterSources,
             PaletteCategory.GrassesTurf => [.. Grasses.Where(g => g.Kind == PaletteKind.GroundCoverSurface)],
             PaletteCategory.GrassesOrnamental => [.. Grasses.Where(g => string.Equals(g.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(IsOrnamentalGrassSurfaceItem))],
             PaletteCategory.Succulents => [.. Plants.Where(p => string.Equals(p.Trait, "succulent", StringComparison.OrdinalIgnoreCase))],
@@ -880,6 +904,7 @@ public static class PaletteCatalog
             PaletteKind.Edging => PaletteCategory.Edging,
             PaletteKind.IrrigationHead => PaletteCategory.IrrigationHeads,
             PaletteKind.IrrigationPipe => PaletteCategory.IrrigationPipes,
+            PaletteKind.WaterSource => PaletteCategory.WaterSources,
             _ => PaletteCategory.BedKits,
         };
     }

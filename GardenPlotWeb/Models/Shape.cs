@@ -127,6 +127,32 @@ public class Shape
     /// and the BOM grouping.
     /// </summary>
     public double? PipeDiameterIn { get; set; }
+
+    /// <summary>
+    /// Issue #160 — water source type discriminator for <see cref="ShapeKind.WaterSource"/>
+    /// shapes. Null on other kinds. Drives the canvas icon AND informs the future zone
+    /// calculator (#31 Phase C) about source-flow characteristics.
+    /// </summary>
+    public WaterSourceType? WaterSourceType { get; set; }
+
+    /// <summary>Issue #160 — maximum flow at the source in gallons per minute. Null when unmeasured.</summary>
+    public double? MaxFlowGpm { get; set; }
+
+    /// <summary>Issue #160 — supply pressure at the source in PSI. Null when unmeasured.</summary>
+    public double? PressurePsi { get; set; }
+}
+
+/// <summary>Issue #160 — kind of water source represented by a <see cref="Shape"/>.</summary>
+public enum WaterSourceType
+{
+    /// <summary>Hose bib / wall faucet tied into potable water.</summary>
+    Faucet,
+
+    /// <summary>Natural spring / surface source; flow varies seasonally.</summary>
+    Spring,
+
+    /// <summary>Pressurised pump (well, booster, on-demand) — output curve dependent on model.</summary>
+    Pump,
 }
 
 public enum AlongPathAnchor

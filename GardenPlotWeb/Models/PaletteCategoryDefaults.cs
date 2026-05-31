@@ -38,6 +38,7 @@ public static class PaletteCategoryDefaults
         PaletteCategory.CustomTiles,
         PaletteCategory.IrrigationHeads,
         PaletteCategory.IrrigationPipes,
+        PaletteCategory.WaterSources,
     };
 
     /// <summary>Display grouping for the settings dialog (label + categories in order).</summary>
@@ -56,6 +57,7 @@ public static class PaletteCategoryDefaults
         [
             PaletteCategory.IrrigationHeads,
             PaletteCategory.IrrigationPipes,
+            PaletteCategory.WaterSources,
         ]),
         ("Trees",
         [
