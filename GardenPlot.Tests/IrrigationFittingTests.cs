@@ -249,4 +249,36 @@ public sealed class IrrigationFittingTests
         Assert.Empty(pts);
         Assert.False(closed);
     }
+
+    [Fact]
+    public void UiPreferences_AutoPlaceFittingsOnPipe_DefaultsToTrue()
+    {
+        UiPreferences ui = new();
+        Assert.True(ui.AutoPlaceFittingsOnPipe);
+    }
+
+    [Fact]
+    public void UiPreferences_AutoPipeBetweenFittingStamps_DefaultsToTrue()
+    {
+        UiPreferences ui = new();
+        Assert.True(ui.AutoPipeBetweenFittingStamps);
+    }
+
+    [Fact]
+    public void UiPreferences_AutoPlaceFittingsOnPipe_RoundTrips()
+    {
+        UiPreferences ui = new() { AutoPlaceFittingsOnPipe = false };
+        Assert.False(ui.AutoPlaceFittingsOnPipe);
+        ui.AutoPlaceFittingsOnPipe = true;
+        Assert.True(ui.AutoPlaceFittingsOnPipe);
+    }
+
+    [Fact]
+    public void UiPreferences_AutoPipeBetweenFittingStamps_RoundTrips()
+    {
+        UiPreferences ui = new() { AutoPipeBetweenFittingStamps = false };
+        Assert.False(ui.AutoPipeBetweenFittingStamps);
+        ui.AutoPipeBetweenFittingStamps = true;
+        Assert.True(ui.AutoPipeBetweenFittingStamps);
+    }
 }

@@ -191,6 +191,14 @@ public partial class GardenPlot
     /// <c>drafting.Points</c> is a cursor-tracking endpoint that the user has not committed yet.</summary>
     private bool buildingPolygon;
 
+    /// <summary>
+    /// Issue #162a — center position of the most recently stamped IrrigationFitting in the
+    /// current Stamp session. When the next stamp lands and auto-pipe-between-fitting-stamps
+    /// is on, a pipe segment is drawn from this point to the new fitting's center.
+    /// Reset on tool change / palette change / Escape so cross-session stamps don't link.
+    /// </summary>
+    private Point? lastFittingStampPos;
+
     /// <summary>Current ground-cover depth (inches) used for newly-drawn volumetric ground-cover shapes.
     /// Initialized from the selected palette item's <see cref="PaletteItem.DefaultDepthIn"/> when picked,
     /// then editable on the toolbar so the user can change depth on the fly without leaving draw mode.</summary>
@@ -6526,6 +6534,14 @@ public partial class GardenPlot
         // Picking a single palette item replaces any active Drawing Set so the next
         // Along-path placement uses this item rather than the previously-active set.
         selectedDrawingSetId = null;
+        // Issue #162a — switching palette items breaks the auto-pipe-between-stamps chain.
+        // Only keep the chain when the user keeps stamping the SAME fitting item (or any
+        // fitting, conservatively the same item).
+        if (item.Kind != PaletteKind.IrrigationFitting)
+        {
+            lastFittingStampPos = null;
+        }
+
         _ = ApplySelectItemSideEffects(item);
     }
 
@@ -7954,6 +7970,27 @@ public partial class GardenPlot
             : null;
     }
 
+    /// <summary>
+    /// Issue #162a — picks a matching pipe catalog code for an auto-pipe drawn between
+    /// fitting stamps, using the fitting's material + diameter so the new pipe groups
+    /// correctly in the BOM. Falls back to null when no matching catalog row exists
+    /// (caller uses a generic "Auto-pipe" label).
+    /// </summary>
+    private static string? ResolveAutoPipeCodeForFitting(Shape fitting)
+    {
+        ArgumentNullException.ThrowIfNull(fitting);
+        if (fitting.FittingMaterial is null || fitting.FittingDiameterIn is not double diameterIn)
+        {
+            return null;
+        }
+
+        double tolerance = diameterIn * 0.01;
+        PaletteItem? match = PaletteCatalog.IrrigationPipes.FirstOrDefault(p =>
+            string.Equals(p.Trait, fitting.FittingMaterial, StringComparison.OrdinalIgnoreCase)
+            && Math.Abs((p.WidthFt * 12.0) - diameterIn) <= tolerance);
+        return match?.Code;
+    }
+
     /// <summary>Issue #162a — parses 'Elbow90' / 'Elbow45' / 'Tee' / 'Coupling' / 'Adapter' from the catalog trait.</summary>
     private static FittingType? ParseFittingType(string? trait)
     {
@@ -9206,6 +9243,46 @@ public partial class GardenPlot
                 foreach (var shape in placement.Shapes)
                 {
                     currentPlot.Shapes.Add(shape);
+                }
+
+                // Issue #162a — auto-pipe between consecutive fitting stamps. When the user
+                // stamps a pipe fitting and the previous stamp was also a fitting (compatible
+                // material + diameter), draw a pipe segment between them. Gated on
+                // library.Ui.AutoPipeBetweenFittingStamps so users can disable for ad-hoc
+                // fitting placement. Tracker resets on tool change / palette change (see
+                // SelectItem) and on Escape.
+                if (k.Kind == PaletteKind.IrrigationFitting
+                    && library.Ui.AutoPipeBetweenFittingStamps
+                    && lastFittingStampPos is { } prevPos
+                    && placement.Shapes.Count > 0)
+                {
+                    Shape newFitting = placement.Shapes[0];
+                    double newCx = newFitting.X + (newFitting.W / 2);
+                    double newCy = newFitting.Y + (newFitting.H / 2);
+                    Shape autoPipe = new()
+                    {
+                        Kind = ShapeKind.IrrigationPipe,
+                        Label = ResolveAutoPipeCodeForFitting(newFitting) ?? "Auto-pipe",
+                        Trait = newFitting.FittingMaterial ?? "PVC",
+                        Stroke = newFitting.Stroke,
+                        Fill = newFitting.Fill,
+                        PipeDiameterIn = newFitting.FittingDiameterIn,
+                    };
+                    autoPipe.Points.Add(prevPos);
+                    autoPipe.Points.Add(new Point(newCx, newCy));
+                    currentPlot.Shapes.Add(autoPipe);
+                    lastFittingStampPos = new Point(newCx, newCy);
+                }
+                else if (k.Kind == PaletteKind.IrrigationFitting && placement.Shapes.Count > 0)
+                {
+                    Shape newFitting = placement.Shapes[0];
+                    lastFittingStampPos = new Point(
+                        newFitting.X + (newFitting.W / 2),
+                        newFitting.Y + (newFitting.H / 2));
+                }
+                else
+                {
+                    lastFittingStampPos = null;
                 }
 
                 if (placement.Groups.Count > 0)
@@ -10499,7 +10576,9 @@ public partial class GardenPlot
             // Issue #162a — auto-place elbow fittings at sharp interior vertices of a
             // freshly drawn irrigation pipe. We mutate the plot before SaveAsync so the
             // committed shape + its derived fittings persist as a single transaction.
-            if (drafting.Kind == ShapeKind.IrrigationPipe)
+            // Gated on library.Ui.AutoPlaceFittingsOnPipe so users can disable for
+            // hand-curated fittings.
+            if (drafting.Kind == ShapeKind.IrrigationPipe && library.Ui.AutoPlaceFittingsOnPipe)
             {
                 var autoFittings = FittingPlacement.BuildAutoElbowsForPipe(drafting);
                 foreach (Shape fitting in autoFittings)
@@ -11715,6 +11794,7 @@ public partial class GardenPlot
             arcApexEdgeIndex = -1;
             lastArcClickAt = null;
             tangentSnapArmed = false; // issue #131
+            lastFittingStampPos = null; // issue #162a — Escape breaks the auto-pipe chain
             ClearSelection();
         }
     }
@@ -12404,6 +12484,33 @@ public partial class GardenPlot
         }
 
         await SaveAsync();
+    }
+
+    /// <summary>Issue #162a — toggle auto-elbow placement on pipe finalisation.</summary>
+    private async Task OnAutoPlaceFittingsOnPipeChanged(ChangeEventArgs e)
+    {
+        if (e.Value is bool checkedValue)
+        {
+            library.Ui.AutoPlaceFittingsOnPipe = checkedValue;
+            await SaveAsync();
+        }
+    }
+
+    /// <summary>Issue #162a — toggle auto-pipe segment between consecutive fitting stamps.</summary>
+    private async Task OnAutoPipeBetweenFittingStampsChanged(ChangeEventArgs e)
+    {
+        if (e.Value is bool checkedValue)
+        {
+            library.Ui.AutoPipeBetweenFittingStamps = checkedValue;
+            // Clear the chain when the user disables mid-session so the next stamp doesn't
+            // accidentally trigger one last pipe based on a stale tracker.
+            if (!checkedValue)
+            {
+                lastFittingStampPos = null;
+            }
+
+            await SaveAsync();
+        }
     }
 
     private async Task SetShapeRotationAsync(IReadOnlyList<Shape> shapes, double normalizedDegrees)

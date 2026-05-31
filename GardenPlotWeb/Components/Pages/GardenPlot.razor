@@ -900,6 +900,38 @@ else
                             </button>
                         }
                     }
+                    @* Issue #162a — auto-fitting toggles surfaced only in the contextual
+                       palette categories where they affect placement. Two checkboxes:
+                       (1) auto-place elbows on pipe finalise, (2) auto-pipe between
+                       fitting stamps. Both persist via library.Ui. *@
+                    @if (currentCategory == PaletteCategory.IrrigationPipes || currentCategory == PaletteCategory.IrrigationFittings)
+                    {
+                        <div class="palette-irrigation-tools small mb-1 p-2 border rounded">
+                            <div class="text-muted x-small mb-1">Auto-placement options</div>
+                            @if (currentCategory == PaletteCategory.IrrigationPipes)
+                            {
+                                <div class="form-check form-check-sm">
+                                    <input class="form-check-input" type="checkbox" id="auto-fittings-pipe"
+                                           checked="@library.Ui.AutoPlaceFittingsOnPipe"
+                                           @onchange="(e) => OnAutoPlaceFittingsOnPipeChanged(e)" />
+                                    <label class="form-check-label x-small" for="auto-fittings-pipe">
+                                        Auto-place elbows at pipe vertices
+                                    </label>
+                                </div>
+                            }
+                            @if (currentCategory == PaletteCategory.IrrigationFittings)
+                            {
+                                <div class="form-check form-check-sm">
+                                    <input class="form-check-input" type="checkbox" id="auto-pipe-fittings"
+                                           checked="@library.Ui.AutoPipeBetweenFittingStamps"
+                                           @onchange="(e) => OnAutoPipeBetweenFittingStampsChanged(e)" />
+                                    <label class="form-check-label x-small" for="auto-pipe-fittings">
+                                        Auto-pipe between fitting stamps
+                                    </label>
+                                </div>
+                            }
+                        </div>
+                    }
                     @foreach (var item in PaletteItemsForCurrentCategory())
                     {
                         var isActive = selectedItem?.Code == item.Code;

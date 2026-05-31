@@ -196,6 +196,19 @@ public class UiPreferences
     /// <summary>Issue #132: last-used Path → Ribbon end cap. Pre-selects the dropdown on reopen.</summary>
     public RibbonGeometry.EndCap LastRibbonEndCap { get; set; } = RibbonGeometry.EndCap.Square;
 
+    /// <summary>
+    /// Issue #162a: when true, finishing a pipe polyline auto-places elbow fittings at every
+    /// sharp interior vertex. Default ON; users can disable for hand-curated fittings.
+    /// </summary>
+    public bool AutoPlaceFittingsOnPipe { get; set; } = true;
+
+    /// <summary>
+    /// Issue #162a: when true, stamping a second irrigation fitting (without changing tool or
+    /// palette item) auto-draws a pipe segment from the previous stamp to the new one, using the
+    /// fitting's diameter + material. Default ON; users can disable for ad-hoc fitting placement.
+    /// </summary>
+    public bool AutoPipeBetweenFittingStamps { get; set; } = true;
+
     /// <summary>Last-used plot sizes, stored in feet and shown as quick-picks in the new-plot flow.</summary>
     [JsonConverter(typeof(RecentPlotSizesJsonConverter))]
     public List<(double WidthFt, double HeightFt)> RecentPlotSizes { get; set; } = new();
