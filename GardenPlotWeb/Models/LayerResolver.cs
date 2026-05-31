@@ -76,22 +76,25 @@ public static class LayerResolver
             }
         }
 
-        if (IsGroundCoverShape(shape) || string.Equals(shape.Trait, "grass", StringComparison.OrdinalIgnoreCase))
+        // Issue #95 — Jig polymorphism. Shapes that match a registered Jig (kind OR
+        // trait-based, e.g. ground covers) delegate their layer assignment to it.
+        // Shapes that match nothing fall through to the legacy if/else chain below.
+        // Once every shape matches a Jig the chain is deleted.
+        if (Jigs.JigRegistry.TryFor(shape, out var jig))
         {
+            return jig.DefaultLayerKey;
+        }
+
+        if (string.Equals(shape.Trait, "grass", StringComparison.OrdinalIgnoreCase))
+        {
+            // Grass-traited custom tiles route to GroundCover even though they're not
+            // ground covers themselves. Stays in fallback until a GrassTileJig lands.
             return LayerKeys.GroundCover;
         }
 
         if (string.Equals(shape.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase))
         {
             return LayerKeys.Plants;
-        }
-
-        // Issue #95 — Jig polymorphism: kinds that have been migrated to a Jig delegate
-        // their layer assignment to the registered Jig. Unconverted kinds fall through
-        // to the legacy if/else chain below. Once every kind is a Jig, the chain is deleted.
-        if (Jigs.JigRegistry.TryFor(shape.Kind, out var jig))
-        {
-            return jig.DefaultLayerKey;
         }
 
         // Legacy per-kind fallback. The switch was an enum switch; expressing this as
@@ -174,11 +177,6 @@ public static class LayerResolver
         }
 
         return LayerKeys.Hardscape;
-    }
-
-    private static bool IsGroundCoverShape(Shape shape)
-    {
-        return shape.IsGroundCoverSurface || !string.IsNullOrWhiteSpace(shape.GroundCoverCode);
     }
 }
 

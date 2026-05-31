@@ -21,7 +21,7 @@ public sealed class JigRegistryTests
         Jig? jig = JigRegistry.For(ShapeKind.IrrigationHead);
         Assert.NotNull(jig);
         Assert.IsType<IrrigationHeadJig>(jig);
-        Assert.Equal(ShapeKind.IrrigationHead, jig!.Kind);
+        Assert.Equal(ShapeKind.IrrigationHead, ((KindJig)jig!).Kind);
     }
 
     [Fact]
@@ -30,7 +30,7 @@ public sealed class JigRegistryTests
         Jig? jig = JigRegistry.For(ShapeKind.WaterSource);
         Assert.NotNull(jig);
         Assert.IsType<WaterSourceJig>(jig);
-        Assert.Equal(ShapeKind.WaterSource, jig!.Kind);
+        Assert.Equal(ShapeKind.WaterSource, ((KindJig)jig!).Kind);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class JigRegistryTests
         Shape head = new() { Kind = ShapeKind.IrrigationHead };
         Jig? jig = JigRegistry.For(head);
         Assert.NotNull(jig);
-        Assert.Equal(ShapeKind.IrrigationHead, jig!.Kind);
+        Assert.Equal(ShapeKind.IrrigationHead, ((KindJig)jig!).Kind);
     }
 
     [Fact]
@@ -76,26 +76,27 @@ public sealed class JigRegistryTests
     public void All_ReturnsEveryRegisteredJig()
     {
         var jigs = JigRegistry.All().ToList();
-        Assert.Equal(2, jigs.Count);
-        Assert.Contains(jigs, j => j.Kind == ShapeKind.IrrigationHead);
-        Assert.Contains(jigs, j => j.Kind == ShapeKind.WaterSource);
+        Assert.Equal(4, jigs.Count); // 2 ground-cover trait-jigs + 2 kind-jigs as of PR 3b
+        Assert.Contains(jigs, j => j is IrrigationHeadJig);
+        Assert.Contains(jigs, j => j is WaterSourceJig);
+        Assert.Contains(jigs, j => j is GroundCoverSurfaceJig);
+        Assert.Contains(jigs, j => j is GroundCoverVolumeJig);
     }
 
     [Fact]
-    public void All_NoTwoJigsClaimTheSameKind()
+    public void All_NoTwoKindJigsClaimTheSameKind()
     {
-        // Sanity guard for the registry: future PRs will add more Jigs, and we want
-        // a fast test failure if anyone double-registers a kind by accident. The
-        // registry's BuildRegistry method also throws in that case at startup, but
-        // having the invariant pinned by a test catches it before runtime.
-        var byKind = JigRegistry.All().GroupBy(j => j.Kind).ToList();
+        // Sanity guard: a future PR could double-register a KindJig by accident.
+        // Trait-jigs are by-state and don't have a Kind to collide.
+        var kindJigs = JigRegistry.All().OfType<KindJig>().ToList();
+        var byKind = kindJigs.GroupBy(j => j.Kind).ToList();
         Assert.All(byKind, group => Assert.Single(group));
     }
 
     [Fact]
     public void IrrigationHeadJig_ContractValues_AreCorrect()
     {
-        Jig jig = new IrrigationHeadJig();
+        KindJig jig = new IrrigationHeadJig();
         Assert.Equal(ShapeKind.IrrigationHead, jig.Kind);
         Assert.Equal(LayerKeys.Irrigation, jig.DefaultLayerKey);
         Assert.Equal("Irrigation Head", jig.TakeoffKindLabel);
@@ -110,7 +111,7 @@ public sealed class JigRegistryTests
     [Fact]
     public void WaterSourceJig_ContractValues_AreCorrect()
     {
-        Jig jig = new WaterSourceJig();
+        KindJig jig = new WaterSourceJig();
         Assert.Equal(ShapeKind.WaterSource, jig.Kind);
         Assert.Equal(LayerKeys.Irrigation, jig.DefaultLayerKey);
         Assert.Equal("Water Source", jig.TakeoffKindLabel);
@@ -142,5 +143,113 @@ public sealed class JigRegistryTests
         // Hardscape exactly as before the refactor.
         Shape bed = new() { Kind = ShapeKind.BedKit };
         Assert.Equal(LayerKeys.Hardscape, LayerResolver.GetLayerKey(bed));
+    }
+
+    // ==== Trait-jig tests (PR 3b) ====
+
+    [Fact]
+    public void GroundCoverSurfaceJig_MatchesSurface_NotVolume()
+    {
+        var jig = new GroundCoverSurfaceJig();
+        Assert.True(jig.Matches(new Shape { Kind = ShapeKind.Rectangle, IsGroundCoverSurface = true }));
+        Assert.False(jig.Matches(new Shape { Kind = ShapeKind.Rectangle, GroundCoverCode = "Sand" }));
+        Assert.False(jig.Matches(new Shape { Kind = ShapeKind.Rectangle }));
+    }
+
+    [Fact]
+    public void GroundCoverVolumeJig_MatchesVolumeOnly()
+    {
+        var jig = new GroundCoverVolumeJig();
+        Assert.True(jig.Matches(new Shape { Kind = ShapeKind.Rectangle, GroundCoverCode = "Sand" }));
+        Assert.False(jig.Matches(new Shape { Kind = ShapeKind.Rectangle, IsGroundCoverSurface = true })); // surface wins
+        Assert.False(jig.Matches(new Shape { Kind = ShapeKind.Rectangle }));
+    }
+
+    [Fact]
+    public void GroundCoverSurfaceJig_ContractValues_AreCorrect()
+    {
+        var jig = new GroundCoverSurfaceJig();
+        Assert.Equal(LayerKeys.GroundCover, jig.DefaultLayerKey);
+        Assert.Equal("Ground Cover — Surface", jig.TakeoffKindLabel);
+        Assert.Equal("ft²", jig.TakeoffUnit);
+        Assert.True(jig.IsAreaShape(new Shape { Kind = ShapeKind.Rectangle, IsGroundCoverSurface = true }));
+    }
+
+    [Fact]
+    public void GroundCoverVolumeJig_ContractValues_AreCorrect()
+    {
+        var jig = new GroundCoverVolumeJig();
+        Assert.Equal(LayerKeys.GroundCover, jig.DefaultLayerKey);
+        Assert.Equal("Ground Cover", jig.TakeoffKindLabel);
+        Assert.Equal("yd³", jig.TakeoffUnit);
+        Assert.True(jig.IsAreaShape(new Shape { Kind = ShapeKind.Rectangle, GroundCoverCode = "Sand" }));
+    }
+
+    [Fact]
+    public void GroundCoverSurfaceJig_TakeoffQuantity_IsArea()
+    {
+        var jig = new GroundCoverSurfaceJig();
+        Shape rect = new() { Kind = ShapeKind.Rectangle, W = 10, H = 6, IsGroundCoverSurface = true };
+        Assert.Equal(60.0, jig.TakeoffQuantity(rect));
+    }
+
+    [Fact]
+    public void GroundCoverVolumeJig_TakeoffQuantity_IsVolumeYd3()
+    {
+        var jig = new GroundCoverVolumeJig();
+        // 100 ft² × 3 inch depth ÷ 12 = 25 ft³, ÷ 27 ≈ 0.926 yd³, × (1 + 10% waste) ≈ 1.019 yd³.
+        // We set DepthIn and WastePercent explicitly to avoid coupling the test to
+        // PaletteCatalog state (which isn't initialized in unit context).
+        Shape rect = new()
+        {
+            Kind = ShapeKind.Rectangle,
+            W = 10,
+            H = 10,
+            GroundCoverCode = "Sand",
+            DepthIn = 3,
+            WastePercent = 0.10,
+        };
+        double vol = jig.TakeoffQuantity(rect);
+        Assert.InRange(vol, 0.9, 1.1); // sanity: ~1 yd³
+    }
+
+    [Fact]
+    public void For_GroundCoverShape_ReturnsTraitJig_NotKindJig()
+    {
+        // A Rectangle with surface trait must resolve to the surface trait-jig, NOT a
+        // future RectangleJig (which would be a kind-jig). This invariant proves the
+        // registration order in JigRegistry.BuildRegistry: trait-jigs FIRST.
+        Shape surface = new() { Kind = ShapeKind.Rectangle, IsGroundCoverSurface = true };
+        var jig = JigRegistry.For(surface);
+        Assert.IsType<GroundCoverSurfaceJig>(jig);
+
+        Shape volume = new() { Kind = ShapeKind.Oval, GroundCoverCode = "Sand" };
+        Assert.IsType<GroundCoverVolumeJig>(JigRegistry.For(volume));
+    }
+
+    [Fact]
+    public void For_ShapeKindOverload_DoesNotReturnTraitJigs()
+    {
+        // The kind-only overload only looks at KindJig registrations. Asking for
+        // "ShapeKind.Rectangle" can't know whether the user means a hardscape or a
+        // ground-cover — that requires the shape itself. So this overload should
+        // return null for kinds that have no KindJig.
+        Assert.Null(JigRegistry.For(ShapeKind.Rectangle));
+        Assert.Null(JigRegistry.For(ShapeKind.Oval));
+        Assert.Null(JigRegistry.For(ShapeKind.FreeDraw));
+    }
+
+    [Fact]
+    public void LayerResolver_GroundCoverSurfaceRect_RoutesToGroundCoverViaJig()
+    {
+        Shape surface = new() { Kind = ShapeKind.Rectangle, IsGroundCoverSurface = true };
+        Assert.Equal(LayerKeys.GroundCover, LayerResolver.GetLayerKey(surface));
+    }
+
+    [Fact]
+    public void LayerResolver_GroundCoverVolumeFreeDraw_RoutesToGroundCoverViaJig()
+    {
+        Shape volume = new() { Kind = ShapeKind.FreeDraw, GroundCoverCode = "Sand" };
+        Assert.Equal(LayerKeys.GroundCover, LayerResolver.GetLayerKey(volume));
     }
 }

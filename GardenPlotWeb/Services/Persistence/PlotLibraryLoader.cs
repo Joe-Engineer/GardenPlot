@@ -505,22 +505,25 @@ public sealed class PlotLibraryLoader
 
     private static string ResolveLegacyShapeTakeoffUnit(Shape shape)
     {
-        // Mirror the units the v2+ catalog projection writes: ground-cover surfaces are sold
-        // by area (ft²), volumetric ground covers by yd³, edging by lf, everything else by ea.
-        if (!string.IsNullOrWhiteSpace(shape.GroundCoverCode))
+        // Issue #95 — Jig polymorphism. The ground-cover trait-jigs own the
+        // surface-vs-volume split (ft² vs yd³); kind-jigs that have been migrated
+        // own their own unit. Unconverted shapes fall through to the legacy chain.
+        if (GardenPlotWeb.Models.Jigs.JigRegistry.TryFor(shape, out var jig))
         {
-            return shape.IsGroundCoverSurface ? "ft²" : "yd³";
+            return jig.TakeoffUnit;
         }
 
-        return shape.Kind switch
+        if (shape.Kind == ShapeKind.Edge)
         {
-            ShapeKind.Edge => "lf",
-            ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.SoilMarker or ShapeKind.IrrigationHead or ShapeKind.WaterSource or ShapeKind.IrrigationControl or ShapeKind.IrrigationFitting => "ea",
-            ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw => "ea",
-            ShapeKind.Ruler or ShapeKind.CircleRuler or ShapeKind.RectRuler => "ea",
-            ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire => "lf",
-            _ => "ea",
-        };
+            return "lf";
+        }
+
+        if (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire)
+        {
+            return "lf";
+        }
+
+        return "ea";
     }
 
     private static (CatalogSource Source, string? PackId, string Code) ResolveLegacyShapeCatalogRef(Shape shape)

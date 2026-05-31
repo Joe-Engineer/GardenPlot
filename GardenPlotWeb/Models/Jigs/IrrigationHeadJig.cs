@@ -10,7 +10,7 @@ namespace GardenPlotWeb.Models.Jigs;
 /// has no path / area footprint (the coverage arc is rendered as a halo, not
 /// part of the takeoff geometry).
 /// </summary>
-public sealed class IrrigationHeadJig : Jig
+public sealed class IrrigationHeadJig : KindJig
 {
     /// <inheritdoc/>
     public override ShapeKind Kind => ShapeKind.IrrigationHead;
