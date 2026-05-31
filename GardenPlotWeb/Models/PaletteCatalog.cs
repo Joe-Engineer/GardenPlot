@@ -221,23 +221,25 @@ public static class PaletteCatalog
     /// </summary>
     public static readonly PaletteItem[] IrrigationPipes =
     [
-        // Mains (carry pressurized water from the source to manifolds)
-        new("PVC Main 1\"", PaletteKind.IrrigationPipe, 1.0 / 12.0, 1.0 / 12.0, "PVC", Notes: "1\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
-        new("PVC Main 1¼\"", PaletteKind.IrrigationPipe, 1.25 / 12.0, 1.25 / 12.0, "PVC", Notes: "1¼\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
-        new("PVC Main 1½\"", PaletteKind.IrrigationPipe, 1.5 / 12.0, 1.5 / 12.0, "PVC", Notes: "1½\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
-        new("PVC Main 2\"", PaletteKind.IrrigationPipe, 2.0 / 12.0, 2.0 / 12.0, "PVC", Notes: "2\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
+        // Mains (carry pressurized water from the source to manifolds). PVC mains are sold
+        // in 20-foot sticks; couplings are needed every 20 ft along a continuous run.
+        new("PVC Main 1\"", PaletteKind.IrrigationPipe, 1.0 / 12.0, 1.0 / 12.0, "PVC", Notes: "1\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0", StockLengthFt: 20.0),
+        new("PVC Main 1¼\"", PaletteKind.IrrigationPipe, 1.25 / 12.0, 1.25 / 12.0, "PVC", Notes: "1¼\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0", StockLengthFt: 20.0),
+        new("PVC Main 1½\"", PaletteKind.IrrigationPipe, 1.5 / 12.0, 1.5 / 12.0, "PVC", Notes: "1½\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0", StockLengthFt: 20.0),
+        new("PVC Main 2\"", PaletteKind.IrrigationPipe, 2.0 / 12.0, 2.0 / 12.0, "PVC", Notes: "2\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0", StockLengthFt: 20.0),
 
-        // Laterals (run from manifold valves out to the sprinkler heads)
-        new("PVC Lateral ½\"", PaletteKind.IrrigationPipe, 0.5 / 12.0, 0.5 / 12.0, "PVC", Notes: "½\" PVC lateral", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
-        new("PVC Lateral ¾\"", PaletteKind.IrrigationPipe, 0.75 / 12.0, 0.75 / 12.0, "PVC", Notes: "¾\" PVC lateral", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
-        new("PVC Lateral 1\"", PaletteKind.IrrigationPipe, 1.0 / 12.0, 1.0 / 12.0, "PVC", Notes: "1\" PVC lateral", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
-        new("Poly Lateral ½\"", PaletteKind.IrrigationPipe, 0.5 / 12.0, 0.5 / 12.0, "Poly", Notes: "½\" poly lateral", StrokeColor: "#2a2a2a", FillColor: "#404040"),
-        new("Poly Lateral ¾\"", PaletteKind.IrrigationPipe, 0.75 / 12.0, 0.75 / 12.0, "Poly", Notes: "¾\" poly lateral", StrokeColor: "#2a2a2a", FillColor: "#404040"),
-        new("Copper Lateral ¾\"", PaletteKind.IrrigationPipe, 0.75 / 12.0, 0.75 / 12.0, "Copper", Notes: "¾\" copper lateral", StrokeColor: "#b7521a", FillColor: "#d2733a"),
+        // Laterals (run from manifold valves out to the sprinkler heads). PVC laterals also
+        // 20 ft sticks; ½" sometimes 10 ft. Poly is spooled, copper is sticked (10 ft).
+        new("PVC Lateral ½\"", PaletteKind.IrrigationPipe, 0.5 / 12.0, 0.5 / 12.0, "PVC", Notes: "½\" PVC lateral", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0", StockLengthFt: 10.0),
+        new("PVC Lateral ¾\"", PaletteKind.IrrigationPipe, 0.75 / 12.0, 0.75 / 12.0, "PVC", Notes: "¾\" PVC lateral", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0", StockLengthFt: 20.0),
+        new("PVC Lateral 1\"", PaletteKind.IrrigationPipe, 1.0 / 12.0, 1.0 / 12.0, "PVC", Notes: "1\" PVC lateral", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0", StockLengthFt: 20.0),
+        new("Poly Lateral ½\"", PaletteKind.IrrigationPipe, 0.5 / 12.0, 0.5 / 12.0, "Poly", Notes: "½\" poly lateral", StrokeColor: "#2a2a2a", FillColor: "#404040", StockLengthFt: 100.0),
+        new("Poly Lateral ¾\"", PaletteKind.IrrigationPipe, 0.75 / 12.0, 0.75 / 12.0, "Poly", Notes: "¾\" poly lateral", StrokeColor: "#2a2a2a", FillColor: "#404040", StockLengthFt: 100.0),
+        new("Copper Lateral ¾\"", PaletteKind.IrrigationPipe, 0.75 / 12.0, 0.75 / 12.0, "Copper", Notes: "¾\" copper lateral", StrokeColor: "#b7521a", FillColor: "#d2733a", StockLengthFt: 10.0),
 
-        // Drip supply / tubing
-        new("Drip Supply ½\"", PaletteKind.IrrigationPipe, 0.5 / 12.0, 0.5 / 12.0, "DripTubing", Notes: "½\" drip distribution tubing", StrokeColor: "#3a3a3a", FillColor: "#5a5a5a"),
-        new("Drip ¼\" Spaghetti", PaletteKind.IrrigationPipe, 0.25 / 12.0, 0.25 / 12.0, "DripTubing", Notes: "¼\" drip spaghetti / micro-tubing", StrokeColor: "#3a3a3a", FillColor: "#5a5a5a"),
+        // Drip supply / tubing — spooled, long stock lengths (rare to need couplings).
+        new("Drip Supply ½\"", PaletteKind.IrrigationPipe, 0.5 / 12.0, 0.5 / 12.0, "DripTubing", Notes: "½\" drip distribution tubing", StrokeColor: "#3a3a3a", FillColor: "#5a5a5a", StockLengthFt: 500.0),
+        new("Drip ¼\" Spaghetti", PaletteKind.IrrigationPipe, 0.25 / 12.0, 0.25 / 12.0, "DripTubing", Notes: "¼\" drip spaghetti / micro-tubing", StrokeColor: "#3a3a3a", FillColor: "#5a5a5a", StockLengthFt: 250.0),
     ];
 
     /// <summary>Standard sprinkler-pipe diameters in inches used by the inspector dropdown.</summary>

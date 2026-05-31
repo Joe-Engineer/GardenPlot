@@ -74,17 +74,23 @@ public static class FittingPlacement
     }
 
     /// <summary>
-    /// Builds the list of auto-placed fittings for a single irrigation pipe. Walks the
-    /// interior vertices, computes the interior angle at each, and creates an
-    /// <see cref="ShapeKind.IrrigationFitting"/> shape for any vertex that bends sharply
-    /// enough to need one. Material + diameter are copied from the pipe.
+    /// Builds the full list of auto-placed fittings for a single irrigation pipe. Walks the
+    /// pipe's vertices and segments, deciding per-vertex whether to drop an elbow (sharp
+    /// bend) or a tee (vertex shared with another pipe), and per-segment whether the run
+    /// exceeds the stock length and needs intermediate couplings.
     /// </summary>
-    public static List<Shape> BuildAutoElbowsForPipe(Shape pipe)
+    /// <param name="pipe">The newly finalised pipe.</param>
+    /// <param name="otherShapes">All other shapes in the plot (used to detect tee junctions).
+    /// Pass null to skip junction detection and produce only elbows + couplings.</param>
+    /// <param name="stockLengthFt">Per-stock pipe length in feet (PVC ~20 ft, Poly 100 ft, etc.).
+    /// Pass null to skip coupling placement.</param>
+    /// <returns>List of new fitting shapes (elbows / tees / couplings) ready to add to the plot.</returns>
+    public static List<Shape> BuildAutoFittingsForPipe(Shape pipe, IEnumerable<Shape>? otherShapes = null, double? stockLengthFt = null)
     {
         ArgumentNullException.ThrowIfNull(pipe);
 
         var fittings = new List<Shape>();
-        if (pipe.Kind != ShapeKind.IrrigationPipe || pipe.Points is null || pipe.Points.Count < 3)
+        if (pipe.Kind != ShapeKind.IrrigationPipe || pipe.Points is null || pipe.Points.Count < 2)
         {
             return fittings;
         }
@@ -96,35 +102,149 @@ public static class FittingPlacement
         }
 
         string? material = string.IsNullOrWhiteSpace(pipe.Trait) ? null : pipe.Trait;
+        double sizeFt = diameterIn / 12.0;
+        IReadOnlyList<Shape> otherList = otherShapes is null
+            ? Array.Empty<Shape>()
+            : otherShapes.Where(s => s.Id != pipe.Id).ToList();
 
-        for (int i = 1; i < pipe.Points.Count - 1; i++)
+        // Pass 1 — per-vertex fittings: elbow at sharp bends, tee at junctions.
+        // Endpoints get a tee only when shared with another pipe (otherwise they're just
+        // the open end of the run and need no fitting). Interior vertices always get
+        // SOMETHING — tee if shared, elbow otherwise.
+        for (int i = 0; i < pipe.Points.Count; i++)
         {
-            double angle = InteriorAngleDegrees(pipe.Points[i - 1], pipe.Points[i], pipe.Points[i + 1]);
-            FittingType? type = FittingForInteriorAngle(angle);
+            bool isEndpoint = i == 0 || i == pipe.Points.Count - 1;
+            bool isJunction = IsJunctionVertex(pipe.Points[i], otherList);
+
+            FittingType? type = null;
+            if (isJunction)
+            {
+                type = FittingType.Tee;
+            }
+            else if (!isEndpoint)
+            {
+                double angle = InteriorAngleDegrees(pipe.Points[i - 1], pipe.Points[i], pipe.Points[i + 1]);
+                type = FittingForInteriorAngle(angle);
+            }
+
             if (type is null)
             {
                 continue;
             }
 
-            double sizeFt = diameterIn / 12.0;
-            fittings.Add(new Shape
+            fittings.Add(MakeFittingShape(pipe.Points[i], sizeFt, material, diameterIn, type.Value, pipe));
+        }
+
+        // Pass 2 — auto-couplings along long segments. A segment longer than stockLengthFt
+        // gets a coupling at every stockLengthFt boundary so the user knows how many stock
+        // sticks the run consumes.
+        if (stockLengthFt is double stockLen && stockLen > 0)
+        {
+            for (int i = 0; i < pipe.Points.Count - 1; i++)
             {
-                Kind = ShapeKind.IrrigationFitting,
-                X = pipe.Points[i].X - (sizeFt / 2),
-                Y = pipe.Points[i].Y - (sizeFt / 2),
-                W = sizeFt,
-                H = sizeFt,
-                Label = ComposeAutoLabel(material, diameterIn, type.Value),
-                Trait = type.Value.ToString(),
-                FittingType = type,
-                FittingDiameterIn = diameterIn,
-                FittingMaterial = material,
-                Stroke = pipe.Stroke,
-                Fill = pipe.Fill,
-            });
+                Point a = pipe.Points[i];
+                Point b = pipe.Points[i + 1];
+                double segLenFt = Math.Sqrt(((b.X - a.X) * (b.X - a.X)) + ((b.Y - a.Y) * (b.Y - a.Y)));
+                if (segLenFt <= stockLen)
+                {
+                    continue;
+                }
+
+                int couplingCount = (int)Math.Floor(segLenFt / stockLen);
+                for (int c = 1; c <= couplingCount; c++)
+                {
+                    double t = (c * stockLen) / segLenFt;
+                    Point at = new(a.X + ((b.X - a.X) * t), a.Y + ((b.Y - a.Y) * t));
+                    fittings.Add(MakeFittingShape(at, sizeFt, material, diameterIn, FittingType.Coupling, pipe));
+                }
+            }
         }
 
         return fittings;
+    }
+
+    /// <summary>
+    /// Issue #162a — back-compat shim. Some call sites and tests still use the original
+    /// elbow-only entry point; the new <see cref="BuildAutoFittingsForPipe"/> is a superset.
+    /// </summary>
+    [Obsolete("Prefer BuildAutoFittingsForPipe(pipe, otherShapes, stockLengthFt) for full fitting coverage.")]
+    public static List<Shape> BuildAutoElbowsForPipe(Shape pipe)
+    {
+        return BuildAutoFittingsForPipe(pipe, otherShapes: null, stockLengthFt: null);
+    }
+
+    private static Shape MakeFittingShape(Point at, double sizeFt, string? material, double diameterIn, FittingType type, Shape sourcePipe)
+    {
+        return new Shape
+        {
+            Kind = ShapeKind.IrrigationFitting,
+            X = at.X - (sizeFt / 2),
+            Y = at.Y - (sizeFt / 2),
+            W = sizeFt,
+            H = sizeFt,
+            Label = ComposeAutoLabel(material, diameterIn, type),
+            Trait = type.ToString(),
+            FittingType = type,
+            FittingDiameterIn = diameterIn,
+            FittingMaterial = material,
+            Stroke = sourcePipe.Stroke,
+            Fill = sourcePipe.Fill,
+        };
+    }
+
+    /// <summary>
+    /// Issue #162b — returns true when at least one OTHER pipe shape has a vertex
+    /// (endpoint or interior) within <see cref="JointToleranceFt"/> of the given point.
+    /// Used to upgrade an elbow → tee at multi-way junctions.
+    /// </summary>
+    private static bool IsJunctionVertex(Point at, IReadOnlyList<Shape> otherShapes)
+    {
+        double tol2 = JointToleranceFt * JointToleranceFt;
+        foreach (Shape other in otherShapes)
+        {
+            if (other.Kind != ShapeKind.IrrigationPipe || other.Points is null)
+            {
+                continue;
+            }
+
+            foreach (Point p in other.Points)
+            {
+                double dx = p.X - at.X;
+                double dy = p.Y - at.Y;
+                if ((dx * dx) + (dy * dy) <= tol2)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Per-vertex coincidence tolerance for junction detection (feet).</summary>
+    private const double JointToleranceFt = 0.15;
+
+    /// <summary>
+    /// Issue #162b — computes stock-unit consumption + waste percentage for a pipe run.
+    /// </summary>
+    /// <param name="totalRunFt">Total polyline length of the pipe in feet.</param>
+    /// <param name="stockLengthFt">Per-stick / per-spool length in feet (PVC ~20, Poly 100, etc.).</param>
+    /// <returns>
+    /// Null when inputs are non-positive. Otherwise (units needed, waste %) where:
+    /// - units = ceil(totalRun / stock)
+    /// - waste = (unitsTotal − totalRun) / unitsTotal × 100
+    /// </returns>
+    public static (int StockUnits, double WastePercent)? ComputeStockUsage(double totalRunFt, double? stockLengthFt)
+    {
+        if (stockLengthFt is not double stockLen || stockLen <= 0 || totalRunFt <= 0)
+        {
+            return null;
+        }
+
+        int units = (int)Math.Ceiling(totalRunFt / stockLen);
+        double totalStockFt = units * stockLen;
+        double wastePct = ((totalStockFt - totalRunFt) / totalStockFt) * 100.0;
+        return (units, wastePct);
     }
 
     /// <summary>

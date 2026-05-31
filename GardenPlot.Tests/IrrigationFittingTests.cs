@@ -161,26 +161,26 @@ public sealed class IrrigationFittingTests
     }
 
     [Fact]
-    public void BuildAutoElbowsForPipe_StraightPipe_ProducesNoFittings()
+    public void BuildAutoFittingsForPipe_StraightPipe_ProducesNoFittings()
     {
         Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75 };
         pipe.Points.Add(new Point(0, 0));
         pipe.Points.Add(new Point(5, 0));
         pipe.Points.Add(new Point(10, 0));
 
-        var fittings = FittingPlacement.BuildAutoElbowsForPipe(pipe);
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe);
         Assert.Empty(fittings);
     }
 
     [Fact]
-    public void BuildAutoElbowsForPipe_RightAngleVertex_ProducesOne90Elbow()
+    public void BuildAutoFittingsForPipe_RightAngleVertex_ProducesOne90Elbow()
     {
         Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
         pipe.Points.Add(new Point(0, 0));
         pipe.Points.Add(new Point(5, 0));
         pipe.Points.Add(new Point(5, 5));
 
-        var fittings = FittingPlacement.BuildAutoElbowsForPipe(pipe);
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe);
         Assert.Single(fittings);
         Assert.Equal(FittingType.Elbow90, fittings[0].FittingType);
         Assert.Equal(0.75, fittings[0].FittingDiameterIn);
@@ -188,31 +188,31 @@ public sealed class IrrigationFittingTests
     }
 
     [Fact]
-    public void BuildAutoElbowsForPipe_135DegreeVertex_ProducesOne45Elbow()
+    public void BuildAutoFittingsForPipe_135DegreeVertex_ProducesOne45Elbow()
     {
         Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 1.0, Trait = "PVC" };
         pipe.Points.Add(new Point(0, 0));
         pipe.Points.Add(new Point(5, 0));
         pipe.Points.Add(new Point(8.535, 3.535)); // ~135° interior at the middle point
-        var fittings = FittingPlacement.BuildAutoElbowsForPipe(pipe);
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe);
         Assert.Single(fittings);
         Assert.Equal(FittingType.Elbow45, fittings[0].FittingType);
     }
 
     [Fact]
-    public void BuildAutoElbowsForPipe_NonPipeShape_ReturnsEmpty()
+    public void BuildAutoFittingsForPipe_NonPipeShape_ReturnsEmpty()
     {
         Shape notPipe = new() { Kind = ShapeKind.FreeDraw };
         notPipe.Points.Add(new Point(0, 0));
         notPipe.Points.Add(new Point(5, 0));
         notPipe.Points.Add(new Point(5, 5));
 
-        var fittings = FittingPlacement.BuildAutoElbowsForPipe(notPipe);
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(notPipe);
         Assert.Empty(fittings);
     }
 
     [Fact]
-    public void BuildAutoElbowsForPipe_TwoSharpVertices_ProducesTwoElbows()
+    public void BuildAutoFittingsForPipe_TwoSharpVertices_ProducesTwoElbows()
     {
         Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.5, Trait = "PVC" };
         pipe.Points.Add(new Point(0, 0));
@@ -220,9 +220,165 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(5, 5));
         pipe.Points.Add(new Point(10, 5));
 
-        var fittings = FittingPlacement.BuildAutoElbowsForPipe(pipe);
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe);
         Assert.Equal(2, fittings.Count);
         Assert.All(fittings, f => Assert.Equal(FittingType.Elbow90, f.FittingType));
+    }
+
+    [Fact]
+    public void BuildAutoFittingsForPipe_EndpointSharedWithOtherPipe_ProducesTee()
+    {
+        Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
+        pipe.Points.Add(new Point(0, 0));
+        pipe.Points.Add(new Point(5, 0));
+
+        Shape branch = new() { Kind = ShapeKind.IrrigationPipe };
+        branch.Points.Add(new Point(5, 0)); // junction at pipe's endpoint
+        branch.Points.Add(new Point(5, 5));
+
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, otherShapes: new[] { branch });
+        Assert.Single(fittings);
+        Assert.Equal(FittingType.Tee, fittings[0].FittingType);
+    }
+
+    [Fact]
+    public void BuildAutoFittingsForPipe_InteriorVertexSharedWithOtherPipe_UpgradesElbowToTee()
+    {
+        Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
+        pipe.Points.Add(new Point(0, 0));
+        pipe.Points.Add(new Point(5, 0));
+        pipe.Points.Add(new Point(5, 5));
+
+        Shape branch = new() { Kind = ShapeKind.IrrigationPipe };
+        branch.Points.Add(new Point(5, 0)); // shares the interior vertex
+        branch.Points.Add(new Point(10, 0));
+
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, otherShapes: new[] { branch });
+        Assert.Single(fittings);
+        Assert.Equal(FittingType.Tee, fittings[0].FittingType);
+    }
+
+    [Fact]
+    public void BuildAutoFittingsForPipe_LongSegment_AddsCouplingsEveryStockLength()
+    {
+        Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
+        pipe.Points.Add(new Point(0, 0));
+        pipe.Points.Add(new Point(50, 0)); // 50 ft straight run
+
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+
+        // 50 / 20 = 2.5 → 2 couplings (at 20 ft and 40 ft); the last partial stick has no coupling.
+        Assert.Equal(2, fittings.Count);
+        Assert.All(fittings, f => Assert.Equal(FittingType.Coupling, f.FittingType));
+        Assert.Equal(20, fittings[0].X + (fittings[0].W / 2), 2);
+        Assert.Equal(40, fittings[1].X + (fittings[1].W / 2), 2);
+    }
+
+    [Fact]
+    public void BuildAutoFittingsForPipe_NoStockLength_NoCouplings()
+    {
+        Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
+        pipe.Points.Add(new Point(0, 0));
+        pipe.Points.Add(new Point(100, 0));
+
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: null);
+        Assert.Empty(fittings);
+    }
+
+    [Fact]
+    public void BuildAutoFittingsForPipe_StockLengthLongerThanRun_NoCouplings()
+    {
+        Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
+        pipe.Points.Add(new Point(0, 0));
+        pipe.Points.Add(new Point(15, 0));
+
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+        Assert.Empty(fittings);
+    }
+
+    [Fact]
+    public void BuildAutoFittingsForPipe_BendsPlusJunctionsPlusCouplings_Coexist()
+    {
+        // U-shaped 30 ft pipe: 10 ft right, 90° bend, 10 ft down, 90° bend, 10 ft left. Junction at the end with another pipe.
+        Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
+        pipe.Points.Add(new Point(0, 0));
+        pipe.Points.Add(new Point(10, 0));
+        pipe.Points.Add(new Point(10, 10));
+        pipe.Points.Add(new Point(0, 10));
+
+        Shape branch = new() { Kind = ShapeKind.IrrigationPipe };
+        branch.Points.Add(new Point(0, 10)); // junction at last point of pipe
+        branch.Points.Add(new Point(-5, 10));
+
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, otherShapes: new[] { branch }, stockLengthFt: 8.0);
+
+        // Expect: 2 elbows at interior vertices (none of which exceed stockLength=8 in a single
+        // segment; each segment is 10ft which is over the 8ft stock, so 1 coupling per 10ft
+        // segment = 3 couplings), 1 tee at the end junction.
+        // Layout: vertex 0 (no fitting; not junction), vertex 1 elbow90, vertex 2 elbow90,
+        // vertex 3 tee (junction). Plus 3 couplings (one at 8 ft into each of the 3 segments).
+        int tees = fittings.Count(f => f.FittingType == FittingType.Tee);
+        int elbows = fittings.Count(f => f.FittingType is FittingType.Elbow90 or FittingType.Elbow45);
+        int couplings = fittings.Count(f => f.FittingType == FittingType.Coupling);
+        Assert.Equal(1, tees);
+        Assert.Equal(2, elbows);
+        Assert.Equal(3, couplings);
+    }
+
+    [Fact]
+    public void ComputeStockUsage_BasicCase_RoundsUpAndComputesWaste()
+    {
+        var result = FittingPlacement.ComputeStockUsage(totalRunFt: 50, stockLengthFt: 20);
+        Assert.NotNull(result);
+        Assert.Equal(3, result!.Value.StockUnits);
+        // 3 × 20 = 60 ft stocks for a 50 ft run → 10 ft waste / 60 ft = 16.667 %
+        Assert.Equal(16.667, result.Value.WastePercent, 2);
+    }
+
+    [Fact]
+    public void ComputeStockUsage_ExactMultiple_ZeroWaste()
+    {
+        var result = FittingPlacement.ComputeStockUsage(totalRunFt: 40, stockLengthFt: 20);
+        Assert.NotNull(result);
+        Assert.Equal(2, result!.Value.StockUnits);
+        Assert.Equal(0.0, result.Value.WastePercent, 2);
+    }
+
+    [Fact]
+    public void ComputeStockUsage_RunShorterThanStock_OneUnit()
+    {
+        var result = FittingPlacement.ComputeStockUsage(totalRunFt: 5, stockLengthFt: 20);
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.Value.StockUnits);
+        Assert.Equal(75.0, result.Value.WastePercent, 2);
+    }
+
+    [Fact]
+    public void ComputeStockUsage_NullStockLength_ReturnsNull()
+    {
+        Assert.Null(FittingPlacement.ComputeStockUsage(totalRunFt: 50, stockLengthFt: null));
+    }
+
+    [Fact]
+    public void ComputeStockUsage_ZeroRun_ReturnsNull()
+    {
+        Assert.Null(FittingPlacement.ComputeStockUsage(totalRunFt: 0, stockLengthFt: 20));
+    }
+
+    [Fact]
+    public void Catalog_AllPVCPipes_HaveStockLength()
+    {
+        var pvcPipes = PaletteCatalog.IrrigationPipes
+            .Where(p => string.Equals(p.Trait, "PVC", StringComparison.OrdinalIgnoreCase));
+        Assert.All(pvcPipes, p => Assert.NotNull(p.StockLengthFt));
+        Assert.All(pvcPipes, p => Assert.True(p.StockLengthFt > 0));
+    }
+
+    [Fact]
+    public void Catalog_DripTubing_HasLargeSpoolStockLength()
+    {
+        var drip = PaletteCatalog.IrrigationPipes.First(p => p.Code == "Drip Supply ½\"");
+        Assert.Equal(500.0, drip.StockLengthFt);
     }
 
     [Fact]

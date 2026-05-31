@@ -999,6 +999,46 @@ public partial class GardenPlot
             }
         }
 
+        // Issue #162b — refresh Quantity + Notes for pipe / wire takeoff rows whose underlying
+        // polyline may have been extended (vertex added, dragged, etc.) since the row was first
+        // created. Without this, pipes that pre-date the stock-length feature stay at Quantity=1,
+        // and pipes that grow after creation don't update their linear feet / stock-stick rollup.
+        Dictionary<Guid, Shape> shapesByIdForRefresh = currentPlot.Shapes.ToDictionary(s => s.Id);
+        foreach (TakeoffItem t in currentPlot.Takeoff)
+        {
+            if (t.ShapeId is not Guid sid || !shapesByIdForRefresh.TryGetValue(sid, out Shape? boundShape))
+            {
+                continue;
+            }
+
+            if (boundShape.Kind is not (ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire))
+            {
+                continue;
+            }
+
+            if (boundShape.Points.Count < 2)
+            {
+                continue;
+            }
+
+            double lengthFt = PolylineSampler.TotalLengthFt(boundShape.Points, closed: false);
+            t.Quantity = lengthFt;
+
+            string? refreshedNotes = null;
+            if (boundShape.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(boundShape.Label) && lengthFt > 0)
+            {
+                PaletteItem? pipeRow = PaletteCatalog.FindByCode(boundShape.Label!);
+                if (FittingPlacement.ComputeStockUsage(lengthFt, pipeRow?.StockLengthFt) is { } usage
+                    && pipeRow?.StockLengthFt is double stockLen)
+                {
+                    string unitWord = usage.StockUnits == 1 ? "stick" : "sticks";
+                    refreshedNotes = $"{usage.StockUnits} {unitWord} @ {stockLen:0.#} ft · {usage.WastePercent:0.0}% waste";
+                }
+            }
+
+            t.Notes = refreshedNotes;
+        }
+
         foreach (Shape shape in currentPlot.Shapes)
         {
             if (IsAssemblyShape(shape) || boundShapeIds.Contains(shape.Id))
@@ -1007,13 +1047,37 @@ public partial class GardenPlot
             }
 
             (CatalogSource src, string? packId, string code) = ResolveCatalogRefForShape(shape);
+
+            // Issue #159 + #161 — pipes and wires quantify in linear feet (polyline length),
+            // not per-piece. Other kinds stay at count = 1.
+            double quantity = 1;
+            string? notes = null;
+            if (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire && shape.Points.Count >= 2)
+            {
+                quantity = PolylineSampler.TotalLengthFt(shape.Points, closed: false);
+
+                // Issue #162b — surface stock-stick consumption ("3 sticks @ 20 ft, 15% waste")
+                // in the row Notes so the takeoff table can render it under the row name.
+                if (shape.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(shape.Label) && quantity > 0)
+                {
+                    PaletteItem? pipeRow = PaletteCatalog.FindByCode(shape.Label!);
+                    if (FittingPlacement.ComputeStockUsage(quantity, pipeRow?.StockLengthFt) is { } usage
+                        && pipeRow?.StockLengthFt is double stockLen)
+                    {
+                        string unitWord = usage.StockUnits == 1 ? "stick" : "sticks";
+                        notes = $"{usage.StockUnits} {unitWord} @ {stockLen:0.#} ft · {usage.WastePercent:0.0}% waste";
+                    }
+                }
+            }
+
             currentPlot.Takeoff.Add(new TakeoffItem
             {
                 Id = nextId++,
                 CatalogSource = src,
                 CatalogPackId = packId,
                 CatalogCode = code,
-                Quantity = 1,
+                Quantity = quantity,
+                Notes = notes,
                 ShapeId = shape.Id,
             });
         }
@@ -8013,6 +8077,23 @@ public partial class GardenPlot
         return match?.Code;
     }
 
+    /// <summary>
+    /// Issue #162b — looks up the stock-length (feet) for a pipe by its catalog Code, so
+    /// the auto-coupling pass knows how often to drop a coupling along a long run.
+    /// Returns null when the pipe has no Label OR the catalog row has no stock length.
+    /// </summary>
+    private static double? ResolveStockLengthFtForPipe(Shape pipe)
+    {
+        ArgumentNullException.ThrowIfNull(pipe);
+        if (string.IsNullOrWhiteSpace(pipe.Label))
+        {
+            return null;
+        }
+
+        PaletteItem? row = PaletteCatalog.FindByCode(pipe.Label);
+        return row?.StockLengthFt;
+    }
+
     /// <summary>Issue #162a — parses 'Elbow90' / 'Elbow45' / 'Tee' / 'Coupling' / 'Adapter' from the catalog trait.</summary>
     private static FittingType? ParseFittingType(string? trait)
     {
@@ -10633,9 +10714,15 @@ public partial class GardenPlot
             // committed shape + its derived fittings persist as a single transaction.
             // Gated on library.Ui.AutoPlaceFittingsOnPipe so users can disable for
             // hand-curated fittings.
+            // Issue #162b — auto-fittings now include tees at cross-pipe junctions AND
+            // couplings at stock-length intervals (looked up from the pipe's catalog row).
             if (drafting.Kind == ShapeKind.IrrigationPipe && library.Ui.AutoPlaceFittingsOnPipe)
             {
-                var autoFittings = FittingPlacement.BuildAutoElbowsForPipe(drafting);
+                double? stockLengthFt = ResolveStockLengthFtForPipe(drafting);
+                var autoFittings = FittingPlacement.BuildAutoFittingsForPipe(
+                    drafting,
+                    otherShapes: currentPlot.Shapes,
+                    stockLengthFt: stockLengthFt);
                 foreach (Shape fitting in autoFittings)
                 {
                     currentPlot.Shapes.Add(fitting);

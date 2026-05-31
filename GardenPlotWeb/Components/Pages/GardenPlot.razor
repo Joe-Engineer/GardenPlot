@@ -948,7 +948,9 @@ else
                                 ? $"linear · {thickness:0.###}\" visual · {edgeCatalog.LaborHoursPerUnit:0.##} h/lf"
                                 : "linear · lf",
                             PaletteKind.IrrigationHead => $"{item.WidthFt:0.#}' Ø · {item.Trait}",
-                            PaletteKind.IrrigationPipe => $"{item.WidthFt * 12:0.##}\" Ø · {item.Trait}",
+                            PaletteKind.IrrigationPipe => item.StockLengthFt is double stockFt
+                                ? $"{item.WidthFt * 12:0.##}\" Ø · {item.Trait} · {stockFt:0.#} ft stock"
+                                : $"{item.WidthFt * 12:0.##}\" Ø · {item.Trait}",
                             PaletteKind.WaterSource => $"{item.Trait} · {item.Notes}",
                             PaletteKind.IrrigationControl => $"{item.Trait} · {item.Notes}",
                             PaletteKind.IrrigationWire => $"{item.Notes}",
@@ -2469,6 +2471,10 @@ else
                                             <td>@row.Kind</td>
                                             <td>
                                                 @row.Name
+                                                @if (!string.IsNullOrWhiteSpace(row.Notes))
+                                                {
+                                                    <div class="x-small text-muted">@row.Notes</div>
+                                                }
                                                 @if (row.Unbound)
                                                 {
                                                     <span class="text-warning-emphasis small ms-1" title="Catalog item not found">(Unbound)</span>
@@ -3009,6 +3015,12 @@ else
                     var pipeMaterial = single!.Trait;
                     var pipeLengthFt = single!.Points.Count >= 2 ? PolylineSampler.TotalLengthFt(single!.Points, closed: false) : 0;
                     var pipeSelectedArray = new[] { single! };
+                    var pipeStockLengthFt = !string.IsNullOrWhiteSpace(single!.Label)
+                        ? PaletteCatalog.FindByCode(single!.Label!)?.StockLengthFt
+                        : null;
+                    var pipeStockUsage = pipeLengthFt > 0
+                        ? GardenPlotWeb.Models.FittingPlacement.ComputeStockUsage(pipeLengthFt, pipeStockLengthFt)
+                        : null;
                     <div class="ground-cover-info mt-2 pt-2 border-top">
                         <div class="small fw-semibold mb-1">Irrigation Pipe</div>
                         <div class="small mb-1">
@@ -3019,12 +3031,28 @@ else
                             <span class="text-muted">Material:</span>
                             <strong>@(string.IsNullOrWhiteSpace(pipeMaterial) ? "(unknown)" : pipeMaterial)</strong>
                         </div>
+                        @if (pipeStockLengthFt is double stockLen)
+                        {
+                            <div class="small mb-1">
+                                <span class="text-muted">Stock length:</span>
+                                <strong>@F(stockLen) ft</strong>
+                                <span class="text-muted">@(stockLen >= 100 ? "(spool)" : "(stick)")</span>
+                            </div>
+                        }
                         @if (!isPreview && pipeLengthFt > 0)
                         {
                             <div class="small mb-1">
                                 <span class="text-muted">Length:</span>
                                 <strong>@F(pipeLengthFt) ft</strong>
                             </div>
+                            @if (pipeStockUsage is { } usage)
+                            {
+                                <div class="small mb-1">
+                                    <span class="text-muted">Stocks needed:</span>
+                                    <strong>@usage.StockUnits</strong>
+                                    <span class="text-muted">(@($"{usage.WastePercent:0.0}")% waste)</span>
+                                </div>
+                            }
                         }
                         <div class="rotation-edit-row mt-1">
                             <span class="text-muted small">Diameter:</span>
