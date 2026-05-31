@@ -915,7 +915,9 @@ else
                             PaletteKind.Edging => GardenPlotWeb.Models.Catalog.Find(item.Code) is { } edgeCatalog && edgeCatalog.DefaultThicknessIn is double thickness
                                 ? $"linear · {thickness:0.###}\" visual · {edgeCatalog.LaborHoursPerUnit:0.##} h/lf"
                                 : "linear · lf",
-                            _ => $"{item.WidthFt}' Ø · {item.Trait}",
+                            PaletteKind.IrrigationHead => $"{item.WidthFt:0.#}' Ø · {item.Trait}",
+                            PaletteKind.IrrigationPipe => $"{item.WidthFt * 12:0.##}\" Ø · {item.Trait}",
+                            _ => $"{item.WidthFt:0.#}' Ø · {item.Trait}",
                         };
                         <button class="palette-item @(isActive ? "active" : "")"
                                 @onclick="() => SelectItem(item)" title="@item.Code — @detail">
