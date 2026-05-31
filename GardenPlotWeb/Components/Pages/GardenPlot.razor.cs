@@ -1328,7 +1328,7 @@ public partial class GardenPlot
 
                 return new TakeoffItemRow(
                     t.Id,
-                    TakeoffMath.Kind(catalog),
+                    TakeoffMath.Kind(t, catalog, boundShape),
                     TakeoffMath.DisplayName(t, catalog),
                     t.Quantity,
                     TakeoffMath.EffectiveUnit(t, catalog),

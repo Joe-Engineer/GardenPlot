@@ -3,6 +3,7 @@
 // </copyright>
 
 using System.Globalization;
+using GardenPlotWeb.Models.Jigs;
 
 namespace GardenPlotWeb.Models;
 
@@ -151,6 +152,36 @@ public static class TakeoffMath
         }
 
         return catalog?.DisplayName ?? item.CatalogCode;
+    }
+
+    /// <summary>
+    /// Issue #182 follow-up — Jig-aware Kind resolution. When a shape is bound and a
+    /// <see cref="Jig"/> matches it (non-assembly-layer rows only), the Jig's
+    /// <see cref="Jig.TakeoffKindLabel"/> is the source of truth for the row label.
+    /// This makes "Material" rows drawn as ground covers correctly read "Ground Cover"
+    /// in the takeoff, without mutating the underlying substance taxonomy in the catalog.
+    ///
+    /// Precedence:
+    /// <list type="number">
+    ///   <item>Jig (when shape-bound, non-assembly-layer, and matches a Jig)</item>
+    ///   <item>Explicit <see cref="TakeoffItem.Kind"/> override (dossier-built rows, etc.)</item>
+    ///   <item>Catalog <see cref="CatalogItem.Kind"/> (substance taxonomy)</item>
+    ///   <item>"(unbound)" sentinel</item>
+    /// </list>
+    /// </summary>
+    public static string Kind(TakeoffItem item, CatalogItem? catalog, Shape? boundShape)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        // Assembly-layer rows have per-layer semantics ("Assembly Layer"); the Jig speaks
+        // for the parent shape, not the layer. Same exclusion as Quantity resolution (#182).
+        bool isAssemblyLayer = !string.IsNullOrEmpty(item.AssemblyCode);
+        if (boundShape is not null && !isAssemblyLayer && JigRegistry.TryFor(boundShape, out Jig? jig))
+        {
+            return jig.TakeoffKindLabel;
+        }
+
+        return Kind(item, catalog);
     }
 
     public static string Kind(TakeoffItem item, CatalogItem? catalog)
