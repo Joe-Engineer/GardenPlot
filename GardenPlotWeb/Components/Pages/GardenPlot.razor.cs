@@ -182,7 +182,7 @@ public partial class GardenPlot
     private enum DropActivationMode { ClickToggle, HoldKey }
     private enum DropModifierKey { Shift, Ctrl, Alt }
 
-    private enum EdgeSubMode { StraightSegments, Freehand }
+    // EdgeSubMode lifted to GardenPlotWeb.Models.Jigs.EdgeSubMode in #95 PR 7.
 
     // GroundCoverSubMode lifted to GardenPlotWeb.Models.Jigs.GroundCoverSubMode in #95 PR 5.
 
@@ -2027,35 +2027,15 @@ public partial class GardenPlot
     }
 
     private static Shape CreateEdgeDraft(PaletteItem item)
-    {
-        return new Shape
-        {
-            Kind = ShapeKind.Edge,
-            Label = item.Code,
-            Trait = string.IsNullOrWhiteSpace(item.Trait) ? "edge" : item.Trait,
-            Stroke = item.StrokeColor,
-            Takeoff = GardenPlotWeb.Models.Catalog.CreateTakeoff(item.Code),
-        };
-    }
+        => EdgeDraftBuilder.CreateEdgeDraft(item);
 
     /// <summary>
     /// Creates a fresh <see cref="ShapeKind.Edge"/> draft bound to a multi-layer edge assembly.
-    /// The visual stroke uses the assembly's preview layer; the assembly source/pack/code are
-    /// stamped on the shape so the reconciler can mint one takeoff item per layer.
+    /// Issue #95 PR 7 — delegates to <see cref="EdgeDraftBuilder.CreateEdgeAssemblyDraft"/>
+    /// so DrawingJig subclasses share the same construction.
     /// </summary>
     private static Shape CreateEdgeAssemblyDraft(CatalogAssembly assembly, PaletteItem? previewItem)
-    {
-        return new Shape
-        {
-            Kind = ShapeKind.Edge,
-            Label = assembly.DisplayName,
-            Trait = "edge-assembly",
-            Stroke = previewItem?.StrokeColor,
-            AssemblySource = assembly.Source,
-            AssemblyPackId = assembly.PackId,
-            AssemblyCode = assembly.Code,
-        };
-    }
+        => EdgeDraftBuilder.CreateEdgeAssemblyDraft(assembly, previewItem);
 
     /// <summary>
     /// Creates a fresh area-shape draft bound to a multi-layer area assembly. The visual
@@ -6983,16 +6963,17 @@ public partial class GardenPlot
     private bool pointerAltDown;
 
     /// <summary>
-    /// Issue #95 PR 4 / 5 — bridge from page modifier state to <see cref="DrawingContext"/>.
+    /// Issue #95 PR 4 / 5 / 7 — bridge from page modifier state to <see cref="DrawingContext"/>.
     /// Called by <see cref="DrawingJig"/> dispatch sites. Reads currently captured
     /// modifier flags + the active palette item + the selected assembly + the
-    /// ground-cover sub-mode + the armed tangent-snap state.
+    /// ground-cover and edge sub-modes + the armed tangent-snap state.
     /// </summary>
     internal DrawingContext BuildDrawingContext()
         => new(
             selectedItem,
             selectedAssembly,
             currentTool == Tool.GroundCover ? groundCoverSubMode : null,
+            currentTool == Tool.Edge ? edgeSubMode : null,
             pointerShiftDown,
             pointerCtrlDown,
             pointerAltDown,
@@ -8703,17 +8684,23 @@ public partial class GardenPlot
                 // append a new tracker. Double-click finalizes (see OnCanvasDoubleClick).
                 // Issue #130: when arcModeArmed is true the click flow becomes two-step
                 // per edge — terminus first, then apex — handled in TryHandleArcClick.
-                // Issue #159: when an IrrigationPipe palette item is selected, the
-                // drafting shape becomes a pipe with the catalog's diameter / material
-                // baked in. Snap-to-head is applied to the (x, y) BEFORE seeding.
+                // Issue #159 / #161: when an IrrigationPipe / IrrigationWire palette item
+                // is selected, the drafting shape becomes a pipe / wire with the catalog's
+                // diameter / material baked in. Snap-to-irrigation-anchor is applied to
+                // the (x, y) BEFORE seeding so the snap shows up in the shape's first vertex.
+                //
+                // Issue #95 PR 7 — seed Shape construction delegated to DrawingJig dispatch.
+                // The page keeps the snap, the vertex-append state machine, and the
+                // restart-on-incompatible-kind guard. Three Jigs match Tool.Polyline:
+                // PolylineIrrigationPipeDrawingJig, PolylineIrrigationWireDrawingJig, and
+                // the generic PolylineDrawingJig (fallback).
                 {
                     bool draftingPipe = selectedItem is { Kind: PaletteKind.IrrigationPipe };
                     bool draftingWire = selectedItem is { Kind: PaletteKind.IrrigationWire };
                     if (draftingPipe || draftingWire)
                     {
                         // Issue #162c — snap to any irrigation anchor (head / source / control /
-                        // fitting / existing pipe-or-wire vertex), not just heads. Same call for
-                        // pipes AND wires so wire runs naturally snap to controllers + valves.
+                        // fitting / existing pipe-or-wire vertex), not just heads.
                         var (snappedX, snappedY, _) = SnapToIrrigationAnchor(x, y);
                         x = snappedX;
                         y = snappedY;
@@ -8721,37 +8708,9 @@ public partial class GardenPlot
 
                     if (drafting is null || (drafting.Kind != ShapeKind.FreeDraw && drafting.Kind != ShapeKind.IrrigationPipe && drafting.Kind != ShapeKind.IrrigationWire) || !buildingPolygon)
                     {
-                        if (draftingPipe && selectedItem is { } pipeItem)
-                        {
-                            drafting = new Shape
-                            {
-                                Kind = ShapeKind.IrrigationPipe,
-                                Label = pipeItem.Code,
-                                Trait = pipeItem.Trait,
-                                Stroke = pipeItem.StrokeColor,
-                                Fill = pipeItem.FillColor,
-                                PipeDiameterIn = pipeItem.WidthFt * 12.0,
-                            };
-                        }
-                        else if (draftingWire && selectedItem is { } wireItem)
-                        {
-                            // Issue #161 — wires use the same polyline drafting path as pipes.
-                            // Conductor count + gauge come from the catalog Notes.
-                            drafting = new Shape
-                            {
-                                Kind = ShapeKind.IrrigationWire,
-                                Label = wireItem.Code,
-                                Trait = wireItem.Trait,
-                                Stroke = wireItem.StrokeColor,
-                                Fill = wireItem.FillColor,
-                                ConductorCount = ParseConductorCountFromNotes(wireItem.Notes),
-                                WireGaugeAwg = ParseWireGaugeFromNotes(wireItem.Notes),
-                            };
-                        }
-                        else
-                        {
-                            drafting = new Shape { Kind = ShapeKind.FreeDraw };
-                        }
+                        DrawingContext drawCtx = BuildDrawingContext();
+                        drafting = DrawingJigRegistry.For(Tool.Polyline, drawCtx)?.BeginPolyline(new Point(x, y), closed: false, drawCtx)
+                            ?? new Shape { Kind = ShapeKind.FreeDraw };
 
                         drafting.Points.Add(new Point(x, y));
                         drafting.Points.Add(new Point(x, y));
@@ -8768,19 +8727,15 @@ public partial class GardenPlot
 
                 break;
             case Tool.Polygon:
-                // Click-by-vertex CLOSED path. Identical input flow to Polyline (first click
-                // seeds the start + trailing cursor tracker, subsequent clicks commit + extend,
-                // double-click finalizes via OnCanvasDoubleClick) but the committed shape gets
-                // CloseEdge=true so the renderer draws it as a filled polygon and IsFillableAreaShape
-                // accepts it for "Fill with plants". See issue #120 for the rationale on reusing
-                // FreeDraw+CloseEdge rather than introducing a new ShapeKind: the existing closed-
-                // path semantics on Shape (already used by Edge with CloseEdge) cover every
-                // downstream consumer (area math, rotation, hit testing) without a 169-call-site
-                // ShapeKind audit. Issue #130 adds the two-click arc flow (terminus + apex) under
-                // arcModeArmed; see TryHandleArcClick.
+                // Click-by-vertex CLOSED path. Identical input flow to Polyline but the
+                // committed shape gets CloseEdge=true. See issue #120 for the rationale on
+                // reusing FreeDraw+CloseEdge rather than introducing a new ShapeKind.
+                // Issue #95 PR 7 — seed Shape now from PolygonDrawingJig.
                 if (drafting is null || drafting.Kind != ShapeKind.FreeDraw || !buildingPolygon)
                 {
-                    drafting = new Shape { Kind = ShapeKind.FreeDraw, CloseEdge = true };
+                    DrawingContext drawCtx = BuildDrawingContext();
+                    drafting = DrawingJigRegistry.For(Tool.Polygon, drawCtx)?.BeginPolyline(new Point(x, y), closed: true, drawCtx)
+                        ?? new Shape { Kind = ShapeKind.FreeDraw, CloseEdge = true };
                     drafting.Points.Add(new Point(x, y));
                     drafting.Points.Add(new Point(x, y));
                     buildingPolygon = true;
@@ -8798,9 +8753,12 @@ public partial class GardenPlot
                     PaletteItem? previewItem = ResolveAssemblyPreviewItem(edgeAssembly);
                     if (edgeSubMode == EdgeSubMode.StraightSegments)
                     {
+                        // Issue #95 PR 7 — seed delegated to EdgeAssemblyPolylineDrawingJig.
                         if (drafting is null || drafting.Kind != ShapeKind.Edge || !buildingPolygon)
                         {
-                            drafting = CreateEdgeAssemblyDraft(edgeAssembly, previewItem);
+                            DrawingContext drawCtx = BuildDrawingContext();
+                            drafting = DrawingJigRegistry.For(Tool.Edge, drawCtx)?.BeginPolyline(new Point(x, y), closed: false, drawCtx)
+                                ?? CreateEdgeAssemblyDraft(edgeAssembly, previewItem);
                             drafting.Points.Add(new Point(x, y));
                             drafting.Points.Add(new Point(x, y));
                             buildingPolygon = true;
@@ -8827,9 +8785,12 @@ public partial class GardenPlot
                 {
                     if (edgeSubMode == EdgeSubMode.StraightSegments)
                     {
+                        // Issue #95 PR 7 — seed delegated to EdgePalettePolylineDrawingJig.
                         if (drafting is null || drafting.Kind != ShapeKind.Edge || !buildingPolygon)
                         {
-                            drafting = CreateEdgeDraft(edgeItem);
+                            DrawingContext drawCtx = BuildDrawingContext();
+                            drafting = DrawingJigRegistry.For(Tool.Edge, drawCtx)?.BeginPolyline(new Point(x, y), closed: false, drawCtx)
+                                ?? CreateEdgeDraft(edgeItem);
                             drafting.Points.Add(new Point(x, y));
                             drafting.Points.Add(new Point(x, y));
                             buildingPolygon = true;
@@ -8895,9 +8856,12 @@ public partial class GardenPlot
                     PaletteItem? previewItem = ResolveAssemblyPreviewItem(areaAssembly);
                     if (groundCoverSubMode == GroundCoverSubMode.Polygon)
                     {
+                        // Issue #95 PR 7 — seed delegated to GroundCoverPolygonAssemblyDrawingJig.
                         if (drafting is null || !buildingPolygon)
                         {
-                            drafting = CreateAreaAssemblyDraft(areaAssembly, previewItem, ShapeKind.FreeDraw);
+                            DrawingContext drawCtx = BuildDrawingContext();
+                            drafting = DrawingJigRegistry.For(Tool.GroundCover, drawCtx)?.BeginPolyline(new Point(x, y), closed: false, drawCtx)
+                                ?? CreateAreaAssemblyDraft(areaAssembly, previewItem, ShapeKind.FreeDraw);
                             drafting.Points.Add(new Point(x, y));
                             drafting.Points.Add(new Point(x, y));
                             buildingPolygon = true;
@@ -8954,24 +8918,34 @@ public partial class GardenPlot
                     {
                         // Click-by-vertex polygon. First click: start the shape with an
                         // anchor + cursor-tracking endpoint. Subsequent clicks add vertices.
-                        // Double-click finalizes (see OnCanvasDoubleClick). Issue #130 wires
-                        // the two-click arc apex flow in via TryHandleArcClick.
+                        // Issue #95 PR 7 — seed delegated to GroundCoverPolylineGcItemDrawingJig.
+                        // Page applies toolbar depth override after Jig returns; Jig stays
+                        // ignorant of page-state UI controls.
                         if (drafting is null || !buildingPolygon)
                         {
-                            drafting = new Shape
+                            DrawingContext drawCtx = BuildDrawingContext();
+                            drafting = DrawingJigRegistry.For(Tool.GroundCover, drawCtx)?.BeginPolyline(new Point(x, y), closed: false, drawCtx);
+                            if (drafting is null)
                             {
-                                Kind = ShapeKind.FreeDraw,
-                                Trait = surfaceTrait,
-                                Label = gcItem.Code,
-                                Stroke = gcItem.StrokeColor,
-                                Fill = gcItem.FillColor,
-                                MaterialCode = gcItem.Code,
-                                DepthIn = depthOverride,
-                                GroundCoverCode = gcItem.Code,
-                                GroundCoverDepthIn = legacyDepth,
-                                IsGroundCoverSurface = isSurface,
-                                TextureKey = gcItem.TextureKey,
-                            };
+                                // Fallback (defensive): build inline if the Jig didn't match.
+                                drafting = new Shape
+                                {
+                                    Kind = ShapeKind.FreeDraw,
+                                    Trait = surfaceTrait,
+                                    Label = gcItem.Code,
+                                    Stroke = gcItem.StrokeColor,
+                                    Fill = gcItem.FillColor,
+                                    MaterialCode = gcItem.Code,
+                                    GroundCoverCode = gcItem.Code,
+                                    IsGroundCoverSurface = isSurface,
+                                    TextureKey = gcItem.TextureKey,
+                                };
+                            }
+
+                            // Layer the toolbar depth override on top of the Jig-seeded shape.
+                            drafting.DepthIn = depthOverride;
+                            drafting.GroundCoverDepthIn = legacyDepth;
+
                             drafting.Points.Add(new Point(x, y));
                             drafting.Points.Add(new Point(x, y));
                             buildingPolygon = true;
@@ -9032,22 +9006,33 @@ public partial class GardenPlot
                         // the Polygon submode (TryHandleArcClick lights up A + T just like
                         // there), but the DRAFT shape is an open centerline. Double-click
                         // commit converts it to the ribbon polygon — see OnCanvasDoubleClick.
+                        // Issue #95 PR 7 — same Jig dispatch as the Polygon submode above
+                        // (GroundCoverPolylineGcItemDrawingJig.Matches accepts BOTH submodes
+                        // because the seed shape is identical; ribbon-vs-polygon split is
+                        // at commit time).
                         if (drafting is null || !buildingPolygon)
                         {
-                            drafting = new Shape
+                            DrawingContext drawCtx = BuildDrawingContext();
+                            drafting = DrawingJigRegistry.For(Tool.GroundCover, drawCtx)?.BeginPolyline(new Point(x, y), closed: false, drawCtx);
+                            if (drafting is null)
                             {
-                                Kind = ShapeKind.FreeDraw,
-                                Trait = surfaceTrait,
-                                Label = gcItem.Code,
-                                Stroke = gcItem.StrokeColor,
-                                Fill = gcItem.FillColor,
-                                MaterialCode = gcItem.Code,
-                                DepthIn = depthOverride,
-                                GroundCoverCode = gcItem.Code,
-                                GroundCoverDepthIn = legacyDepth,
-                                IsGroundCoverSurface = isSurface,
-                                TextureKey = gcItem.TextureKey,
-                            };
+                                drafting = new Shape
+                                {
+                                    Kind = ShapeKind.FreeDraw,
+                                    Trait = surfaceTrait,
+                                    Label = gcItem.Code,
+                                    Stroke = gcItem.StrokeColor,
+                                    Fill = gcItem.FillColor,
+                                    MaterialCode = gcItem.Code,
+                                    GroundCoverCode = gcItem.Code,
+                                    IsGroundCoverSurface = isSurface,
+                                    TextureKey = gcItem.TextureKey,
+                                };
+                            }
+
+                            drafting.DepthIn = depthOverride;
+                            drafting.GroundCoverDepthIn = legacyDepth;
+
                             drafting.Points.Add(new Point(x, y));
                             drafting.Points.Add(new Point(x, y));
                             buildingPolygon = true;

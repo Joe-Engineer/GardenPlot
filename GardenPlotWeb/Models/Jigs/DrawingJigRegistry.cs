@@ -70,15 +70,29 @@ public static class DrawingJigRegistry
         // tool-only Jig (if any) becomes the catch-all fallback.
         return new System.Collections.Generic.List<DrawingJig>
         {
-            // Sub-mode-discriminated Jigs first (so they win over any future tool-only fallback).
+            // ==== Drag-rect family (PR 4 / 5) ====
+            // Sub-mode-discriminated GroundCover first
             new GroundCoverRectangleDrawingJig(),
             new GroundCoverOvalDrawingJig(),
-
-            // Simple tool-only drag-rect Jigs.
+            // Simple tool-only drag-rect Jigs
             new RectangleDrawingJig(),
             new OvalDrawingJig(),
             new CircleRulerDrawingJig(),
             new RectRulerDrawingJig(),
+
+            // ==== Polyline-by-click family (PR 7) ====
+            // Discriminated variants of Tool.Polyline first
+            new PolylineIrrigationPipeDrawingJig(),
+            new PolylineIrrigationWireDrawingJig(),
+            // Edge sub-mode-discriminated variants
+            new EdgeAssemblyPolylineDrawingJig(),
+            new EdgePalettePolylineDrawingJig(),
+            // GroundCover sub-mode-discriminated polyline variants
+            new GroundCoverPolygonAssemblyDrawingJig(),
+            new GroundCoverPolylineGcItemDrawingJig(),
+            // Generic fallback Jigs for Tool.Polyline / Tool.Polygon
+            new PolylineDrawingJig(),
+            new PolygonDrawingJig(),
         };
     }
 }

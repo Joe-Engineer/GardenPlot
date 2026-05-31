@@ -77,6 +77,23 @@ public abstract class DrawingJig
     public virtual Shape? BeginDragRect(Point at, DrawingContext context) => null;
 
     /// <summary>
+    /// Polyline-by-click START. Called on the FIRST click of a click-by-vertex flow.
+    /// The Jig returns the initial Shape pre-populated with metadata (Kind, Label,
+    /// Trait, Stroke, etc.); the page handles vertex appending and the finalize-on-
+    /// double-click lifecycle. The Shape returned should be configured for either
+    /// open polyline (<paramref name="closed"/> = false) or closed polygon
+    /// (<paramref name="closed"/> = true) — the Jig is the authority on
+    /// <see cref="Shape.CloseEdge"/>.
+    /// </summary>
+    /// <remarks>
+    /// Why not have the Jig append both vertices (anchor + cursor-tracker)?
+    /// The page's vertex-append logic also handles snapping (e.g. snap-to-irrigation-
+    /// anchor for pipes/wires). Keeping that in the page lets the Jig stay focused on
+    /// shape-metadata seed without re-implementing snap math.
+    /// </remarks>
+    public virtual Shape? BeginPolyline(Point at, bool closed, DrawingContext context) => null;
+
+    /// <summary>
     /// Polyline-by-click finalize. Called when the user double-clicks / presses
     /// Enter / closes the polyline. The Jig takes the committed point list and
     /// produces a Shape. Returns null if this Jig doesn't handle polyline-by-click.
