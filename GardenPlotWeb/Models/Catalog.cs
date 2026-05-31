@@ -123,14 +123,14 @@ public static class Catalog
 {
     public static readonly CatalogItem[] Edging =
     [
-        new() { Code = "Steel Edging (4\")", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Steel Edging (4\")", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.10, DefaultThicknessIn = 0.125 },
-        new() { Code = "Steel Edging (6\")", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Steel Edging (6\")", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.12, DefaultThicknessIn = 0.125 },
-        new() { Code = "Aluminum Edging", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Aluminum Edging", Unit = "lf", DefaultWastePercent = 5, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.08, DefaultThicknessIn = 0.125 },
-        new() { Code = "Polyethylene Edging (Trex-style)", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Polyethylene Edging (Trex-style)", Unit = "lf", DefaultWastePercent = 5, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.05, DefaultThicknessIn = 0.25 },
-        new() { Code = "Brick on edge", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Brick on edge", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.25, DefaultThicknessIn = 4.0 },
-        new() { Code = "Cobble", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Cobble", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.35, DefaultThicknessIn = 4.0 },
-        new() { Code = "Concrete Curb", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Concrete Curb", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.60, DefaultThicknessIn = 6.0 },
-        new() { Code = "Paver Soldier Course", Source = CatalogSource.Base, Kind = "Material", DisplayName = "Paver Soldier Course", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.30, DefaultThicknessIn = 4.0 },
+        new() { Code = "Steel Edging (4\")", Source = CatalogSource.Base, Kind = CatalogKinds.Edging, DisplayName = "Steel Edging (4\")", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.10, DefaultThicknessIn = 0.125 },
+        new() { Code = "Steel Edging (6\")", Source = CatalogSource.Base, Kind = CatalogKinds.Edging, DisplayName = "Steel Edging (6\")", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.12, DefaultThicknessIn = 0.125 },
+        new() { Code = "Aluminum Edging", Source = CatalogSource.Base, Kind = CatalogKinds.Edging, DisplayName = "Aluminum Edging", Unit = "lf", DefaultWastePercent = 5, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.08, DefaultThicknessIn = 0.125 },
+        new() { Code = "Polyethylene Edging (Trex-style)", Source = CatalogSource.Base, Kind = CatalogKinds.Edging, DisplayName = "Polyethylene Edging (Trex-style)", Unit = "lf", DefaultWastePercent = 5, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.05, DefaultThicknessIn = 0.25 },
+        new() { Code = "Brick on edge", Source = CatalogSource.Base, Kind = CatalogKinds.Edging, DisplayName = "Brick on edge", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.25, DefaultThicknessIn = 4.0 },
+        new() { Code = "Cobble", Source = CatalogSource.Base, Kind = CatalogKinds.Edging, DisplayName = "Cobble", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.35, DefaultThicknessIn = 4.0 },
+        new() { Code = "Concrete Curb", Source = CatalogSource.Base, Kind = CatalogKinds.Edging, DisplayName = "Concrete Curb", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.60, DefaultThicknessIn = 6.0 },
+        new() { Code = "Paver Soldier Course", Source = CatalogSource.Base, Kind = CatalogKinds.Edging, DisplayName = "Paver Soldier Course", Unit = "lf", DefaultWastePercent = 10, LaborType = LaborType.Hardscape, LaborHoursPerUnit = 0.30, DefaultThicknessIn = 4.0 },
     ];
 
     public static readonly CatalogItem[] Base = [.. Edging];

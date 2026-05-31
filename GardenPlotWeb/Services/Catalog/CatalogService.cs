@@ -394,12 +394,12 @@ public sealed class CatalogService : ICatalogService
             PaletteItem[] arr = (PaletteItem[])field.GetValue(null)!;
             (string kind, string unit, LaborType labor, double hours) = field.Name switch
             {
-                "Plants" => ("Plant", "ea", LaborType.Planting, 0.1),
-                "Grasses" => ("Ground Cover", "ft²", LaborType.Planting, 0.0),
-                "GroundCoverSurfaceCovers" => ("Ground Cover", "ft²", LaborType.Planting, 0.0),
-                "GroundCoverMaterials" => ("Material", "yd³", LaborType.Mulching, 0.5),
-                "FocalPoints" => ("Focal Point", "ea", LaborType.Hardscape, 0.5),
-                "Edging" => ("Material", "lf", LaborType.Hardscape, 0.0),
+                "Plants" => (CatalogKinds.Plant, "ea", LaborType.Planting, 0.1),
+                "Grasses" => (CatalogKinds.GroundCover, "ft²", LaborType.Planting, 0.0),
+                "GroundCoverSurfaceCovers" => (CatalogKinds.GroundCover, "ft²", LaborType.Planting, 0.0),
+                "GroundCoverMaterials" => (CatalogKinds.Aggregate, "yd³", LaborType.Mulching, 0.5),
+                "FocalPoints" => (CatalogKinds.FocalPoint, "ea", LaborType.Hardscape, 0.5),
+                "Edging" => (CatalogKinds.Edging, "lf", LaborType.Hardscape, 0.0),
                 _ => (field.Name, "ea", LaborType.Other, 0.0),
             };
             AddRange(items, arr, kind, unit, labor, hours);
