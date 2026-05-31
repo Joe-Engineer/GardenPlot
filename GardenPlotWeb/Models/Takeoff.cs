@@ -672,6 +672,20 @@ public static class TakeoffReconciler
                     ? PolylineSampler.TotalLengthFt(shape.Points, closed: false)
                     : 0;
 
+                // Issue #162b — surface stock-length consumption for pipes in the row Notes
+                // (e.g. "20 ft stocks · 3 needed · 8.3% waste"). Looks up StockLengthFt from
+                // the pipe's catalog row; null when unmatched or when this isn't a pipe.
+                string? stockNotes = null;
+                if (shape.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(shape.Label) && linearLengthFt > 0)
+                {
+                    PaletteItem? pipeRow = PaletteCatalog.FindByCode(shape.Label!);
+                    if (FittingPlacement.ComputeStockUsage(linearLengthFt, pipeRow?.StockLengthFt) is { } usage
+                        && pipeRow?.StockLengthFt is double stockLen)
+                    {
+                        stockNotes = $"{stockLen:0.#} ft stocks · {usage.StockUnits} needed · {usage.WastePercent:0.0}% waste";
+                    }
+                }
+
                 items.Add(new TakeoffItem
                 {
                     ShapeId = shape.Id,
@@ -702,6 +716,7 @@ public static class TakeoffReconciler
                     Quantity = (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire) ? linearLengthFt : 1,
                     CatalogSource = CatalogSource.Base,
                     CatalogCode = !string.IsNullOrWhiteSpace(shape.Label) ? shape.Label! : shape.Kind.ToString(),
+                    Notes = stockNotes,
                 });
             }
         }

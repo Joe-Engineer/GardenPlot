@@ -8013,6 +8013,23 @@ public partial class GardenPlot
         return match?.Code;
     }
 
+    /// <summary>
+    /// Issue #162b — looks up the stock-length (feet) for a pipe by its catalog Code, so
+    /// the auto-coupling pass knows how often to drop a coupling along a long run.
+    /// Returns null when the pipe has no Label OR the catalog row has no stock length.
+    /// </summary>
+    private static double? ResolveStockLengthFtForPipe(Shape pipe)
+    {
+        ArgumentNullException.ThrowIfNull(pipe);
+        if (string.IsNullOrWhiteSpace(pipe.Label))
+        {
+            return null;
+        }
+
+        PaletteItem? row = PaletteCatalog.FindByCode(pipe.Label);
+        return row?.StockLengthFt;
+    }
+
     /// <summary>Issue #162a — parses 'Elbow90' / 'Elbow45' / 'Tee' / 'Coupling' / 'Adapter' from the catalog trait.</summary>
     private static FittingType? ParseFittingType(string? trait)
     {
@@ -10633,9 +10650,15 @@ public partial class GardenPlot
             // committed shape + its derived fittings persist as a single transaction.
             // Gated on library.Ui.AutoPlaceFittingsOnPipe so users can disable for
             // hand-curated fittings.
+            // Issue #162b — auto-fittings now include tees at cross-pipe junctions AND
+            // couplings at stock-length intervals (looked up from the pipe's catalog row).
             if (drafting.Kind == ShapeKind.IrrigationPipe && library.Ui.AutoPlaceFittingsOnPipe)
             {
-                var autoFittings = FittingPlacement.BuildAutoElbowsForPipe(drafting);
+                double? stockLengthFt = ResolveStockLengthFtForPipe(drafting);
+                var autoFittings = FittingPlacement.BuildAutoFittingsForPipe(
+                    drafting,
+                    otherShapes: currentPlot.Shapes,
+                    stockLengthFt: stockLengthFt);
                 foreach (Shape fitting in autoFittings)
                 {
                     currentPlot.Shapes.Add(fitting);
