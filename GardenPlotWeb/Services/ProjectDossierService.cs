@@ -61,13 +61,21 @@ public sealed class ProjectDossierService
         ArgumentNullException.ThrowIfNull(plot);
         NormalizePlot(plot);
 
+        // Issue #182 follow-up — Jig-aware Kind resolution. Dossier exports (PDF/CSV)
+        // need the same shape-role labels the live editor shows so a Sand ground cover
+        // reads "Ground Cover", not "Material", in printed quotes.
+        Dictionary<Guid, Shape> shapesById = plot.Shapes.ToDictionary(s => s.Id);
+
         return [.. plot.Takeoff
             .Select(item =>
             {
                 CatalogItem? resolved = ResolveCatalog(item, customCatalogItems);
+                Shape? boundShape = item.ShapeId is Guid sid && shapesById.TryGetValue(sid, out Shape? s)
+                    ? s
+                    : null;
                 return new DossierTakeoffRow(
                     item,
-                    TakeoffMath.Kind(resolved),
+                    TakeoffMath.Kind(item, resolved, boundShape),
                     TakeoffMath.DisplayName(item, resolved),
                     item.Quantity.ToString("0.##", CultureInfo.InvariantCulture),
                     TakeoffMath.EffectiveUnit(item, resolved),
