@@ -3,6 +3,7 @@
 // </copyright>
 
 using GardenPlotWeb.Models;
+using GardenPlotWeb.Models.Jigs;
 using Microsoft.AspNetCore.Components;
 
 namespace GardenPlotWeb.Components.Pages;
@@ -49,7 +50,7 @@ public partial class ShapeCohortRenderer : ComponentBase
     public bool IsConceptMode { get; set; }
 
     [Parameter]
-    public GardenPlot.Tool CurrentTool { get; set; }
+    public Tool CurrentTool { get; set; }
 
     [CascadingParameter]
     internal GardenPlot? Parent { get; set; }

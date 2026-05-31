@@ -1,4 +1,5 @@
 ﻿@using GardenPlotWeb.Models
+@using GardenPlotWeb.Models.Jigs
 @using GardenPlotWeb.Services
 @namespace GardenPlotWeb.Components.Pages
 
@@ -10,7 +11,7 @@
     var style = Parent!.GetEffectiveStyle(s);
     <g @key="s.Id" class="shape @(SelectedIds.Contains(s.Id) && !IsConceptMode ? "selected" : string.Empty) @(GardenPlot.IsRulerShape(s) ? "concept-ruler" : string.Empty) @(Parent!.UseConceptPlantEffects(s) ? "concept-shadowed" : string.Empty)"
        transform="rotate(@GardenPlot.F(s.Rotation) @GardenPlot.F(scx) @GardenPlot.F(scy))"
-       pointer-events="@(!IsConceptMode && CurrentTool == GardenPlot.Tool.Select && Parent!.CanSelectShape(s) && Parent!.CanReceiveShapePointer(s) ? "auto" : "none")"
+       pointer-events="@(!IsConceptMode && CurrentTool == Tool.Select && Parent!.CanSelectShape(s) && Parent!.CanReceiveShapePointer(s) ? "auto" : "none")"
        @onpointerdown="(e) => Parent!.OnShapePointerDown(e, s)"
        @onpointerdown:stopPropagation="true"
        @oncontextmenu="(e) => Parent!.OnShapeContextMenu(e, s)"
@@ -164,7 +165,7 @@
                         fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
                         stroke="@style.Stroke" stroke-width="0.06" />
                 @((MarkupString)GardenPlot.CircleRulerLabelsSvg(s))
-                @if (CurrentTool == GardenPlot.Tool.Select)
+                @if (CurrentTool == Tool.Select)
                 {
                     @((MarkupString)GardenPlot.CircleRulerGrabbersSvg(s, SelectedIds.Contains(s.Id)))
                 }
@@ -174,7 +175,7 @@
                       fill="@style.Fill" fill-opacity="@GardenPlot.F(style.FillOpacity)"
                       stroke="@style.Stroke" stroke-width="0.06" />
                 @((MarkupString)GardenPlot.RectRulerLabelsSvg(s))
-                @if (CurrentTool == GardenPlot.Tool.Select)
+                @if (CurrentTool == Tool.Select)
                 {
                     @((MarkupString)GardenPlot.RectRulerGrabbersSvg(s, SelectedIds.Contains(s.Id)))
                 }
@@ -502,7 +503,7 @@
                bulge of their edge; releasing within snap tolerance of the chord restores
                a straight line. Different shapes/colors keep the two affordances visually
                distinct: squares + blue for vertices, circles + cream/amber for arcs. *@
-            @if (CurrentTool == GardenPlot.Tool.Select && s.Kind == ShapeKind.FreeDraw && s.Points.Count >= 2)
+            @if (CurrentTool == Tool.Select && s.Kind == ShapeKind.FreeDraw && s.Points.Count >= 2)
             {
                 var capturedShapeId = s.Id;
                 @for (int vIdx = 0; vIdx < s.Points.Count; vIdx++)
@@ -542,7 +543,7 @@
             @* Issue #162a iteration — pipes and wires get vertex handles too so the user
                can fine-tune polyline geometry post-finalisation. No edge-bulge midpoint
                handles because pipes / wires don't curve (they're straight-segment polylines). *@
-            @if (CurrentTool == GardenPlot.Tool.Select && (s.Kind == ShapeKind.IrrigationPipe || s.Kind == ShapeKind.IrrigationWire) && s.Points.Count >= 2)
+            @if (CurrentTool == Tool.Select && (s.Kind == ShapeKind.IrrigationPipe || s.Kind == ShapeKind.IrrigationWire) && s.Points.Count >= 2)
             {
                 var capturedPipeId = s.Id;
                 @for (int vIdx = 0; vIdx < s.Points.Count; vIdx++)

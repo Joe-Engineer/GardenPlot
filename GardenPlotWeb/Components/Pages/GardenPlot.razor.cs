@@ -88,7 +88,9 @@ public partial class GardenPlot
     private double PlotWidthFt => currentPlot?.WidthFt ?? DefaultPlotWidthFt;
     private double PlotHeightFt => currentPlot?.HeightFt ?? DefaultPlotHeightFt;
 
-    public enum Tool { Select, FreeDraw, Edge, Rectangle, Oval, Ruler, CircleRuler, RectRuler, Stamp, GroundCover, Polyline, Polygon }
+    // Tool enum lifted to GardenPlotWeb.Models.Jigs.Tool in #95 PR 4. The page already
+    // has `using GardenPlotWeb.Models.Jigs;`, so unqualified Tool.X references continue
+    // to compile unchanged.
 
     // ---- Perf HUD (opt-in via ?perf=1) -------------------------------------
     // The whole block is null-when-off so production traffic pays a single null
@@ -7008,6 +7010,14 @@ public partial class GardenPlot
     private bool pointerCtrlDown;
     private bool pointerAltDown;
 
+    /// <summary>
+    /// Issue #95 PR 4 — bridge from page modifier state to <see cref="DrawingContext"/>.
+    /// Called by <see cref="DrawingJig"/> dispatch sites. Reads currently captured
+    /// modifier flags + the active palette item + the armed tangent-snap state.
+    /// </summary>
+    internal DrawingContext BuildDrawingContext()
+        => new(selectedItem, pointerShiftDown, pointerCtrlDown, pointerAltDown, tangentSnapArmed);
+
     private bool IsDropModifierDown(bool shift, bool ctrl, bool alt) => dropModifierKey switch
     {
         DropModifierKey.Shift => shift,
@@ -8863,8 +8873,15 @@ public partial class GardenPlot
                 }
                 break;
             case Tool.Rectangle:
-                drafting = new Shape { Kind = ShapeKind.Rectangle, X = x, Y = y, W = 0, H = 0 };
-                dragStartX = x; dragStartY = y;
+                {
+                    // Issue #95 PR 4 — drag-rect start delegates to RectangleDrawingJig. The Jig
+                    // owns the initial Shape construction (Kind + origin); the page keeps the
+                    // drag-tracking lifecycle (dragStartX/Y, mouse-move W/H updates, finalize).
+                    DrawingContext drawCtx = BuildDrawingContext();
+                    drafting = DrawingJigRegistry.For(Tool.Rectangle, drawCtx)?.BeginDragRect(new Point(x, y), drawCtx)
+                        ?? new Shape { Kind = ShapeKind.Rectangle, X = x, Y = y, W = 0, H = 0 };
+                    dragStartX = x; dragStartY = y;
+                }
                 break;
             case Tool.Oval:
                 drafting = new Shape { Kind = ShapeKind.Oval, X = x, Y = y, W = 0, H = 0 };
