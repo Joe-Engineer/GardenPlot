@@ -105,8 +105,10 @@ public sealed class IrrigationFittingTests
 
     [Theory]
     [InlineData(180.0, null)]
-    [InlineData(170.0, null)]
-    [InlineData(160.0, null)]
+    [InlineData(178.0, null)]
+    [InlineData(175.0, null)]
+    [InlineData(170.0, FittingType.Elbow45)]
+    [InlineData(160.0, FittingType.Elbow45)]
     [InlineData(155.0, FittingType.Elbow45)]
     [InlineData(120.0, FittingType.Elbow45)]
     [InlineData(115.0, FittingType.Elbow45)]

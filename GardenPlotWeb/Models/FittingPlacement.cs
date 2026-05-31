@@ -12,10 +12,13 @@ namespace GardenPlotWeb.Models;
 public static class FittingPlacement
 {
     /// <summary>
-    /// Interior angle threshold (degrees) at or above which a vertex is "nearly straight"
-    /// and gets no fitting. Below this the vertex turns hard enough to need an elbow.
+    /// Interior angle threshold (degrees) at or above which a vertex is "effectively straight"
+    /// and gets no fitting. Below this the vertex turns visibly and gets at least a 45° elbow.
+    /// Issue #162a iteration: the original 160° threshold skipped fittings on shallow but
+    /// deliberate bends (the user reported a hand-drawn ~30° turn produced no fitting).
+    /// 175° keeps the rounding-error guard while catching every visible bend.
     /// </summary>
-    public const double StraightAngleDegrees = 160.0;
+    public const double StraightAngleDegrees = 175.0;
 
     /// <summary>
     /// Interior angle (degrees) below which the bend is treated as a 90° elbow rather
