@@ -103,6 +103,9 @@ public static class DrawingJigRegistry
             new GroundCoverFreehandGcItemDrawingJig(),
             // Generic Tool.FreeDraw
             new FreeDrawDrawingJig(),
+
+            // ==== Click-to-place family (PR 9) ====
+            new StampDrawingJig(),
         };
     }
 }
