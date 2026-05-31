@@ -20,6 +20,7 @@
 @inject GardenPlotWeb.Services.Catalog.ICatalogService Catalog
 @inject NavigationManager Navigation
 @inject ILogger<GardenPlot> Logger
+@inject GardenPlotWeb.Services.CitationService Citation
 
 <PageTitle>Garden Plot</PageTitle>
 
@@ -4132,7 +4133,7 @@ else
                 }
                 else
                 {
-                    var topic = WikipediaTopic(single.Label ?? "");
+                    var topic = GardenPlotWeb.Models.CitationTopics.WikipediaTopic(single.Label ?? "");
                     var searchUrl = $"https://en.wikipedia.org/w/index.php?search={System.Net.WebUtility.UrlEncode(topic)}";
                     <div class="x-small text-muted">No Wikipedia summary found.</div>
                     <a class="x-small" href="@searchUrl" target="_blank" rel="noopener">Search Wikipedia →</a>
