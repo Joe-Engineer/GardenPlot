@@ -380,10 +380,44 @@ public sealed class PlotLibraryLoader
                 }
             }
 
+            // Issue #182 — normalize TakeoffItem.Quantity for shape-bound, non-assembly-layer
+            // rows via the resolver. Without this, plots saved under any schema version with
+            // a stale Quantity (e.g. pre-#182 ground covers stored as Quantity=1) would load
+            // back in showing the wrong quantity until the user touched the shape. By running
+            // the resolver here every load path converges to the same answer — which is also
+            // what the live ReconcileTakeoff would compute at runtime.
+            NormalizeShapeBoundTakeoffQuantities(plot);
+
             library.Plots[i] = plot;
         }
 
         return library;
+    }
+
+    private static void NormalizeShapeBoundTakeoffQuantities(PlotData plot)
+    {
+        if (plot.Takeoff.Count == 0 || plot.Shapes.Count == 0)
+        {
+            return;
+        }
+
+        Dictionary<Guid, Shape> shapesById = plot.Shapes.ToDictionary(s => s.Id);
+        foreach (TakeoffItem t in plot.Takeoff)
+        {
+            if (t.ShapeId is not Guid sid || !shapesById.TryGetValue(sid, out Shape? boundShape))
+            {
+                continue;
+            }
+
+            // Assembly-layer rows have per-layer semantics and should not be overwritten by
+            // the shape-level resolver. Same exclusion as the live ReconcileTakeoff refresh.
+            if (!string.IsNullOrEmpty(t.AssemblyCode))
+            {
+                continue;
+            }
+
+            t.Quantity = TakeoffQuantityResolver.Resolve(boundShape);
+        }
     }
 
     private static PlotLibrary BackfillBackgroundFit(PlotLibrary library)
@@ -494,7 +528,7 @@ public sealed class PlotLibraryLoader
                 CatalogSource = source,
                 CatalogPackId = packId,
                 CatalogCode = code,
-                Quantity = 1,
+                Quantity = TakeoffQuantityResolver.Resolve(shape),
                 Unit = unit,
                 ShapeId = shape.Id,
             });
