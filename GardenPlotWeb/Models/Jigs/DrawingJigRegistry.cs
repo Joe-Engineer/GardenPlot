@@ -70,8 +70,15 @@ public static class DrawingJigRegistry
         // tool-only Jig (if any) becomes the catch-all fallback.
         return new System.Collections.Generic.List<DrawingJig>
         {
-            // PR 1 — canary.
+            // Sub-mode-discriminated Jigs first (so they win over any future tool-only fallback).
+            new GroundCoverRectangleDrawingJig(),
+            new GroundCoverOvalDrawingJig(),
+
+            // Simple tool-only drag-rect Jigs.
             new RectangleDrawingJig(),
+            new OvalDrawingJig(),
+            new CircleRulerDrawingJig(),
+            new RectRulerDrawingJig(),
         };
     }
 }
