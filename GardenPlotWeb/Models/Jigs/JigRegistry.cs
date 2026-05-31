@@ -97,11 +97,25 @@ public static class JigRegistry
             new GroundCoverSurfaceJig(),
             new GroundCoverVolumeJig(),
 
-            // Kind-jigs (one per ShapeKind).
+            // Kind-jigs (one per ShapeKind), alphabetised within their family.
+            // Plants
+            new TreeJig(),
+            new BushJig(),
+            new PlantJig(),
+
+            // Hardscape
+            new BedKitJig(),
+
+            // Irrigation
             new IrrigationHeadJig(),
             new IrrigationPipeJig(),
             new IrrigationWireJig(),
+            new IrrigationFittingJig(),
+            new IrrigationControlJig(),
             new WaterSourceJig(),
+
+            // Measurement
+            new SoilMarkerJig(),
         };
     }
 
