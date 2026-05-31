@@ -639,7 +639,7 @@ public static class TakeoffReconciler
                 continue;
             }
 
-            if (shape.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw or ShapeKind.IrrigationHead or ShapeKind.IrrigationPipe or ShapeKind.WaterSource)
+            if (shape.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw or ShapeKind.IrrigationHead or ShapeKind.IrrigationPipe or ShapeKind.WaterSource or ShapeKind.IrrigationControl or ShapeKind.IrrigationWire)
             {
                 string name = !string.IsNullOrWhiteSpace(shape.Label)
                     ? shape.Label
@@ -660,12 +660,14 @@ public static class TakeoffReconciler
                         ShapeKind.IrrigationHead => shape.Label ?? "Irrigation head",
                         ShapeKind.IrrigationPipe => shape.Label ?? "Irrigation pipe",
                         ShapeKind.WaterSource => shape.Label ?? "Water source",
+                        ShapeKind.IrrigationControl => shape.Label ?? "Irrigation control",
+                        ShapeKind.IrrigationWire => shape.Label ?? "Irrigation wire",
                         _ => "(unnamed)",
                     };
 
                 // Issue #159 — pipes are quantified in linear feet (polyline length), not
-                // per-piece. Every other kind in this branch stays at count = 1.
-                double pipeLengthFt = shape.Kind == ShapeKind.IrrigationPipe && shape.Points.Count >= 2
+                // per-piece. Issue #161 — wires also quantified in linear feet. Other kinds stay at count = 1.
+                double linearLengthFt = (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire) && shape.Points.Count >= 2
                     ? PolylineSampler.TotalLengthFt(shape.Points, closed: false)
                     : 0;
 
@@ -689,11 +691,13 @@ public static class TakeoffReconciler
                         ShapeKind.IrrigationHead => "Irrigation Head",
                         ShapeKind.IrrigationPipe => "Irrigation Pipe",
                         ShapeKind.WaterSource => "Water Source",
+                        ShapeKind.IrrigationControl => "Irrigation Control",
+                        ShapeKind.IrrigationWire => "Irrigation Wire",
                         _ => shape.Kind.ToString(),
                     },
                     Name = name,
                     Count = 1,
-                    Quantity = shape.Kind == ShapeKind.IrrigationPipe ? pipeLengthFt : 1,
+                    Quantity = (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire) ? linearLengthFt : 1,
                     CatalogSource = CatalogSource.Base,
                     CatalogCode = !string.IsNullOrWhiteSpace(shape.Label) ? shape.Label! : shape.Kind.ToString(),
                 });

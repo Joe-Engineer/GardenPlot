@@ -140,6 +140,60 @@ public class Shape
 
     /// <summary>Issue #160 — supply pressure at the source in PSI. Null when unmeasured.</summary>
     public double? PressurePsi { get; set; }
+
+    /// <summary>
+    /// Issue #161 — irrigation control element subtype for <see cref="ShapeKind.IrrigationControl"/>
+    /// shapes. Null on other kinds. Drives the canvas icon (controller / manifold / valve / etc.)
+    /// AND determines which capacity fields are meaningful (e.g., ZoneOutputs only applies to
+    /// Controller / Manifold).
+    /// </summary>
+    public IrrigationControlType? IrrigationControlType { get; set; }
+
+    /// <summary>
+    /// Issue #161 — number of zone outputs / valve slots for the control element. Meaningful for
+    /// Controller (4 / 6 / 8 / 12 / 16) and Manifold (3 / 4 / 6 valve slots). Null on others.
+    /// </summary>
+    public int? ZoneOutputs { get; set; }
+
+    /// <summary>
+    /// Issue #161 — zone label associated with a valve (e.g., "Zone 1", "Front lawn"). Used by
+    /// the future zone calculator (#31 Phase C) to group heads under the controlling valve.
+    /// </summary>
+    public string? ZoneLabel { get; set; }
+
+    /// <summary>
+    /// Issue #161 — number of conductors in an <see cref="ShapeKind.IrrigationWire"/>. Common
+    /// values: 5, 7, 9, 13. Drives BOM (wire-foot per conductor count).
+    /// </summary>
+    public int? ConductorCount { get; set; }
+
+    /// <summary>Issue #161 — American Wire Gauge for an irrigation wire. Typical: 18 AWG.</summary>
+    public int? WireGaugeAwg { get; set; }
+}
+
+/// <summary>Issue #161 — kind of irrigation control element represented by a <see cref="Shape"/>.</summary>
+public enum IrrigationControlType
+{
+    /// <summary>Brain of the irrigation system; switches power to the zone valves.</summary>
+    Controller,
+
+    /// <summary>Hub of valves; carries a fixed number of valve slots.</summary>
+    Manifold,
+
+    /// <summary>Solenoid-operated valve that opens a zone when energised by the controller.</summary>
+    Valve,
+
+    /// <summary>Backflow preventer (PVB / RPZ / Double-Check) required on potable supply.</summary>
+    Backflow,
+
+    /// <summary>Pressure regulator that steps high source pressure down for drip / micro-spray.</summary>
+    PressureRegulator,
+
+    /// <summary>Mesh filter that protects emitters from particulate.</summary>
+    Filter,
+
+    /// <summary>Standalone quick-coupler / hose-bib outlet on the irrigation line.</summary>
+    QuickCoupler,
 }
 
 /// <summary>Issue #160 — kind of water source represented by a <see cref="Shape"/>.</summary>

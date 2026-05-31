@@ -27,6 +27,12 @@ public enum ShapeKind
 
     /// <summary>Issue #160 — water source anchor (faucet / spring / pump).</summary>
     WaterSource,
+
+    /// <summary>Issue #161 — irrigation control element (controller / manifold / valve / backflow / regulator / filter / quick-coupler).</summary>
+    IrrigationControl,
+
+    /// <summary>Issue #161 — irrigation control wire (multi-conductor; runs from controller to zone valves).</summary>
+    IrrigationWire,
 }
 
 public record struct Point(double X, double Y);
@@ -52,6 +58,12 @@ public enum PaletteKind
 
     /// <summary>Issue #160 — water source palette (faucet / spring / pump).</summary>
     WaterSource,
+
+    /// <summary>Issue #161 — irrigation control element palette (controller / manifold / valve / backflow / etc.).</summary>
+    IrrigationControl,
+
+    /// <summary>Issue #161 — irrigation control wire palette (multi-conductor wire from controller to valves).</summary>
+    IrrigationWire,
 }
 
 public static class LayerKeys
@@ -121,6 +133,12 @@ public enum PaletteCategory
 
     /// <summary>Issue #160 — water source catalog (faucet / spring / pump).</summary>
     WaterSources,
+
+    /// <summary>Issue #161 — irrigation control element catalog (controllers / manifolds / valves / backflow / regulators / filters / quick-couplers).</summary>
+    IrrigationControls,
+
+    /// <summary>Issue #161 — irrigation wire catalog (multi-conductor wire from controller to valves).</summary>
+    IrrigationWires,
 }
 
 /// <summary>

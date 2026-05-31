@@ -918,6 +918,8 @@ else
                             PaletteKind.IrrigationHead => $"{item.WidthFt:0.#}' Ø · {item.Trait}",
                             PaletteKind.IrrigationPipe => $"{item.WidthFt * 12:0.##}\" Ø · {item.Trait}",
                             PaletteKind.WaterSource => $"{item.Trait} · {item.Notes}",
+                            PaletteKind.IrrigationControl => $"{item.Trait} · {item.Notes}",
+                            PaletteKind.IrrigationWire => $"{item.Notes}",
                             _ => $"{item.WidthFt:0.#}' Ø · {item.Trait}",
                         };
                         <button class="palette-item @(isActive ? "active" : "")"
@@ -1607,6 +1609,25 @@ else
                                     var pv = drafting.Points[pi];
                                     <circle cx="@F(pv.X)" cy="@F(pv.Y)" r="@F(Math.Max(0.12, draftStrokeFt * 0.6))"
                                             fill="#fff" stroke="@draftPipeColor" stroke-width="0.05"
+                                            pointer-events="none" />
+                                }
+                            }
+                            break;
+                        case ShapeKind.IrrigationWire:
+                            @* Issue #161 — in-progress wire polyline preview (dashed thin line). *@
+                            @if (drafting.Points.Count >= 2)
+                            {
+                                string draftWireColor = drafting.Stroke ?? "#7a1f4a";
+                                <polyline points="@PointsString(drafting.Points)"
+                                          fill="none" stroke="@draftWireColor" stroke-width="0.05"
+                                          stroke-dasharray="0.18,0.12" stroke-linecap="round" stroke-linejoin="round"
+                                          opacity="0.7"
+                                          pointer-events="none" />
+                                @for (int wpi = 0; wpi < drafting.Points.Count - 1; wpi++)
+                                {
+                                    var wpv = drafting.Points[wpi];
+                                    <circle cx="@F(wpv.X)" cy="@F(wpv.Y)" r="0.12"
+                                            fill="#fff" stroke="@draftWireColor" stroke-width="0.04"
                                             pointer-events="none" />
                                 }
                             }
@@ -3046,6 +3067,117 @@ else
                         else
                         {
                             <div class="x-small text-muted mt-1">Flow / pressure feed the future zone calculator (#31 Phase C).</div>
+                        }
+                    </div>
+                }
+
+                @* Issue #161 — irrigation control detail panel. Shows the control type,
+                   palette code, parsed zone capacity, and editable zone label. Type dropdown
+                   lets the user reclassify; ZoneOutputs input overrides parsed capacity. *@
+                @if (single!.Kind == ShapeKind.IrrigationControl)
+                {
+                    var ctrlType = single!.IrrigationControlType;
+                    var ctrlZones = single!.ZoneOutputs;
+                    var ctrlLabel = single!.ZoneLabel ?? string.Empty;
+                    var ctrlSelectedArray = new[] { single! };
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Irrigation Control</div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Code:</span>
+                            <strong>@(single!.Label ?? "(unnamed)")</strong>
+                        </div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Notes:</span>
+                            @if (PaletteCatalog.FindByCode(single!.Label ?? string.Empty) is { } ctrlCatalog && !string.IsNullOrWhiteSpace(ctrlCatalog.Notes))
+                            {
+                                <strong>@ctrlCatalog.Notes</strong>
+                            }
+                            else
+                            {
+                                <span class="text-muted">(none)</span>
+                            }
+                        </div>
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Type:</span>
+                            <select class="form-select form-select-sm" style="max-width: 10rem;"
+                                    value="@(ctrlType?.ToString() ?? string.Empty)"
+                                    disabled="@isPreview"
+                                    @onchange="(e) => OnIrrigationControlTypeChanged(ctrlSelectedArray, e)">
+                                <option value="@GardenPlotWeb.Models.IrrigationControlType.Controller">Controller</option>
+                                <option value="@GardenPlotWeb.Models.IrrigationControlType.Manifold">Manifold</option>
+                                <option value="@GardenPlotWeb.Models.IrrigationControlType.Valve">Valve</option>
+                                <option value="@GardenPlotWeb.Models.IrrigationControlType.Backflow">Backflow</option>
+                                <option value="@GardenPlotWeb.Models.IrrigationControlType.PressureRegulator">Pressure regulator</option>
+                                <option value="@GardenPlotWeb.Models.IrrigationControlType.Filter">Filter</option>
+                                <option value="@GardenPlotWeb.Models.IrrigationControlType.QuickCoupler">Quick-coupler</option>
+                            </select>
+                        </div>
+                        @if (ctrlType == GardenPlotWeb.Models.IrrigationControlType.Controller || ctrlType == GardenPlotWeb.Models.IrrigationControlType.Manifold)
+                        {
+                            <div class="rotation-edit-row mt-1">
+                                <span class="text-muted small">@(ctrlType == GardenPlotWeb.Models.IrrigationControlType.Controller ? "Zone outputs:" : "Valve slots:")</span>
+                                <input type="number" min="0" step="1" class="form-control form-control-sm" style="max-width: 6rem;"
+                                       value="@(ctrlZones is int z ? z.ToString(CultureInfo.InvariantCulture) : string.Empty)"
+                                       disabled="@isPreview"
+                                       @onchange="(e) => OnIrrigationControlZonesChanged(ctrlSelectedArray, e)" />
+                            </div>
+                        }
+                        @if (ctrlType == GardenPlotWeb.Models.IrrigationControlType.Valve)
+                        {
+                            <div class="rotation-edit-row mt-1">
+                                <span class="text-muted small">Zone label:</span>
+                                <input type="text" class="form-control form-control-sm" style="max-width: 10rem;"
+                                       value="@ctrlLabel"
+                                       placeholder="e.g., Front lawn"
+                                       disabled="@isPreview"
+                                       @onchange="(e) => OnIrrigationControlZoneLabelChanged(ctrlSelectedArray, e)" />
+                            </div>
+                        }
+                        @if (isPreview)
+                        {
+                            <div class="x-small text-muted mt-1">Click on the canvas to drop this control.</div>
+                        }
+                    </div>
+                }
+
+                @* Issue #161 — irrigation wire detail panel. Shows the wire's conductor
+                   count + AWG gauge; both are editable so a custom run can be specified. *@
+                @if (single!.Kind == ShapeKind.IrrigationWire)
+                {
+                    var wireCond = single!.ConductorCount;
+                    var wireGauge = single!.WireGaugeAwg;
+                    var wireSelectedArray = new[] { single! };
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Irrigation Wire</div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Code:</span>
+                            <strong>@(single!.Label ?? "(unnamed)")</strong>
+                        </div>
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Conductors:</span>
+                            <input type="number" min="1" step="1" class="form-control form-control-sm" style="max-width: 6rem;"
+                                   value="@(wireCond is int c ? c.ToString(CultureInfo.InvariantCulture) : string.Empty)"
+                                   disabled="@isPreview"
+                                   @onchange="(e) => OnIrrigationWireConductorsChanged(wireSelectedArray, e)" />
+                        </div>
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Gauge:</span>
+                            <input type="number" min="10" max="24" step="1" class="form-control form-control-sm" style="max-width: 6rem;"
+                                   value="@(wireGauge is int g ? g.ToString(CultureInfo.InvariantCulture) : string.Empty)"
+                                   disabled="@isPreview"
+                                   @onchange="(e) => OnIrrigationWireGaugeChanged(wireSelectedArray, e)" />
+                            <span class="small text-muted">AWG</span>
+                        </div>
+                        @if (!isPreview && single!.Points.Count >= 2)
+                        {
+                            <div class="small mt-1">
+                                <span class="text-muted">Length:</span>
+                                <strong>@($"{PolylineSampler.TotalLengthFt(single!.Points, closed: false):0.##}") lf</strong>
+                            </div>
+                        }
+                        @if (isPreview)
+                        {
+                            <div class="x-small text-muted mt-1">Polyline tool is active — click to draw the wire; double-click to finish.</div>
                         }
                     </div>
                 }

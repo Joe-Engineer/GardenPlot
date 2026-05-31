@@ -589,6 +589,28 @@ public sealed class ProjectDossierService
                 }
 
                 break;
+            case ShapeKind.IrrigationControl:
+                // Issue #161 — dossier render: simple rounded rect with a label dot, sized to the shape.
+                {
+                    double ctrlX = shape.X;
+                    double ctrlY = shape.Y;
+                    double ctrlW = Math.Abs(shape.W);
+                    double ctrlH = Math.Abs(shape.H);
+                    _ = sb.Append("<rect x=\"").Append(F(ctrlX)).Append("\" y=\"").Append(F(ctrlY)).Append("\" width=\"").Append(F(ctrlW)).Append("\" height=\"").Append(F(ctrlH)).Append("\" rx=\"0.1\" fill=\"").Append(fill).Append("\" stroke=\"").Append(stroke).Append("\" stroke-width=\"0.06\" />");
+                    _ = sb.Append("<circle cx=\"").Append(F(ctrlX + (ctrlW / 2))).Append("\" cy=\"").Append(F(ctrlY + (ctrlH / 2))).Append("\" r=\"").Append(F(Math.Min(ctrlW, ctrlH) * 0.15)).Append("\" fill=\"").Append(stroke).Append("\" />");
+                }
+
+                break;
+            case ShapeKind.IrrigationWire:
+                // Issue #161 — dossier render: thin dashed polyline (matches canvas wire style).
+                if (shape.Points.Count >= 2)
+                {
+                    _ = sb.Append("<polyline points=\"")
+                        .Append(string.Join(' ', shape.Points.Select(point => $"{F(point.X)},{F(point.Y)}")))
+                        .Append("\" fill=\"none\" stroke=\"").Append(stroke).Append("\" stroke-width=\"0.04\" stroke-dasharray=\"0.15,0.1\" stroke-linecap=\"round\" />");
+                }
+
+                break;
             default:
                 break;
         }
@@ -678,6 +700,8 @@ public sealed class ProjectDossierService
             ShapeKind.IrrigationHead => "#1f6f8b",
             ShapeKind.IrrigationPipe => "#5a5a5a",
             ShapeKind.WaterSource => "#1f4e7a",
+            ShapeKind.IrrigationControl => "#2c2c2c",
+            ShapeKind.IrrigationWire => "#7a1f4a",
             _ => "#2f5a3a",
         };
     }
@@ -706,6 +730,8 @@ public sealed class ProjectDossierService
             ShapeKind.IrrigationHead => "#5fb0cf",
             ShapeKind.IrrigationPipe => "#cfd0d2",
             ShapeKind.WaterSource => "#9bc7e0",
+            ShapeKind.IrrigationControl => "#bdbdbd",
+            ShapeKind.IrrigationWire => "#d4a8c0",
             _ => "#9fcf9f",
         };
     }
@@ -729,6 +755,8 @@ public sealed class ProjectDossierService
             ShapeKind.IrrigationHead => 0.18,
             ShapeKind.IrrigationPipe => 1.0,
             ShapeKind.WaterSource => 1.0,
+            ShapeKind.IrrigationControl => 1.0,
+            ShapeKind.IrrigationWire => 0,
             _ => 0.6,
         };
     }
