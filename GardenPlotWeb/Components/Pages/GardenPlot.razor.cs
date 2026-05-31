@@ -9575,6 +9575,18 @@ public partial class GardenPlot
                     AppendEdgePoint(drafting, new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt)), 0.05);
                 }
                 break;
+            case ShapeKind.IrrigationPipe:
+            case ShapeKind.IrrigationWire:
+                // Issue #162a iteration — mirror the FreeDraw polyline behaviour so the
+                // in-progress pipe / wire shows a live segment from the last committed vertex
+                // to the cursor. Without this the user sees nothing until the second click.
+                // Pipes additionally snap-to-head (commit path); the move path stays unsnapped
+                // so the cursor reflects the actual mouse position.
+                if (buildingPolygon && drafting.Points.Count >= 1)
+                {
+                    drafting.Points[^1] = new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt));
+                }
+                break;
             case ShapeKind.Ruler:
                 if (drafting.Points.Count >= 1)
                     drafting.Points[^1] = new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt));

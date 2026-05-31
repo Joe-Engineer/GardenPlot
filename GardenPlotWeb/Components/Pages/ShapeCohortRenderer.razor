@@ -538,6 +538,27 @@
                     </circle>
                 }
             }
+
+            @* Issue #162a iteration — pipes and wires get vertex handles too so the user
+               can fine-tune polyline geometry post-finalisation. No edge-bulge midpoint
+               handles because pipes / wires don't curve (they're straight-segment polylines). *@
+            @if (CurrentTool == GardenPlot.Tool.Select && (s.Kind == ShapeKind.IrrigationPipe || s.Kind == ShapeKind.IrrigationWire) && s.Points.Count >= 2)
+            {
+                var capturedPipeId = s.Id;
+                @for (int vIdx = 0; vIdx < s.Points.Count; vIdx++)
+                {
+                    var localVertexIdx = vIdx;
+                    var vp = s.Points[localVertexIdx];
+                    <rect x="@GardenPlot.F(vp.X - 0.1)" y="@GardenPlot.F(vp.Y - 0.1)"
+                          width="0.2" height="0.2"
+                          fill="#e7f1ff" stroke="#0d6efd" stroke-width="0.04" cursor="move"
+                          pointer-events="auto"
+                          @onpointerdown="@(e => Parent!.OnShapeVertexPointerDown(e, capturedPipeId, localVertexIdx))"
+                          @onpointerdown:stopPropagation="true">
+                        <title>Drag to move this vertex</title>
+                    </rect>
+                }
+            }
         }
     </g>
 }
