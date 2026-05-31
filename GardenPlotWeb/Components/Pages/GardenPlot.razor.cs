@@ -194,10 +194,21 @@ public partial class GardenPlot
     /// <summary>
     /// Issue #162a — center position of the most recently stamped IrrigationFitting in the
     /// current Stamp session. When the next stamp lands and auto-pipe-between-fitting-stamps
-    /// is on, a pipe segment is drawn from this point to the new fitting's center.
+    /// is on, the running pipe is extended with a new vertex at the new fitting's center.
     /// Reset on tool change / palette change / Escape so cross-session stamps don't link.
     /// </summary>
     private Point? lastFittingStampPos;
+
+    /// <summary>
+    /// Issue #162a iteration — id of the SINGLE polyline pipe shape that's accumulating
+    /// vertices as the user stamps fittings in sequence (one pipe with N vertices, NOT N
+    /// separate two-point pipes). When non-null, the next fitting stamp appends a vertex
+    /// to this pipe rather than creating a new shape. Reset on the same triggers as
+    /// <see cref="lastFittingStampPos"/>. Each pipe vertex naturally aligns with a stamped
+    /// fitting, so dragging a vertex via the Select-tool handle moves both the pipe vertex
+    /// AND the fitting on top of it (via FittingPlacement.FindJointCoMovers).
+    /// </summary>
+    private Guid? runningFittingPipeId;
 
     /// <summary>Current ground-cover depth (inches) used for newly-drawn volumetric ground-cover shapes.
     /// Initialized from the selected palette item's <see cref="PaletteItem.DefaultDepthIn"/> when picked,
@@ -2994,6 +3005,17 @@ public partial class GardenPlot
     private bool isShapeVertexDragging;
     private Guid shapeVertexDragShapeId;
     private int shapeVertexDragIndex = -1;
+
+    // Issue #162a iteration — when dragging a pipe / wire vertex that coincides with
+    // the endpoint of OTHER pipes / wires AND/OR with a fitting, those co-movers drag
+    // along by the same delta so the user can adjust an entire junction in one motion.
+    // Pressing 'm' mid-drag clears this list, breaking the link and letting the user
+    // move the picked vertex independently. Reset to null on drag end.
+    // - vertexIndex non-null = pipe / wire endpoint to translate
+    // - vertexIndex null     = fitting (translate the whole shape via X / Y delta)
+    private List<(Guid id, int? vertexIndex)>? shapeVertexDragCoMovers;
+    private Point? shapeVertexDragPrevPos;
+    private const double JointSnapToleranceFt = 0.15;
 
     // Issue #133 — corner-snap state. snapPreview is what the renderer draws as the
     // visible "snapped here" glyph; null means no snap is engaged for the current
@@ -6535,11 +6557,11 @@ public partial class GardenPlot
         // Along-path placement uses this item rather than the previously-active set.
         selectedDrawingSetId = null;
         // Issue #162a — switching palette items breaks the auto-pipe-between-stamps chain.
-        // Only keep the chain when the user keeps stamping the SAME fitting item (or any
-        // fitting, conservatively the same item).
+        // Only keep the chain when the user keeps stamping fittings (any fitting item).
         if (item.Kind != PaletteKind.IrrigationFitting)
         {
             lastFittingStampPos = null;
+            runningFittingPipeId = null;
         }
 
         _ = ApplySelectItemSideEffects(item);
@@ -9245,44 +9267,60 @@ public partial class GardenPlot
                     currentPlot.Shapes.Add(shape);
                 }
 
-                // Issue #162a — auto-pipe between consecutive fitting stamps. When the user
-                // stamps a pipe fitting and the previous stamp was also a fitting (compatible
-                // material + diameter), draw a pipe segment between them. Gated on
-                // library.Ui.AutoPipeBetweenFittingStamps so users can disable for ad-hoc
-                // fitting placement. Tracker resets on tool change / palette change (see
-                // SelectItem) and on Escape.
-                if (k.Kind == PaletteKind.IrrigationFitting
-                    && library.Ui.AutoPipeBetweenFittingStamps
-                    && lastFittingStampPos is { } prevPos
-                    && placement.Shapes.Count > 0)
+                // Issue #162a iteration — auto-pipe between consecutive fitting stamps now
+                // builds a SINGLE polyline pipe that accumulates vertices, instead of N
+                // separate 2-point segments. The pipe's vertex anchors then naturally
+                // serve as joint controls: drag a vertex with the Select tool and the
+                // pipe vertex + the fitting at that position both move (the existing
+                // FittingPlacement.FindJointCoMovers picks up the fitting because it sits
+                // at the same coordinate). Tracker resets on tool change / palette change
+                // (see SelectItem) and on Escape.
+                if (k.Kind == PaletteKind.IrrigationFitting && placement.Shapes.Count > 0)
                 {
                     Shape newFitting = placement.Shapes[0];
-                    double newCx = newFitting.X + (newFitting.W / 2);
-                    double newCy = newFitting.Y + (newFitting.H / 2);
-                    Shape autoPipe = new()
-                    {
-                        Kind = ShapeKind.IrrigationPipe,
-                        Label = ResolveAutoPipeCodeForFitting(newFitting) ?? "Auto-pipe",
-                        Trait = newFitting.FittingMaterial ?? "PVC",
-                        Stroke = newFitting.Stroke,
-                        Fill = newFitting.Fill,
-                        PipeDiameterIn = newFitting.FittingDiameterIn,
-                    };
-                    autoPipe.Points.Add(prevPos);
-                    autoPipe.Points.Add(new Point(newCx, newCy));
-                    currentPlot.Shapes.Add(autoPipe);
-                    lastFittingStampPos = new Point(newCx, newCy);
-                }
-                else if (k.Kind == PaletteKind.IrrigationFitting && placement.Shapes.Count > 0)
-                {
-                    Shape newFitting = placement.Shapes[0];
-                    lastFittingStampPos = new Point(
+                    Point newCenter = new(
                         newFitting.X + (newFitting.W / 2),
                         newFitting.Y + (newFitting.H / 2));
+
+                    if (library.Ui.AutoPipeBetweenFittingStamps && lastFittingStampPos is { } prevPos)
+                    {
+                        // Find the running pipe (if any). It may have been deleted between
+                        // stamps; if so, fall through and create a new one starting at the
+                        // previous fitting position.
+                        Shape? runningPipe = runningFittingPipeId is Guid pid
+                            ? currentPlot.Shapes.FirstOrDefault(z => z.Id == pid)
+                            : null;
+
+                        if (runningPipe is null)
+                        {
+                            // Seed a fresh pipe with two vertices: previous stamp center → new center.
+                            Shape seed = new()
+                            {
+                                Kind = ShapeKind.IrrigationPipe,
+                                Label = ResolveAutoPipeCodeForFitting(newFitting) ?? "Auto-pipe",
+                                Trait = newFitting.FittingMaterial ?? "PVC",
+                                Stroke = newFitting.Stroke,
+                                Fill = newFitting.Fill,
+                                PipeDiameterIn = newFitting.FittingDiameterIn,
+                            };
+                            seed.Points.Add(prevPos);
+                            seed.Points.Add(newCenter);
+                            currentPlot.Shapes.Add(seed);
+                            runningFittingPipeId = seed.Id;
+                        }
+                        else
+                        {
+                            // Extend the existing pipe with another vertex at the new center.
+                            runningPipe.Points.Add(newCenter);
+                        }
+                    }
+
+                    lastFittingStampPos = newCenter;
                 }
                 else
                 {
                     lastFittingStampPos = null;
+                    runningFittingPipeId = null;
                 }
 
                 if (placement.Groups.Count > 0)
@@ -9730,6 +9768,11 @@ public partial class GardenPlot
             isShapeVertexDragging = false;
             shapeVertexDragShapeId = Guid.Empty;
             shapeVertexDragIndex = -1;
+
+            // Issue #162a iteration — clear co-mover state at drag end.
+            shapeVertexDragCoMovers = null;
+            shapeVertexDragPrevPos = null;
+
             await SaveAsync();
             return;
         }
@@ -11525,6 +11568,17 @@ public partial class GardenPlot
         isShapeVertexDragging = true;
         shapeVertexDragShapeId = shapeId;
         shapeVertexDragIndex = vertexIndex;
+
+        // Issue #162a iteration — capture co-movers so a junction (two pipes ending at
+        // the same point + optional fitting on top) drags as a single rigid bundle.
+        Point anchor = shape.Points[vertexIndex];
+        shapeVertexDragPrevPos = anchor;
+        shapeVertexDragCoMovers = FittingPlacement.FindJointCoMovers(
+            currentPlot.Shapes,
+            anchor,
+            excludeShapeId: shapeId,
+            excludeVertexIndex: vertexIndex,
+            toleranceFt: JointSnapToleranceFt);
     }
 
     /// <summary>
@@ -11547,9 +11601,49 @@ public partial class GardenPlot
             return;
         }
 
-        shape.Points[shapeVertexDragIndex] = new Point(
+        Point newPos = new(
             Math.Clamp(cursorX, 0, PlotWidthFt),
             Math.Clamp(cursorY, 0, PlotHeightFt));
+
+        // Issue #162a iteration — translate every co-mover by the same delta as the
+        // dragged vertex. Without this the junction "breaks" when the user moves an
+        // anchor shared by two pipes. Press 'm' mid-drag to clear the co-mover list and
+        // move only the picked vertex (see OnKeyDown for the hotkey).
+        if (shapeVertexDragCoMovers is { Count: > 0 } coMovers && shapeVertexDragPrevPos is { } prev)
+        {
+            double dx = newPos.X - prev.X;
+            double dy = newPos.Y - prev.Y;
+            if (dx != 0 || dy != 0)
+            {
+                foreach (var (id, idx) in coMovers)
+                {
+                    Shape? co = currentPlot.Shapes.FirstOrDefault(s => s.Id == id);
+                    if (co is null)
+                    {
+                        continue;
+                    }
+
+                    if (idx is int vIdx)
+                    {
+                        if (vIdx >= 0 && vIdx < co.Points.Count)
+                        {
+                            Point cp = co.Points[vIdx];
+                            co.Points[vIdx] = new Point(
+                                Math.Clamp(cp.X + dx, 0, PlotWidthFt),
+                                Math.Clamp(cp.Y + dy, 0, PlotHeightFt));
+                        }
+                    }
+                    else
+                    {
+                        co.X = Math.Clamp(co.X + dx, 0, PlotWidthFt);
+                        co.Y = Math.Clamp(co.Y + dy, 0, PlotHeightFt);
+                    }
+                }
+            }
+        }
+
+        shape.Points[shapeVertexDragIndex] = newPos;
+        shapeVertexDragPrevPos = newPos;
     }
 
     /// <summary>
@@ -11646,6 +11740,17 @@ public partial class GardenPlot
     {
         ClearIdleRenderSuppression();
         var kb = KeyBindings;
+
+        // Issue #162a iteration — 'm' mid-drag breaks the joint co-mover link so the
+        // user can move just the picked vertex independently. Handled BEFORE other
+        // bindings so the literal key isn't shadowed by a future re-binding.
+        if (isShapeVertexDragging
+            && !e.CtrlKey && !e.AltKey && !e.MetaKey
+            && (string.Equals(e.Key, "m", StringComparison.OrdinalIgnoreCase)))
+        {
+            shapeVertexDragCoMovers = null;
+            return;
+        }
 
         // Issue #130 — diagnostic logging so the user can share browser console output
         // when reporting hotkey issues. Logs every key + modifier + current tool, and a
@@ -11807,6 +11912,7 @@ public partial class GardenPlot
             lastArcClickAt = null;
             tangentSnapArmed = false; // issue #131
             lastFittingStampPos = null; // issue #162a — Escape breaks the auto-pipe chain
+            runningFittingPipeId = null;
             ClearSelection();
         }
     }
@@ -12519,6 +12625,7 @@ public partial class GardenPlot
             if (!checkedValue)
             {
                 lastFittingStampPos = null;
+                runningFittingPipeId = null;
             }
 
             await SaveAsync();

@@ -186,4 +186,95 @@ public static class FittingPlacement
 
         return $"{diameterIn:0.##}\"";
     }
+
+    /// <summary>
+    /// Issue #162a iteration — finds shapes whose endpoint (pipe / wire) or center
+    /// (fitting) coincides with the supplied anchor position. Used during a vertex drag
+    /// so a junction (two pipes ending at the same point + optional fitting on top)
+    /// moves as a single rigid bundle. The dragged vertex itself is excluded via the
+    /// excludeShapeId / excludeVertexIndex pair.
+    /// </summary>
+    /// <param name="shapes">All shapes in the plot to scan.</param>
+    /// <param name="anchor">Anchor position in plot-space feet.</param>
+    /// <param name="excludeShapeId">The id of the shape that owns the dragged vertex.</param>
+    /// <param name="excludeVertexIndex">The index of the dragged vertex on the excluded shape.</param>
+    /// <param name="toleranceFt">Distance tolerance for coincidence (feet). Defaults to 0.15.</param>
+    /// <returns>
+    /// List of co-movers. Each entry is (shape id, optional vertex index). A null
+    /// vertex index means a fitting shape that should translate via X / Y delta.
+    /// </returns>
+    public static List<(Guid Id, int? VertexIndex)> FindJointCoMovers(
+        IEnumerable<Shape> shapes,
+        Point anchor,
+        Guid excludeShapeId,
+        int excludeVertexIndex,
+        double toleranceFt = 0.15)
+    {
+        ArgumentNullException.ThrowIfNull(shapes);
+        var hits = new List<(Guid, int?)>();
+        double tol2 = toleranceFt * toleranceFt;
+
+        foreach (Shape other in shapes)
+        {
+            if (other.Id == excludeShapeId)
+            {
+                // Same shape — check OTHER vertices that happen to share the anchor.
+                if (other.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire)
+                {
+                    for (int idx = 0; idx < other.Points.Count; idx++)
+                    {
+                        if (idx == excludeVertexIndex)
+                        {
+                            continue;
+                        }
+
+                        if (IsEndpointIndex(other, idx) && DistanceSquared(other.Points[idx], anchor) <= tol2)
+                        {
+                            hits.Add((other.Id, idx));
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            if (other.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire)
+            {
+                if (other.Points.Count == 0)
+                {
+                    continue;
+                }
+
+                int last = other.Points.Count - 1;
+                if (DistanceSquared(other.Points[0], anchor) <= tol2)
+                {
+                    hits.Add((other.Id, 0));
+                }
+
+                if (last != 0 && DistanceSquared(other.Points[last], anchor) <= tol2)
+                {
+                    hits.Add((other.Id, last));
+                }
+            }
+            else if (other.Kind == ShapeKind.IrrigationFitting)
+            {
+                Point ctr = new(other.X + (other.W / 2), other.Y + (other.H / 2));
+                if (DistanceSquared(ctr, anchor) <= tol2)
+                {
+                    hits.Add((other.Id, null));
+                }
+            }
+        }
+
+        return hits;
+
+        static bool IsEndpointIndex(Shape s, int idx) => idx == 0 || idx == s.Points.Count - 1;
+
+        static double DistanceSquared(Point a, Point b)
+        {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+            return (dx * dx) + (dy * dy);
+        }
+    }
 }

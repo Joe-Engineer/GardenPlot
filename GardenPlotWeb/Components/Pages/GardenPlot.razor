@@ -1489,6 +1489,12 @@ else
 
                 @{
                     var visibleShapes = currentPlot.Shapes.Where(IsShapeVisible).ToList();
+                    // Issue #162a iteration — fittings render ABOVE pipes / wires in z-order.
+                    // OrderBy is stable, so any shape with Z=0 keeps its insertion order; only
+                    // fittings (Z=1) get bubbled to the end of the render pass.
+                    visibleShapes = visibleShapes
+                        .OrderBy(z => z.Kind == ShapeKind.IrrigationFitting ? 1 : 0)
+                        .ToList();
                     var interacting = IsInteractingWithCanvas;
                     var stampGhosting = IsStampGhostActive;
                     lastRenderVisibleShapeCount = visibleShapes.Count;

@@ -281,4 +281,166 @@ public sealed class IrrigationFittingTests
         ui.AutoPipeBetweenFittingStamps = true;
         Assert.True(ui.AutoPipeBetweenFittingStamps);
     }
+
+    [Fact]
+    public void FindJointCoMovers_NoCoincidentShapes_ReturnsEmpty()
+    {
+        Shape dragged = MakePipe([new Point(0, 0), new Point(5, 0)]);
+        Shape other = MakePipe([new Point(10, 10), new Point(20, 10)]);
+
+        var hits = FittingPlacement.FindJointCoMovers(
+            new[] { dragged, other },
+            anchor: new Point(0, 0),
+            excludeShapeId: dragged.Id,
+            excludeVertexIndex: 0);
+
+        Assert.Empty(hits);
+    }
+
+    [Fact]
+    public void FindJointCoMovers_OtherPipeEndpointAtAnchor_ReturnsIt()
+    {
+        Shape dragged = MakePipe([new Point(0, 0), new Point(5, 0)]);
+        Shape other = MakePipe([new Point(0, 0), new Point(0, 5)]); // starts at same anchor
+
+        var hits = FittingPlacement.FindJointCoMovers(
+            new[] { dragged, other },
+            anchor: new Point(0, 0),
+            excludeShapeId: dragged.Id,
+            excludeVertexIndex: 0);
+
+        Assert.Single(hits);
+        Assert.Equal(other.Id, hits[0].Id);
+        Assert.Equal(0, hits[0].VertexIndex);
+    }
+
+    [Fact]
+    public void FindJointCoMovers_OtherPipeFarEndpointAtAnchor_ReturnsLastIndex()
+    {
+        Shape dragged = MakePipe([new Point(0, 0), new Point(5, 0)]);
+        Shape other = MakePipe([new Point(10, 10), new Point(5, 5), new Point(0, 0)]); // ends at anchor
+
+        var hits = FittingPlacement.FindJointCoMovers(
+            new[] { dragged, other },
+            anchor: new Point(0, 0),
+            excludeShapeId: dragged.Id,
+            excludeVertexIndex: 0);
+
+        Assert.Single(hits);
+        Assert.Equal(other.Id, hits[0].Id);
+        Assert.Equal(2, hits[0].VertexIndex);
+    }
+
+    [Fact]
+    public void FindJointCoMovers_FittingAtAnchor_ReturnsNullVertexIndex()
+    {
+        Shape dragged = MakePipe([new Point(0, 0), new Point(5, 0)]);
+        Shape fitting = new()
+        {
+            Kind = ShapeKind.IrrigationFitting,
+            X = -0.05,
+            Y = -0.05,
+            W = 0.1,
+            H = 0.1,
+        };
+
+        var hits = FittingPlacement.FindJointCoMovers(
+            new[] { dragged, fitting },
+            anchor: new Point(0, 0),
+            excludeShapeId: dragged.Id,
+            excludeVertexIndex: 0);
+
+        Assert.Single(hits);
+        Assert.Equal(fitting.Id, hits[0].Id);
+        Assert.Null(hits[0].VertexIndex);
+    }
+
+    [Fact]
+    public void FindJointCoMovers_InteriorVertexOfOtherPipe_IgnoredAsCoMover()
+    {
+        // Only endpoints (index 0 / last) of OTHER pipes participate in joint detection.
+        // Interior vertices stay attached to their own polyline.
+        Shape dragged = MakePipe([new Point(0, 0), new Point(5, 0)]);
+        Shape other = MakePipe([new Point(-10, 0), new Point(0, 0), new Point(10, 0)]); // interior at anchor
+
+        var hits = FittingPlacement.FindJointCoMovers(
+            new[] { dragged, other },
+            anchor: new Point(0, 0),
+            excludeShapeId: dragged.Id,
+            excludeVertexIndex: 0);
+
+        Assert.Empty(hits);
+    }
+
+    [Fact]
+    public void FindJointCoMovers_JunctionOfTwoPipesAndFitting_ReturnsAllThree()
+    {
+        Shape dragged = MakePipe([new Point(0, 0), new Point(5, 0)]);
+        Shape pipe2 = MakePipe([new Point(0, 0), new Point(0, 5)]);
+        Shape pipe3 = MakePipe([new Point(-5, 0), new Point(0, 0)]);
+        Shape tee = new()
+        {
+            Kind = ShapeKind.IrrigationFitting,
+            FittingType = FittingType.Tee,
+            X = -0.05,
+            Y = -0.05,
+            W = 0.1,
+            H = 0.1,
+        };
+
+        var hits = FittingPlacement.FindJointCoMovers(
+            new[] { dragged, pipe2, pipe3, tee },
+            anchor: new Point(0, 0),
+            excludeShapeId: dragged.Id,
+            excludeVertexIndex: 0);
+
+        Assert.Equal(3, hits.Count);
+        Assert.Contains(hits, h => h.Id == pipe2.Id && h.VertexIndex == 0);
+        Assert.Contains(hits, h => h.Id == pipe3.Id && h.VertexIndex == 1);
+        Assert.Contains(hits, h => h.Id == tee.Id && h.VertexIndex == null);
+    }
+
+    [Fact]
+    public void FindJointCoMovers_OutsideTolerance_NotIncluded()
+    {
+        Shape dragged = MakePipe([new Point(0, 0), new Point(5, 0)]);
+        Shape farPipe = MakePipe([new Point(1, 0), new Point(5, 5)]); // 1ft away, > 0.15ft tolerance
+
+        var hits = FittingPlacement.FindJointCoMovers(
+            new[] { dragged, farPipe },
+            anchor: new Point(0, 0),
+            excludeShapeId: dragged.Id,
+            excludeVertexIndex: 0);
+
+        Assert.Empty(hits);
+    }
+
+    [Fact]
+    public void FindJointCoMovers_WireAndPipeAtSameAnchor_BothReturned()
+    {
+        Shape dragged = MakePipe([new Point(0, 0), new Point(5, 0)]);
+        Shape wire = new() { Kind = ShapeKind.IrrigationWire };
+        wire.Points.Add(new Point(0, 0));
+        wire.Points.Add(new Point(0, 5));
+
+        var hits = FittingPlacement.FindJointCoMovers(
+            new[] { dragged, wire },
+            anchor: new Point(0, 0),
+            excludeShapeId: dragged.Id,
+            excludeVertexIndex: 0);
+
+        Assert.Single(hits);
+        Assert.Equal(wire.Id, hits[0].Id);
+    }
+
+    private static Shape MakePipe(Point[] points)
+    {
+        Shape s = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
+        foreach (Point p in points)
+        {
+            s.Points.Add(p);
+        }
+
+        return s;
+    }
 }
