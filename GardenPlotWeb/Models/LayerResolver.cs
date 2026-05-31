@@ -86,28 +86,39 @@ public static class LayerResolver
             return LayerKeys.Plants;
         }
 
-        return shape.Kind switch
+        // Issue #95 — Jig polymorphism: kinds that have been migrated to a Jig delegate
+        // their layer assignment to the registered Jig. Unconverted kinds fall through
+        // to the legacy if/else chain below. Once every kind is a Jig, the chain is deleted.
+        if (Jigs.JigRegistry.TryFor(shape.Kind, out var jig))
         {
-            ShapeKind.BedKit => LayerKeys.Hardscape,
-            ShapeKind.Edge => LayerKeys.Hardscape,
-            ShapeKind.Tree => LayerKeys.Plants,
-            ShapeKind.Bush => LayerKeys.Plants,
-            ShapeKind.Plant => LayerKeys.Plants,
-            ShapeKind.Ruler => LayerKeys.Measurement,
-            ShapeKind.CircleRuler => LayerKeys.Measurement,
-            ShapeKind.RectRuler => LayerKeys.Measurement,
-            ShapeKind.Rectangle => LayerKeys.Hardscape,
-            ShapeKind.Oval => LayerKeys.Hardscape,
-            ShapeKind.FreeDraw => LayerKeys.Hardscape,
-            ShapeKind.SoilMarker => LayerKeys.Measurement,
-            ShapeKind.IrrigationHead => LayerKeys.Irrigation,
-            ShapeKind.IrrigationPipe => LayerKeys.Irrigation,
-            ShapeKind.WaterSource => LayerKeys.Irrigation,
-            ShapeKind.IrrigationControl => LayerKeys.Irrigation,
-            ShapeKind.IrrigationWire => LayerKeys.Irrigation,
-            ShapeKind.IrrigationFitting => LayerKeys.Irrigation,
-            _ => LayerKeys.Notes,
-        };
+            return jig.DefaultLayerKey;
+        }
+
+        // Legacy per-kind fallback. The switch was an enum switch; expressing this as
+        // if/else lets us shrink it one kind at a time as Jigs absorb cases without
+        // tripping IDE0072 (which would demand every removed case be re-added as a
+        // no-op).
+        if (shape.Kind is ShapeKind.BedKit or ShapeKind.Edge or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
+        {
+            return LayerKeys.Hardscape;
+        }
+
+        if (shape.Kind is ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant)
+        {
+            return LayerKeys.Plants;
+        }
+
+        if (shape.Kind is ShapeKind.Ruler or ShapeKind.CircleRuler or ShapeKind.RectRuler or ShapeKind.SoilMarker)
+        {
+            return LayerKeys.Measurement;
+        }
+
+        if (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationControl or ShapeKind.IrrigationWire or ShapeKind.IrrigationFitting)
+        {
+            return LayerKeys.Irrigation;
+        }
+
+        return LayerKeys.Notes;
     }
 
     /// <summary>Returns whether the supplied shape should render on the canvas.</summary>
