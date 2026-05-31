@@ -25,11 +25,10 @@ public class DrawingJigTests
     [Fact]
     public void Registry_For_UnregisteredTool_ReturnsNull()
     {
-        // PR 7 added polyline-by-click Jigs for Polyline / Polygon / Edge / GroundCover variants,
-        // so those have entries now. The tools still un-Jig'd: Stamp (PR 8), Select, FreeDraw
-        // (freehand, PR 9), Ruler (no Jig planned).
+        // PR 8 added freehand Jigs for FreeDraw / Edge / GroundCover variants. Remaining
+        // un-Jig'd: Stamp (PR 9) and the Rulers (no Jig planned). Select is not a drawing
+        // tool.
         Assert.Null(DrawingJigRegistry.For(Tool.Stamp, DrawingContext.None));
-        Assert.Null(DrawingJigRegistry.For(Tool.FreeDraw, DrawingContext.None));
         Assert.Null(DrawingJigRegistry.For(Tool.Select, DrawingContext.None));
         Assert.Null(DrawingJigRegistry.For(Tool.Ruler, DrawingContext.None));
         Assert.False(DrawingJigRegistry.TryFor(Tool.Stamp, DrawingContext.None, out DrawingJig _));
@@ -47,8 +46,8 @@ public class DrawingJigTests
     {
         var jigs = DrawingJigRegistry.All().ToList();
         Assert.Contains(jigs, j => j is RectangleDrawingJig);
-        // PR 7 grew the registry to 14 Jigs (6 drag-rect + 8 polyline-by-click).
-        Assert.Equal(14, jigs.Count);
+        // PR 8 grew the registry to 19 Jigs (6 drag-rect + 8 polyline-by-click + 5 freehand).
+        Assert.Equal(19, jigs.Count);
     }
 
     [Fact]

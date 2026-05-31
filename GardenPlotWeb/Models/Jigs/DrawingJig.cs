@@ -94,6 +94,22 @@ public abstract class DrawingJig
     public virtual Shape? BeginPolyline(Point at, bool closed, DrawingContext context) => null;
 
     /// <summary>
+    /// Freehand-drag START. Called on pointer-down for a continuous-drag freehand
+    /// flow (FreeDraw, Edge Freehand sub-mode, GroundCover FreehandArea /
+    /// FreehandRibbon sub-modes). The Jig returns the seed Shape with metadata
+    /// pre-populated. The Shape's <see cref="Shape.Points"/> list is empty on
+    /// return — the caller adds the first point and any subsequent drag samples.
+    /// </summary>
+    /// <remarks>
+    /// Consistent with <see cref="BeginPolyline"/> and <see cref="BeginDragRect"/>
+    /// which also don't touch Points. The page's Edge Freehand flow uses
+    /// AppendEdgePoint (with min-distance dedup) for the first commit; FreeDraw /
+    /// GroundCover variants just call Points.Add. Either way, the Jig stays
+    /// focused on metadata seed only.
+    /// </remarks>
+    public virtual Shape? BeginFreehand(Point at, DrawingContext context) => null;
+
+    /// <summary>
     /// Polyline-by-click finalize. Called when the user double-clicks / presses
     /// Enter / closes the polyline. The Jig takes the committed point list and
     /// produces a Shape. Returns null if this Jig doesn't handle polyline-by-click.

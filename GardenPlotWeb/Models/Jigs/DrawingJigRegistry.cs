@@ -93,6 +93,16 @@ public static class DrawingJigRegistry
             // Generic fallback Jigs for Tool.Polyline / Tool.Polygon
             new PolylineDrawingJig(),
             new PolygonDrawingJig(),
+
+            // ==== Freehand family (PR 8) ====
+            // Edge sub-mode-discriminated freehand variants
+            new EdgeAssemblyFreehandDrawingJig(),
+            new EdgePaletteFreehandDrawingJig(),
+            // GroundCover sub-mode-discriminated freehand variants
+            new GroundCoverFreehandAreaAssemblyDrawingJig(),
+            new GroundCoverFreehandGcItemDrawingJig(),
+            // Generic Tool.FreeDraw
+            new FreeDrawDrawingJig(),
         };
     }
 }

@@ -8675,8 +8675,15 @@ public partial class GardenPlot
                 boxSelectCurrentY = y;
                 break;
             case Tool.FreeDraw:
-                drafting = new Shape { Kind = ShapeKind.FreeDraw };
-                drafting.Points.Add(new Point(x, y));
+                {
+                    // Issue #95 PR 8 — freehand seed delegated to FreeDrawDrawingJig.
+                    // Jig produces metadata-only shape; page adds the first point and
+                    // OnPointerMove appends drag samples.
+                    DrawingContext drawCtx = BuildDrawingContext();
+                    drafting = DrawingJigRegistry.For(Tool.FreeDraw, drawCtx)?.BeginFreehand(new Point(x, y), drawCtx)
+                        ?? new Shape { Kind = ShapeKind.FreeDraw };
+                    drafting.Points.Add(new Point(x, y));
+                }
                 break;
             case Tool.Polyline:
                 // Click-by-vertex open path. First click anchors the start AND a trailing
@@ -8771,9 +8778,15 @@ public partial class GardenPlot
                     }
                     else
                     {
+                        // Issue #95 PR 8 — Edge Freehand sub-mode (assembly). Click-by-click
+                        // append via AppendEdgePoint; the Jig only owns the seed Shape (no
+                        // points added — AppendEdgePoint handles the first commit with its
+                        // 0.01 ft min-distance dedup).
                         if (drafting is null || drafting.Kind != ShapeKind.Edge || buildingPolygon || !string.Equals(drafting.AssemblyCode, edgeAssembly.Code, StringComparison.OrdinalIgnoreCase))
                         {
-                            drafting = CreateEdgeAssemblyDraft(edgeAssembly, previewItem);
+                            DrawingContext drawCtx = BuildDrawingContext();
+                            drafting = DrawingJigRegistry.For(Tool.Edge, drawCtx)?.BeginFreehand(new Point(x, y), drawCtx)
+                                ?? CreateEdgeAssemblyDraft(edgeAssembly, previewItem);
                         }
 
                         buildingPolygon = false;
@@ -8803,9 +8816,13 @@ public partial class GardenPlot
                     }
                     else
                     {
+                        // Issue #95 PR 8 — Edge Freehand sub-mode (palette). Same pattern as
+                        // the assembly variant above.
                         if (drafting is null || drafting.Kind != ShapeKind.Edge || buildingPolygon || !string.Equals(drafting.Label, edgeItem.Code, StringComparison.OrdinalIgnoreCase))
                         {
-                            drafting = CreateEdgeDraft(edgeItem);
+                            DrawingContext drawCtx = BuildDrawingContext();
+                            drafting = DrawingJigRegistry.For(Tool.Edge, drawCtx)?.BeginFreehand(new Point(x, y), drawCtx)
+                                ?? CreateEdgeDraft(edgeItem);
                         }
 
                         buildingPolygon = false;
@@ -8874,7 +8891,11 @@ public partial class GardenPlot
                     }
                     else if (groundCoverSubMode == GroundCoverSubMode.FreehandArea)
                     {
-                        drafting = CreateAreaAssemblyDraft(areaAssembly, previewItem, ShapeKind.FreeDraw);
+                        // Issue #95 PR 8 — assembly FreehandArea seed via Jig. Page adds
+                        // first point and OnPointerMove appends drag samples.
+                        DrawingContext drawCtx = BuildDrawingContext();
+                        drafting = DrawingJigRegistry.For(Tool.GroundCover, drawCtx)?.BeginFreehand(new Point(x, y), drawCtx)
+                            ?? CreateAreaAssemblyDraft(areaAssembly, previewItem, ShapeKind.FreeDraw);
                         drafting.Points.Add(new Point(x, y));
                     }
                     else
@@ -8962,20 +8983,28 @@ public partial class GardenPlot
                     }
                     else if (groundCoverSubMode == GroundCoverSubMode.FreehandArea)
                     {
-                        drafting = new Shape
+                        // Issue #95 PR 8 — gcItem FreehandArea seed via Jig. Page applies
+                        // toolbar depth override after Jig returns, then adds first point.
+                        DrawingContext drawCtx = BuildDrawingContext();
+                        drafting = DrawingJigRegistry.For(Tool.GroundCover, drawCtx)?.BeginFreehand(new Point(x, y), drawCtx);
+                        if (drafting is null)
                         {
-                            Kind = ShapeKind.FreeDraw,
-                            Trait = surfaceTrait,
-                            Label = gcItem.Code,
-                            Stroke = gcItem.StrokeColor,
-                            Fill = gcItem.FillColor,
-                            MaterialCode = gcItem.Code,
-                            DepthIn = depthOverride,
-                            GroundCoverCode = gcItem.Code,
-                            GroundCoverDepthIn = legacyDepth,
-                            IsGroundCoverSurface = isSurface,
-                            TextureKey = gcItem.TextureKey,
-                        };
+                            drafting = new Shape
+                            {
+                                Kind = ShapeKind.FreeDraw,
+                                Trait = surfaceTrait,
+                                Label = gcItem.Code,
+                                Stroke = gcItem.StrokeColor,
+                                Fill = gcItem.FillColor,
+                                MaterialCode = gcItem.Code,
+                                GroundCoverCode = gcItem.Code,
+                                IsGroundCoverSurface = isSurface,
+                                TextureKey = gcItem.TextureKey,
+                            };
+                        }
+
+                        drafting.DepthIn = depthOverride;
+                        drafting.GroundCoverDepthIn = legacyDepth;
                         drafting.Points.Add(new Point(x, y));
                     }
                     else if (groundCoverSubMode == GroundCoverSubMode.FreehandRibbon)
@@ -8984,20 +9013,29 @@ public partial class GardenPlot
                         // to sketch a centerline) but commits as a closed ribbon polygon
                         // in OnPointerUp via the same RibbonGeometry pipeline used by the
                         // PolylineRibbon submode.
-                        drafting = new Shape
+                        // Issue #95 PR 8 — same Jig dispatch as FreehandArea above
+                        // (GroundCoverFreehandGcItemDrawingJig.Matches accepts BOTH submodes;
+                        // ribbon-vs-area split is at commit time).
+                        DrawingContext drawCtx = BuildDrawingContext();
+                        drafting = DrawingJigRegistry.For(Tool.GroundCover, drawCtx)?.BeginFreehand(new Point(x, y), drawCtx);
+                        if (drafting is null)
                         {
-                            Kind = ShapeKind.FreeDraw,
-                            Trait = surfaceTrait,
-                            Label = gcItem.Code,
-                            Stroke = gcItem.StrokeColor,
-                            Fill = gcItem.FillColor,
-                            MaterialCode = gcItem.Code,
-                            DepthIn = depthOverride,
-                            GroundCoverCode = gcItem.Code,
-                            GroundCoverDepthIn = legacyDepth,
-                            IsGroundCoverSurface = isSurface,
-                            TextureKey = gcItem.TextureKey,
-                        };
+                            drafting = new Shape
+                            {
+                                Kind = ShapeKind.FreeDraw,
+                                Trait = surfaceTrait,
+                                Label = gcItem.Code,
+                                Stroke = gcItem.StrokeColor,
+                                Fill = gcItem.FillColor,
+                                MaterialCode = gcItem.Code,
+                                GroundCoverCode = gcItem.Code,
+                                IsGroundCoverSurface = isSurface,
+                                TextureKey = gcItem.TextureKey,
+                            };
+                        }
+
+                        drafting.DepthIn = depthOverride;
+                        drafting.GroundCoverDepthIn = legacyDepth;
                         drafting.Points.Add(new Point(x, y));
                     }
                     else if (groundCoverSubMode == GroundCoverSubMode.PolylineRibbon)
