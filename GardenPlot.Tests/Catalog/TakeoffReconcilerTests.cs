@@ -24,8 +24,8 @@ public sealed class TakeoffReconcilerTests
         Assert.Equal(2, items.Count);
         Assert.Equal(assembly.Code, items[0].AssemblyCode);
         Assert.Equal(0, items[0].AssemblyLayerIndex);
-        Assert.Equal("yd┬│", items[0].QuantityUnit);
-        Assert.Equal("ft┬▓", items[1].QuantityUnit);
+        Assert.Equal("yd³", items[0].QuantityUnit);
+        Assert.Equal("ft²", items[1].QuantityUnit);
         Assert.Equal(80, items[0].AreaFt2);
         Assert.Equal(80, items[1].Quantity);
     }
@@ -48,7 +48,7 @@ public sealed class TakeoffReconcilerTests
         IReadOnlyList<TakeoffItem> items = TakeoffReconciler.Reconcile([shape], ResolveAssembly);
 
         Assert.Equal(2, items.Count);
-        Assert.Equal("yd┬│", items[0].QuantityUnit);
+        Assert.Equal("yd³", items[0].QuantityUnit);
         Assert.Equal(GroundCoverMath.VolumeYd3(10 * (4.0 / 12.0), 1), items[0].Quantity, 6);
         Assert.Equal("lf", items[1].QuantityUnit);
         Assert.Equal(10, items[1].Quantity, 6);
@@ -74,7 +74,7 @@ public sealed class TakeoffReconcilerTests
         TakeoffItem item = Assert.Single(items);
         Assert.Equal("Custom Assembly", item.CatalogCode);
         Assert.Null(item.AssemblyCode);
-        Assert.Equal("ft┬▓", item.QuantityUnit);
+        Assert.Equal("ft²", item.QuantityUnit);
     }
 
     [Fact]

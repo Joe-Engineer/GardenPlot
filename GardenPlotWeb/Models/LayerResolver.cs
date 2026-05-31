@@ -100,25 +100,20 @@ public static class LayerResolver
         // Legacy per-kind fallback. The switch was an enum switch; expressing this as
         // if/else lets us shrink it one kind at a time as Jigs absorb cases without
         // tripping IDE0072 (which would demand every removed case be re-added as a
-        // no-op).
-        if (shape.Kind is ShapeKind.BedKit or ShapeKind.Edge or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
+        // no-op). PR 5 (element-Jig batch) removed BedKit / Tree / Bush / Plant /
+        // SoilMarker / IrrigationPipe / IrrigationControl / IrrigationWire /
+        // IrrigationFitting from this chain — they're now KindJig-routed above.
+        // What's left: geometry primitives (Edge / Rectangle / Oval / FreeDraw) and
+        // the Ruler family. The geometry primitives are intentionally trait-derived;
+        // the Rulers are measurement-only and don't really belong on a Jig.
+        if (shape.Kind is ShapeKind.Edge or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
         {
             return LayerKeys.Hardscape;
         }
 
-        if (shape.Kind is ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant)
-        {
-            return LayerKeys.Plants;
-        }
-
-        if (shape.Kind is ShapeKind.Ruler or ShapeKind.CircleRuler or ShapeKind.RectRuler or ShapeKind.SoilMarker)
+        if (shape.Kind is ShapeKind.Ruler or ShapeKind.CircleRuler or ShapeKind.RectRuler)
         {
             return LayerKeys.Measurement;
-        }
-
-        if (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationControl or ShapeKind.IrrigationWire or ShapeKind.IrrigationFitting)
-        {
-            return LayerKeys.Irrigation;
         }
 
         return LayerKeys.Notes;

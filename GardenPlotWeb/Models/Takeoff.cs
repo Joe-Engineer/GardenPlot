@@ -1,4 +1,4 @@
-﻿// <copyright file="Takeoff.cs" company="Garden Plot">
+﻿﻿// <copyright file="Takeoff.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -656,11 +656,11 @@ public static class TakeoffReconciler
                 items.Add(new TakeoffItem
                 {
                     ShapeId = shape.Id,
-                    Kind = shape.IsGroundCoverSurface ? "Ground Cover ΓÇö Surface" : "Ground Cover",
+                    Kind = shape.IsGroundCoverSurface ? "Ground Cover — Surface" : "Ground Cover",
                     Name = catalogCode,
                     Count = 1,
                     Quantity = isVolumetric ? GroundCoverMath.VolumeYd3(areaFt2, depthIn!.Value) : areaFt2,
-                    QuantityUnit = isVolumetric ? "yd┬│" : "ft┬▓",
+                    QuantityUnit = isVolumetric ? "yd³" : "ft²",
                     AreaFt2 = areaFt2,
                     ThicknessIn = isVolumetric ? depthIn : null,
                     CatalogSource = CatalogSource.Base,
@@ -670,84 +670,88 @@ public static class TakeoffReconciler
                 continue;
             }
 
-            if (shape.Kind is ShapeKind.BedKit or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw or ShapeKind.IrrigationHead or ShapeKind.IrrigationPipe or ShapeKind.WaterSource or ShapeKind.IrrigationControl or ShapeKind.IrrigationWire or ShapeKind.IrrigationFitting)
+            // Issue #95 PR 5 (element-Jig batch) — KindJig dispatch for shape-bound rows.
+            // The 10 material KindJigs that match here (Tree, Bush, Plant, BedKit,
+            // IrrigationHead, IrrigationPipe, IrrigationWire, IrrigationFitting,
+            // IrrigationControl, WaterSource) own their Kind label, default name,
+            // takeoff quantity, and Notes via the Jig contract — collapsing the giant
+            // switch that used to live inline. The pipe stock-stick rollup lives in
+            // IrrigationPipeJig.TakeoffNotes; the pipe / wire polyline-length lives in
+            // their TakeoffQuantity overrides.
+            //
+            // Trait-jigs (GroundCoverSurfaceJig / GroundCoverVolumeJig) are intentionally
+            // excluded here — the ground-cover branch above keeps its own slightly
+            // different volume math (no waste in the dossier vs WITH waste in the live
+            // editor; preserving the long-standing divergence).
+            //
+            // SoilMarkerJig is also skipped — soil markers are measurement-only and
+            // historically excluded from the dossier BOM. The Jig still drives layer /
+            // label resolution for the live editor where SoilMarkers DO appear; the
+            // dossier just doesn't carry them as purchasable line items.
+            if (Jigs.JigRegistry.TryFor(shape, out Jigs.Jig? matchedJig)
+                && matchedJig is Jigs.KindJig kindJig
+                && kindJig is not Jigs.SoilMarkerJig)
             {
-                string name = !string.IsNullOrWhiteSpace(shape.Label)
-                    ? shape.Label
-                    : shape.Kind switch
-                    {
-                        ShapeKind.Rectangle => $"{shape.W:0.##}'├ù{shape.H:0.##}'",
-                        ShapeKind.Oval => $"{shape.W:0.##}'├ù{shape.H:0.##}'",
-                        ShapeKind.FreeDraw => "(unnamed)",
-                        ShapeKind.BedKit => "(unnamed)",
-                        ShapeKind.Tree => "(unnamed)",
-                        ShapeKind.Bush => "(unnamed)",
-                        ShapeKind.Plant => "(unnamed)",
-                        ShapeKind.Edge => shape.Takeoff?.CatalogCode ?? shape.Label ?? "(unnamed edge)",
-                        ShapeKind.Ruler => "(measurement)",
-                        ShapeKind.CircleRuler => "(measurement)",
-                        ShapeKind.RectRuler => "(measurement)",
-                        ShapeKind.SoilMarker => shape.Label ?? "Soil marker",
-                        ShapeKind.IrrigationHead => shape.Label ?? "Irrigation head",
-                        ShapeKind.IrrigationPipe => shape.Label ?? "Irrigation pipe",
-                        ShapeKind.WaterSource => shape.Label ?? "Water source",
-                        ShapeKind.IrrigationControl => shape.Label ?? "Irrigation control",
-                        ShapeKind.IrrigationWire => shape.Label ?? "Irrigation wire",
-                        ShapeKind.IrrigationFitting => shape.Label ?? "Irrigation fitting",
-                        _ => "(unnamed)",
-                    };
-
-                // Issue #159 — pipes are quantified in linear feet (polyline length), not
-                // per-piece. Issue #161 — wires also quantified in linear feet. Other kinds stay at count = 1.
-                double linearLengthFt = (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire) && shape.Points.Count >= 2
-                    ? PolylineSampler.TotalLengthFt(shape.Points, closed: false)
-                    : 0;
-
-                // Issue #162b — surface stock-length consumption for pipes in the row Notes
-                // (e.g. "20 ft stocks · 3 needed · 8.3% waste"). Looks up StockLengthFt from
-                // the pipe's catalog row; null when unmatched or when this isn't a pipe.
-                string? stockNotes = null;
-                if (shape.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(shape.Label) && linearLengthFt > 0)
+                string name = !string.IsNullOrWhiteSpace(shape.Label) ? shape.Label! : kindJig.DefaultDisplayName;
+                items.Add(new TakeoffItem
                 {
-                    PaletteItem? pipeRow = PaletteCatalog.FindByCode(shape.Label!);
-                    if (FittingPlacement.ComputeStockUsage(linearLengthFt, pipeRow?.StockLengthFt) is { } usage
-                        && pipeRow?.StockLengthFt is double stockLen)
-                    {
-                        stockNotes = $"{stockLen:0.#} ft stocks · {usage.StockUnits} needed · {usage.WastePercent:0.0}% waste";
-                    }
+                    ShapeId = shape.Id,
+                    Kind = kindJig.TakeoffKindLabel,
+                    Name = name,
+                    Count = 1,
+                    Quantity = kindJig.TakeoffQuantity(shape),
+                    CatalogSource = CatalogSource.Base,
+                    CatalogCode = !string.IsNullOrWhiteSpace(shape.Label) ? shape.Label! : shape.Kind.ToString(),
+                    Notes = kindJig.TakeoffNotes(shape),
+                });
+
+                continue;
+            }
+
+            // Legacy fallback for the geometry-primitive kinds (Rectangle, Oval, FreeDraw)
+            // that don't have a KindJig. Each is a generic shape whose "role" comes from
+            // a trait or a catalog material rather than a fixed Kind label — they stay
+            // intentionally un-Jig'd. The Name / Kind / Quantity machinery is shrunk to
+            // just these three cases.
+            if (shape.Kind is ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw)
+            {
+                string fallbackName;
+                string fallbackKindLabel;
+                if (!string.IsNullOrWhiteSpace(shape.Label))
+                {
+                    fallbackName = shape.Label;
+                }
+                else if (shape.Kind is ShapeKind.Rectangle or ShapeKind.Oval)
+                {
+                    fallbackName = $"{shape.W:0.##}'×{shape.H:0.##}'";
+                }
+                else
+                {
+                    fallbackName = "(unnamed)";
+                }
+
+                if (shape.Kind == ShapeKind.Rectangle)
+                {
+                    fallbackKindLabel = "Rectangle";
+                }
+                else if (shape.Kind == ShapeKind.Oval)
+                {
+                    fallbackKindLabel = "Oval";
+                }
+                else
+                {
+                    fallbackKindLabel = "Freehand";
                 }
 
                 items.Add(new TakeoffItem
                 {
                     ShapeId = shape.Id,
-                    Kind = shape.Kind switch
-                    {
-                        ShapeKind.BedKit => "Bed Kit",
-                        ShapeKind.Tree => "Tree",
-                        ShapeKind.Bush => "Bush",
-                        ShapeKind.Plant => "Plant",
-                        ShapeKind.Rectangle => "Rectangle",
-                        ShapeKind.Oval => "Oval",
-                        ShapeKind.FreeDraw => "Freehand",
-                        ShapeKind.Edge => "Edging",
-                        ShapeKind.Ruler => "Ruler",
-                        ShapeKind.CircleRuler => "Circle Ruler",
-                        ShapeKind.RectRuler => "Rectangle Ruler",
-                        ShapeKind.SoilMarker => "Soil Marker",
-                        ShapeKind.IrrigationHead => "Irrigation Head",
-                        ShapeKind.IrrigationPipe => "Irrigation Pipe",
-                        ShapeKind.WaterSource => "Water Source",
-                        ShapeKind.IrrigationControl => "Irrigation Control",
-                        ShapeKind.IrrigationWire => "Irrigation Wire",
-                        ShapeKind.IrrigationFitting => "Irrigation Fitting",
-                        _ => shape.Kind.ToString(),
-                    },
-                    Name = name,
+                    Kind = fallbackKindLabel,
+                    Name = fallbackName,
                     Count = 1,
-                    Quantity = (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire) ? linearLengthFt : 1,
+                    Quantity = 1,
                     CatalogSource = CatalogSource.Base,
                     CatalogCode = !string.IsNullOrWhiteSpace(shape.Label) ? shape.Label! : shape.Kind.ToString(),
-                    Notes = stockNotes,
                 });
             }
         }
@@ -764,19 +768,19 @@ public static class TakeoffReconciler
             return null;
         }
 
-        if (string.Equals(item.QuantityUnit, "yd┬│", StringComparison.Ordinal))
+        if (string.Equals(item.QuantityUnit, "yd³", StringComparison.Ordinal))
         {
             string suffix = item.AreaFt2 is double area && item.ThicknessIn is double thickness
-                ? $" ({area:0.#} ft┬▓ ├ù {thickness:0.#}\")"
+                ? $" ({area:0.#} ft² × {thickness:0.#}\")"
                 : string.Empty;
-            return $"{item.Quantity:0.##} yd┬│{suffix}";
+            return $"{item.Quantity:0.##} yd³{suffix}";
         }
 
-        if (string.Equals(item.QuantityUnit, "ft┬▓", StringComparison.Ordinal))
+        if (string.Equals(item.QuantityUnit, "ft²", StringComparison.Ordinal))
         {
             return item.QuantityMultiplier > 1.0001 || item.QuantityMultiplier < 0.9999
-                ? $"{item.Quantity:0.#} ft┬▓ ({item.QuantityMultiplier:0.##}├ù)"
-                : $"{item.Quantity:0.#} ft┬▓";
+                ? $"{item.Quantity:0.#} ft² ({item.QuantityMultiplier:0.##}×)"
+                : $"{item.Quantity:0.#} ft²";
         }
 
         return $"{item.Quantity:0.##} {item.QuantityUnit}";
@@ -813,7 +817,7 @@ public static class TakeoffReconciler
                 Quantity = isVolumetric
                     ? GroundCoverMath.VolumeYd3(areaFt2, layer.ThicknessIn!.Value) * multiplier
                     : areaFt2 * multiplier,
-                QuantityUnit = isVolumetric ? "yd┬│" : "ft┬▓",
+                QuantityUnit = isVolumetric ? "yd³" : "ft²",
                 AreaFt2 = areaFt2,
                 ThicknessIn = layer.ThicknessIn,
                 CatalogSource = layer.Source,
@@ -850,7 +854,7 @@ public static class TakeoffReconciler
                 Quantity = isVolumetric
                     ? GroundCoverMath.VolumeYd3(stripAreaFt2, layer.ThicknessIn!.Value) * multiplier
                     : lengthFt * multiplier,
-                QuantityUnit = isVolumetric ? "yd┬│" : "lf",
+                QuantityUnit = isVolumetric ? "yd³" : "lf",
                 AreaFt2 = isVolumetric ? stripAreaFt2 : null,
                 ThicknessIn = layer.ThicknessIn,
                 CatalogSource = layer.Source,
@@ -868,7 +872,7 @@ public static class TakeoffReconciler
     }
 
     private static string FormatAssemblyLayerName(CatalogAssemblyLayer layer)
-        => string.IsNullOrWhiteSpace(layer.Label) ? layer.CatalogCode : $"{layer.Label} ΓÇö {layer.CatalogCode}";
+        => string.IsNullOrWhiteSpace(layer.Label) ? layer.CatalogCode : $"{layer.Label} — {layer.CatalogCode}";
 
     private static CatalogItem? ResolveEdgeAssemblyVisualCatalog(CatalogAssembly assembly)
     {
