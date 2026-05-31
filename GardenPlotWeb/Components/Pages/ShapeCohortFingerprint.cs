@@ -174,6 +174,14 @@ internal static class ShapeCohortFingerprint
         // so the stroke width updates without a forced re-render.
         h = MixD(h, s.PipeDiameterIn ?? 0.0);
 
+        // Issue #160 — water source type / max flow / pressure. Same fingerprint hazard:
+        // the inspector lets the user reclassify a source (Faucet → Pump) or edit GPM/PSI,
+        // and the canvas icon picks one of three glyphs based on Type — without mixing
+        // these, the swap doesn't redraw until something else invalidates the cohort.
+        h = Mix(h, (int)(s.WaterSourceType ?? Models.WaterSourceType.Faucet));
+        h = MixD(h, s.MaxFlowGpm ?? 0.0);
+        h = MixD(h, s.PressurePsi ?? 0.0);
+
         return h;
     }
 
