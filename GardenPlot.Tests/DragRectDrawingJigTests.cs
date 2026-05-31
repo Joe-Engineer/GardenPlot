@@ -69,7 +69,6 @@ public class DragRectDrawingJigTests
     }
 
     // ==== GroundCover sub-mode-discriminated drag-rect Jigs ====
-
     [Fact]
     public void GroundCoverRectangleJig_Matches_RequiresAllGateConditions()
     {
