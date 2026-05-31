@@ -127,15 +127,14 @@ public class TakeoffQuantityResolverTests
     }
 
     [Fact]
-    public void Resolve_GroundCoverTraitWins_OverPipeKindCheck()
+    public void Resolve_Pipe_GoesThroughPipeJig()
     {
-        // Sanity: the pipe/wire kind check comes first, so a Pipe with IsGroundCoverSurface
-        // would NOT route through the ground-cover trait. This locks in the precedence order
-        // (pipe/wire first, then Jig). Future refactor: when PipeJig exists, this special
-        // case disappears.
-        Shape oddPipe = new() { Kind = ShapeKind.IrrigationPipe, IsGroundCoverSurface = true };
-        oddPipe.Points.Add(new Point(0, 0));
-        oddPipe.Points.Add(new Point(10, 0));
-        Assert.Equal(10.0, TakeoffQuantityResolver.Resolve(oddPipe));
+        // PR 3c: pipes/wires no longer have a special case in the resolver — they go
+        // through IrrigationPipeJig / IrrigationWireJig like every other Jig-aware shape.
+        // Verifying the polyline-length result confirms the Jig path is being exercised.
+        Shape pipe = new() { Kind = ShapeKind.IrrigationPipe };
+        pipe.Points.Add(new Point(0, 0));
+        pipe.Points.Add(new Point(10, 0));
+        Assert.Equal(10.0, TakeoffQuantityResolver.Resolve(pipe));
     }
 }

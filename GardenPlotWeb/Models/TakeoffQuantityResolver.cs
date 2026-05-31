@@ -38,28 +38,18 @@ public static class TakeoffQuantityResolver
 {
     /// <summary>
     /// Resolves the Quantity for a shape-bound takeoff row. Returns <c>1</c> for shapes
-    /// with no Jig and no pipe/wire special-case (legacy fallback).
+    /// with no Jig (legacy fallback).
     /// </summary>
     /// <param name="shape">The shape the takeoff row is bound to.</param>
-    /// <returns>The quantity in the shape's native takeoff unit (ft for pipe, ft² or yd³ for ground cover, etc.).</returns>
+    /// <returns>The quantity in the shape's native takeoff unit (ft for pipe/wire, ft² or yd³ for ground cover, etc.).</returns>
     public static double Resolve(Shape shape)
     {
         ArgumentNullException.ThrowIfNull(shape);
 
-        // Pipes and wires quantify in polyline length. Done inline (not as a Jig) because
-        // pipes don't have a Jig yet — that lands in a future PR (path-Jig demo). The pipe
-        // also carries Notes (stock-stick rollup) that the caller refreshes separately, so
-        // keeping the special case here is the smallest viable seam.
-        if (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire)
-        {
-            return shape.Points.Count >= 2
-                ? PolylineSampler.TotalLengthFt(shape.Points, closed: false)
-                : 0;
-        }
-
-        // Trait-jigs (GroundCoverSurfaceJig, GroundCoverVolumeJig) and kind-jigs
-        // (IrrigationHeadJig, WaterSourceJig) all answer here. Kind-jigs that don't
-        // override TakeoffQuantity inherit the default of 1, which is correct for them.
+        // All Jig-aware shapes (kind-jigs for IrrigationHead/Pipe/Wire/WaterSource and
+        // trait-jigs for ground covers) answer through their TakeoffQuantity contract.
+        // Pre-#95-PR-3c this method had a pipe/wire special case because there was no
+        // PipeJig/WireJig — that special case is now obsolete.
         if (JigRegistry.TryFor(shape, out Jig? jig))
         {
             return jig.TakeoffQuantity(shape);

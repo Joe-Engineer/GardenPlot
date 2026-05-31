@@ -36,12 +36,13 @@ public sealed class JigRegistryTests
     [Fact]
     public void For_UnconvertedKind_ReturnsNull()
     {
-        // PR 3a only converts IrrigationHead + WaterSource. Every other kind should
-        // still resolve to null so callers fall through to the legacy switch path.
+        // PR 3c converts IrrigationPipe + IrrigationWire (in addition to the prior
+        // IrrigationHead + WaterSource). Every other kind should still resolve to null
+        // so callers fall through to the legacy switch path.
         Assert.Null(JigRegistry.For(ShapeKind.BedKit));
         Assert.Null(JigRegistry.For(ShapeKind.Tree));
-        Assert.Null(JigRegistry.For(ShapeKind.IrrigationPipe));
         Assert.Null(JigRegistry.For(ShapeKind.IrrigationFitting));
+        Assert.Null(JigRegistry.For(ShapeKind.IrrigationControl));
     }
 
     [Fact]
@@ -76,8 +77,10 @@ public sealed class JigRegistryTests
     public void All_ReturnsEveryRegisteredJig()
     {
         var jigs = JigRegistry.All().ToList();
-        Assert.Equal(4, jigs.Count); // 2 ground-cover trait-jigs + 2 kind-jigs as of PR 3b
+        Assert.Equal(6, jigs.Count); // 2 ground-cover trait-jigs + 4 kind-jigs as of PR 3c
         Assert.Contains(jigs, j => j is IrrigationHeadJig);
+        Assert.Contains(jigs, j => j is IrrigationPipeJig);
+        Assert.Contains(jigs, j => j is IrrigationWireJig);
         Assert.Contains(jigs, j => j is WaterSourceJig);
         Assert.Contains(jigs, j => j is GroundCoverSurfaceJig);
         Assert.Contains(jigs, j => j is GroundCoverVolumeJig);

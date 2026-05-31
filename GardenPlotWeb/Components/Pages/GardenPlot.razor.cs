@@ -19,6 +19,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using GardenPlotWeb.Models;
+using GardenPlotWeb.Models.Jigs;
 using GardenPlotWeb.Services;
 using GardenPlotWeb.Services.Catalog;
 using Microsoft.AspNetCore.Components;
@@ -1021,24 +1022,18 @@ public partial class GardenPlot
 
             t.Quantity = TakeoffQuantityResolver.Resolve(boundShape);
 
-            // Pipe-specific Notes (stock-stick rollup) — still inline because it's irrigation-
-            // specific. Will move into a PipeJig in a later #95 PR.
-            string? refreshedNotes = null;
-            if (boundShape.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(boundShape.Label) && t.Quantity > 0)
+            // Issue #95 PR 3c — Notes refresh is now Jig-driven. When the bound shape has a
+            // Jig that supplies non-null TakeoffNotes (currently only IrrigationPipeJig for the
+            // stock-stick rollup), overwrite t.Notes so the rollup tracks shape edits. When the
+            // Jig returns null (or no Jig matches), leave t.Notes alone so user-authored notes
+            // on non-Jig rows aren't wiped.
+            if (JigRegistry.TryFor(boundShape, out Jig? refreshJig))
             {
-                PaletteItem? pipeRow = PaletteCatalog.FindByCode(boundShape.Label!);
-                if (FittingPlacement.ComputeStockUsage(t.Quantity, pipeRow?.StockLengthFt) is { } usage
-                    && pipeRow?.StockLengthFt is double stockLen)
+                string? jigNotes = refreshJig.TakeoffNotes(boundShape);
+                if (jigNotes is not null)
                 {
-                    string unitWord = usage.StockUnits == 1 ? "stick" : "sticks";
-                    refreshedNotes = $"{usage.StockUnits} {unitWord} @ {stockLen:0.#} ft · {usage.WastePercent:0.0}% waste";
+                    t.Notes = jigNotes;
                 }
-            }
-
-            // Only overwrite Notes for pipes; leave other shapes' Notes untouched.
-            if (boundShape.Kind == ShapeKind.IrrigationPipe)
-            {
-                t.Notes = refreshedNotes;
             }
         }
 
@@ -1051,24 +1046,13 @@ public partial class GardenPlot
 
             (CatalogSource src, string? packId, string code) = ResolveCatalogRefForShape(shape);
 
-            // Issue #182 — Quantity is resolved through the unified TakeoffQuantityResolver
-            // so ground covers (and any future Jig) get the right area / volume from the
-            // start. Pipes and wires still carry stock-stick Notes; those are computed
-            // inline since they're pipe-specific (not a Jig responsibility yet).
+            // Issue #182 + #95 PR 3c — Quantity and Notes both resolved through the Jig
+            // contract. The pipe stock-stick rollup now lives in IrrigationPipeJig.TakeoffNotes;
+            // the inline pipe-specific block that used to live here is gone.
             double quantity = TakeoffQuantityResolver.Resolve(shape);
-            string? notes = null;
-            if (shape.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(shape.Label) && quantity > 0)
-            {
-                // Issue #162b — surface stock-stick consumption ("3 sticks @ 20 ft, 15% waste")
-                // in the row Notes so the takeoff table can render it under the row name.
-                PaletteItem? pipeRow = PaletteCatalog.FindByCode(shape.Label!);
-                if (FittingPlacement.ComputeStockUsage(quantity, pipeRow?.StockLengthFt) is { } usage
-                    && pipeRow?.StockLengthFt is double stockLen)
-                {
-                    string unitWord = usage.StockUnits == 1 ? "stick" : "sticks";
-                    notes = $"{usage.StockUnits} {unitWord} @ {stockLen:0.#} ft · {usage.WastePercent:0.0}% waste";
-                }
-            }
+            string? notes = JigRegistry.TryFor(shape, out Jig? createJig)
+                ? createJig.TakeoffNotes(shape)
+                : null;
 
             currentPlot.Takeoff.Add(new TakeoffItem
             {
