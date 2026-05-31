@@ -1215,19 +1215,7 @@ public partial class GardenPlot
     }
 
     private static string EffectivePaletteTrait(PaletteItem item)
-    {
-        if (item.Kind == PaletteKind.CustomTile)
-        {
-            return string.IsNullOrWhiteSpace(item.Trait) ? "custom-tile" : item.Trait;
-        }
-
-        if (item.Kind == PaletteKind.FocalPoint)
-        {
-            return string.IsNullOrWhiteSpace(item.Trait) ? "focal-point-sculpture" : item.Trait;
-        }
-
-        return item.Trait;
-    }
+        => PaletteShapeBuilder.EffectivePaletteTrait(item);
 
     private static bool IsFocalPointTrait(string trait)
     {
@@ -7728,88 +7716,26 @@ public partial class GardenPlot
             ? TotalPathLengthFt(source)
             : 0;
 
-    private static ShapeKind ShapeKindFromPalette(PaletteItem item) => item.Kind switch
-    {
-        PaletteKind.Tree => ShapeKind.Tree,
-        PaletteKind.Bush => ShapeKind.Bush,
-        PaletteKind.Plant => ShapeKind.Plant,
-        PaletteKind.FocalPoint => ShapeKind.Plant,
-        PaletteKind.SoilMarker => ShapeKind.SoilMarker,
-        PaletteKind.CustomTile => item.StampShapeKind is ShapeKind.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
-        PaletteKind.Edging => ShapeKind.Edge,
-        PaletteKind.IrrigationHead => ShapeKind.IrrigationHead,
-        PaletteKind.IrrigationPipe => ShapeKind.IrrigationPipe,
-        PaletteKind.WaterSource => ShapeKind.WaterSource,
-        PaletteKind.IrrigationControl => ShapeKind.IrrigationControl,
-        PaletteKind.IrrigationWire => ShapeKind.IrrigationWire,
-        PaletteKind.IrrigationFitting => ShapeKind.IrrigationFitting,
-        _ => ShapeKind.BedKit,
-    };
+    private static ShapeKind ShapeKindFromPalette(PaletteItem item)
+        => PaletteShapeBuilder.ShapeKindFromPalette(item);
 
     private Shape BuildStampShapeAt(PaletteItem item, double centerX, double centerY, double rotation, Guid? groupId, int? groupIndex)
     {
-        return new Shape
-        {
-            Kind = ShapeKindFromPalette(item),
-            X = centerX - (item.WidthFt / 2),
-            Y = centerY - (item.HeightFt / 2),
-            W = item.WidthFt,
-            H = item.HeightFt,
-            Rotation = rotation,
-            Label = item.Code,
-            FilledAreaShapeId = null,
-            Trait = EffectivePaletteTrait(item),
-            Stroke = item.StrokeColor,
-            Fill = item.FillColor,
-            TileBackgroundImageFileName = item.TileBackgroundImageFileName,
-            GroupId = groupId,
-            GroupIndex = groupIndex,
-            // Issue #31 Phase A — irrigation heads carry their coverage arc on the shape
-            // so a stamped head can be edited independently of the catalog.
-            ArcDegrees = item.ArcDegrees,
-
-            // Issue #160 — water sources carry their type + flow/pressure on the shape
-            // so the future zone calculator can read them per-instance.
-            WaterSourceType = item.Kind == PaletteKind.WaterSource
-                ? ParseWaterSourceType(item.Trait)
-                : null,
-            MaxFlowGpm = item.Kind == PaletteKind.WaterSource
-                ? ParseFlowFromNotes(item.Notes)
-                : null,
-            PressurePsi = item.Kind == PaletteKind.WaterSource
-                ? ParsePressureFromNotes(item.Notes)
-                : null,
-
-            // Issue #161 — irrigation controls carry the control type + zone capacity so
-            // the future zone calculator can validate "heads per zone ≤ controller capacity".
-            IrrigationControlType = item.Kind == PaletteKind.IrrigationControl
-                ? ParseIrrigationControlType(item.Trait)
-                : null,
-            ZoneOutputs = item.Kind == PaletteKind.IrrigationControl
-                ? ParseZoneOutputsFromNotes(item.Notes)
-                : null,
-
-            // Issue #161 — wires carry conductor count + gauge so the BOM can group by
-            // conductor count and total wire-feet per conductor count.
-            ConductorCount = item.Kind == PaletteKind.IrrigationWire
-                ? ParseConductorCountFromNotes(item.Notes)
-                : null,
-            WireGaugeAwg = item.Kind == PaletteKind.IrrigationWire
-                ? ParseWireGaugeFromNotes(item.Notes)
-                : null,
-
-            // Issue #162a — pipe fittings carry type + diameter + material on the shape so the
-            // BOM can group counts per (type, material, diameter) without re-reading the catalog.
-            FittingType = item.Kind == PaletteKind.IrrigationFitting
-                ? ParseFittingType(item.Trait)
-                : null,
-            FittingDiameterIn = item.Kind == PaletteKind.IrrigationFitting
-                ? item.WidthFt * 12.0
-                : null,
-            FittingMaterial = item.Kind == PaletteKind.IrrigationFitting
-                ? ParseFittingMaterial(item.Notes)
-                : null,
-        };
+        // Issue #95 PR 9 — single-shape construction delegated to StampDrawingJig (via
+        // PaletteShapeBuilder). Page only layers rotation / group metadata on top — those
+        // are drop-pattern concerns the Jig doesn't see.
+        DrawingContext drawCtx = new(
+            item,
+            null,
+            null,
+            null,
+            pointerShiftDown, pointerCtrlDown, pointerAltDown, tangentSnapArmed);
+        Shape shape = DrawingJigRegistry.For(Tool.Stamp, drawCtx)?.BeginClickToPlace(new Point(centerX, centerY), drawCtx)
+            ?? PaletteShapeBuilder.BuildStampShape(item, centerX, centerY);
+        shape.Rotation = rotation;
+        shape.GroupId = groupId;
+        shape.GroupIndex = groupIndex;
+        return shape;
     }
 
     /// <summary>Issue #160 — parses 'Faucet' / 'Spring' / 'Pump' from the catalog trait.</summary>
