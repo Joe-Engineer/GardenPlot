@@ -7737,6 +7737,7 @@ public partial class GardenPlot
         PaletteKind.CustomTile => item.StampShapeKind is ShapeKind.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
         PaletteKind.Edging => ShapeKind.Edge,
         PaletteKind.IrrigationHead => ShapeKind.IrrigationHead,
+        PaletteKind.IrrigationPipe => ShapeKind.IrrigationPipe,
         _ => ShapeKind.BedKit,
     };
 
@@ -13488,6 +13489,8 @@ public partial class GardenPlot
             ShapeKind.Ruler => "Line Ruler",
             ShapeKind.CircleRuler => "Circle Ruler",
             ShapeKind.RectRuler => "Rectangle Ruler",
+            ShapeKind.IrrigationHead => $"Irrigation Head · {s.Label}",
+            ShapeKind.IrrigationPipe => $"Irrigation Pipe · {s.Label}",
             _ => "Item",
         };
     }
