@@ -35,4 +35,16 @@ public sealed class StampDrawingJig : ToolDrawingJig
 
         return PaletteShapeBuilder.BuildStampShape(item, at.X, at.Y);
     }
+
+    /// <inheritdoc/>
+    public override AlongPathPlacementResult? BuildAlongPathPlacement(
+        AlongPathPlacementRequest request,
+        DrawingContext context)
+    {
+        // Delegates to the pure-function builder. The Jig doesn't need anything from
+        // DrawingContext — the request carries everything (source path, rows + fill-area
+        // bits, stamp rotation, ID-assignment policy). Page-side state assembly happens
+        // before the call.
+        return AlongPathPlacementBuilder.BuildPlacement(request);
+    }
 }
