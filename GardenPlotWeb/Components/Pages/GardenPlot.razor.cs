@@ -999,10 +999,10 @@ public partial class GardenPlot
             }
         }
 
-        // Issue #162b — refresh Quantity + Notes for pipe / wire takeoff rows whose underlying
-        // polyline may have been extended (vertex added, dragged, etc.) since the row was first
-        // created. Without this, pipes that pre-date the stock-length feature stay at Quantity=1,
-        // and pipes that grow after creation don't update their linear feet / stock-stick rollup.
+        // Issue #162b + #182 — refresh Quantity for shape-bound takeoff rows whose underlying
+        // shape may have been edited (W/H/Depth/Waste/vertex add) since the row was first
+        // created. Without this, ground covers created before #182 stay at Quantity=1, and
+        // pipes that grow after creation don't update their linear feet / stock-stick rollup.
         Dictionary<Guid, Shape> shapesByIdForRefresh = currentPlot.Shapes.ToDictionary(s => s.Id);
         foreach (TakeoffItem t in currentPlot.Takeoff)
         {
@@ -1011,24 +1011,23 @@ public partial class GardenPlot
                 continue;
             }
 
-            if (boundShape.Kind is not (ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire))
+            // Assembly layer rows are sub-rows of an assembly shape (e.g., BedKit's internal
+            // materials). Their Quantity is per-layer and shouldn't be overwritten by the
+            // shape-level resolver. Leave them alone.
+            if (!string.IsNullOrEmpty(t.AssemblyCode))
             {
                 continue;
             }
 
-            if (boundShape.Points.Count < 2)
-            {
-                continue;
-            }
+            t.Quantity = TakeoffQuantityResolver.Resolve(boundShape);
 
-            double lengthFt = PolylineSampler.TotalLengthFt(boundShape.Points, closed: false);
-            t.Quantity = lengthFt;
-
+            // Pipe-specific Notes (stock-stick rollup) — still inline because it's irrigation-
+            // specific. Will move into a PipeJig in a later #95 PR.
             string? refreshedNotes = null;
-            if (boundShape.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(boundShape.Label) && lengthFt > 0)
+            if (boundShape.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(boundShape.Label) && t.Quantity > 0)
             {
                 PaletteItem? pipeRow = PaletteCatalog.FindByCode(boundShape.Label!);
-                if (FittingPlacement.ComputeStockUsage(lengthFt, pipeRow?.StockLengthFt) is { } usage
+                if (FittingPlacement.ComputeStockUsage(t.Quantity, pipeRow?.StockLengthFt) is { } usage
                     && pipeRow?.StockLengthFt is double stockLen)
                 {
                     string unitWord = usage.StockUnits == 1 ? "stick" : "sticks";
@@ -1036,7 +1035,11 @@ public partial class GardenPlot
                 }
             }
 
-            t.Notes = refreshedNotes;
+            // Only overwrite Notes for pipes; leave other shapes' Notes untouched.
+            if (boundShape.Kind == ShapeKind.IrrigationPipe)
+            {
+                t.Notes = refreshedNotes;
+            }
         }
 
         foreach (Shape shape in currentPlot.Shapes)
@@ -1048,25 +1051,22 @@ public partial class GardenPlot
 
             (CatalogSource src, string? packId, string code) = ResolveCatalogRefForShape(shape);
 
-            // Issue #159 + #161 — pipes and wires quantify in linear feet (polyline length),
-            // not per-piece. Other kinds stay at count = 1.
-            double quantity = 1;
+            // Issue #182 — Quantity is resolved through the unified TakeoffQuantityResolver
+            // so ground covers (and any future Jig) get the right area / volume from the
+            // start. Pipes and wires still carry stock-stick Notes; those are computed
+            // inline since they're pipe-specific (not a Jig responsibility yet).
+            double quantity = TakeoffQuantityResolver.Resolve(shape);
             string? notes = null;
-            if (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire && shape.Points.Count >= 2)
+            if (shape.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(shape.Label) && quantity > 0)
             {
-                quantity = PolylineSampler.TotalLengthFt(shape.Points, closed: false);
-
                 // Issue #162b — surface stock-stick consumption ("3 sticks @ 20 ft, 15% waste")
                 // in the row Notes so the takeoff table can render it under the row name.
-                if (shape.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(shape.Label) && quantity > 0)
+                PaletteItem? pipeRow = PaletteCatalog.FindByCode(shape.Label!);
+                if (FittingPlacement.ComputeStockUsage(quantity, pipeRow?.StockLengthFt) is { } usage
+                    && pipeRow?.StockLengthFt is double stockLen)
                 {
-                    PaletteItem? pipeRow = PaletteCatalog.FindByCode(shape.Label!);
-                    if (FittingPlacement.ComputeStockUsage(quantity, pipeRow?.StockLengthFt) is { } usage
-                        && pipeRow?.StockLengthFt is double stockLen)
-                    {
-                        string unitWord = usage.StockUnits == 1 ? "stick" : "sticks";
-                        notes = $"{usage.StockUnits} {unitWord} @ {stockLen:0.#} ft · {usage.WastePercent:0.0}% waste";
-                    }
+                    string unitWord = usage.StockUnits == 1 ? "stick" : "sticks";
+                    notes = $"{usage.StockUnits} {unitWord} @ {stockLen:0.#} ft · {usage.WastePercent:0.0}% waste";
                 }
             }
 
