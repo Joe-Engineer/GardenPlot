@@ -21,6 +21,9 @@ public enum ShapeKind
 
     /// <summary>Issue #31 Phase A — irrigation head (sprinkler / drip emitter).</summary>
     IrrigationHead,
+
+    /// <summary>Issue #159 — irrigation pipe (PVC / poly / copper laterals + mains + drip supply).</summary>
+    IrrigationPipe,
 }
 
 public record struct Point(double X, double Y);
@@ -40,6 +43,9 @@ public enum PaletteKind
 
     /// <summary>Issue #31 Phase A — irrigation head (sprinkler / drip).</summary>
     IrrigationHead,
+
+    /// <summary>Issue #159 — irrigation pipe palette (mains / laterals / drip supply).</summary>
+    IrrigationPipe,
 }
 
 public static class LayerKeys
@@ -103,6 +109,9 @@ public enum PaletteCategory
 
     /// <summary>Issue #31 Phase A — irrigation head catalog (sprinklers + drip emitters).</summary>
     IrrigationHeads,
+
+    /// <summary>Issue #159 — irrigation pipe catalog (mains / laterals / drip supply).</summary>
+    IrrigationPipes,
 }
 
 /// <summary>

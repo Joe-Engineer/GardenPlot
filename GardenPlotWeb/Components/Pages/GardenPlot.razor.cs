@@ -2787,6 +2787,10 @@ public partial class GardenPlot
         // Issue #31 Phase A — carry the head's coverage arc into the preview so the
         // inspector shows the correct value AND the canvas ghost halo renders as a wedge.
         ArcDegrees = item.ArcDegrees,
+
+        // Issue #159 — carry the pipe's nominal diameter (catalog WidthFt encodes feet =
+        // inches/12) so the inspector preview shows the right Diameter row.
+        PipeDiameterIn = item.Kind == PaletteKind.IrrigationPipe ? item.WidthFt * 12 : null,
     };
 
     /// <summary>
@@ -5581,6 +5585,7 @@ public partial class GardenPlot
         PaletteCategory.CustomTiles => "Custom Tiles",
         PaletteCategory.GroundCoverAssemblies => "Materials — Assemblies",
         PaletteCategory.IrrigationHeads => "Irrigation — Heads",
+        PaletteCategory.IrrigationPipes => "Irrigation — Pipes",
         _ => k.ToString(),
     };
 
@@ -5597,7 +5602,8 @@ public partial class GardenPlot
             or PaletteCategory.Edging
             or PaletteCategory.SoilMarkers
             or PaletteCategory.CustomTiles
-            or PaletteCategory.IrrigationHeads);
+            or PaletteCategory.IrrigationHeads
+            or PaletteCategory.IrrigationPipes);
     }
 
     private IReadOnlyList<PaletteItem> PaletteItemsForCurrentCategory()
@@ -6511,6 +6517,12 @@ public partial class GardenPlot
             CancelEdgeDraftInProgress();
             currentTool = Tool.Edge;
         }
+        else if (item.Kind == PaletteKind.IrrigationPipe)
+        {
+            // Issue #159 — pipes are drawn as click-by-vertex polylines with snap-to-head
+            // behaviour. Auto-switch to Polyline so the user can start drawing immediately.
+            currentTool = Tool.Polyline;
+        }
         else
         {
             currentTool = Tool.Stamp;
@@ -6703,6 +6715,7 @@ public partial class GardenPlot
             PaletteKind.FocalPoint => PaletteCatalog.FocalPoints.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.SoilMarker => PaletteCatalog.SoilMarkers.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.IrrigationHead => PaletteCatalog.IrrigationHeads.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.IrrigationPipe => PaletteCatalog.IrrigationPipes.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.BedKit => PaletteCatalog.BedKits.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             // Issue #138 — volume materials (mulch / gravel / soil / rock) live in
             // GroundCoverMaterials and carry MaterialSoldBy.Volume + DefaultDepthIn.
@@ -7724,6 +7737,7 @@ public partial class GardenPlot
         PaletteKind.CustomTile => item.StampShapeKind is ShapeKind.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
         PaletteKind.Edging => ShapeKind.Edge,
         PaletteKind.IrrigationHead => ShapeKind.IrrigationHead,
+        PaletteKind.IrrigationPipe => ShapeKind.IrrigationPipe,
         _ => ShapeKind.BedKit,
     };
 
@@ -8585,20 +8599,48 @@ public partial class GardenPlot
                 // append a new tracker. Double-click finalizes (see OnCanvasDoubleClick).
                 // Issue #130: when arcModeArmed is true the click flow becomes two-step
                 // per edge — terminus first, then apex — handled in TryHandleArcClick.
-                if (drafting is null || drafting.Kind != ShapeKind.FreeDraw || !buildingPolygon)
+                // Issue #159: when an IrrigationPipe palette item is selected, the
+                // drafting shape becomes a pipe with the catalog's diameter / material
+                // baked in. Snap-to-head is applied to the (x, y) BEFORE seeding.
                 {
-                    drafting = new Shape { Kind = ShapeKind.FreeDraw };
-                    drafting.Points.Add(new Point(x, y));
-                    drafting.Points.Add(new Point(x, y));
-                    buildingPolygon = true;
-                    awaitingArcApex = false;
-                    arcApexEdgeIndex = -1;
+                    bool draftingPipe = selectedItem is { Kind: PaletteKind.IrrigationPipe };
+                    if (draftingPipe)
+                    {
+                        (x, y) = SnapToIrrigationHeadCenter(x, y);
+                    }
+
+                    if (drafting is null || (drafting.Kind != ShapeKind.FreeDraw && drafting.Kind != ShapeKind.IrrigationPipe) || !buildingPolygon)
+                    {
+                        if (draftingPipe && selectedItem is { } pipeItem)
+                        {
+                            drafting = new Shape
+                            {
+                                Kind = ShapeKind.IrrigationPipe,
+                                Label = pipeItem.Code,
+                                Trait = pipeItem.Trait,
+                                Stroke = pipeItem.StrokeColor,
+                                Fill = pipeItem.FillColor,
+                                PipeDiameterIn = pipeItem.WidthFt * 12.0,
+                            };
+                        }
+                        else
+                        {
+                            drafting = new Shape { Kind = ShapeKind.FreeDraw };
+                        }
+
+                        drafting.Points.Add(new Point(x, y));
+                        drafting.Points.Add(new Point(x, y));
+                        buildingPolygon = true;
+                        awaitingArcApex = false;
+                        arcApexEdgeIndex = -1;
+                    }
+                    else if (!TryHandleArcClick(x, y))
+                    {
+                        drafting.Points[^1] = new Point(x, y);
+                        drafting.Points.Add(new Point(x, y));
+                    }
                 }
-                else if (!TryHandleArcClick(x, y))
-                {
-                    drafting.Points[^1] = new Point(x, y);
-                    drafting.Points.Add(new Point(x, y));
-                }
+
                 break;
             case Tool.Polygon:
                 // Click-by-vertex CLOSED path. Identical input flow to Polyline (first click
@@ -10240,6 +10282,61 @@ public partial class GardenPlot
     }
 
     /// <summary>
+    /// Issue #159 — snaps a candidate cursor position to the centre of the nearest
+    /// irrigation head when within a tolerance. Lets the user run pipe polylines from
+    /// head to head without aiming pixel-perfectly. Falls back to the input when no
+    /// head is within range or no plot is open.
+    /// </summary>
+    /// <param name="x">Candidate x in plot feet.</param>
+    /// <param name="y">Candidate y in plot feet.</param>
+    /// <returns>The snapped position, or (<paramref name="x"/>, <paramref name="y"/>) when nothing is within range.</returns>
+    private (double x, double y) SnapToIrrigationHeadCenter(double x, double y)
+    {
+        if (currentPlot is null)
+        {
+            return (x, y);
+        }
+
+        double scale = PxPerFt * zoom;
+        if (scale <= 0)
+        {
+            return (x, y);
+        }
+
+        // 14-pixel snap radius — generous enough to "click into" a head without forcing
+        // the user to land on the dot pixel-exactly, tight enough that nearby heads
+        // don't fight each other for the snap.
+        const double snapRadiusPx = 14;
+        double snapRadiusFt = snapRadiusPx / scale;
+        double snapRadiusFtSquared = snapRadiusFt * snapRadiusFt;
+
+        double bestDistSquared = double.PositiveInfinity;
+        double bestX = x;
+        double bestY = y;
+        foreach (Shape s in currentPlot.Shapes)
+        {
+            if (s.Kind != ShapeKind.IrrigationHead)
+            {
+                continue;
+            }
+
+            double cx = s.X + (s.W / 2);
+            double cy = s.Y + (s.H / 2);
+            double dx = cx - x;
+            double dy = cy - y;
+            double d2 = (dx * dx) + (dy * dy);
+            if (d2 < bestDistSquared && d2 <= snapRadiusFtSquared)
+            {
+                bestDistSquared = d2;
+                bestX = cx;
+                bestY = cy;
+            }
+        }
+
+        return (bestX, bestY);
+    }
+
+    /// <summary>
     /// Issue #133 — corner-snap resolver. Enumerates the vertices of every
     /// snappable shape in the current plot (excluding the one being drafted,
     /// to prevent self-snap during the same drag), feeds them into a transient
@@ -11740,6 +11837,46 @@ public partial class GardenPlot
             if (shape.Kind == ShapeKind.IrrigationHead)
             {
                 shape.ArcDegrees = arcValue;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #159 — handler for the pipe diameter dropdown in the inspector. Sets every
+    /// selected IrrigationPipe's PipeDiameterIn to the chosen value, records an undo
+    /// step, and persists. No-ops when the selection contains anything other than pipes.
+    /// </summary>
+    private async Task OnPipeDiameterChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double diameterIn))
+        {
+            return;
+        }
+
+        if (diameterIn <= 0)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationPipe)
+            {
+                shape.PipeDiameterIn = diameterIn;
             }
         }
 
@@ -13352,6 +13489,8 @@ public partial class GardenPlot
             ShapeKind.Ruler => "Line Ruler",
             ShapeKind.CircleRuler => "Circle Ruler",
             ShapeKind.RectRuler => "Rectangle Ruler",
+            ShapeKind.IrrigationHead => $"Irrigation Head · {s.Label}",
+            ShapeKind.IrrigationPipe => $"Irrigation Pipe · {s.Label}",
             _ => "Item",
         };
     }

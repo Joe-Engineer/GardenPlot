@@ -47,6 +47,7 @@ public static class DrawingSetPreview
             PaletteKind.SoilMarker => RowVisualKind.Stamp,
             PaletteKind.CustomTile => RowVisualKind.Stamp,
             PaletteKind.IrrigationHead => RowVisualKind.Stamp,
+            PaletteKind.IrrigationPipe => RowVisualKind.Stripe,
             _ => RowVisualKind.Stamp,
         };
     }

@@ -169,6 +169,11 @@ internal static class ShapeCohortFingerprint
         // dropdown which triggers a focus-out diff).
         h = MixD(h, s.ArcDegrees ?? 360.0);
 
+        // Issue #159 — pipe diameter. Same fingerprint hazard as ArcDegrees: changing
+        // the diameter via the inspector dropdown needs to invalidate the cohort cache
+        // so the stroke width updates without a forced re-render.
+        h = MixD(h, s.PipeDiameterIn ?? 0.0);
+
         return h;
     }
 

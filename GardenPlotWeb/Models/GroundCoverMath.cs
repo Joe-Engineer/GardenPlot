@@ -33,6 +33,7 @@ public static class GroundCoverMath
             ShapeKind.Plant => 0,
             ShapeKind.SoilMarker => 0,
             ShapeKind.IrrigationHead => 0,
+            ShapeKind.IrrigationPipe => 0,
             _ => 0,
         };
     }
@@ -115,6 +116,7 @@ public static class GroundCoverMath
             case ShapeKind.Plant:
             case ShapeKind.SoilMarker:
             case ShapeKind.IrrigationHead:
+            case ShapeKind.IrrigationPipe:
             default:
                 polygon = new List<Point>();
                 break;

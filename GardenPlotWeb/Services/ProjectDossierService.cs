@@ -561,6 +561,21 @@ public sealed class ProjectDossierService
                 }
 
                 break;
+            case ShapeKind.IrrigationPipe:
+                // Issue #159 — dossier render: polyline with diameter-scaled stroke + the
+                // material's stroke color, matching the canvas render.
+                if (shape.Points.Count >= 2)
+                {
+                    double diameterIn = shape.PipeDiameterIn ?? (shape.W * 12);
+                    if (diameterIn <= 0)
+                    {
+                        diameterIn = 0.5;
+                    }
+
+                    AppendPolyline(sb, shape.Points, stroke, (diameterIn / 12.0) * 3.0);
+                }
+
+                break;
             default:
                 break;
         }
@@ -648,6 +663,7 @@ public sealed class ProjectDossierService
             ShapeKind.RectRuler => "#2f5a3a",
             ShapeKind.SoilMarker => "#6b4b2a",
             ShapeKind.IrrigationHead => "#1f6f8b",
+            ShapeKind.IrrigationPipe => "#5a5a5a",
             _ => "#2f5a3a",
         };
     }
@@ -674,6 +690,7 @@ public sealed class ProjectDossierService
             ShapeKind.Plant => "#9fcf9f",
             ShapeKind.SoilMarker => "#d49b52",
             ShapeKind.IrrigationHead => "#5fb0cf",
+            ShapeKind.IrrigationPipe => "#cfd0d2",
             _ => "#9fcf9f",
         };
     }
@@ -695,6 +712,7 @@ public sealed class ProjectDossierService
             ShapeKind.Plant => 0.6,
             ShapeKind.SoilMarker => 1.0,
             ShapeKind.IrrigationHead => 0.18,
+            ShapeKind.IrrigationPipe => 1.0,
             _ => 0.6,
         };
     }

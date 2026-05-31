@@ -915,7 +915,9 @@ else
                             PaletteKind.Edging => GardenPlotWeb.Models.Catalog.Find(item.Code) is { } edgeCatalog && edgeCatalog.DefaultThicknessIn is double thickness
                                 ? $"linear · {thickness:0.###}\" visual · {edgeCatalog.LaborHoursPerUnit:0.##} h/lf"
                                 : "linear · lf",
-                            _ => $"{item.WidthFt}' Ø · {item.Trait}",
+                            PaletteKind.IrrigationHead => $"{item.WidthFt:0.#}' Ø · {item.Trait}",
+                            PaletteKind.IrrigationPipe => $"{item.WidthFt * 12:0.##}\" Ø · {item.Trait}",
+                            _ => $"{item.WidthFt:0.#}' Ø · {item.Trait}",
                         };
                         <button class="palette-item @(isActive ? "active" : "")"
                                 @onclick="() => SelectItem(item)" title="@item.Code — @detail">
@@ -1575,6 +1577,38 @@ else
                                      rx="@F(Math.Abs(drafting.W) / 2)" ry="@F(Math.Abs(drafting.H) / 2)"
                                      fill="rgba(74,124,89,0.2)" stroke="#2f5a3a" stroke-width="0.06"
                                      stroke-dasharray="0.2,0.1" pointer-events="none" />
+                            break;
+                        case ShapeKind.IrrigationPipe:
+                            @* Issue #159 — in-progress pipe polyline preview. Stroke width
+                               scaled to diameter; stroke color from material. Visible from
+                               the very first click so the user knows the draft is live. *@
+                            @if (drafting.Points.Count >= 2)
+                            {
+                                double draftDiameterIn = drafting.PipeDiameterIn ?? (drafting.W * 12);
+                                if (draftDiameterIn <= 0) { draftDiameterIn = 0.5; }
+                                double draftStrokeFt = (draftDiameterIn / 12.0) * 3.0;
+                                string draftPipeColor = drafting.Trait switch
+                                {
+                                    "PVC" => "#cfd0d2",
+                                    "Poly" => "#2a2a2a",
+                                    "Copper" => "#b7521a",
+                                    "DripTubing" => "#3a3a3a",
+                                    _ => drafting.Stroke ?? "#5a5a5a",
+                                };
+                                <polyline points="@PointsString(drafting.Points)"
+                                          fill="none" stroke="@draftPipeColor" stroke-width="@F(draftStrokeFt)"
+                                          stroke-linecap="round" stroke-linejoin="round"
+                                          opacity="0.7"
+                                          pointer-events="none" />
+                                @* Vertex dots so the user sees where they've clicked. *@
+                                @for (int pi = 0; pi < drafting.Points.Count - 1; pi++)
+                                {
+                                    var pv = drafting.Points[pi];
+                                    <circle cx="@F(pv.X)" cy="@F(pv.Y)" r="@F(Math.Max(0.12, draftStrokeFt * 0.6))"
+                                            fill="#fff" stroke="@draftPipeColor" stroke-width="0.05"
+                                            pointer-events="none" />
+                                }
+                            }
                             break;
                         case ShapeKind.FreeDraw:
                             bool hasArc = ArcPolygonPathBuilder.HasAnyArc(drafting.EdgeBulges);
@@ -2716,14 +2750,20 @@ else
     var hasDraftPanel = draftOrPreviewPanelShape is not null;
 }
 
-@if (!IsConceptMode && (selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null) || infoRuler is not null || hasDraftPanel) && currentPlot is not null)
+@if (!IsConceptMode && (selectedIds.Count > 0 || (currentTool == Tool.Stamp && selectedItem is not null) || (currentTool == Tool.Polyline && selectedItem is { Kind: PaletteKind.IrrigationPipe }) || infoRuler is not null || hasDraftPanel) && currentPlot is not null)
 {
     var forceRulerMode = infoRuler is not null && (drafting is not null || selectedIds.Count <= 1);
     var draftPreview = (!forceRulerMode && selectedIds.Count == 0 && currentTool != Tool.Stamp && draftOrPreviewPanelShape is not null)
         ? draftOrPreviewPanelShape
         : null;
-    var stampPreview = (!forceRulerMode && selectedIds.Count == 0 && currentTool == Tool.Stamp && selectedItem is not null && draftPreview is null)
-        ? PreviewShapeFromItem(selectedItem)
+    // Issue #159 — extend the stamp-preview path to also fire when the user has picked
+    // an IrrigationPipe palette item and the Polyline tool is active (auto-switched).
+    // Without this, the inspector would show nothing for pipes until the first vertex
+    // is clicked.
+    var stampPreview = (!forceRulerMode && selectedIds.Count == 0 && draftPreview is null
+            && ((currentTool == Tool.Stamp && selectedItem is not null)
+                || (currentTool == Tool.Polyline && selectedItem is { Kind: PaletteKind.IrrigationPipe })))
+        ? PreviewShapeFromItem(selectedItem!)
         : null;
     var isPreview = stampPreview is not null;
     // Issue #129: isDraftMode flags the new "treat drafting (or palette preview) as
@@ -2895,6 +2935,52 @@ else
                         else
                         {
                             <div class="x-small text-muted mt-1">Rotate the head to aim the arc.</div>
+                        }
+                    </div>
+                }
+
+                @* Issue #159 — irrigation pipe detail panel. Shows the pipe's material,
+                   diameter, and (for committed shapes) total length. Diameter dropdown
+                   lets the user swap the nominal diameter post-draw. *@
+                @if (single!.Kind == ShapeKind.IrrigationPipe)
+                {
+                    var pipeDiameter = single!.PipeDiameterIn ?? (single!.W * 12);
+                    var pipeMaterial = single!.Trait;
+                    var pipeLengthFt = single!.Points.Count >= 2 ? PolylineSampler.TotalLengthFt(single!.Points, closed: false) : 0;
+                    var pipeSelectedArray = new[] { single! };
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Irrigation Pipe</div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Type:</span>
+                            <strong>@(single!.Label ?? "(unnamed pipe)")</strong>
+                        </div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Material:</span>
+                            <strong>@(string.IsNullOrWhiteSpace(pipeMaterial) ? "(unknown)" : pipeMaterial)</strong>
+                        </div>
+                        @if (!isPreview && pipeLengthFt > 0)
+                        {
+                            <div class="small mb-1">
+                                <span class="text-muted">Length:</span>
+                                <strong>@F(pipeLengthFt) ft</strong>
+                            </div>
+                        }
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Diameter:</span>
+                            <select class="form-select form-select-sm" style="max-width: 8rem;"
+                                    value="@F(pipeDiameter)"
+                                    disabled="@isPreview"
+                                    @onchange="(e) => OnPipeDiameterChanged(pipeSelectedArray, e)">
+                                @foreach (double dia in PaletteCatalog.StandardPipeDiametersIn)
+                                {
+                                    <option value="@F(dia)">@F(dia)"</option>
+                                }
+                            </select>
+                            <span class="small text-muted">in</span>
+                        </div>
+                        @if (isPreview)
+                        {
+                            <div class="x-small text-muted mt-1">Polyline tool is active — click to start drawing this pipe; double-click to finish. Cursor snaps to nearby head centers.</div>
                         }
                     </div>
                 }

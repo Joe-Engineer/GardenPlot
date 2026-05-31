@@ -119,6 +119,14 @@ public class Shape
     /// <see cref="Rotation"/>.
     /// </summary>
     public double? ArcDegrees { get; set; }
+
+    /// <summary>
+    /// Issue #159 — irrigation pipe nominal diameter in inches. Set on
+    /// <see cref="ShapeKind.IrrigationPipe"/> shapes only; null for other kinds. Standard
+    /// values: 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2 inches. Drives the rendered stroke width
+    /// and the BOM grouping.
+    /// </summary>
+    public double? PipeDiameterIn { get; set; }
 }
 
 public enum AlongPathAnchor

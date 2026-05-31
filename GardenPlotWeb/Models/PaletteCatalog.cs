@@ -214,6 +214,38 @@ public static class PaletteCatalog
         15, 30, 45, 90, 120, 150, 180, 210, 300, 360,
     ];
 
+    /// <summary>
+    /// Issue #159 — irrigation pipes. WidthFt encodes the NOMINAL diameter in inches /
+    /// 12 (so a 1" pipe has WidthFt = 1/12 ≈ 0.083). Trait carries the material code
+    /// (PVC / Poly / Copper / DripTubing) which drives the rendered stroke color.
+    /// </summary>
+    public static readonly PaletteItem[] IrrigationPipes =
+    [
+        // Mains (carry pressurized water from the source to manifolds)
+        new("PVC Main 1\"", PaletteKind.IrrigationPipe, 1.0 / 12.0, 1.0 / 12.0, "PVC", Notes: "1\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
+        new("PVC Main 1¼\"", PaletteKind.IrrigationPipe, 1.25 / 12.0, 1.25 / 12.0, "PVC", Notes: "1¼\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
+        new("PVC Main 1½\"", PaletteKind.IrrigationPipe, 1.5 / 12.0, 1.5 / 12.0, "PVC", Notes: "1½\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
+        new("PVC Main 2\"", PaletteKind.IrrigationPipe, 2.0 / 12.0, 2.0 / 12.0, "PVC", Notes: "2\" PVC main", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
+
+        // Laterals (run from manifold valves out to the sprinkler heads)
+        new("PVC Lateral ½\"", PaletteKind.IrrigationPipe, 0.5 / 12.0, 0.5 / 12.0, "PVC", Notes: "½\" PVC lateral", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
+        new("PVC Lateral ¾\"", PaletteKind.IrrigationPipe, 0.75 / 12.0, 0.75 / 12.0, "PVC", Notes: "¾\" PVC lateral", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
+        new("PVC Lateral 1\"", PaletteKind.IrrigationPipe, 1.0 / 12.0, 1.0 / 12.0, "PVC", Notes: "1\" PVC lateral", StrokeColor: "#e4e4e4", FillColor: "#f0f0f0"),
+        new("Poly Lateral ½\"", PaletteKind.IrrigationPipe, 0.5 / 12.0, 0.5 / 12.0, "Poly", Notes: "½\" poly lateral", StrokeColor: "#2a2a2a", FillColor: "#404040"),
+        new("Poly Lateral ¾\"", PaletteKind.IrrigationPipe, 0.75 / 12.0, 0.75 / 12.0, "Poly", Notes: "¾\" poly lateral", StrokeColor: "#2a2a2a", FillColor: "#404040"),
+        new("Copper Lateral ¾\"", PaletteKind.IrrigationPipe, 0.75 / 12.0, 0.75 / 12.0, "Copper", Notes: "¾\" copper lateral", StrokeColor: "#b7521a", FillColor: "#d2733a"),
+
+        // Drip supply / tubing
+        new("Drip Supply ½\"", PaletteKind.IrrigationPipe, 0.5 / 12.0, 0.5 / 12.0, "DripTubing", Notes: "½\" drip distribution tubing", StrokeColor: "#3a3a3a", FillColor: "#5a5a5a"),
+        new("Drip ¼\" Spaghetti", PaletteKind.IrrigationPipe, 0.25 / 12.0, 0.25 / 12.0, "DripTubing", Notes: "¼\" drip spaghetti / micro-tubing", StrokeColor: "#3a3a3a", FillColor: "#5a5a5a"),
+    ];
+
+    /// <summary>Standard sprinkler-pipe diameters in inches used by the inspector dropdown.</summary>
+    public static readonly double[] StandardPipeDiametersIn =
+    [
+        0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0,
+    ];
+
     public static IReadOnlyList<PaletteItem> For(PaletteKind kind)
     {
         return kind switch
@@ -229,6 +261,7 @@ public static class PaletteCatalog
             PaletteKind.GroundCoverSurface => GroundCoverSurfaceCovers,
             PaletteKind.Edging => Edging,
             PaletteKind.IrrigationHead => IrrigationHeads,
+            PaletteKind.IrrigationPipe => IrrigationPipes,
             _ => [],
         };
     }
@@ -709,6 +742,7 @@ public static class PaletteCatalog
             GroundCoverSurfaceCovers,
             Edging,
             IrrigationHeads,
+            IrrigationPipes,
         ];
 
         foreach (PaletteItem[] bucket in buckets)
@@ -765,6 +799,7 @@ public static class PaletteCatalog
             PaletteCategory.GroundCoverPlants => [.. GroundCoverSurfaceCovers.Where(IsGroundCoverPlantSurfaceItem)],
             PaletteCategory.SoilMarkers => SoilMarkers,
             PaletteCategory.IrrigationHeads => IrrigationHeads,
+            PaletteCategory.IrrigationPipes => IrrigationPipes,
             PaletteCategory.GrassesTurf => [.. Grasses.Where(g => g.Kind == PaletteKind.GroundCoverSurface)],
             PaletteCategory.GrassesOrnamental => [.. Grasses.Where(g => string.Equals(g.Trait, "grass-ornamental", StringComparison.OrdinalIgnoreCase)).Concat(GroundCoverSurfaceCovers.Where(IsOrnamentalGrassSurfaceItem))],
             PaletteCategory.Succulents => [.. Plants.Where(p => string.Equals(p.Trait, "succulent", StringComparison.OrdinalIgnoreCase))],
@@ -844,6 +879,7 @@ public static class PaletteCatalog
             },
             PaletteKind.Edging => PaletteCategory.Edging,
             PaletteKind.IrrigationHead => PaletteCategory.IrrigationHeads,
+            PaletteKind.IrrigationPipe => PaletteCategory.IrrigationPipes,
             _ => PaletteCategory.BedKits,
         };
     }

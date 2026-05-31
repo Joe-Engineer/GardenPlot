@@ -101,6 +101,7 @@ public static class LayerResolver
             ShapeKind.FreeDraw => LayerKeys.Hardscape,
             ShapeKind.SoilMarker => LayerKeys.Measurement,
             ShapeKind.IrrigationHead => LayerKeys.Irrigation,
+            ShapeKind.IrrigationPipe => LayerKeys.Irrigation,
             _ => LayerKeys.Notes,
         };
     }
@@ -136,6 +137,7 @@ public static class LayerResolver
             PaletteKind.SoilMarker => LayerKeys.Measurement,
             PaletteKind.CustomTile => ResolveCustomTileLayer(item),
             PaletteKind.IrrigationHead => LayerKeys.Irrigation,
+            PaletteKind.IrrigationPipe => LayerKeys.Irrigation,
             _ => null,
         };
     }
