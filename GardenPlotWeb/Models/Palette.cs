@@ -33,6 +33,9 @@ public enum ShapeKind
 
     /// <summary>Issue #161 — irrigation control wire (multi-conductor; runs from controller to zone valves).</summary>
     IrrigationWire,
+
+    /// <summary>Issue #162a — irrigation pipe fitting (elbow / tee / coupling / adapter).</summary>
+    IrrigationFitting,
 }
 
 public record struct Point(double X, double Y);
@@ -64,6 +67,9 @@ public enum PaletteKind
 
     /// <summary>Issue #161 — irrigation control wire palette (multi-conductor wire from controller to valves).</summary>
     IrrigationWire,
+
+    /// <summary>Issue #162a — irrigation pipe fitting palette (elbow / tee / coupling / adapter).</summary>
+    IrrigationFitting,
 }
 
 public static class LayerKeys
@@ -139,6 +145,9 @@ public enum PaletteCategory
 
     /// <summary>Issue #161 — irrigation wire catalog (multi-conductor wire from controller to valves).</summary>
     IrrigationWires,
+
+    /// <summary>Issue #162a — irrigation pipe fitting catalog (elbow / tee / coupling / adapter per material × diameter).</summary>
+    IrrigationFittings,
 }
 
 /// <summary>

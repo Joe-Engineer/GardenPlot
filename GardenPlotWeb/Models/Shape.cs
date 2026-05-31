@@ -169,6 +169,42 @@ public class Shape
 
     /// <summary>Issue #161 — American Wire Gauge for an irrigation wire. Typical: 18 AWG.</summary>
     public int? WireGaugeAwg { get; set; }
+
+    /// <summary>
+    /// Issue #162a — pipe fitting type for <see cref="ShapeKind.IrrigationFitting"/> shapes.
+    /// Null on other kinds. Drives the canvas icon (elbow / tee / coupling / adapter) and the
+    /// BOM grouping per (fitting type, diameter, material).
+    /// </summary>
+    public FittingType? FittingType { get; set; }
+
+    /// <summary>Issue #162a — nominal diameter of the pipe this fitting joins (inches). Drives BOM grouping.</summary>
+    public double? FittingDiameterIn { get; set; }
+
+    /// <summary>
+    /// Issue #162a — pipe material this fitting is made of ("PVC" / "Poly" / "Copper" / "DripTubing").
+    /// Stored separately from <see cref="Trait"/> so a manually-placed fitting can carry its own
+    /// material without colliding with the trait conventions used by other shape kinds.
+    /// </summary>
+    public string? FittingMaterial { get; set; }
+}
+
+/// <summary>Issue #162a — kind of pipe fitting represented by a <see cref="Shape"/>.</summary>
+public enum FittingType
+{
+    /// <summary>45-degree elbow — used at polyline vertices with a ~135° interior angle.</summary>
+    Elbow45,
+
+    /// <summary>90-degree elbow — used at polyline vertices with a ~90° interior angle.</summary>
+    Elbow90,
+
+    /// <summary>Tee — three-way junction where a branch line departs from a main run.</summary>
+    Tee,
+
+    /// <summary>Straight coupling — joins two stock-length pipes inline.</summary>
+    Coupling,
+
+    /// <summary>Adapter / reducer — joins two pipes of different diameters or materials.</summary>
+    Adapter,
 }
 
 /// <summary>Issue #161 — kind of irrigation control element represented by a <see cref="Shape"/>.</summary>

@@ -194,6 +194,13 @@ internal static class ShapeCohortFingerprint
         h = Mix(h, s.ConductorCount ?? 0);
         h = Mix(h, s.WireGaugeAwg ?? 0);
 
+        // Issue #162a — fitting type / diameter / material. Reclassifying a fitting in the
+        // inspector swaps the canvas icon (elbow ↔ tee ↔ coupling); diameter changes the
+        // visible footprint; material drives the stroke color.
+        h = Mix(h, (int)(s.FittingType ?? Models.FittingType.Elbow90));
+        h = MixD(h, s.FittingDiameterIn ?? 0.0);
+        h = MixS(h, s.FittingMaterial);
+
         return h;
     }
 

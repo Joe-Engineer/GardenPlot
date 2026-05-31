@@ -191,6 +191,25 @@ public partial class GardenPlot
     /// <c>drafting.Points</c> is a cursor-tracking endpoint that the user has not committed yet.</summary>
     private bool buildingPolygon;
 
+    /// <summary>
+    /// Issue #162a — center position of the most recently stamped IrrigationFitting in the
+    /// current Stamp session. When the next stamp lands and auto-pipe-between-fitting-stamps
+    /// is on, the running pipe is extended with a new vertex at the new fitting's center.
+    /// Reset on tool change / palette change / Escape so cross-session stamps don't link.
+    /// </summary>
+    private Point? lastFittingStampPos;
+
+    /// <summary>
+    /// Issue #162a iteration — id of the SINGLE polyline pipe shape that's accumulating
+    /// vertices as the user stamps fittings in sequence (one pipe with N vertices, NOT N
+    /// separate two-point pipes). When non-null, the next fitting stamp appends a vertex
+    /// to this pipe rather than creating a new shape. Reset on the same triggers as
+    /// <see cref="lastFittingStampPos"/>. Each pipe vertex naturally aligns with a stamped
+    /// fitting, so dragging a vertex via the Select-tool handle moves both the pipe vertex
+    /// AND the fitting on top of it (via FittingPlacement.FindJointCoMovers).
+    /// </summary>
+    private Guid? runningFittingPipeId;
+
     /// <summary>Current ground-cover depth (inches) used for newly-drawn volumetric ground-cover shapes.
     /// Initialized from the selected palette item's <see cref="PaletteItem.DefaultDepthIn"/> when picked,
     /// then editable on the toolbar so the user can change depth on the fly without leaving draw mode.</summary>
@@ -2806,6 +2825,12 @@ public partial class GardenPlot
         // Issue #161 — wire conductor count + gauge from Notes ("5 conductor, 18 AWG").
         ConductorCount = item.Kind == PaletteKind.IrrigationWire ? ParseConductorCountFromNotes(item.Notes) : null,
         WireGaugeAwg = item.Kind == PaletteKind.IrrigationWire ? ParseWireGaugeFromNotes(item.Notes) : null,
+
+        // Issue #162a — pipe fitting type + diameter + material so the inspector preview shows
+        // the right Type / Diameter / Material rows before the user drops the fitting.
+        FittingType = item.Kind == PaletteKind.IrrigationFitting ? ParseFittingType(item.Trait) : null,
+        FittingDiameterIn = item.Kind == PaletteKind.IrrigationFitting ? item.WidthFt * 12.0 : null,
+        FittingMaterial = item.Kind == PaletteKind.IrrigationFitting ? ParseFittingMaterial(item.Notes) : null,
     };
 
     /// <summary>
@@ -2980,6 +3005,17 @@ public partial class GardenPlot
     private bool isShapeVertexDragging;
     private Guid shapeVertexDragShapeId;
     private int shapeVertexDragIndex = -1;
+
+    // Issue #162a iteration — when dragging a pipe / wire vertex that coincides with
+    // the endpoint of OTHER pipes / wires AND/OR with a fitting, those co-movers drag
+    // along by the same delta so the user can adjust an entire junction in one motion.
+    // Pressing 'm' mid-drag clears this list, breaking the link and letting the user
+    // move the picked vertex independently. Reset to null on drag end.
+    // - vertexIndex non-null = pipe / wire endpoint to translate
+    // - vertexIndex null     = fitting (translate the whole shape via X / Y delta)
+    private List<(Guid id, int? vertexIndex)>? shapeVertexDragCoMovers;
+    private Point? shapeVertexDragPrevPos;
+    private const double JointSnapToleranceFt = 0.15;
 
     // Issue #133 — corner-snap state. snapPreview is what the renderer draws as the
     // visible "snapped here" glyph; null means no snap is engaged for the current
@@ -5604,6 +5640,7 @@ public partial class GardenPlot
         PaletteCategory.WaterSources => "Irrigation — Sources",
         PaletteCategory.IrrigationControls => "Irrigation — Controls",
         PaletteCategory.IrrigationWires => "Irrigation — Wire",
+        PaletteCategory.IrrigationFittings => "Irrigation — Fittings",
         _ => k.ToString(),
     };
 
@@ -5624,7 +5661,8 @@ public partial class GardenPlot
             or PaletteCategory.IrrigationPipes
             or PaletteCategory.WaterSources
             or PaletteCategory.IrrigationControls
-            or PaletteCategory.IrrigationWires);
+            or PaletteCategory.IrrigationWires
+            or PaletteCategory.IrrigationFittings);
     }
 
     private IReadOnlyList<PaletteItem> PaletteItemsForCurrentCategory()
@@ -6518,6 +6556,14 @@ public partial class GardenPlot
         // Picking a single palette item replaces any active Drawing Set so the next
         // Along-path placement uses this item rather than the previously-active set.
         selectedDrawingSetId = null;
+        // Issue #162a — switching palette items breaks the auto-pipe-between-stamps chain.
+        // Only keep the chain when the user keeps stamping fittings (any fitting item).
+        if (item.Kind != PaletteKind.IrrigationFitting)
+        {
+            lastFittingStampPos = null;
+            runningFittingPipeId = null;
+        }
+
         _ = ApplySelectItemSideEffects(item);
     }
 
@@ -6745,6 +6791,7 @@ public partial class GardenPlot
             PaletteKind.WaterSource => PaletteCatalog.WaterSources.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.IrrigationControl => PaletteCatalog.IrrigationControls.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.IrrigationWire => PaletteCatalog.IrrigationWires.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
+            PaletteKind.IrrigationFitting => PaletteCatalog.IrrigationFittings.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             PaletteKind.BedKit => PaletteCatalog.BedKits.FirstOrDefault(p => string.Equals(p.Code, row.PaletteItemCode, StringComparison.OrdinalIgnoreCase)),
             // Issue #138 — volume materials (mulch / gravel / soil / rock) live in
             // GroundCoverMaterials and carry MaterialSoldBy.Volume + DefaultDepthIn.
@@ -7770,6 +7817,7 @@ public partial class GardenPlot
         PaletteKind.WaterSource => ShapeKind.WaterSource,
         PaletteKind.IrrigationControl => ShapeKind.IrrigationControl,
         PaletteKind.IrrigationWire => ShapeKind.IrrigationWire,
+        PaletteKind.IrrigationFitting => ShapeKind.IrrigationFitting,
         _ => ShapeKind.BedKit,
     };
 
@@ -7823,6 +7871,18 @@ public partial class GardenPlot
                 : null,
             WireGaugeAwg = item.Kind == PaletteKind.IrrigationWire
                 ? ParseWireGaugeFromNotes(item.Notes)
+                : null,
+
+            // Issue #162a — pipe fittings carry type + diameter + material on the shape so the
+            // BOM can group counts per (type, material, diameter) without re-reading the catalog.
+            FittingType = item.Kind == PaletteKind.IrrigationFitting
+                ? ParseFittingType(item.Trait)
+                : null,
+            FittingDiameterIn = item.Kind == PaletteKind.IrrigationFitting
+                ? item.WidthFt * 12.0
+                : null,
+            FittingMaterial = item.Kind == PaletteKind.IrrigationFitting
+                ? ParseFittingMaterial(item.Notes)
                 : null,
         };
     }
@@ -7930,6 +7990,59 @@ public partial class GardenPlot
         return match.Success && int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)
             ? n
             : null;
+    }
+
+    /// <summary>
+    /// Issue #162a — picks a matching pipe catalog code for an auto-pipe drawn between
+    /// fitting stamps, using the fitting's material + diameter so the new pipe groups
+    /// correctly in the BOM. Falls back to null when no matching catalog row exists
+    /// (caller uses a generic "Auto-pipe" label).
+    /// </summary>
+    private static string? ResolveAutoPipeCodeForFitting(Shape fitting)
+    {
+        ArgumentNullException.ThrowIfNull(fitting);
+        if (fitting.FittingMaterial is null || fitting.FittingDiameterIn is not double diameterIn)
+        {
+            return null;
+        }
+
+        double tolerance = diameterIn * 0.01;
+        PaletteItem? match = PaletteCatalog.IrrigationPipes.FirstOrDefault(p =>
+            string.Equals(p.Trait, fitting.FittingMaterial, StringComparison.OrdinalIgnoreCase)
+            && Math.Abs((p.WidthFt * 12.0) - diameterIn) <= tolerance);
+        return match?.Code;
+    }
+
+    /// <summary>Issue #162a — parses 'Elbow90' / 'Elbow45' / 'Tee' / 'Coupling' / 'Adapter' from the catalog trait.</summary>
+    private static FittingType? ParseFittingType(string? trait)
+    {
+        return trait switch
+        {
+            "Elbow90" => GardenPlotWeb.Models.FittingType.Elbow90,
+            "Elbow45" => GardenPlotWeb.Models.FittingType.Elbow45,
+            "Tee" => GardenPlotWeb.Models.FittingType.Tee,
+            "Coupling" => GardenPlotWeb.Models.FittingType.Coupling,
+            "Adapter" => GardenPlotWeb.Models.FittingType.Adapter,
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Issue #162a — pulls the pipe material out of a fitting's Notes string. Catalog patterns
+    /// like "PVC ¾\" tee", "Poly ½\" 90° barbed elbow", "Copper ¾\" sweat coupling".
+    /// </summary>
+    private static string? ParseFittingMaterial(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            return null;
+        }
+
+        if (notes.StartsWith("PVC", StringComparison.OrdinalIgnoreCase)) { return "PVC"; }
+        if (notes.StartsWith("Poly", StringComparison.OrdinalIgnoreCase)) { return "Poly"; }
+        if (notes.StartsWith("Copper", StringComparison.OrdinalIgnoreCase)) { return "Copper"; }
+        if (notes.Contains("drip", StringComparison.OrdinalIgnoreCase)) { return "DripTubing"; }
+        return null;
     }
 
     private sealed class StampPlacement
@@ -9154,6 +9267,62 @@ public partial class GardenPlot
                     currentPlot.Shapes.Add(shape);
                 }
 
+                // Issue #162a iteration — auto-pipe between consecutive fitting stamps now
+                // builds a SINGLE polyline pipe that accumulates vertices, instead of N
+                // separate 2-point segments. The pipe's vertex anchors then naturally
+                // serve as joint controls: drag a vertex with the Select tool and the
+                // pipe vertex + the fitting at that position both move (the existing
+                // FittingPlacement.FindJointCoMovers picks up the fitting because it sits
+                // at the same coordinate). Tracker resets on tool change / palette change
+                // (see SelectItem) and on Escape.
+                if (k.Kind == PaletteKind.IrrigationFitting && placement.Shapes.Count > 0)
+                {
+                    Shape newFitting = placement.Shapes[0];
+                    Point newCenter = new(
+                        newFitting.X + (newFitting.W / 2),
+                        newFitting.Y + (newFitting.H / 2));
+
+                    if (library.Ui.AutoPipeBetweenFittingStamps && lastFittingStampPos is { } prevPos)
+                    {
+                        // Find the running pipe (if any). It may have been deleted between
+                        // stamps; if so, fall through and create a new one starting at the
+                        // previous fitting position.
+                        Shape? runningPipe = runningFittingPipeId is Guid pid
+                            ? currentPlot.Shapes.FirstOrDefault(z => z.Id == pid)
+                            : null;
+
+                        if (runningPipe is null)
+                        {
+                            // Seed a fresh pipe with two vertices: previous stamp center → new center.
+                            Shape seed = new()
+                            {
+                                Kind = ShapeKind.IrrigationPipe,
+                                Label = ResolveAutoPipeCodeForFitting(newFitting) ?? "Auto-pipe",
+                                Trait = newFitting.FittingMaterial ?? "PVC",
+                                Stroke = newFitting.Stroke,
+                                Fill = newFitting.Fill,
+                                PipeDiameterIn = newFitting.FittingDiameterIn,
+                            };
+                            seed.Points.Add(prevPos);
+                            seed.Points.Add(newCenter);
+                            currentPlot.Shapes.Add(seed);
+                            runningFittingPipeId = seed.Id;
+                        }
+                        else
+                        {
+                            // Extend the existing pipe with another vertex at the new center.
+                            runningPipe.Points.Add(newCenter);
+                        }
+                    }
+
+                    lastFittingStampPos = newCenter;
+                }
+                else
+                {
+                    lastFittingStampPos = null;
+                    runningFittingPipeId = null;
+                }
+
                 if (placement.Groups.Count > 0)
                 {
                     foreach (var group in placement.Groups)
@@ -9444,6 +9613,18 @@ public partial class GardenPlot
                     AppendEdgePoint(drafting, new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt)), 0.05);
                 }
                 break;
+            case ShapeKind.IrrigationPipe:
+            case ShapeKind.IrrigationWire:
+                // Issue #162a iteration — mirror the FreeDraw polyline behaviour so the
+                // in-progress pipe / wire shows a live segment from the last committed vertex
+                // to the cursor. Without this the user sees nothing until the second click.
+                // Pipes additionally snap-to-head (commit path); the move path stays unsnapped
+                // so the cursor reflects the actual mouse position.
+                if (buildingPolygon && drafting.Points.Count >= 1)
+                {
+                    drafting.Points[^1] = new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt));
+                }
+                break;
             case ShapeKind.Ruler:
                 if (drafting.Points.Count >= 1)
                     drafting.Points[^1] = new Point(Math.Clamp(x, 0, PlotWidthFt), Math.Clamp(y, 0, PlotHeightFt));
@@ -9587,6 +9768,11 @@ public partial class GardenPlot
             isShapeVertexDragging = false;
             shapeVertexDragShapeId = Guid.Empty;
             shapeVertexDragIndex = -1;
+
+            // Issue #162a iteration — clear co-mover state at drag end.
+            shapeVertexDragCoMovers = null;
+            shapeVertexDragPrevPos = null;
+
             await SaveAsync();
             return;
         }
@@ -10441,6 +10627,21 @@ public partial class GardenPlot
             NormalizeEdgeBulgesOnCommit(drafting); // issue #130
             RecordUndoState();
             currentPlot.Shapes.Add(drafting);
+
+            // Issue #162a — auto-place elbow fittings at sharp interior vertices of a
+            // freshly drawn irrigation pipe. We mutate the plot before SaveAsync so the
+            // committed shape + its derived fittings persist as a single transaction.
+            // Gated on library.Ui.AutoPlaceFittingsOnPipe so users can disable for
+            // hand-curated fittings.
+            if (drafting.Kind == ShapeKind.IrrigationPipe && library.Ui.AutoPlaceFittingsOnPipe)
+            {
+                var autoFittings = FittingPlacement.BuildAutoElbowsForPipe(drafting);
+                foreach (Shape fitting in autoFittings)
+                {
+                    currentPlot.Shapes.Add(fitting);
+                }
+            }
+
             // Issue #138 — if a drawing set is active AND it has PaintAsDrawn=true, run
             // Along-path placement against the freshly drawn path. Capture the id before
             // resetting drafting state below.
@@ -11367,6 +11568,17 @@ public partial class GardenPlot
         isShapeVertexDragging = true;
         shapeVertexDragShapeId = shapeId;
         shapeVertexDragIndex = vertexIndex;
+
+        // Issue #162a iteration — capture co-movers so a junction (two pipes ending at
+        // the same point + optional fitting on top) drags as a single rigid bundle.
+        Point anchor = shape.Points[vertexIndex];
+        shapeVertexDragPrevPos = anchor;
+        shapeVertexDragCoMovers = FittingPlacement.FindJointCoMovers(
+            currentPlot.Shapes,
+            anchor,
+            excludeShapeId: shapeId,
+            excludeVertexIndex: vertexIndex,
+            toleranceFt: JointSnapToleranceFt);
     }
 
     /// <summary>
@@ -11389,9 +11601,49 @@ public partial class GardenPlot
             return;
         }
 
-        shape.Points[shapeVertexDragIndex] = new Point(
+        Point newPos = new(
             Math.Clamp(cursorX, 0, PlotWidthFt),
             Math.Clamp(cursorY, 0, PlotHeightFt));
+
+        // Issue #162a iteration — translate every co-mover by the same delta as the
+        // dragged vertex. Without this the junction "breaks" when the user moves an
+        // anchor shared by two pipes. Press 'm' mid-drag to clear the co-mover list and
+        // move only the picked vertex (see OnKeyDown for the hotkey).
+        if (shapeVertexDragCoMovers is { Count: > 0 } coMovers && shapeVertexDragPrevPos is { } prev)
+        {
+            double dx = newPos.X - prev.X;
+            double dy = newPos.Y - prev.Y;
+            if (dx != 0 || dy != 0)
+            {
+                foreach (var (id, idx) in coMovers)
+                {
+                    Shape? co = currentPlot.Shapes.FirstOrDefault(s => s.Id == id);
+                    if (co is null)
+                    {
+                        continue;
+                    }
+
+                    if (idx is int vIdx)
+                    {
+                        if (vIdx >= 0 && vIdx < co.Points.Count)
+                        {
+                            Point cp = co.Points[vIdx];
+                            co.Points[vIdx] = new Point(
+                                Math.Clamp(cp.X + dx, 0, PlotWidthFt),
+                                Math.Clamp(cp.Y + dy, 0, PlotHeightFt));
+                        }
+                    }
+                    else
+                    {
+                        co.X = Math.Clamp(co.X + dx, 0, PlotWidthFt);
+                        co.Y = Math.Clamp(co.Y + dy, 0, PlotHeightFt);
+                    }
+                }
+            }
+        }
+
+        shape.Points[shapeVertexDragIndex] = newPos;
+        shapeVertexDragPrevPos = newPos;
     }
 
     /// <summary>
@@ -11488,6 +11740,17 @@ public partial class GardenPlot
     {
         ClearIdleRenderSuppression();
         var kb = KeyBindings;
+
+        // Issue #162a iteration — 'm' mid-drag breaks the joint co-mover link so the
+        // user can move just the picked vertex independently. Handled BEFORE other
+        // bindings so the literal key isn't shadowed by a future re-binding.
+        if (isShapeVertexDragging
+            && !e.CtrlKey && !e.AltKey && !e.MetaKey
+            && (string.Equals(e.Key, "m", StringComparison.OrdinalIgnoreCase)))
+        {
+            shapeVertexDragCoMovers = null;
+            return;
+        }
 
         // Issue #130 — diagnostic logging so the user can share browser console output
         // when reporting hotkey issues. Logs every key + modifier + current tool, and a
@@ -11648,6 +11911,8 @@ public partial class GardenPlot
             arcApexEdgeIndex = -1;
             lastArcClickAt = null;
             tangentSnapArmed = false; // issue #131
+            lastFittingStampPos = null; // issue #162a — Escape breaks the auto-pipe chain
+            runningFittingPipeId = null;
             ClearSelection();
         }
     }
@@ -12263,6 +12528,108 @@ public partial class GardenPlot
         }
 
         await SaveAsync();
+    }
+
+    /// <summary>Issue #162a — change a pipe fitting's type via the inspector dropdown.</summary>
+    private async Task OnFittingTypeChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw) || !Enum.TryParse<FittingType>(raw, out var type))
+        {
+            return;
+        }
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationFitting)
+            {
+                shape.FittingType = type;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #162a — change a pipe fitting's nominal diameter (inches).</summary>
+    private async Task OnFittingDiameterChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        double? value = string.IsNullOrWhiteSpace(raw)
+            ? null
+            : double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) ? parsed : (double?)null;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationFitting)
+            {
+                shape.FittingDiameterIn = value;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #162a — change a pipe fitting's material ('PVC' / 'Poly' / 'Copper' / 'DripTubing').</summary>
+    private async Task OnFittingMaterialChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        string? value = string.IsNullOrWhiteSpace(raw) ? null : raw;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationFitting)
+            {
+                shape.FittingMaterial = value;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>Issue #162a — toggle auto-elbow placement on pipe finalisation.</summary>
+    private async Task OnAutoPlaceFittingsOnPipeChanged(ChangeEventArgs e)
+    {
+        if (e.Value is bool checkedValue)
+        {
+            library.Ui.AutoPlaceFittingsOnPipe = checkedValue;
+            await SaveAsync();
+        }
+    }
+
+    /// <summary>Issue #162a — toggle auto-pipe segment between consecutive fitting stamps.</summary>
+    private async Task OnAutoPipeBetweenFittingStampsChanged(ChangeEventArgs e)
+    {
+        if (e.Value is bool checkedValue)
+        {
+            library.Ui.AutoPipeBetweenFittingStamps = checkedValue;
+            // Clear the chain when the user disables mid-session so the next stamp doesn't
+            // accidentally trigger one last pipe based on a stale tracker.
+            if (!checkedValue)
+            {
+                lastFittingStampPos = null;
+                runningFittingPipeId = null;
+            }
+
+            await SaveAsync();
+        }
     }
 
     private async Task SetShapeRotationAsync(IReadOnlyList<Shape> shapes, double normalizedDegrees)
@@ -13876,6 +14243,7 @@ public partial class GardenPlot
             ShapeKind.WaterSource => $"Water Source · {s.Label}",
             ShapeKind.IrrigationControl => $"Irrigation Control · {s.Label}",
             ShapeKind.IrrigationWire => $"Irrigation Wire · {s.Label}",
+            ShapeKind.IrrigationFitting => $"Irrigation Fitting · {s.Label}",
             _ => "Item",
         };
     }

@@ -51,6 +51,7 @@ public static class DrawingSetPreview
             PaletteKind.WaterSource => RowVisualKind.Stamp,
             PaletteKind.IrrigationControl => RowVisualKind.Stamp,
             PaletteKind.IrrigationWire => RowVisualKind.Stripe,
+            PaletteKind.IrrigationFitting => RowVisualKind.Stamp,
             _ => RowVisualKind.Stamp,
         };
     }
