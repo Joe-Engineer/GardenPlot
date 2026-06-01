@@ -51,7 +51,9 @@ jobs:
         # NOTE: no --no-build — publish does its own WASM relink/AOT pass
         # against an obj/Release/.../for-publish/ tree, separate from the
         # for-build/ tree that the build + test steps produced.
+        # NOTE: publish the Host project so the budget target sees the same
+        # composition the deploy workflow sees.
         run: |
-          dotnet publish ./GardenPlotWeb/GardenPlotWeb.csproj \
+          dotnet publish ./GardenPlotWeb.Host/GardenPlotWeb.Host.csproj \
             --configuration Release \
             --output ${{ runner.temp }}/publish

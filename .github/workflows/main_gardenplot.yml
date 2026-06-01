@@ -1,4 +1,10 @@
-# Build and deploy GardenPlotWeb (Blazor Server, .NET 10) to Azure App Service
+# Build and deploy the Blazor WASM app to Azure App Service Linux.
+#
+# The WASM client (GardenPlotWeb) is hosted by a thin ASP.NET Core static-file
+# server (GardenPlotWeb.Host) because App Service Linux / Oryx expects a startup
+# DLL. The host stores NO user data — plots live in the browser's IndexedDB,
+# which is the explicit free-tier privacy model.
+#
 # Auth: OIDC federated identity (no secrets/passwords)
 # Docs: https://github.com/Azure/login
 
@@ -35,11 +41,13 @@ jobs:
         # enforced by GardenPlotWeb/Build/PayloadBudget.targets.
         run: dotnet workload install wasm-tools
 
-      - name: Publish GardenPlotWeb
-        # Scope to the web project only; the Aspire AppHost is dev-only
-        # and not deployed to App Service.
+      - name: Publish GardenPlotWeb.Host
+        # The Host project references the WASM client and produces a publish
+        # output that includes BOTH the server DLL (Oryx startup target) AND
+        # the WASM client's wwwroot/ static files. The PayloadBudget target
+        # still fires because it's wired to the WASM client csproj.
         run: |
-          dotnet publish ./GardenPlotWeb/GardenPlotWeb.csproj \
+          dotnet publish ./GardenPlotWeb.Host/GardenPlotWeb.Host.csproj \
             --configuration Release \
             --output ${{ runner.temp }}/publish
 
