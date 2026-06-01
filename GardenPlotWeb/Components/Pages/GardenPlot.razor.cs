@@ -341,6 +341,26 @@ public partial class GardenPlot
         selectedTakeoffCategory = category;
     }
 
+    /// <summary>
+    /// Issue #6 — set when the takeoff PDF is being generated (libs lazy-loading
+    /// + raster + autotable). Drives the button's busy state in the razor markup.
+    /// </summary>
+    private bool pdfExporting;
+
+    /// <summary>
+    /// Issue #6 — set when the most recent PDF export attempt failed. Shown
+    /// next to the export buttons; cleared on the next successful export.
+    /// </summary>
+    private string? pdfExportError;
+
+    /// <summary>
+    /// Issue #6 — while true, <see cref="IsShapeInViewport"/> returns true for
+    /// every shape so the SVG snapshot used for the PDF includes off-screen
+    /// content. Toggled by <see cref="ExportTakeoffPdf"/> for the duration of
+    /// the export only; layer-visibility checks still apply.
+    /// </summary>
+    private bool disableViewportCullingForExport;
+
     private TakeoffItem? EditingTakeoff =>
         editingTakeoffId is int id && currentPlot is not null
             ? currentPlot.Takeoff.FirstOrDefault(t => t.Id == id)
@@ -453,6 +473,14 @@ public partial class GardenPlot
 
     private bool IsShapeInViewport(Shape shape)
     {
+        // Issue #6 — when exporting the plot to PDF we temporarily disable
+        // viewport culling so off-screen shapes land in the DOM and survive
+        // the SVG snapshot. Reset by the export orchestrator's finally block.
+        if (disableViewportCullingForExport)
+        {
+            return true;
+        }
+
         if (viewportScrollLeftPx is not double scrollLeft
             || viewportScrollTopPx is not double scrollTop
             || viewportClientWidthPx is not double clientWidth
@@ -2314,6 +2342,88 @@ public partial class GardenPlot
         catch
         {
             // ignore
+        }
+    }
+
+    /// <summary>
+    /// Issue #6 — exports the current takeoff as a customer-safe PDF (plot
+    /// snapshot + grouped BOM). Lazy-loads jsPDF + jspdf-autotable on first
+    /// click; payload is built by <see cref="TakeoffPdfPayloadBuilder.BuildCustomer"/>.
+    /// V1 is always customer view regardless of <c>ShowInternalView</c> to avoid
+    /// leaking labor cost/markup into a shareable artifact.
+    /// </summary>
+    private async Task ExportTakeoffPdf()
+    {
+        if (jsModule is null || currentPlot is null)
+        {
+            return;
+        }
+
+        pdfExporting = true;
+        pdfExportError = null;
+        StateHasChanged();
+
+        try
+        {
+            ReconcileTakeoff();
+            IReadOnlyList<TakeoffItemRow> itemRows = BuildTakeoffItemRows();
+
+            TakeoffPdfPayload payload;
+            if (library.Ui.TakeoffViewMode == TakeoffViewMode.Item)
+            {
+                List<TakeoffPdfRowSource> rowSources = itemRows
+                    .Select(r => new TakeoffPdfRowSource(r.Kind, r.Name, r.LineTotal))
+                    .ToList();
+
+                payload = TakeoffPdfPayloadBuilder.BuildCustomer(
+                    firm: library.Ui.FirmName,
+                    project: currentPlot.Name,
+                    date: FormatCustomerCutDate(library.Ui),
+                    rows: rowSources);
+            }
+            else
+            {
+                // Summary / Aggregate view — one row per Kind+Name+Unit+Markup group.
+                IReadOnlyList<TakeoffAggregateRow> summaryRows = BuildTakeoffSummaryRows(itemRows);
+                List<TakeoffPdfSummaryRowSource> summarySources = summaryRows
+                    .Select(r => new TakeoffPdfSummaryRowSource(
+                        r.Kind, r.Name, r.Count, r.Quantity, r.Unit, r.LineTotal))
+                    .ToList();
+
+                payload = TakeoffPdfPayloadBuilder.BuildCustomerSummary(
+                    firm: library.Ui.FirmName,
+                    project: currentPlot.Name,
+                    date: FormatCustomerCutDate(library.Ui),
+                    rows: summarySources);
+            }
+
+            // Disable viewport culling and force a render so EVERY shape lands in the
+            // DOM — even ones panned off-screen or out of the current zoom area.
+            // Without this the SVG snapshot only sees what's currently visible,
+            // and off-screen content silently drops from the PDF.
+            disableViewportCullingForExport = true;
+            StateHasChanged();
+            // Yield so the queued render flushes to the DOM before we snapshot.
+            // Two awaits because StateHasChanged() queues, OnAfterRenderAsync runs
+            // after the render commits — a small delay gives async-loaded children
+            // (client images) a chance to settle before serialization.
+            await Task.Yield();
+            await Task.Delay(50);
+
+            await PreloadClientImagesAsync();
+            await jsModule.InvokeVoidAsync("exportTakeoffPdf", canvasRef, payload);
+        }
+        catch (Exception ex)
+        {
+            pdfExportError = $"PDF export failed: {ex.Message}";
+        }
+        finally
+        {
+            // Always restore viewport culling so the editor doesn't keep paying
+            // the render cost of off-screen shapes.
+            disableViewportCullingForExport = false;
+            pdfExporting = false;
+            StateHasChanged();
         }
     }
 
