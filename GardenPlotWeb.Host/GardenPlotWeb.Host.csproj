@@ -35,4 +35,23 @@
   </PropertyGroup>
   <Import Project="..\GardenPlotWeb\Build\PayloadBudget.targets" />
 
+  <!--
+    Oryx (App Service Linux startup) chokes when two *.runtimeconfig.json files
+    are at the publish root because it can't pick the startup DLL deterministically:
+
+      WARNING: Expected to find only one file with extension '.runtimeconfig.json' but found 2
+      WARNING: Found files: 'GardenPlotWeb.Host.runtimeconfig.json, GardenPlotWeb.runtimeconfig.json'
+      Running the default app using command: dotnet "/defaulthome/hostingstart/hostingstart.dll"
+
+    The Blazor WASM SDK emits GardenPlotWeb.runtimeconfig.json at the publish
+    root for tooling/CLI use, but the browser-side WASM runtime reads its
+    config from _framework/blazor.boot.json — NOT from the root file. Safe to
+    delete from the publish output. Leaves GardenPlotWeb.Host.runtimeconfig.json
+    as the sole runtimeconfig, which is what Oryx wants.
+  -->
+  <Target Name="RemoveStrayWasmClientRuntimeConfig" AfterTargets="Publish">
+    <Delete Files="$(PublishDir)GardenPlotWeb.runtimeconfig.json" />
+    <Message Importance="High" Text="Removed stray $(PublishDir)GardenPlotWeb.runtimeconfig.json (Oryx startup-DLL disambiguation; see csproj comment)." />
+  </Target>
+
 </Project>
