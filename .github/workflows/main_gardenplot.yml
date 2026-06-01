@@ -58,11 +58,26 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'gardenplot'
-          slot-name: 'production'
-          package: ${{ runner.temp }}/publish
+      - name: Zip publish output
+        # az webapp deploy --clean true requires a zip package.
+        # webapps-deploy@v3 zipped internally but doesn't expose --clean.
+        run: |
+          cd ${{ runner.temp }}/publish
+          zip -r ${{ runner.temp }}/publish.zip .
+
+      - name: Deploy to Azure Web App (clean)
+        # IMPORTANT: --clean true wipes /home/site/wwwroot/ BEFORE extracting
+        # the new package. Without this, Azure does incremental file sync
+        # and stale files (e.g. an extra .runtimeconfig.json from a prior
+        # deploy) persist forever and break Oryx startup-DLL detection.
+        # The host stores NO user data on the server, so wiping is safe.
+        run: |
+          az webapp deploy \
+            --resource-group rg-gardenplot-prod \
+            --name gardenplot \
+            --src-path ${{ runner.temp }}/publish.zip \
+            --type zip \
+            --clean true \
+            --restart true
 
 
