@@ -76,17 +76,6 @@ public class Shape
     /// <summary>Legacy ground-cover palette item code kept for one schema-version overlap.</summary>
     public string? GroundCoverCode { get; set; }
 
-    /// <summary>
-    /// Issue #136 — the surface-material kind this shape represents (Lawn, Paver,
-    /// Plant bed, etc.). Distinct from <see cref="MaterialCode"/>: this is the
-    /// shape's <em>use / purpose</em>; <see cref="MaterialCode"/> references a
-    /// specific purchasable substance. Both can be set independently. Values
-    /// are codes from <see cref="SurfaceMaterials"/>; <see langword="null"/>
-    /// means "untyped". Resolve via <see cref="SurfaceMaterialResolver.Resolve"/>
-    /// to also pick up legacy shapes via inference.
-    /// </summary>
-    public string? SurfaceMaterialCode { get; set; }
-
     /// <summary>Legacy ground-cover depth in inches kept for one schema-version overlap.</summary>
     public double? GroundCoverDepthIn { get; set; }
 
