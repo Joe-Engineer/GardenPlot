@@ -1843,6 +1843,60 @@ public partial class GardenPlot
         _ = SaveAsync();
     }
 
+    /// <summary>
+    /// Issue #136 Phase B — handles changes to the Surface material dropdown in
+    /// the shape inspector. Unknown / empty codes clear the tag; known codes are
+    /// stored as-is. Does NOT touch <see cref="Shape.Fill"/> / <see cref="Shape.Stroke"/>;
+    /// the user has to click "Apply default fill" to opt in to visual changes.
+    /// </summary>
+    private void OnSurfaceMaterialChanged(Shape shape, string? value)
+    {
+        // Pre-check: would this be a real change? Avoid the undo-record cost
+        // on no-op writes (e.g. selecting the same value the dropdown already has).
+        string? normalized = SurfaceMaterialApplier.NormalizeCode(value);
+        if (string.Equals(shape.SurfaceMaterialCode, normalized, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        RecordUndoState();
+        if (SurfaceMaterialApplier.TryAssign(shape, value))
+        {
+            _ = SaveAsync();
+        }
+    }
+
+    /// <summary>
+    /// Issue #136 Phase B — opt-in fill swap. Replaces the shape's fill /
+    /// stroke / texture with the assigned surface material's defaults. No-op
+    /// when no surface material is set. Intentionally explicit (button-driven)
+    /// so the user controls when their custom fills get overwritten.
+    /// </summary>
+    private void ApplySurfaceMaterialDefaultFill(Shape shape)
+    {
+        SurfaceMaterialProfile? profile = SurfaceMaterials.Find(shape.SurfaceMaterialCode);
+        if (profile is null)
+        {
+            return;
+        }
+
+        RecordUndoState();
+        if (SurfaceMaterialApplier.ApplyDefaultFill(shape))
+        {
+            _ = SaveAsync();
+        }
+    }
+
+    /// <summary>
+    /// Issue #136 Phase B — predicate for "may this shape carry a
+    /// <see cref="Shape.SurfaceMaterialCode"/>?" True for area shapes
+    /// (Rectangle, Oval, closed FreeDraw). Used to gate the inspector section.
+    /// </summary>
+    private static bool CanHaveSurfaceMaterial(Shape shape)
+    {
+        return shape is not null && GroundCoverMath.IsAreaShape(shape);
+    }
+
     private void OnGroundCoverDepthChanged(Shape s, string? value)
     {
         PaletteItem? item = MaterialItemFor(s);

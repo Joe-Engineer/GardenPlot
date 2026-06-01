@@ -3402,6 +3402,44 @@ else
                     </div>
                 }
 
+                @if (!isPreview && CanHaveSurfaceMaterial(single!))
+                {
+                    @* Issue #136 Phase B — surface-material picker. Distinct from the
+                       ground-cover Material section below (substance vs use). Visible
+                       for every area shape, not just ground-cover ones. *@
+                    var surfaceCode = single!.SurfaceMaterialCode;
+                    var surfaceProfile = SurfaceMaterials.Find(surfaceCode);
+                    <div class="ground-cover-info mt-2 pt-2 border-top">
+                        <div class="small fw-semibold mb-1">Surface material</div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <select class="form-select form-select-sm"
+                                    value="@(surfaceCode ?? string.Empty)"
+                                    @onchange="@(e => OnSurfaceMaterialChanged(single!, e.Value?.ToString()))">
+                                <option value="">(none)</option>
+                                @foreach (var sm in SurfaceMaterials.All)
+                                {
+                                    <option value="@sm.Code">@sm.DisplayName</option>
+                                }
+                            </select>
+                            @if (surfaceProfile is not null)
+                            {
+                                <span class="gc-swatch"
+                                      style="@($"background:{surfaceProfile.DefaultFill};border-color:{surfaceProfile.DefaultStroke};")"
+                                      title="@($"Default fill for {surfaceProfile.DisplayName}")"></span>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        @onclick="() => ApplySurfaceMaterialDefaultFill(single!)"
+                                        title="Replace this shape's fill / stroke / texture with the surface material defaults">
+                                    Apply default fill
+                                </button>
+                            }
+                        </div>
+                        <div class="x-small text-muted">
+                            Tag the shape's purpose (lawn, paver, plant bed, etc.). Drives future BOM grouping, edge widths, irrigation defaults.
+                        </div>
+                    </div>
+                }
+
                 @if (!isPreview && IsGroundCoverShape(single!))
                 {
                     var materialItem = MaterialItemFor(single!);
