@@ -68,6 +68,9 @@ public static class ShapeCloning
             GroundCoverCode = source.GroundCoverCode,
             GroundCoverDepthIn = source.GroundCoverDepthIn,
             IsGroundCoverSurface = source.IsGroundCoverSurface,
+            // Issue #136 — new shape field; cloned alongside MaterialCode so undo / clipboard
+            // / drag-duplicate all preserve the SurfaceMaterial tag.
+            SurfaceMaterialCode = source.SurfaceMaterialCode,
             TextureKey = source.TextureKey,
             TextureImageId = source.TextureImageId,
             Readings = source.Readings.Select(CloneSoilReading).ToList(),
