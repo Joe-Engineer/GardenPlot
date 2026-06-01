@@ -17,6 +17,19 @@ public sealed record TakeoffPdfRowSource(
     decimal? LineTotal);
 
 /// <summary>
+/// Lightweight DTO for a single aggregate/summary takeoff row consumed by the
+/// PDF payload builder. Mirrors the relevant fields of the page-private
+/// <c>TakeoffAggregateRow</c> record for unit-testability.
+/// </summary>
+public sealed record TakeoffPdfSummaryRowSource(
+    string Kind,
+    string Name,
+    int Count,
+    double Quantity,
+    string Unit,
+    decimal? LineTotal);
+
+/// <summary>
 /// Issue #6 — builds a <see cref="TakeoffPdfPayload"/> from a flat list of takeoff
 /// rows. V1 produces a customer-safe payload (Kind / Name / LineTotal only) with
 /// per-Kind subtotal rows and a grand total. Internal-view PDFs are intentionally
@@ -108,6 +121,93 @@ public static class TakeoffPdfPayloadBuilder
     }
 
     /// <summary>
+    /// Builds a customer-safe takeoff PDF payload from aggregate/summary rows
+    /// (one row per Kind+Name+Unit+Markup group, with a Count). Mirrors the
+    /// customer-view CSV summary columns: Kind / Item / Count / Quantity /
+    /// Unit / Line total. Per-Kind subtotal rows are appended; grand total
+    /// is the sum across all aggregate rows.
+    /// </summary>
+    public static TakeoffPdfPayload BuildCustomerSummary(
+        string? firm,
+        string? project,
+        string? date,
+        IReadOnlyList<TakeoffPdfSummaryRowSource> rows)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+
+        IReadOnlyList<TakeoffPdfColumn> columns = new[]
+        {
+            new TakeoffPdfColumn("Kind", "kind", "left"),
+            new TakeoffPdfColumn("Item", "name", "left"),
+            new TakeoffPdfColumn("Count", "count", "right"),
+            new TakeoffPdfColumn("Quantity", "quantity", "right"),
+            new TakeoffPdfColumn("Unit", "unit", "left"),
+            new TakeoffPdfColumn("Line total", "lineTotal", "right"),
+        };
+
+        List<TakeoffPdfRow> tableRows = new();
+
+        var groups = rows
+            .GroupBy(r => r.Kind ?? string.Empty, StringComparer.Ordinal)
+            .OrderBy(g => g.Key, StringComparer.Ordinal);
+
+        foreach (var group in groups)
+        {
+            foreach (TakeoffPdfSummaryRowSource row in group)
+            {
+                tableRows.Add(new TakeoffPdfRow(
+                    Type: "row",
+                    Values: new Dictionary<string, string>
+                    {
+                        ["kind"] = row.Kind ?? string.Empty,
+                        ["name"] = row.Name ?? string.Empty,
+                        ["count"] = row.Count.ToString(CultureInfo.InvariantCulture),
+                        ["quantity"] = FormatQuantity(row.Quantity),
+                        ["unit"] = row.Unit ?? string.Empty,
+                        ["lineTotal"] = FormatCurrency(row.LineTotal),
+                    }));
+            }
+
+            // Per-Kind subtotal row. Count/Quantity/Unit are intentionally blank;
+            // the meaningful rollup is the LineTotal sum (matches CSV behavior).
+            decimal subtotal = SumSummaryLineTotals(group);
+            tableRows.Add(new TakeoffPdfRow(
+                Type: "subtotal",
+                Values: new Dictionary<string, string>
+                {
+                    ["kind"] = group.Key,
+                    ["name"] = "Subtotal",
+                    ["count"] = string.Empty,
+                    ["quantity"] = string.Empty,
+                    ["unit"] = string.Empty,
+                    ["lineTotal"] = FormatCurrency(subtotal),
+                }));
+        }
+
+        decimal grandTotal = SumSummaryLineTotals(rows);
+        string grandTotalText = FormatCurrency(grandTotal);
+
+        string projectSlug = Sanitize(project);
+        string fileName = $"{projectSlug}-takeoff-customer-summary.pdf";
+
+        return new TakeoffPdfPayload(
+            SchemaVersion: CurrentSchemaVersion,
+            FileName: fileName,
+            Firm: firm,
+            Project: project,
+            Date: date,
+            Audience: AudienceCustomer,
+            Plot: new TakeoffPdfPlotSection(
+                HeaderTitle: "Plot",
+                IncludeSnapshot: true),
+            Takeoff: new TakeoffPdfTakeoffSection(
+                HeaderTitle: "Bill of materials (summary)",
+                Columns: columns,
+                Rows: tableRows,
+                GrandTotal: grandTotalText));
+    }
+
+    /// <summary>
     /// Sanitizes a project name into a download-safe filename slug. Mirrors
     /// the existing <c>Sanitize</c> helper on the GardenPlot page so customer-
     /// facing exports share the same naming convention.
@@ -138,6 +238,25 @@ public static class TakeoffPdfPayloadBuilder
         }
 
         return total;
+    }
+
+    private static decimal SumSummaryLineTotals(IEnumerable<TakeoffPdfSummaryRowSource> source)
+    {
+        decimal total = 0m;
+        foreach (TakeoffPdfSummaryRowSource row in source)
+        {
+            if (row.LineTotal is decimal v)
+            {
+                total += v;
+            }
+        }
+
+        return total;
+    }
+
+    private static string FormatQuantity(double value)
+    {
+        return value.ToString("0.##", CultureInfo.InvariantCulture);
     }
 
     private static string FormatCurrency(decimal? amount)

@@ -245,4 +245,147 @@ public class TakeoffPdfPayloadBuilderTests
             TakeoffPdfPayloadBuilder.BuildCustomer(
                 firm: null, project: null, date: null, rows: null!));
     }
+
+    // ===== Summary mode (TakeoffViewMode.Aggregate) =====
+    [Fact]
+    public void BuildCustomerSummary_ExposesExactlySixColumnsInOrder()
+    {
+        // Customer-safe summary columns: Kind / Item / Count / Quantity / Unit / Line total.
+        // No MaterialCost, no LaborCost, no MarkupPercent.
+        TakeoffPdfPayload payload = TakeoffPdfPayloadBuilder.BuildCustomerSummary(
+            firm: null, project: null, date: null,
+            rows: System.Array.Empty<TakeoffPdfSummaryRowSource>());
+
+        Assert.Equal(6, payload.Takeoff.Columns.Count);
+        Assert.Equal("kind", payload.Takeoff.Columns[0].DataKey);
+        Assert.Equal("name", payload.Takeoff.Columns[1].DataKey);
+        Assert.Equal("count", payload.Takeoff.Columns[2].DataKey);
+        Assert.Equal("quantity", payload.Takeoff.Columns[3].DataKey);
+        Assert.Equal("unit", payload.Takeoff.Columns[4].DataKey);
+        Assert.Equal("lineTotal", payload.Takeoff.Columns[5].DataKey);
+
+        // Numeric columns right-aligned for readability.
+        Assert.Equal("right", payload.Takeoff.Columns[2].Align);
+        Assert.Equal("right", payload.Takeoff.Columns[3].Align);
+        Assert.Equal("right", payload.Takeoff.Columns[5].Align);
+    }
+
+    [Fact]
+    public void BuildCustomerSummary_EmptyRows_NoTableBody_ZeroGrandTotal()
+    {
+        TakeoffPdfPayload payload = TakeoffPdfPayloadBuilder.BuildCustomerSummary(
+            firm: null, project: null, date: null,
+            rows: System.Array.Empty<TakeoffPdfSummaryRowSource>());
+
+        Assert.Empty(payload.Takeoff.Rows);
+        Assert.Equal("$0.00", payload.Takeoff.GrandTotal);
+        Assert.Equal("Bill of materials (summary)", payload.Takeoff.HeaderTitle);
+    }
+
+    [Fact]
+    public void BuildCustomerSummary_GroupsByKindOrdinal_AppendsSubtotalRow()
+    {
+        TakeoffPdfSummaryRowSource[] rows = new[]
+        {
+            new TakeoffPdfSummaryRowSource("Tree", "Maple", Count: 3, Quantity: 3, Unit: "ea", LineTotal: 1350m),
+            new TakeoffPdfSummaryRowSource("Tree", "Oak", Count: 2, Quantity: 2, Unit: "ea", LineTotal: 1200m),
+            new TakeoffPdfSummaryRowSource("Bush", "Boxwood", Count: 5, Quantity: 5, Unit: "ea", LineTotal: 300m),
+        };
+
+        TakeoffPdfPayload payload = TakeoffPdfPayloadBuilder.BuildCustomerSummary(
+            firm: null, project: null, date: null, rows: rows);
+
+        IReadOnlyList<TakeoffPdfRow> body = payload.Takeoff.Rows;
+
+        // Bush group first (ordinal order): 1 data row + 1 subtotal
+        Assert.Equal("row", body[0].Type);
+        Assert.Equal("Bush", body[0].Values["kind"]);
+        Assert.Equal("Boxwood", body[0].Values["name"]);
+        Assert.Equal("5", body[0].Values["count"]);
+        Assert.Equal("5", body[0].Values["quantity"]);
+        Assert.Equal("ea", body[0].Values["unit"]);
+        Assert.Equal("$300.00", body[0].Values["lineTotal"]);
+
+        Assert.Equal("subtotal", body[1].Type);
+        Assert.Equal("Bush", body[1].Values["kind"]);
+        Assert.Equal("Subtotal", body[1].Values["name"]);
+        Assert.Equal(string.Empty, body[1].Values["count"]);
+        Assert.Equal(string.Empty, body[1].Values["quantity"]);
+        Assert.Equal(string.Empty, body[1].Values["unit"]);
+        Assert.Equal("$300.00", body[1].Values["lineTotal"]);
+
+        // Tree group: 2 data rows + 1 subtotal
+        Assert.Equal("Maple", body[2].Values["name"]);
+        Assert.Equal("Oak", body[3].Values["name"]);
+        Assert.Equal("subtotal", body[4].Type);
+        Assert.Equal("$2,550.00", body[4].Values["lineTotal"]);
+
+        Assert.Equal(5, body.Count);
+        Assert.Equal("$2,850.00", payload.Takeoff.GrandTotal);
+    }
+
+    [Fact]
+    public void BuildCustomerSummary_FormatsQuantityWithUpToTwoDecimals()
+    {
+        TakeoffPdfSummaryRowSource[] rows = new[]
+        {
+            new TakeoffPdfSummaryRowSource("Mulch", "Cedar bark", Count: 1, Quantity: 3.5, Unit: "cy", LineTotal: 175m),
+            new TakeoffPdfSummaryRowSource("Mulch", "Pine straw", Count: 1, Quantity: 12.0, Unit: "cy", LineTotal: 480m),
+        };
+
+        TakeoffPdfPayload payload = TakeoffPdfPayloadBuilder.BuildCustomerSummary(
+            firm: null, project: null, date: null, rows: rows);
+
+        Assert.Equal("3.5", payload.Takeoff.Rows[0].Values["quantity"]);
+        Assert.Equal("12", payload.Takeoff.Rows[1].Values["quantity"]);
+    }
+
+    [Fact]
+    public void BuildCustomerSummary_FileNameMarkedAsSummary()
+    {
+        // Summary PDF has its own filename suffix so a designer can tell
+        // an Item-mode and Summary-mode export apart on disk.
+        TakeoffPdfPayload payload = TakeoffPdfPayloadBuilder.BuildCustomerSummary(
+            firm: null, project: "Smith Residence", date: null,
+            rows: System.Array.Empty<TakeoffPdfSummaryRowSource>());
+
+        Assert.Equal("Smith_Residence-takeoff-customer-summary.pdf", payload.FileName);
+    }
+
+    [Fact]
+    public void BuildCustomerSummary_FormatsInInvariantCultureMode()
+    {
+        // Regression: summary path uses the same culture-sensitive code paths.
+        System.Globalization.CultureInfo originalCulture = System.Threading.Thread.CurrentThread.CurrentCulture;
+        System.Globalization.CultureInfo originalUiCulture = System.Threading.Thread.CurrentThread.CurrentUICulture;
+        try
+        {
+            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+            System.Threading.Thread.CurrentThread.CurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
+
+            TakeoffPdfSummaryRowSource[] rows = new[]
+            {
+                new TakeoffPdfSummaryRowSource("Tree", "Maple", Count: 1, Quantity: 1, Unit: "ea", LineTotal: 1234.5m),
+            };
+
+            TakeoffPdfPayload payload = TakeoffPdfPayloadBuilder.BuildCustomerSummary(
+                firm: null, project: null, date: null, rows: rows);
+
+            Assert.Equal("$1,234.50", payload.Takeoff.Rows[0].Values["lineTotal"]);
+            Assert.Equal("$1,234.50", payload.Takeoff.GrandTotal);
+        }
+        finally
+        {
+            System.Threading.Thread.CurrentThread.CurrentCulture = originalCulture;
+            System.Threading.Thread.CurrentThread.CurrentUICulture = originalUiCulture;
+        }
+    }
+
+    [Fact]
+    public void BuildCustomerSummary_GuardsAgainstNullRows()
+    {
+        Assert.Throws<System.ArgumentNullException>(() =>
+            TakeoffPdfPayloadBuilder.BuildCustomerSummary(
+                firm: null, project: null, date: null, rows: null!));
+    }
 }

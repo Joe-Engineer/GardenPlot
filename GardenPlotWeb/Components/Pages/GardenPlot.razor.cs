@@ -2351,15 +2351,35 @@ public partial class GardenPlot
         {
             ReconcileTakeoff();
             IReadOnlyList<TakeoffItemRow> itemRows = BuildTakeoffItemRows();
-            List<TakeoffPdfRowSource> rowSources = itemRows
-                .Select(r => new TakeoffPdfRowSource(r.Kind, r.Name, r.LineTotal))
-                .ToList();
 
-            TakeoffPdfPayload payload = TakeoffPdfPayloadBuilder.BuildCustomer(
-                firm: library.Ui.FirmName,
-                project: currentPlot.Name,
-                date: FormatCustomerCutDate(library.Ui),
-                rows: rowSources);
+            TakeoffPdfPayload payload;
+            if (library.Ui.TakeoffViewMode == TakeoffViewMode.Item)
+            {
+                List<TakeoffPdfRowSource> rowSources = itemRows
+                    .Select(r => new TakeoffPdfRowSource(r.Kind, r.Name, r.LineTotal))
+                    .ToList();
+
+                payload = TakeoffPdfPayloadBuilder.BuildCustomer(
+                    firm: library.Ui.FirmName,
+                    project: currentPlot.Name,
+                    date: FormatCustomerCutDate(library.Ui),
+                    rows: rowSources);
+            }
+            else
+            {
+                // Summary / Aggregate view — one row per Kind+Name+Unit+Markup group.
+                IReadOnlyList<TakeoffAggregateRow> summaryRows = BuildTakeoffSummaryRows(itemRows);
+                List<TakeoffPdfSummaryRowSource> summarySources = summaryRows
+                    .Select(r => new TakeoffPdfSummaryRowSource(
+                        r.Kind, r.Name, r.Count, r.Quantity, r.Unit, r.LineTotal))
+                    .ToList();
+
+                payload = TakeoffPdfPayloadBuilder.BuildCustomerSummary(
+                    firm: library.Ui.FirmName,
+                    project: currentPlot.Name,
+                    date: FormatCustomerCutDate(library.Ui),
+                    rows: summarySources);
+            }
 
             await PreloadClientImagesAsync();
             await jsModule.InvokeVoidAsync("exportTakeoffPdf", canvasRef, payload);
