@@ -28,6 +28,13 @@ jobs:
           dotnet-version: '10.0.x'
           dotnet-quality: 'preview'
 
+      - name: Install wasm-tools workload
+        # Required for Blazor WASM AOT/relink/trim optimization. Without it,
+        # the published _framework/ payload is ~540 KB larger than a local
+        # `dotnet publish` and breaches the 3 MB Brotli first-paint budget
+        # enforced by GardenPlotWeb/Build/PayloadBudget.targets.
+        run: dotnet workload install wasm-tools
+
       - name: Publish GardenPlotWeb
         # Scope to the web project only; the Aspire AppHost is dev-only
         # and not deployed to App Service.
