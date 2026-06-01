@@ -1,5 +1,6 @@
-<Solution>
+﻿<Solution>
   <Project Path="GardenPlot.DataFetcher/GardenPlot.DataFetcher.csproj" />
   <Project Path="GardenPlotWeb/GardenPlotWeb.csproj" />
+  <Project Path="GardenPlotWeb.Host/GardenPlotWeb.Host.csproj" />
   <Project Path="GardenPlot.Tests/GardenPlot.Tests.csproj" />
 </Solution>
