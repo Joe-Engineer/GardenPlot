@@ -340,6 +340,182 @@ export function confirmAction(message) {
     return window.confirm(message || 'Are you sure?');
 }
 
+// ===== PDF export (Issue #6) =====
+// jsPDF + jspdf-autotable are bundled in wwwroot/lib/jspdf/ and lazy-loaded
+// on first export click to keep first-paint payload small.
+
+let pdfLibsPromise = null;
+
+function loadScriptOnce(src) {
+    return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[data-gp-lib="${src}"]`);
+        if (existing) { resolve(); return; }
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = false;
+        s.dataset.gpLib = src;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error(`Failed to load ${src}`));
+        document.head.appendChild(s);
+    });
+}
+
+async function ensurePdfLibs() {
+    if (window.jspdf && window.jspdf.jsPDF) return;
+    if (pdfLibsPromise) return pdfLibsPromise;
+    pdfLibsPromise = (async () => {
+        await loadScriptOnce('lib/jspdf/jspdf.umd.min.js');
+        await loadScriptOnce('lib/jspdf/jspdf.plugin.autotable.min.js');
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            pdfLibsPromise = null;
+            throw new Error('jsPDF failed to load (window.jspdf.jsPDF missing)');
+        }
+    })().catch((err) => {
+        pdfLibsPromise = null;
+        throw err;
+    });
+    return pdfLibsPromise;
+}
+
+// Rasterizes an SVG element to a PNG data URL at a target pixel width,
+// preserving aspect ratio. Used for embedding the plot snapshot into the PDF.
+async function rasterizeSvgToDataUrl(svgEl, targetWidthPx) {
+    const rect = svgEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+        throw new Error('SVG element has no rendered size');
+    }
+    const aspect = rect.height / rect.width;
+    const w = Math.max(1, Math.round(targetWidthPx));
+    const h = Math.max(1, Math.round(targetWidthPx * aspect));
+    const xml = new XMLSerializer().serializeToString(svgEl);
+    const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = dataUrl;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return { dataUrl: canvas.toDataURL('image/png'), width: w, height: h };
+}
+
+// Exports the takeoff (BOM) as a PDF using a structured payload built in C#.
+// Schema is versioned so the JS guards against C#-side drift.
+//
+// Payload shape (schemaVersion 1):
+//   { schemaVersion, fileName, firm, project, date, audience,
+//     plot: { headerTitle, includeSnapshot },
+//     takeoff: {
+//       headerTitle,
+//       columns: [{ header, dataKey, align }],
+//       rows:    [{ type: "row"|"subtotal", values: { [dataKey]: string } }],
+//       grandTotal: "string"
+//     } }
+export async function exportTakeoffPdf(svgEl, payload) {
+    if (!payload || payload.schemaVersion !== 1) {
+        throw new Error('Unsupported PDF payload schema (expected schemaVersion 1)');
+    }
+    await ensurePdfLibs();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 36; // 0.5 inch
+    const contentWidth = pageWidth - margin * 2;
+
+    // Cover header
+    let y = margin + 4;
+    doc.setFont('helvetica', 'bold').setFontSize(16);
+    if (payload.firm) { doc.text(String(payload.firm), margin, y); y += 22; }
+    doc.setFont('helvetica', 'normal').setFontSize(12);
+    if (payload.project) { doc.text(String(payload.project), margin, y); y += 16; }
+    if (payload.date) { doc.text(String(payload.date), margin, y); y += 22; }
+
+    // Plot snapshot
+    if (svgEl && (payload.plot?.includeSnapshot !== false)) {
+        doc.setFont('helvetica', 'bold').setFontSize(13);
+        doc.text(payload.plot?.headerTitle || 'Plot', margin, y);
+        y += 12;
+        try {
+            // Target ~200 DPI at the content width.
+            // pt = 72/inch, so contentWidth pt at 200 DPI = contentWidth * 200/72 px.
+            const targetPx = Math.round(contentWidth * 200 / 72);
+            const cappedPx = Math.min(targetPx, 2400); // memory cap
+            const img = await rasterizeSvgToDataUrl(svgEl, cappedPx);
+            const drawW = contentWidth;
+            const drawH = (img.height / img.width) * drawW;
+            const maxH = pageHeight - y - margin;
+            const finalH = Math.min(drawH, maxH);
+            const finalW = (img.width / img.height) * finalH;
+            doc.addImage(img.dataUrl, 'PNG', margin, y, finalW, finalH);
+        } catch (err) {
+            doc.setFontSize(9).setTextColor('#a00');
+            doc.text(`(Plot snapshot unavailable: ${err.message || err})`, margin, y);
+            doc.setTextColor(0, 0, 0);
+        }
+    }
+
+    // BOM table (new page)
+    doc.addPage();
+    doc.setFont('helvetica', 'bold').setFontSize(13);
+    doc.text(payload.takeoff?.headerTitle || 'Bill of Materials', margin, margin + 4);
+
+    const cols = Array.isArray(payload.takeoff?.columns) ? payload.takeoff.columns : [];
+    const rows = Array.isArray(payload.takeoff?.rows) ? payload.takeoff.rows : [];
+    const head = [cols.map((c) => c.header)];
+    const body = rows.map((r) =>
+        cols.map((c) => (r.values && r.values[c.dataKey] != null) ? String(r.values[c.dataKey]) : ''));
+
+    const columnStyles = {};
+    cols.forEach((c, idx) => { columnStyles[idx] = { halign: c.align || 'left' }; });
+
+    const foot = payload.takeoff?.grandTotal
+        ? [[...cols.slice(0, -1).map(() => ''), `Total: ${payload.takeoff.grandTotal}`]]
+        : undefined;
+
+    doc.autoTable({
+        startY: margin + 16,
+        margin: { left: margin, right: margin },
+        head,
+        body,
+        foot,
+        theme: 'striped',
+        headStyles: { fillColor: [60, 60, 60], textColor: 255, fontStyle: 'bold' },
+        footStyles: { fillColor: [220, 220, 220], textColor: 20, fontStyle: 'bold', halign: 'right' },
+        styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' },
+        columnStyles,
+        didParseCell: (data) => {
+            if (data.section !== 'body') return;
+            const row = rows[data.row.index];
+            if (row && row.type === 'subtotal') {
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fillColor = [235, 235, 235];
+            }
+        },
+    });
+
+    // Page footer
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(110, 110, 110);
+        doc.text(
+            `Generated by GardenPlot \u00B7 ${payload.date || ''} \u00B7 Page ${i} of ${totalPages}`,
+            pageWidth / 2,
+            pageHeight - 16,
+            { align: 'center' });
+    }
+
+    doc.save(payload.fileName || 'takeoff.pdf');
+}
+
 const gpDbName = 'gardenplot-db';
 const gpStore = 'kv';
 let gpDbPromise = null;

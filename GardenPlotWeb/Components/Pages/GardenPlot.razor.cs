@@ -341,6 +341,18 @@ public partial class GardenPlot
         selectedTakeoffCategory = category;
     }
 
+    /// <summary>
+    /// Issue #6 — true while the takeoff PDF is being generated (libs lazy-loading
+    /// + raster + autotable). Drives the button's busy state in the razor markup.
+    /// </summary>
+    private bool pdfExporting;
+
+    /// <summary>
+    /// Issue #6 — set when the most recent PDF export attempt failed. Shown
+    /// next to the export buttons; cleared on the next successful export.
+    /// </summary>
+    private string? pdfExportError;
+
     private TakeoffItem? EditingTakeoff =>
         editingTakeoffId is int id && currentPlot is not null
             ? currentPlot.Takeoff.FirstOrDefault(t => t.Id == id)
@@ -2314,6 +2326,52 @@ public partial class GardenPlot
         catch
         {
             // ignore
+        }
+    }
+
+    /// <summary>
+    /// Issue #6 — exports the current takeoff as a customer-safe PDF (plot
+    /// snapshot + grouped BOM). Lazy-loads jsPDF + jspdf-autotable on first
+    /// click; payload is built by <see cref="TakeoffPdfPayloadBuilder.BuildCustomer"/>.
+    /// V1 is always customer view regardless of <c>ShowInternalView</c> to avoid
+    /// leaking labor cost/markup into a shareable artifact.
+    /// </summary>
+    private async Task ExportTakeoffPdf()
+    {
+        if (jsModule is null || currentPlot is null)
+        {
+            return;
+        }
+
+        pdfExporting = true;
+        pdfExportError = null;
+        StateHasChanged();
+
+        try
+        {
+            ReconcileTakeoff();
+            IReadOnlyList<TakeoffItemRow> itemRows = BuildTakeoffItemRows();
+            List<TakeoffPdfRowSource> rowSources = itemRows
+                .Select(r => new TakeoffPdfRowSource(r.Kind, r.Name, r.LineTotal))
+                .ToList();
+
+            TakeoffPdfPayload payload = TakeoffPdfPayloadBuilder.BuildCustomer(
+                firm: library.Ui.FirmName,
+                project: currentPlot.Name,
+                date: FormatCustomerCutDate(library.Ui),
+                rows: rowSources);
+
+            await PreloadClientImagesAsync();
+            await jsModule.InvokeVoidAsync("exportTakeoffPdf", canvasRef, payload);
+        }
+        catch (Exception ex)
+        {
+            pdfExportError = $"PDF export failed: {ex.Message}";
+        }
+        finally
+        {
+            pdfExporting = false;
+            StateHasChanged();
         }
     }
 

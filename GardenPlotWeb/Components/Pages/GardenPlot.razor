@@ -2374,10 +2374,17 @@ else
                             <button class="btn btn-sm btn-outline-secondary" @onclick="ExportTakeoffCsv" title="Download as CSV">
                                 Download CSV
                             </button>
-                            @* TODO(issue #6): wire a dedicated takeoff PDF exporter once a PDF library is added. *@
-                            <button class="btn btn-sm btn-outline-secondary" type="button" disabled title="PDF export pending follow-up issue #6">
-                                PDF pending (#6)
+                            @* Issue #6 — customer-safe PDF (plot snapshot + BOM). Libs lazy-load on first click. *@
+                            <button class="btn btn-sm btn-outline-secondary" type="button"
+                                    @onclick="ExportTakeoffPdf"
+                                    disabled="@pdfExporting"
+                                    title="Download as PDF (customer view: Kind / Item / Line total)">
+                                @(pdfExporting ? "Generating PDF\u2026" : "Download PDF")
                             </button>
+                            @if (!string.IsNullOrEmpty(pdfExportError))
+                            {
+                                <span class="small text-danger" role="alert">@pdfExportError</span>
+                            }
                         </div>
                     </div>
 
