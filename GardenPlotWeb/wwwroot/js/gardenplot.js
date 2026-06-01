@@ -379,15 +379,66 @@ async function ensurePdfLibs() {
 
 // Rasterizes an SVG element to a PNG data URL at a target pixel width,
 // preserving aspect ratio. Used for embedding the plot snapshot into the PDF.
-async function rasterizeSvgToDataUrl(svgEl, targetWidthPx) {
-    const rect = svgEl.getBoundingClientRect();
-    if (!rect.width || !rect.height) {
-        throw new Error('SVG element has no rendered size');
+//
+// When opts.fitToContent is true (default for PDF export), the snapshot uses
+// the actual SVG content bounding box (svgEl.getBBox()) instead of the current
+// viewport rect — so shapes panned off-screen still appear in the PDF.
+// opts.paddingFrac (default 0.04) adds breathing room around the content.
+async function rasterizeSvgToDataUrl(svgEl, targetWidthPx, opts) {
+    const fitToContent = opts ? opts.fitToContent !== false : true;
+    const paddingFrac = opts && typeof opts.paddingFrac === 'number' ? opts.paddingFrac : 0.04;
+
+    let xml;
+    let aspect;
+
+    if (fitToContent) {
+        // getBBox returns the bounding box of all rendered descendants in the SVG's
+        // user-coordinate space, regardless of current pan/zoom or viewport scroll.
+        let bbox;
+        try {
+            bbox = svgEl.getBBox();
+        } catch (err) {
+            bbox = null;
+        }
+        if (!bbox || !bbox.width || !bbox.height) {
+            // Fall back to the viewport rect if the SVG has no rendered content (or
+            // getBBox isn't supported, e.g. in some test environments).
+            return rasterizeSvgToDataUrl(svgEl, targetWidthPx, { fitToContent: false });
+        }
+
+        // Inflate the content bbox by paddingFrac on each side so shapes don't
+        // butt up against the page edge in the PDF.
+        const pad = Math.max(bbox.width, bbox.height) * paddingFrac;
+        const vbX = bbox.x - pad;
+        const vbY = bbox.y - pad;
+        const vbW = bbox.width + pad * 2;
+        const vbH = bbox.height + pad * 2;
+        aspect = vbH / vbW;
+
+        // Clone deep so we can retarget the viewBox without mutating the live SVG.
+        // The clone inherits all child elements (shapes, labels, client images) —
+        // pan/zoom transforms applied by Blazor on the root <g> are still in there,
+        // but the new viewBox now covers the full content extent.
+        const clone = svgEl.cloneNode(true);
+        clone.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
+        // Strip width/height pixel attributes so the SVG scales to whatever size
+        // we feed it via the <img> element.
+        clone.removeAttribute('width');
+        clone.removeAttribute('height');
+        // preserveAspectRatio default is xMidYMid meet — letterbox if needed.
+        clone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        xml = new XMLSerializer().serializeToString(clone);
+    } else {
+        const rect = svgEl.getBoundingClientRect();
+        if (!rect.width || !rect.height) {
+            throw new Error('SVG element has no rendered size');
+        }
+        aspect = rect.height / rect.width;
+        xml = new XMLSerializer().serializeToString(svgEl);
     }
-    const aspect = rect.height / rect.width;
+
     const w = Math.max(1, Math.round(targetWidthPx));
     const h = Math.max(1, Math.round(targetWidthPx * aspect));
-    const xml = new XMLSerializer().serializeToString(svgEl);
     const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
     const img = new Image();
     img.crossOrigin = 'anonymous';
