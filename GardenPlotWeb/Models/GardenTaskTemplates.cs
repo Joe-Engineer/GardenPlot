@@ -1,4 +1,4 @@
-// <copyright file="GardenTaskTemplates.cs" company="Garden Plot">
+﻿// <copyright file="GardenTaskTemplates.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -86,41 +86,19 @@ public static class GardenTaskTemplates
             return "Plant";
         }
 
-        if (!string.IsNullOrWhiteSpace(shape.GroundCoverCode))
+        // Issue #136 — delegate the "what material category is this?" decision to
+        // SurfaceMaterialResolver, which checks the typed Shape.SurfaceMaterialCode
+        // first and falls back to the high-confidence inference rules. Replaces the
+        // earlier per-feature fuzzy substring matcher so all consumers agree.
+        string? surfaceCode = SurfaceMaterialResolver.Resolve(shape);
+        if (surfaceCode == SurfaceMaterials.Mulch)
         {
-            PaletteItem? material = PaletteCatalog.GroundCoverMaterials
-                .Concat(PaletteCatalog.GroundCoverSurfaceCovers)
-                .Concat(PaletteCatalog.Grasses)
-                .FirstOrDefault(item => string.Equals(item.Code, shape.GroundCoverCode, StringComparison.OrdinalIgnoreCase));
+            return "Mulch";
+        }
 
-            if (material is not null)
-            {
-                if (material.Kind == PaletteKind.GroundCover &&
-                    (string.Equals(material.Trait, "mulch", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(material.Trait, "bark", StringComparison.OrdinalIgnoreCase)))
-                {
-                    return "Mulch";
-                }
-
-                if (material.Kind == PaletteKind.GroundCoverSurface &&
-                    (material.Trait.Contains("grass", StringComparison.OrdinalIgnoreCase) ||
-                     material.Code.Contains("lawn", StringComparison.OrdinalIgnoreCase)))
-                {
-                    return "Lawn";
-                }
-            }
-
-            if (shape.GroundCoverCode.Contains("mulch", StringComparison.OrdinalIgnoreCase) ||
-                shape.GroundCoverCode.Contains("bark", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Mulch";
-            }
-
-            if (shape.GroundCoverCode.Contains("lawn", StringComparison.OrdinalIgnoreCase) ||
-                shape.GroundCoverCode.Contains("grass", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Lawn";
-            }
+        if (surfaceCode == SurfaceMaterials.Lawn)
+        {
+            return "Lawn";
         }
 
         return null;

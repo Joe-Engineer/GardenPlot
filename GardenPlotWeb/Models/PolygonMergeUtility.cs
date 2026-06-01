@@ -133,6 +133,10 @@ public static class PolygonMergeUtility
         merged.GroundCoverCode = styleCarrier.GroundCoverCode;
         merged.GroundCoverDepthIn = styleCarrier.GroundCoverDepthIn;
         merged.IsGroundCoverSurface = styleCarrier.IsGroundCoverSurface;
+        // Issue #136 — merged polygon inherits SurfaceMaterial from the style carrier
+        // so a "Lawn + Lawn" merge stays Lawn, and material-aware downstream logic
+        // (edge defaults, irrigation, BOM) sees the same tag on the merged result.
+        merged.SurfaceMaterialCode = styleCarrier.SurfaceMaterialCode;
         merged.TextureKey = styleCarrier.TextureKey;
         merged.TextureImageId = styleCarrier.TextureImageId;
         merged.FontScale = styleCarrier.FontScale;

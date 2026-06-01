@@ -480,6 +480,24 @@ public sealed class PlotLibraryLoader
                 {
                     shapeObject["DepthIn"] = legacyDepthNode.DeepClone();
                 }
+
+                // Issue #136 — for shapes saved before SurfaceMaterialCode existed, try
+                // a conservative inference from the existing material/ground-cover code
+                // so common cases (mulch beds, lawns, gravel paths) get their typed
+                // surface tag automatically. Ambiguous cases stay null — the resolver
+                // is intentionally narrow (Mulch/Bark/Gravel/Lawn substrings only).
+                string? existingSurface = shapeObject["SurfaceMaterialCode"]?.GetValue<string>();
+                if (string.IsNullOrWhiteSpace(existingSurface))
+                {
+                    string? inferenceSource = !string.IsNullOrWhiteSpace(materialCode)
+                        ? materialCode
+                        : legacyCode;
+                    string? inferred = SurfaceMaterialResolver.InferFromCatalogCode(inferenceSource);
+                    if (inferred is not null)
+                    {
+                        shapeObject["SurfaceMaterialCode"] = inferred;
+                    }
+                }
             }
         }
     }
