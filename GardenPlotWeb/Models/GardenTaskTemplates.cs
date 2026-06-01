@@ -86,17 +86,42 @@ public static class GardenTaskTemplates
             return "Plant";
         }
 
-        // Issue #136 — delegate the "what material category is this?" decision to
-        // SurfaceMaterialResolver, which checks the typed Shape.SurfaceMaterialCode
-        // first and falls back to the high-confidence inference rules. Replaces the
-        // earlier per-feature fuzzy substring matcher so all consumers agree.
-        string? surfaceCode = SurfaceMaterialResolver.Resolve(shape);
-        if (surfaceCode == SurfaceMaterials.Mulch)
+        // Issue #136 — material-driven task category. Delegates to a single
+        // inference helper so we don't have two competing fuzzy-matchers
+        // (one here, another in some future #136 follow-up). MaterialCode is
+        // checked before the legacy GroundCoverCode field.
+        string? candidate = !string.IsNullOrWhiteSpace(shape.MaterialCode)
+            ? shape.MaterialCode
+            : shape.GroundCoverCode;
+        return InferTaskCategoryFromCatalogCode(candidate);
+    }
+
+    /// <summary>
+    /// Issue #136 — high-confidence material → task-category inference. Mirrors
+    /// the (intentionally narrow) trigger words this code used to inline:
+    /// mulch / bark anywhere → "Mulch"; lawn / grass / common turfgrass cultivars
+    /// → "Lawn". Returns null for anything ambiguous (soil, sand, compost, stone,
+    /// gravel, non-turf ground covers) so the caller doesn't synthesize the
+    /// wrong calendar task.
+    /// </summary>
+    private static string? InferTaskCategoryFromCatalogCode(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return null;
+        }
+
+        string lower = code.ToLowerInvariant();
+
+        if (lower.Contains("mulch") || lower.Contains("bark"))
         {
             return "Mulch";
         }
 
-        if (surfaceCode == SurfaceMaterials.Lawn)
+        if (lower.Contains("lawn") || lower.Contains("grass") ||
+            lower.Contains("fescue") || lower.Contains("bermuda") ||
+            lower.Contains("zoysia") || lower.Contains("ryegrass") ||
+            lower.Contains("bluegrass"))
         {
             return "Lawn";
         }
