@@ -342,7 +342,7 @@ public partial class GardenPlot
     }
 
     /// <summary>
-    /// Issue #6 — true while the takeoff PDF is being generated (libs lazy-loading
+    /// Issue #6 — set when the takeoff PDF is being generated (libs lazy-loading
     /// + raster + autotable). Drives the button's busy state in the razor markup.
     /// </summary>
     private bool pdfExporting;
@@ -352,6 +352,14 @@ public partial class GardenPlot
     /// next to the export buttons; cleared on the next successful export.
     /// </summary>
     private string? pdfExportError;
+
+    /// <summary>
+    /// Issue #6 — while true, <see cref="IsShapeInViewport"/> returns true for
+    /// every shape so the SVG snapshot used for the PDF includes off-screen
+    /// content. Toggled by <see cref="ExportTakeoffPdf"/> for the duration of
+    /// the export only; layer-visibility checks still apply.
+    /// </summary>
+    private bool disableViewportCullingForExport;
 
     private TakeoffItem? EditingTakeoff =>
         editingTakeoffId is int id && currentPlot is not null
@@ -465,6 +473,14 @@ public partial class GardenPlot
 
     private bool IsShapeInViewport(Shape shape)
     {
+        // Issue #6 — when exporting the plot to PDF we temporarily disable
+        // viewport culling so off-screen shapes land in the DOM and survive
+        // the SVG snapshot. Reset by the export orchestrator's finally block.
+        if (disableViewportCullingForExport)
+        {
+            return true;
+        }
+
         if (viewportScrollLeftPx is not double scrollLeft
             || viewportScrollTopPx is not double scrollTop
             || viewportClientWidthPx is not double clientWidth
@@ -2381,6 +2397,19 @@ public partial class GardenPlot
                     rows: summarySources);
             }
 
+            // Disable viewport culling and force a render so EVERY shape lands in the
+            // DOM — even ones panned off-screen or out of the current zoom area.
+            // Without this the SVG snapshot only sees what's currently visible,
+            // and off-screen content silently drops from the PDF.
+            disableViewportCullingForExport = true;
+            StateHasChanged();
+            // Yield so the queued render flushes to the DOM before we snapshot.
+            // Two awaits because StateHasChanged() queues, OnAfterRenderAsync runs
+            // after the render commits — a small delay gives async-loaded children
+            // (client images) a chance to settle before serialization.
+            await Task.Yield();
+            await Task.Delay(50);
+
             await PreloadClientImagesAsync();
             await jsModule.InvokeVoidAsync("exportTakeoffPdf", canvasRef, payload);
         }
@@ -2390,6 +2419,9 @@ public partial class GardenPlot
         }
         finally
         {
+            // Always restore viewport culling so the editor doesn't keep paying
+            // the render cost of off-screen shapes.
+            disableViewportCullingForExport = false;
             pdfExporting = false;
             StateHasChanged();
         }
