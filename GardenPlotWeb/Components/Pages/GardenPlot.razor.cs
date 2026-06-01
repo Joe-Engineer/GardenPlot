@@ -314,6 +314,33 @@ public partial class GardenPlot
     private double takeoffContextMenuY;
     private int? takeoffContextMenuItemId;
     private int? editingTakeoffId;
+
+    /// <summary>
+    /// Issue #139 — active category filter for the Takeoff panel. <see langword="null"/>
+    /// means "All". Set by clicking a category-filter pill at the top of the panel.
+    /// Not persisted to disk; resets to "All" on session reload.
+    /// </summary>
+    private TakeoffCategory? selectedTakeoffCategory;
+
+    /// <summary>
+    /// Issue #139 — applies the active <see cref="selectedTakeoffCategory"/> filter to a
+    /// freshly-built takeoff row list. When the filter is null, returns the input unchanged.
+    /// </summary>
+    private IReadOnlyList<TakeoffItemRow> ApplyTakeoffCategoryFilter(IReadOnlyList<TakeoffItemRow> rows)
+    {
+        if (selectedTakeoffCategory is not { } filter)
+        {
+            return rows;
+        }
+
+        return rows.Where(r => TakeoffCategoryClassifier.Classify(r.Kind) == filter).ToList();
+    }
+
+    private void SetTakeoffCategoryFilter(TakeoffCategory? category)
+    {
+        selectedTakeoffCategory = category;
+    }
+
     private TakeoffItem? EditingTakeoff =>
         editingTakeoffId is int id && currentPlot is not null
             ? currentPlot.Takeoff.FirstOrDefault(t => t.Id == id)
