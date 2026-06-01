@@ -1,4 +1,4 @@
-// <copyright file="GardenTaskTests.cs" company="Garden Plot">
+﻿// <copyright file="GardenTaskTests.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -181,5 +181,51 @@ public sealed class GardenTaskTests
         Assert.Contains(GardenTaskTemplates.GetTemplatesForShape(hydrangea), template => template.Title == "Prune after flowering");
         Assert.Contains(GardenTaskTemplates.GetTemplatesForShape(mulchArea), template => template.Title == "Top dress mulch");
         Assert.Contains(GardenTaskTemplates.GetTemplatesForShape(lawnArea), template => template.Title == "Mow");
+    }
+
+    // Issue #136 — pin the inlined inference helper so future PRs can rely on
+    // its contract: MaterialCode is checked before GroundCoverCode, and the
+    // matcher only triggers on a narrow whitelist of confident keywords.
+    [Theory]
+    [InlineData("Cedar Mulch", "Mulch")]
+    [InlineData("Hardwood Mulch", "Mulch")]
+    [InlineData("Pine Bark (Large)", "Mulch")]
+    [InlineData("Bark Chips", "Mulch")]
+    [InlineData("Lawn (Bluegrass)", "Lawn")]
+    [InlineData("Kentucky Bluegrass Seed", "Lawn")]
+    [InlineData("Tall Fescue Seed", "Lawn")]
+    [InlineData("Bermuda Seed", "Lawn")]
+    [InlineData("Zoysia Sod", "Lawn")]
+    [InlineData("Perennial Ryegrass Seed", "Lawn")]
+    public void GardenTaskTemplates_GetCatalogKind_MaterialCodeWins(string materialCode, string expected)
+    {
+        // MaterialCode is the modern field; GroundCoverCode is the legacy one
+        // we still read for v4 doc compatibility. The inference path must
+        // prefer MaterialCode when both are set or only MaterialCode is set.
+        Shape shape = new() { Kind = ShapeKind.Rectangle, MaterialCode = materialCode };
+        Assert.Equal(expected, GardenTaskTemplates.GetCatalogKind(shape));
+    }
+
+    [Theory]
+    [InlineData("Topsoil")]           // soil — bed input, not a use
+    [InlineData("Garden Mix")]        // soil
+    [InlineData("Compost")]           // amendment
+    [InlineData("Sand (Coarse)")]     // sand — paver bed or sandbox or beach
+    [InlineData("Pea Gravel")]        // gravel — many uses; doesn't trigger Mow or Mulch tasks
+    [InlineData("River Rock")]        // stone — decorative
+    [InlineData("Creeping Thyme")]    // living ground cover, not turf
+    [InlineData("Sedum (Stonecrop)")] // succulent, not turf
+    [InlineData("")]
+    public void GardenTaskTemplates_GetCatalogKind_AmbiguousReturnsNull(string code)
+    {
+        Shape shape = new() { Kind = ShapeKind.Rectangle, MaterialCode = code };
+        Assert.Null(GardenTaskTemplates.GetCatalogKind(shape));
+    }
+
+    [Fact]
+    public void GardenTaskTemplates_GetCatalogKind_NoMaterial_NoGroundCover_ReturnsNull()
+    {
+        Shape bareRectangle = new() { Kind = ShapeKind.Rectangle };
+        Assert.Null(GardenTaskTemplates.GetCatalogKind(bareRectangle));
     }
 }

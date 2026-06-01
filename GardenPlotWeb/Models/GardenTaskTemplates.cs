@@ -1,4 +1,4 @@
-// <copyright file="GardenTaskTemplates.cs" company="Garden Plot">
+﻿// <copyright file="GardenTaskTemplates.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -86,41 +86,44 @@ public static class GardenTaskTemplates
             return "Plant";
         }
 
-        if (!string.IsNullOrWhiteSpace(shape.GroundCoverCode))
+        // Issue #136 — material-driven task category. Delegates to a single
+        // inference helper so we don't have two competing fuzzy-matchers
+        // (one here, another in some future #136 follow-up). MaterialCode is
+        // checked before the legacy GroundCoverCode field.
+        string? candidate = !string.IsNullOrWhiteSpace(shape.MaterialCode)
+            ? shape.MaterialCode
+            : shape.GroundCoverCode;
+        return InferTaskCategoryFromCatalogCode(candidate);
+    }
+
+    /// <summary>
+    /// Issue #136 — high-confidence material → task-category inference. Mirrors
+    /// the (intentionally narrow) trigger words this code used to inline:
+    /// mulch / bark anywhere → "Mulch"; lawn / grass / common turfgrass cultivars
+    /// → "Lawn". Returns null for anything ambiguous (soil, sand, compost, stone,
+    /// gravel, non-turf ground covers) so the caller doesn't synthesize the
+    /// wrong calendar task.
+    /// </summary>
+    private static string? InferTaskCategoryFromCatalogCode(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
         {
-            PaletteItem? material = PaletteCatalog.GroundCoverMaterials
-                .Concat(PaletteCatalog.GroundCoverSurfaceCovers)
-                .Concat(PaletteCatalog.Grasses)
-                .FirstOrDefault(item => string.Equals(item.Code, shape.GroundCoverCode, StringComparison.OrdinalIgnoreCase));
+            return null;
+        }
 
-            if (material is not null)
-            {
-                if (material.Kind == PaletteKind.GroundCover &&
-                    (string.Equals(material.Trait, "mulch", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(material.Trait, "bark", StringComparison.OrdinalIgnoreCase)))
-                {
-                    return "Mulch";
-                }
+        string lower = code.ToLowerInvariant();
 
-                if (material.Kind == PaletteKind.GroundCoverSurface &&
-                    (material.Trait.Contains("grass", StringComparison.OrdinalIgnoreCase) ||
-                     material.Code.Contains("lawn", StringComparison.OrdinalIgnoreCase)))
-                {
-                    return "Lawn";
-                }
-            }
+        if (lower.Contains("mulch") || lower.Contains("bark"))
+        {
+            return "Mulch";
+        }
 
-            if (shape.GroundCoverCode.Contains("mulch", StringComparison.OrdinalIgnoreCase) ||
-                shape.GroundCoverCode.Contains("bark", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Mulch";
-            }
-
-            if (shape.GroundCoverCode.Contains("lawn", StringComparison.OrdinalIgnoreCase) ||
-                shape.GroundCoverCode.Contains("grass", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Lawn";
-            }
+        if (lower.Contains("lawn") || lower.Contains("grass") ||
+            lower.Contains("fescue") || lower.Contains("bermuda") ||
+            lower.Contains("zoysia") || lower.Contains("ryegrass") ||
+            lower.Contains("bluegrass"))
+        {
+            return "Lawn";
         }
 
         return null;
