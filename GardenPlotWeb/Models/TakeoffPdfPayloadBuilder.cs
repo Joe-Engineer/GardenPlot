@@ -142,8 +142,12 @@ public static class TakeoffPdfPayloadBuilder
 
     private static string FormatCurrency(decimal? amount)
     {
+        // Blazor WASM runs in invariant-culture mode by default (smaller payload),
+        // so GetCultureInfo("en-US") throws. The "#,##0.00" format honors the
+        // InvariantCulture group separator (",") and decimal point (".") — gives
+        // us US-style thousands separators without loading a specific culture.
         return amount is decimal v
-            ? v.ToString("C", CultureInfo.GetCultureInfo("en-US"))
+            ? "$" + v.ToString("#,##0.00", CultureInfo.InvariantCulture)
             : string.Empty;
     }
 }

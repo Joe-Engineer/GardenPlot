@@ -136,6 +136,42 @@ public class TakeoffPdfPayloadBuilderTests
     }
 
     [Fact]
+    public void BuildCustomer_FormatsCurrencyInInvariantCultureMode()
+    {
+        // Regression for Issue #6: Blazor WASM runs in invariant-culture mode
+        // by default. Any internal call to CultureInfo.GetCultureInfo("en-US")
+        // or ToString("C", ...) without a culture would throw at runtime
+        // (Argument_CultureNotSupportedInInvariantMode). Force invariant for
+        // the duration of this test to mimic the WASM environment.
+        System.Globalization.CultureInfo originalCulture = System.Threading.Thread.CurrentThread.CurrentCulture;
+        System.Globalization.CultureInfo originalUiCulture = System.Threading.Thread.CurrentThread.CurrentUICulture;
+        try
+        {
+            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+            System.Threading.Thread.CurrentThread.CurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
+
+            TakeoffPdfRowSource[] rows = new[]
+            {
+                new TakeoffPdfRowSource("Tree", "Maple", 1234.5m),
+                new TakeoffPdfRowSource("Tree", "Oak", 2345.6m),
+            };
+
+            // Must not throw — this is the exact failure mode we hit on 2026-05-31.
+            TakeoffPdfPayload payload = TakeoffPdfPayloadBuilder.BuildCustomer(
+                firm: null, project: null, date: null, rows: rows);
+
+            Assert.Equal("$1,234.50", payload.Takeoff.Rows[0].Values["lineTotal"]);
+            Assert.Equal("$2,345.60", payload.Takeoff.Rows[1].Values["lineTotal"]);
+            Assert.Equal("$3,580.10", payload.Takeoff.GrandTotal);
+        }
+        finally
+        {
+            System.Threading.Thread.CurrentThread.CurrentCulture = originalCulture;
+            System.Threading.Thread.CurrentThread.CurrentUICulture = originalUiCulture;
+        }
+    }
+
+    [Fact]
     public void BuildCustomer_NullProjectName_FallsBackToGardenPlotInFileName()
     {
         TakeoffPdfPayload payload = TakeoffPdfPayloadBuilder.BuildCustomer(
