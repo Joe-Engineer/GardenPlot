@@ -110,6 +110,26 @@ public abstract class DrawingJig
     public virtual Shape? BeginFreehand(Point at, DrawingContext context) => null;
 
     /// <summary>
+    /// Along-path placement entry. Given an existing source-path shape on the canvas
+    /// + a drawing-set recipe of rows, materialize the per-row stripes / fills /
+    /// stamps that follow the path. Unlike the other Begin/Finalize hooks, this one
+    /// is INPUT-driven (Shape + rows) rather than gesture-driven (Point); the user's
+    /// click that triggered it is implicit.
+    /// </summary>
+    /// <remarks>
+    /// The Jig is pure-function over the request — drawing-set + FillArea bit
+    /// resolution lives in the page (it consults <c>GetSelectedDrawingSet</c>). The
+    /// page assembles the request and invokes this method; the result's Shapes /
+    /// Groups are added to the plot by the page.
+    ///
+    /// Returns <see langword="null"/> when this Jig doesn't handle along-path
+    /// placement (most Jigs).
+    /// </remarks>
+    public virtual AlongPathPlacementResult? BuildAlongPathPlacement(
+        AlongPathPlacementRequest request,
+        DrawingContext context) => null;
+
+    /// <summary>
     /// Polyline-by-click finalize. Called when the user double-clicks / presses
     /// Enter / closes the polyline. The Jig takes the committed point list and
     /// produces a Shape. Returns null if this Jig doesn't handle polyline-by-click.

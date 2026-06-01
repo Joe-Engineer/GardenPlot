@@ -7470,44 +7470,11 @@ public partial class GardenPlot
     /// stamped with the row's material code, fill, stroke, texture, and depth so the
     /// downstream takeoff + BOM treat it as a ground-cover instance.
     /// </summary>
+    /// <summary>
+    /// Issue #95 PR 10 — delegate to <see cref="AlongPathStripeBuilder.BuildFilledArea"/>.
+    /// </summary>
     private static Shape? BuildFilledAreaShapeForRow(PaletteItem item, Shape sourcePath, bool assignNewIds)
-    {
-        if (sourcePath is null || item is null)
-        {
-            return null;
-        }
-
-        Shape fill = new()
-        {
-            Kind = sourcePath.Kind,
-            X = sourcePath.X,
-            Y = sourcePath.Y,
-            W = sourcePath.W,
-            H = sourcePath.H,
-            Rotation = sourcePath.Rotation,
-            CloseEdge = sourcePath.Kind == ShapeKind.FreeDraw ? true : sourcePath.CloseEdge,
-            Points = sourcePath.Points.Select(p => new Point(p.X, p.Y)).ToList(),
-            EdgeBulges = sourcePath.EdgeBulges is null ? null : new List<double>(sourcePath.EdgeBulges),
-            Fill = item.FillColor,
-            Stroke = item.StrokeColor,
-            TextureKey = item.TextureKey,
-            MaterialCode = item.Code,
-            IsGroundCoverSurface = item.MaterialSoldBy == MaterialSoldBy.Area,
-        };
-
-        if (item.DefaultDepthIn is double d)
-        {
-            fill.DepthIn = d;
-            fill.GroundCoverDepthIn = d;
-        }
-
-        if (!assignNewIds)
-        {
-            fill.Id = Guid.Empty;
-        }
-
-        return fill;
-    }
+        => AlongPathStripeBuilder.BuildFilledArea(item, sourcePath, assignNewIds);
 
     /// <summary>
     /// Issue #138 — builds a non-committal preview of where the active drawing set would
@@ -7862,149 +7829,34 @@ public partial class GardenPlot
         Shape sourcePath,
         bool assignNewIds)
     {
-        var (points, closed) = ResolvePathPoints(sourcePath);
-        if (points.Count < 2 || rows.Count == 0)
-        {
-            return new StampPlacement();
-        }
-
-        // Issue #138 — partition rows by visual kind. Stripe rows (GroundCover,
-        // GroundCoverSurface, Edging) render as continuous ribbon polygons; stamp rows
-        // continue through the existing tile-along-path pipeline below. FillArea rows
-        // (for stripes) become a single solid polygon matching the source interior.
-        var stripeShapes = new List<Shape>();
-        var stampRowIndices = new List<int>();
-        var stampRowsResolved = new List<(PaletteItem Item, AlongPathRowSpec Spec)>();
+        // Issue #95 PR 10 — the entire body of this method moved to
+        // AlongPathPlacementBuilder + dispatched via StampDrawingJig. Page-side
+        // responsibility shrinks to: resolve FillArea bits per row (uses page
+        // state via TryGetFillAreaForRow), assemble the request, invoke the Jig,
+        // adapt the Jig's AlongPathPlacementResult into the page's internal
+        // StampPlacement.
+        var enrichedRows = new AlongPathRowRequest[rows.Count];
         for (int i = 0; i < rows.Count; i++)
         {
-            var (item, spec) = rows[i];
-            // FillArea bit isn't on the spec record; consult the source drawing-set row.
-            // Pull it from the page's editingDrawingSet OR the currentlySelected set —
-            // the callers pass rows derived from a real AlongPathDrawingSet; the FillArea
-            // flag is carried via the alignment slot trick below.
-            var visualKind = GardenPlotWeb.Models.DrawingSetPreview.VisualKindFor(item.Kind);
-            bool fillArea = TryGetFillAreaForRow(item, i);
-            if (visualKind == GardenPlotWeb.Models.DrawingSetPreview.RowVisualKind.Stripe)
-            {
-                if (fillArea && closed)
-                {
-                    Shape? fill = BuildFilledAreaShapeForRow(item, sourcePath, assignNewIds);
-                    if (fill is not null)
-                    {
-                        stripeShapes.Add(fill);
-                    }
-                }
-                else
-                {
-                    Shape? stripe = TryBuildStripeShape(item, spec, points, sourcePath.EdgeBulges, closed, assignNewIds);
-                    if (stripe is not null)
-                    {
-                        stripeShapes.Add(stripe);
-                    }
-                }
-            }
-            else
-            {
-                // Stamp rows with FillArea will gain Fill-with-plants integration in a
-                // follow-up; for now they fall through to the existing tile-along-path
-                // pipeline so behaviour stays predictable.
-                stampRowIndices.Add(i);
-                stampRowsResolved.Add(rows[i]);
-            }
+            enrichedRows[i] = new AlongPathRowRequest(
+                rows[i].Item,
+                rows[i].Spec,
+                TryGetFillAreaForRow(rows[i].Item, i));
         }
 
-        if (stampRowsResolved.Count == 0)
+        var request = new AlongPathPlacementRequest(sourcePath, enrichedRows, stampRotation, assignNewIds);
+        DrawingContext drawCtx = BuildDrawingContext();
+        AlongPathPlacementResult? jigResult = DrawingJigRegistry.For(Tool.Stamp, drawCtx)?.BuildAlongPathPlacement(request, drawCtx);
+        if (jigResult is not { } result)
         {
-            // Pure stripe set — short-circuit; no DropGroups needed for stripes (they're
-            // single shapes, not repeating placements).
-            return new StampPlacement { Shapes = stripeShapes };
-        }
-
-        var specs = new AlongPathRowSpec[stampRowsResolved.Count];
-        for (int i = 0; i < stampRowsResolved.Count; i++)
-        {
-            specs[i] = stampRowsResolved[i].Spec;
-        }
-
-        // Issue #138 — densify any arc-bulged edges before sampling so stamps follow the
-        // actual curve rather than the chord between vertices. Stripe rows already
-        // consume the original points + bulges through RibbonGeometry which handles
-        // bulges natively; only the stamp path needed this.
-        IReadOnlyList<Point> stampPath = GardenPlotWeb.Models.ArcPathDensifier.Densify(
-            points,
-            sourcePath.EdgeBulges,
-            closed);
-
-        var samples = AlongPathBuilder.BuildSamples(stampPath, closed, specs, alignToTangent: true);
-
-        // Issue #138 — drop stamps whose centre is closer than |OffsetFt| to any other
-        // path segment. Without this, negative-offset rows on closed shapes (Rectangle,
-        // Oval, closed Polygon) crowd extras at the corners because the inward miter
-        // brings adjacent segments inside the stamp's intended exclusion radius.
-        samples = (IReadOnlyList<AlongPathSample>)GardenPlotWeb.Models.AlongPathProximityFilter.Filter(samples, stampPath, closed);
-        if (samples.Count == 0 && stripeShapes.Count == 0)
-        {
+            // Defensive fallback — should never hit since StampDrawingJig handles this.
             return new StampPlacement();
         }
 
-        // One DropGroup per row, anchored at the row's first placed sample. Existing along-path
-        // tools work group-by-group (move / resize / reflow), so per-row grouping keeps those
-        // operations intact for layered borders.
-        var groups = new DropGroup[stampRowsResolved.Count];
-        var groupIndices = new int[stampRowsResolved.Count];
-        for (int i = 0; i < stampRowsResolved.Count; i++)
+        var placement = new StampPlacement { Shapes = result.Shapes.ToList() };
+        foreach (DropGroup g in result.Groups)
         {
-            groups[i] = new DropGroup
-            {
-                Pattern = DropPattern.AlongPath,
-                Rotation = stampRotation,
-                SourcePathShapeId = sourcePath.Id,
-                Anchor = AlongPathAnchor.Start,
-                AlignToTangent = true,
-                CenterSpacingYFt = stampRowsResolved[i].Item.HeightFt,
-                CenterSpacingXFt = stampRowsResolved[i].Spec.WidthFt + stampRowsResolved[i].Spec.GapFt,
-                OffsetIn = stampRowsResolved[i].Spec.OffsetFt * 12.0,
-            };
-        }
-
-        var shapes = new List<Shape>(samples.Count + stripeShapes.Count);
-        // Stripe shapes first so stamps render on top (matches "lower in list = higher z"
-        // when stripes are placed as background plates under stamps).
-        shapes.AddRange(stripeShapes);
-        foreach (var s in samples)
-        {
-            var (item, _) = stampRowsResolved[s.RowIndex];
-            var group = groups[s.RowIndex];
-            int index = groupIndices[s.RowIndex]++;
-            var shape = BuildStampShapeAt(item, s.Pos.X, s.Pos.Y, s.AngleDeg, group.Id, index);
-            if (!assignNewIds)
-            {
-                shape.Id = Guid.Empty;
-            }
-
-            // Restore the ORIGINAL drawing-set row index so cross-row coordination still
-            // works (the stamp pipeline used compacted indices; this maps back).
-            shape.AlongPathRowIndex = stampRowIndices[s.RowIndex];
-            shape.AlongPathArcLengthFt = s.ArcLengthFt;
-            shape.AlongPathOffsetFt = s.OffsetFt;
-            shape.AlongPathSlideFt = s.SlideFt;
-            shapes.Add(shape);
-            if (index == 0)
-            {
-                group.AnchorCenterX = s.Pos.X;
-                group.AnchorCenterY = s.Pos.Y;
-            }
-
-            group.ItemCount = index + 1;
-        }
-
-        var placement = new StampPlacement { Shapes = shapes };
-        for (int i = 0; i < groups.Length; i++)
-        {
-            if (groupIndices[i] > 0)
-            {
-                placement.Groups.Add(groups[i]);
-            }
+            placement.Groups.Add(g);
         }
         return placement;
     }
@@ -8014,6 +7866,7 @@ public partial class GardenPlot
     /// GroundCoverSurface, Edging) along <paramref name="points"/> with width and
     /// perpendicular offset taken from <paramref name="spec"/>. Returns null when the
     /// inputs are degenerate (closed source path, width &lt;= 0, ribbon builder threw).
+    /// Issue #95 PR 10 — delegate to <see cref="AlongPathStripeBuilder.TryBuildStripe"/>.
     /// </summary>
     private static Shape? TryBuildStripeShape(
         PaletteItem item,
@@ -8022,71 +7875,7 @@ public partial class GardenPlot
         IReadOnlyList<double>? edgeBulges,
         bool closed,
         bool assignNewIds)
-    {
-        if (closed)
-        {
-            // Closed source paths (Rectangle perimeter, Oval perimeter, closed FreeDraw)
-            // need ribbon-around-perimeter which RibbonGeometry doesn't yet support.
-            // Skip for now; a follow-up can add Buffer-based perimeter stripes.
-            return null;
-        }
-
-        double width = spec.WidthFt;
-        if (width <= 0)
-        {
-            width = item.WidthFt;
-        }
-
-        if (width <= 0 || points.Count < 2)
-        {
-            return null;
-        }
-
-        // Apply perpendicular offset to the source polyline FIRST, then build a centered
-        // ribbon of `width`. Arc bulges are treated as straight chords here; downstream
-        // accuracy on heavily-curved drafts can improve in a follow-up if needed.
-        IReadOnlyList<Point> offsetPath = Math.Abs(spec.OffsetFt) > 1e-9
-            ? PolylineOffset.Offset(points, spec.OffsetFt)
-            : points;
-
-        if (offsetPath.Count < 2)
-        {
-            return null;
-        }
-
-        try
-        {
-            Shape ribbon = RibbonGeometry.BuildRibbon(
-                offsetPath,
-                edgeBulges,
-                width,
-                RibbonGeometry.Alignment.Center,
-                RibbonGeometry.EndCap.Square);
-
-            ribbon.Fill = item.FillColor;
-            ribbon.Stroke = item.StrokeColor;
-            ribbon.TextureKey = item.TextureKey;
-            ribbon.MaterialCode = item.Code;
-            ribbon.IsGroundCoverSurface = item.MaterialSoldBy == MaterialSoldBy.Area;
-            if (item.DefaultDepthIn is double d)
-            {
-                ribbon.DepthIn = d;
-                ribbon.GroundCoverDepthIn = d;
-            }
-
-            if (!assignNewIds)
-            {
-                ribbon.Id = Guid.Empty;
-            }
-
-            return ribbon;
-        }
-        catch (ArgumentException)
-        {
-            // Degenerate width or vertices — skip this stripe row rather than blow up.
-            return null;
-        }
-    }
+        => AlongPathStripeBuilder.TryBuildStripe(item, spec, points, edgeBulges, closed, assignNewIds);
 
     private List<Shape> RebuildAlongPathShapes(DropGroup group, Shape sourcePath, Shape template)
     {
