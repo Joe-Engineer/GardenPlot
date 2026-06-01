@@ -1,4 +1,4 @@
-// <copyright file="CatalogServiceTests.cs" company="Garden Plot">
+﻿// <copyright file="CatalogServiceTests.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -34,6 +34,122 @@ public sealed class CatalogServiceTests
         Assert.Equal(2, assembly.Layers.Count);
         Assert.Equal("3/4\" Gravel", assembly.Layers[0].CatalogCode);
         Assert.Equal("Flagstone Paver", assembly.Layers[1].CatalogCode);
+    }
+
+    // Issue #136 — pins the multi-layer area assemblies seeded for the
+    // Material epic. Drift here silently changes BOM generation for any
+    // shape using these assemblies, so we pin layer counts, catalog codes,
+    // and thicknesses explicitly.
+    [Fact]
+    public async Task Loads_PlantBedMulched_TwoLayers_SoilThenMulch()
+    {
+        CatalogService service = await BuildSeededServiceAsync();
+        CatalogAssembly? assembly = service.GetAssembly(CatalogSource.Base, null, "plant-bed-mulched");
+
+        Assert.NotNull(assembly);
+        Assert.Equal("Plant Bed (Mulched)", assembly!.DisplayName);
+        Assert.Equal("Area", assembly.TargetKind);
+        Assert.Equal(2, assembly.Layers.Count);
+
+        Assert.Equal("Garden Mix", assembly.Layers[0].CatalogCode);
+        Assert.Equal(6, assembly.Layers[0].ThicknessIn);
+        Assert.Equal("Soil prep", assembly.Layers[0].Label);
+
+        Assert.Equal("Cedar Mulch", assembly.Layers[1].CatalogCode);
+        Assert.Equal(3, assembly.Layers[1].ThicknessIn);
+        Assert.Equal("Mulch top", assembly.Layers[1].Label);
+    }
+
+    [Fact]
+    public async Task Loads_VeggieGardenBed_TwoLayers_BedThenCompost()
+    {
+        CatalogService service = await BuildSeededServiceAsync();
+        CatalogAssembly? assembly = service.GetAssembly(CatalogSource.Base, null, "veggie-garden-bed");
+
+        Assert.NotNull(assembly);
+        Assert.Equal("Veggie Garden Bed", assembly!.DisplayName);
+        Assert.Equal("Area", assembly.TargetKind);
+        Assert.Equal(2, assembly.Layers.Count);
+        Assert.Equal("Garden Mix", assembly.Layers[0].CatalogCode);
+        Assert.Equal(8, assembly.Layers[0].ThicknessIn);
+        Assert.Equal("Compost", assembly.Layers[1].CatalogCode);
+        Assert.Equal(2, assembly.Layers[1].ThicknessIn);
+    }
+
+    [Fact]
+    public async Task Loads_PaverPadStandard_ThreeLayers_AggregateSandPaver()
+    {
+        CatalogService service = await BuildSeededServiceAsync();
+        CatalogAssembly? assembly = service.GetAssembly(CatalogSource.Base, null, "paver-pad-standard");
+
+        Assert.NotNull(assembly);
+        Assert.Equal("Standard Paver Pad", assembly!.DisplayName);
+        Assert.Equal(3, assembly.Layers.Count);
+        Assert.Equal("3/4\" Gravel", assembly.Layers[0].CatalogCode);
+        Assert.Equal(4, assembly.Layers[0].ThicknessIn);
+        Assert.Equal("Sand (Mason)", assembly.Layers[1].CatalogCode);
+        Assert.Equal(1, assembly.Layers[1].ThicknessIn);
+        Assert.Equal("Concrete Paver", assembly.Layers[2].CatalogCode);
+        // Surface layer has no thickness — area-based takeoff (ft²).
+        Assert.Null(assembly.Layers[2].ThicknessIn);
+    }
+
+    [Fact]
+    public async Task Loads_ConcreteSlab_TwoLayers_SubbaseThenPour()
+    {
+        CatalogService service = await BuildSeededServiceAsync();
+        CatalogAssembly? assembly = service.GetAssembly(CatalogSource.Base, null, "concrete-slab");
+
+        Assert.NotNull(assembly);
+        Assert.Equal(2, assembly!.Layers.Count);
+        Assert.Equal("Road Base", assembly.Layers[0].CatalogCode);
+        Assert.Equal(4, assembly.Layers[0].ThicknessIn);
+        Assert.Equal("Concrete Pour", assembly.Layers[1].CatalogCode);
+        Assert.Equal(4, assembly.Layers[1].ThicknessIn);
+    }
+
+    [Fact]
+    public async Task Loads_WaterFeatureLined_TwoLayers_LinerThenRimRock()
+    {
+        CatalogService service = await BuildSeededServiceAsync();
+        CatalogAssembly? assembly = service.GetAssembly(CatalogSource.Base, null, "water-feature-lined");
+
+        Assert.NotNull(assembly);
+        Assert.Equal(2, assembly!.Layers.Count);
+        Assert.Equal("Pond Liner", assembly.Layers[0].CatalogCode);
+        // Liner has no depth — area-based takeoff (ft²).
+        Assert.Null(assembly.Layers[0].ThicknessIn);
+        Assert.Equal("Cobblestone", assembly.Layers[1].CatalogCode);
+        Assert.Equal(4, assembly.Layers[1].ThicknessIn);
+    }
+
+    [Fact]
+    public async Task BaseAssemblies_AllNewEpicEntriesPresent()
+    {
+        // Single guard so a future "I'll just remove one" doesn't slip through
+        // without an explicit re-evaluation of the epic acceptance criteria.
+        CatalogService service = await BuildSeededServiceAsync();
+        string[] requiredCodes =
+        [
+            "plant-bed-mulched",
+            "veggie-garden-bed",
+            "paver-pad-standard",
+            "concrete-slab",
+            "water-feature-lined",
+        ];
+        foreach (string code in requiredCodes)
+        {
+            Assert.NotNull(service.GetAssembly(CatalogSource.Base, null, code));
+        }
+    }
+
+    private static async Task<CatalogService> BuildSeededServiceAsync()
+    {
+        TestHttpHandler handler = BuildHandlerFromShippedSeeds();
+        HttpClient http = handler.ToClient();
+        CatalogService service = new(http, NullLogger<CatalogService>.Instance);
+        await service.EnsureLoadedAsync();
+        return service;
     }
 
     [Fact]

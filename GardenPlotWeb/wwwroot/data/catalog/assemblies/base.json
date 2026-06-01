@@ -95,6 +95,110 @@
           "label": "Edge restraint"
         }
       ]
+    },
+    {
+      "code": "plant-bed-mulched",
+      "source": "Base",
+      "displayName": "Plant Bed (Mulched)",
+      "targetKind": "Area",
+      "layers": [
+        {
+          "source": "Base",
+          "catalogCode": "Garden Mix",
+          "thicknessIn": 6,
+          "label": "Soil prep"
+        },
+        {
+          "source": "Base",
+          "catalogCode": "Cedar Mulch",
+          "thicknessIn": 3,
+          "label": "Mulch top"
+        }
+      ]
+    },
+    {
+      "code": "veggie-garden-bed",
+      "source": "Base",
+      "displayName": "Veggie Garden Bed",
+      "targetKind": "Area",
+      "layers": [
+        {
+          "source": "Base",
+          "catalogCode": "Garden Mix",
+          "thicknessIn": 8,
+          "label": "Bed soil"
+        },
+        {
+          "source": "Base",
+          "catalogCode": "Compost",
+          "thicknessIn": 2,
+          "label": "Compost top"
+        }
+      ]
+    },
+    {
+      "code": "paver-pad-standard",
+      "source": "Base",
+      "displayName": "Standard Paver Pad",
+      "targetKind": "Area",
+      "layers": [
+        {
+          "source": "Base",
+          "catalogCode": "3/4\" Gravel",
+          "thicknessIn": 4,
+          "label": "Aggregate base"
+        },
+        {
+          "source": "Base",
+          "catalogCode": "Sand (Mason)",
+          "thicknessIn": 1,
+          "label": "Setting bed"
+        },
+        {
+          "source": "Base",
+          "catalogCode": "Concrete Paver",
+          "label": "Surface"
+        }
+      ]
+    },
+    {
+      "code": "concrete-slab",
+      "source": "Base",
+      "displayName": "Concrete Slab",
+      "targetKind": "Area",
+      "layers": [
+        {
+          "source": "Base",
+          "catalogCode": "Road Base",
+          "thicknessIn": 4,
+          "label": "Subbase"
+        },
+        {
+          "source": "Base",
+          "catalogCode": "Concrete Pour",
+          "thicknessIn": 4,
+          "label": "Slab"
+        }
+      ]
+    },
+    {
+      "code": "water-feature-lined",
+      "source": "Base",
+      "displayName": "Water Feature (Liner + Rim Rock)",
+      "targetKind": "Area",
+      "layers": [
+        {
+          "source": "Base",
+          "catalogCode": "Pond Liner",
+          "label": "Liner"
+        },
+        {
+          "source": "Base",
+          "catalogCode": "Cobblestone",
+          "thicknessIn": 4,
+          "label": "Perimeter rock"
+        }
+      ]
     }
   ]
 }
