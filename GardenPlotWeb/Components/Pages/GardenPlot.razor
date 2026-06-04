@@ -1279,7 +1279,7 @@ else
                         <span class="panel-title">Layers</span>
                         <span class="panel-header-actions">
                             <span class="drag-grip" aria-hidden="true">⠿</span>
-                            <button type="button" class="panel-close-btn" title="Hide layers panel" aria-label="Hide layers panel" @onclick="ToggleLayersPanel">×</button>
+                            <button type="button" class="panel-close-btn" title="Hide layers panel" aria-label="Hide layers panel" @onclick="ToggleLayersPanel" @onpointerdown:stopPropagation="true">×</button>
                         </span>
                     </div>
                     <div class="panel-body layers-panel-body">
