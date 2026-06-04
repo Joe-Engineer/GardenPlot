@@ -1,0 +1,106 @@
+# Issue #239 Phase A — Garden Plot line-ending policy
+#
+# This repo targets Windows-native development (VS / VS Code on Windows,
+# Razzle-style scripts) but CI and deploy run on Linux (GitHub Actions
+# ubuntu-latest, Azure App Service Linux).
+#
+# Policy: CRLF by default so the Windows IDE working tree matches the
+# repo, with explicit LF exceptions for files Linux interprets as shell
+# (.sh, Dockerfile). YAML CI workflows stay CRLF because GitHub Actions
+# on ubuntu-latest normalizes line endings inside `run: |` blocks
+# automatically. Tools that don't preserve line endings (formatters,
+# web editors, "edit" round-trips) won't produce whitespace-only diffs.
+#
+# Per-extension entries below are the Phase A scope: only the extensions
+# we have today are explicitly listed. There is intentionally NO
+# `* text eol=crlf` catchall in Phase A — that, plus the one-time bulk
+# `git add --renormalize .` commit, lands in Phase B (see issue #239).
+# Keeping Phase A explicit means files NOT listed below stay in their
+# current state and don't get silently rewritten on next checkout.
+#
+# When introducing a new extension, add it here in the same PR.
+# When introducing a new Linux-script extension (e.g., .bash, .nu,
+# entry-point .py used as a hashbang), add it to the LF-override
+# block at the bottom.
+
+# --- C# source ---
+*.cs        text eol=crlf
+*.csproj    text eol=crlf
+*.slnx      text eol=crlf
+*.props     text eol=crlf
+*.targets   text eol=crlf
+*.config    text eol=crlf
+
+# --- Blazor / web ---
+*.razor     text eol=crlf
+*.razor.cs  text eol=crlf
+*.razor.css text eol=crlf
+*.cshtml    text eol=crlf
+*.html      text eol=crlf
+*.htm       text eol=crlf
+*.css       text eol=crlf
+*.scss      text eol=crlf
+*.js        text eol=crlf
+*.mjs       text eol=crlf
+*.cjs       text eol=crlf
+*.ts        text eol=crlf
+*.json      text eol=crlf
+*.webmanifest text eol=crlf
+*.xml       text eol=crlf
+*.xsd       text eol=crlf
+*.svg       text eol=crlf
+
+# --- Build / CI / docs ---
+# YAML CI workflows: CRLF is OK because GitHub Actions on ubuntu-latest
+# normalizes line endings inside `run: |` blocks (heredoc bash content
+# strips trailing \r automatically). If we ever extract those blocks
+# into standalone .sh files invoked from YAML, those .sh files MUST be
+# LF per the override below.
+*.yml       text eol=crlf
+*.yaml      text eol=crlf
+*.md        text eol=crlf
+*.txt       text eol=crlf
+.editorconfig text eol=crlf
+.gitattributes text eol=crlf
+.gitignore  text eol=crlf
+
+# --- Windows-native scripts (already CRLF; explicit for clarity) ---
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+*.psm1      text eol=crlf
+*.psd1      text eol=crlf
+
+# --- Linux-interpreted files (MUST be LF) ---
+# Bash refuses CRLF: `$'\r': command not found`. Any script invoked from
+# the GitHub Actions runner or App Service Linux startup that uses a
+# shell shebang line lives here.
+*.sh        text eol=lf
+*.bash      text eol=lf
+Dockerfile  text eol=lf
+Dockerfile.* text eol=lf
+*.dockerignore text eol=lf
+
+# --- Binary (never normalize) ---
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.webp      binary
+*.bmp       binary
+*.tiff      binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.eot       binary
+*.otf       binary
+*.pdf       binary
+*.zip       binary
+*.7z        binary
+*.gz        binary
+*.tar       binary
+*.exe       binary
+*.dll       binary
+*.pdb       binary
+*.dat       binary
