@@ -32,6 +32,17 @@ public class AlongPathPlacementBuilderTests
         => new(code, PaletteKind.Edging, 0.5, 0.5, "edge", 0, "n/a", "n/a", 0,
             FillColor: "#888", StrokeColor: "#444");
 
+    private static PaletteItem MakeGroundCover(string code = "Mulch", double widthFt = 4.0)
+        => new(code, PaletteKind.GroundCover, widthFt, 0.0,
+            FillColor: "#7a5230", StrokeColor: "#4a3220",
+            DefaultDepthIn: 3.0,
+            MaterialSoldBy: MaterialSoldBy.Volume);
+
+    private static PaletteItem MakePipe(string code = "PVC 1\" Sch40", double widthFt = 1.0 / 12.0, double? stockLengthFt = 10.0)
+        => new(code, PaletteKind.IrrigationPipe, widthFt, 0.0, "pvc",
+            FillColor: "#cccccc", StrokeColor: "#666666",
+            StockLengthFt: stockLengthFt);
+
     [Fact]
     public void BuildPlacement_NoPoints_ReturnsEmpty()
     {
@@ -79,16 +90,18 @@ public class AlongPathPlacementBuilderTests
     }
 
     [Fact]
-    public void BuildPlacement_StripeRow_ProducesRibbonNoDropGroup()
+    public void BuildPlacement_GroundCoverStripeRow_ProducesRibbonPolygonNoDropGroup()
     {
+        // Ground covers stay on the ribbon-polygon path (the original behavior).
+        // Issue #220 follow-up: only IrrigationPipe / IrrigationWire / Edging
+        // switched to the new polyline-stripe path; GroundCover did not.
         Shape path = MakeOpenPath((0, 0), (10, 0));
         var rows = new[]
         {
-            new AlongPathRowRequest(MakeEdging(), new AlongPathRowSpec(0.5, 0, 0, 0), false),
+            new AlongPathRowRequest(MakeGroundCover(), new AlongPathRowSpec(0.5, 0, 0, 0), false),
         };
         var request = new AlongPathPlacementRequest(path, rows, 0, true);
         var result = AlongPathPlacementBuilder.BuildPlacement(request);
-        // Stripe-only placement yields a single ribbon shape and no DropGroups.
         Assert.Single(result.Shapes);
         Assert.Empty(result.Groups);
         Shape ribbon = result.Shapes[0];
@@ -106,9 +119,10 @@ public class AlongPathPlacementBuilderTests
         };
         var request = new AlongPathPlacementRequest(path, rows, 0, true);
         var result = AlongPathPlacementBuilder.BuildPlacement(request);
-        // Order: stripe ribbon(s) first, then stamps.
+        // Order: stripe(s) first (edging is a polyline-stripe → Kind=Edge per #220 follow-up),
+        // then stamps.
         Assert.True(result.Shapes.Count >= 2);
-        Assert.Equal(ShapeKind.FreeDraw, result.Shapes[0].Kind); // Ribbon is FreeDraw
+        Assert.Equal(ShapeKind.Edge, result.Shapes[0].Kind);
         Assert.Contains(result.Shapes, s => s.Kind == ShapeKind.Plant);
         Assert.Single(result.Groups); // One DropGroup for the stamp row
     }
@@ -148,5 +162,126 @@ public class AlongPathPlacementBuilderTests
         var rows = new[] { new AlongPathRowRequest(MakePlant(), new AlongPathRowSpec(1, 0, 0.5, 0), false) };
         var request = new AlongPathPlacementRequest(path, rows, 0, true);
         Assert.Null(rect.BuildAlongPathPlacement(request, DrawingContext.None));
+    }
+
+    // ---- Issue #220 follow-up — pipe / wire / edging polyline-stripe rows ----
+    [Fact]
+    public void BuildPlacement_PipeStripeRow_ProducesIrrigationPipePolylineWithCatalogMetadata()
+    {
+        Shape path = MakeOpenPath((0, 0), (10, 0), (10, 5));
+        PaletteItem pipe = MakePipe("PVC 3/4\" Sch40", widthFt: 0.75 / 12.0);
+        var rows = new[]
+        {
+            new AlongPathRowRequest(pipe, new AlongPathRowSpec(0, 0, 0, 0), false),
+        };
+        var request = new AlongPathPlacementRequest(path, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+        Shape produced = Assert.Single(result.Shapes);
+        Assert.Equal(ShapeKind.IrrigationPipe, produced.Kind);
+        Assert.Equal(pipe.Code, produced.Label);
+        Assert.NotNull(produced.PipeDiameterIn);
+        Assert.Equal(0.75, produced.PipeDiameterIn!.Value, 6);
+        Assert.Equal(path.Points.Count, produced.Points.Count);
+        Assert.Empty(result.Groups);
+    }
+
+    [Fact]
+    public void BuildPlacement_EdgingStripeRow_ProducesEdgePolylineNotRibbon()
+    {
+        Shape path = MakeOpenPath((0, 0), (10, 0));
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakeEdging(), new AlongPathRowSpec(0, 0, 0, 0), false),
+        };
+        var request = new AlongPathPlacementRequest(path, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+        Shape produced = Assert.Single(result.Shapes);
+        Assert.Equal(ShapeKind.Edge, produced.Kind);
+        Assert.Equal(2, produced.Points.Count); // open polyline, NOT a closed ribbon polygon
+        Assert.Equal("edge", produced.Trait);
+        Assert.NotNull(produced.Takeoff); // seeded by Catalog.CreateTakeoff
+    }
+
+    [Fact]
+    public void BuildPlacement_PipeRowWithAutoAddFittings_AlsoEmitsFittingShapes()
+    {
+        // L-shaped pipe at one interior vertex → BuildAutoFittingsForPipe should
+        // emit at least an elbow at the corner.
+        Shape path = MakeOpenPath((0, 0), (10, 0), (10, 8));
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakePipe(), new AlongPathRowSpec(0, 0, 0, 0), false, AutoAddFittings: true),
+        };
+        var request = new AlongPathPlacementRequest(path, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Assert.Contains(result.Shapes, s => s.Kind == ShapeKind.IrrigationPipe);
+        Assert.Contains(result.Shapes, s => s.Kind == ShapeKind.IrrigationFitting);
+    }
+
+    [Fact]
+    public void BuildPlacement_PipeRowWithoutAutoAddFittings_EmitsPipeOnly()
+    {
+        Shape path = MakeOpenPath((0, 0), (10, 0), (10, 8));
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakePipe(), new AlongPathRowSpec(0, 0, 0, 0), false, AutoAddFittings: false),
+        };
+        var request = new AlongPathPlacementRequest(path, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Assert.Single(result.Shapes); // pipe only, no fittings
+        Assert.Equal(ShapeKind.IrrigationPipe, result.Shapes[0].Kind);
+    }
+
+    [Fact]
+    public void BuildPlacement_AutoAddFittingsOnNonPipeRow_IsNoOp()
+    {
+        // AutoAddFittings on a wire / edging / ground-cover row must be ignored —
+        // BuildAutoFittingsForPipe only operates on IrrigationPipe shapes.
+        Shape path = MakeOpenPath((0, 0), (10, 0), (10, 8));
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakeEdging(), new AlongPathRowSpec(0, 0, 0, 0), false, AutoAddFittings: true),
+        };
+        var request = new AlongPathPlacementRequest(path, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Assert.Single(result.Shapes); // edge only, no fittings
+        Assert.Equal(ShapeKind.Edge, result.Shapes[0].Kind);
+    }
+
+    [Fact]
+    public void BuildPlacement_PolylineStripeWithOffset_RoutesPipeAlongOffsetPath()
+    {
+        // OffsetFt should perpendicular-offset the pipe path from the centerline.
+        Shape path = MakeOpenPath((0, 0), (10, 0));
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakePipe(), new AlongPathRowSpec(0, 0, OffsetFt: 2.0, 0), false),
+        };
+        var request = new AlongPathPlacementRequest(path, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Shape pipe = Assert.Single(result.Shapes);
+        Assert.Equal(ShapeKind.IrrigationPipe, pipe.Kind);
+        // Pipe should run roughly parallel to the centerline but offset by ~2 ft.
+        // For a horizontal centerline with positive offset, the pipe Y should be ≈ +2 ft.
+        Assert.All(pipe.Points, p => Assert.InRange(p.Y, 1.5, 2.5));
+    }
+
+    [Fact]
+    public void BuildPlacement_PolylineStripeAssignNewIdsFalse_LeavesPipeAndFittingsWithEmptyId()
+    {
+        Shape path = MakeOpenPath((0, 0), (10, 0), (10, 8));
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakePipe(), new AlongPathRowSpec(0, 0, 0, 0), false, AutoAddFittings: true),
+        };
+        var request = new AlongPathPlacementRequest(path, rows, 0, AssignNewIds: false);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Assert.NotEmpty(result.Shapes);
+        Assert.All(result.Shapes, s => Assert.Equal(System.Guid.Empty, s.Id));
     }
 }

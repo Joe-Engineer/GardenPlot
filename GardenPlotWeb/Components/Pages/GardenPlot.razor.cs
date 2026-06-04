@@ -7609,6 +7609,22 @@ public partial class GardenPlot
     }
 
     /// <summary>
+    /// Issue #220 follow-up — convenience lookup of the AutoAddFittings flag on the
+    /// active drawing set's row at <paramref name="idx"/>. Returns false when there's
+    /// no active set, the index is out of range, or the row simply hasn't opted in.
+    /// </summary>
+    private bool TryGetAutoAddFittingsForRow(int idx)
+    {
+        var set = GetSelectedDrawingSet();
+        if (set is null || idx < 0 || idx >= set.Rows.Count)
+        {
+            return false;
+        }
+
+        return set.Rows[idx].AutoAddFittings;
+    }
+
+    /// <summary>
     /// Issue #138 — synthesises a single filled-area Shape for a stripe row whose source
     /// is a CLOSED area shape (Rectangle / Oval / closed FreeDraw). The resulting Shape
     /// adopts the source's geometry (Kind / X / Y / W / H / Points / EdgeBulges) and is
@@ -7986,7 +8002,8 @@ public partial class GardenPlot
             enrichedRows[i] = new AlongPathRowRequest(
                 rows[i].Item,
                 rows[i].Spec,
-                TryGetFillAreaForRow(rows[i].Item, i));
+                TryGetFillAreaForRow(rows[i].Item, i),
+                TryGetAutoAddFittingsForRow(i));
         }
 
         var request = new AlongPathPlacementRequest(sourcePath, enrichedRows, stampRotation, assignNewIds);

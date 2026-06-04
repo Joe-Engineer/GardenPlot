@@ -26,6 +26,9 @@ public class DrawingSetCaptureRulesTests
     [InlineData(ShapeKind.WaterSource)]
     [InlineData(ShapeKind.IrrigationControl)]
     [InlineData(ShapeKind.IrrigationFitting)]
+    [InlineData(ShapeKind.IrrigationPipe)]
+    [InlineData(ShapeKind.IrrigationWire)]
+    [InlineData(ShapeKind.Edge)]
     public void IsCapturable_PointPlacementKindsWithLabel_AreCapturable(ShapeKind kind)
     {
         Shape shape = new() { Kind = kind, Label = "Some Item" };
@@ -33,27 +36,11 @@ public class DrawingSetCaptureRulesTests
         Assert.True(DrawingSetCaptureRules.IsCapturable(shape));
     }
 
-    // ---- IsCapturable: irrigation polyline kinds (negative — #220 explicit scope) ----
-    [Theory]
-    [InlineData(ShapeKind.IrrigationPipe)]
-    [InlineData(ShapeKind.IrrigationWire)]
-    public void IsCapturable_IrrigationPolylineKinds_AreNotCapturable(ShapeKind kind)
-    {
-        // Pipes and wires are inherently path-shaped (multi-vertex polylines)
-        // and don't fit the drawing-set row model of "point at offset N from
-        // axis". A separate capture model would be needed for them; out of
-        // scope for #220.
-        Shape shape = new() { Kind = kind, Label = "10\" PVC Schedule 40" };
-
-        Assert.False(DrawingSetCaptureRules.IsCapturable(shape));
-    }
-
     // ---- IsCapturable: other non-capturable kinds ----
     [Theory]
     [InlineData(ShapeKind.Rectangle)]
     [InlineData(ShapeKind.Oval)]
     [InlineData(ShapeKind.FreeDraw)]
-    [InlineData(ShapeKind.Edge)]
     [InlineData(ShapeKind.BedKit)]
     [InlineData(ShapeKind.Ruler)]
     [InlineData(ShapeKind.CircleRuler)]
@@ -90,6 +77,9 @@ public class DrawingSetCaptureRulesTests
     [InlineData(ShapeKind.WaterSource, PaletteKind.WaterSource)]
     [InlineData(ShapeKind.IrrigationControl, PaletteKind.IrrigationControl)]
     [InlineData(ShapeKind.IrrigationFitting, PaletteKind.IrrigationFitting)]
+    [InlineData(ShapeKind.IrrigationPipe, PaletteKind.IrrigationPipe)]
+    [InlineData(ShapeKind.IrrigationWire, PaletteKind.IrrigationWire)]
+    [InlineData(ShapeKind.Edge, PaletteKind.Edging)]
     public void ResolveCaptureKind_MapsEachCapturableShapeToCorrectPaletteKind(ShapeKind shape, PaletteKind expected)
     {
         Assert.Equal(expected, DrawingSetCaptureRules.ResolveCaptureKind(shape));

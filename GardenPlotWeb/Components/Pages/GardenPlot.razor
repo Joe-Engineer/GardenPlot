@@ -1248,6 +1248,17 @@ else
                                     <input type="checkbox" checked="@row.FillArea"
                                            @onchange="async (e) => { row.FillArea = e.Value is bool v && v; await OnDrawingSetRowFieldChangedAsync(); }" />
                                 </span>
+                                @* Issue #220 follow-up — auto-add-fittings only shown for pipe rows. *@
+                                @if (row.PaletteItemKind == PaletteKind.IrrigationPipe)
+                                {
+                                    <span class="drawing-set-editor-fittings-cell"
+                                          title="When checked, applying this drawing set along a path also generates the elbow / tee / coupling fittings for the pipe (same behavior as drawing a pipe directly with Auto-place fittings on).">
+                                        <input type="checkbox" checked="@row.AutoAddFittings"
+                                               @onchange="async (e) => { row.AutoAddFittings = e.Value is bool v && v; await OnDrawingSetRowFieldChangedAsync(); }"
+                                               aria-label="Auto-add fittings for this pipe row" />
+                                        <span class="drawing-set-editor-fittings-label">fittings</span>
+                                    </span>
+                                }
                                 <span class="drawing-set-editor-row-actions">
                                     <button class="btn btn-sm btn-outline-secondary" title="Move row up (towards higher z-order / top)" disabled="@(idx == 0)" @onclick="() => MoveDrawingSetRowAsync(idx, -1)">↑</button>
                                     <button class="btn btn-sm btn-outline-secondary" title="Move row down (towards lower z-order / back)" disabled="@(idx == editingDrawingSet.Rows.Count - 1)" @onclick="() => MoveDrawingSetRowAsync(idx, +1)">↓</button>

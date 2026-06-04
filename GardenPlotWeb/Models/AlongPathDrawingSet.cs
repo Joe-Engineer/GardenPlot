@@ -143,4 +143,14 @@ public sealed class AlongPathDrawingSetRow
 
         return this.CapturedHeightFt;
     }
+
+    /// <summary>
+    /// Issue #220 follow-up — when this row's <see cref="PaletteItemKind"/> is
+    /// <see cref="PaletteKind.IrrigationPipe"/>, automatically generate the
+    /// per-vertex elbows, per-coupling-interval couplings, and per-junction tees
+    /// for the produced pipe shape via
+    /// <see cref="FittingPlacement.BuildAutoFittingsForPipe"/> when the drawing
+    /// set is applied along a path. No-op for non-pipe rows.
+    /// </summary>
+    public bool AutoAddFittings { get; set; }
 }

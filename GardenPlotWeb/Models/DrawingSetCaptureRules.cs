@@ -64,6 +64,13 @@ public static class DrawingSetCaptureRules
         ShapeKind.IrrigationControl => PaletteKind.IrrigationControl,
         ShapeKind.IrrigationFitting => PaletteKind.IrrigationFitting,
 
+        // Issue #220 follow-up — polyline-stripe kinds. The apply path detects
+        // these by their PaletteKind and produces the canonical Shape (with the
+        // correct kind + pipe/wire/edge metadata) rather than a generic ribbon.
+        ShapeKind.IrrigationPipe => PaletteKind.IrrigationPipe,
+        ShapeKind.IrrigationWire => PaletteKind.IrrigationWire,
+        ShapeKind.Edge => PaletteKind.Edging,
+
         // Defensive fallback for kinds that should be filtered out by IsCapturable
         // first. Listing each one explicitly (rather than using a discard) makes
         // the analyzer happy AND forces future ShapeKind additions to surface
@@ -71,13 +78,10 @@ public static class DrawingSetCaptureRules
         ShapeKind.Rectangle => PaletteKind.Plant,
         ShapeKind.Oval => PaletteKind.Plant,
         ShapeKind.FreeDraw => PaletteKind.Plant,
-        ShapeKind.Edge => PaletteKind.Plant,
         ShapeKind.BedKit => PaletteKind.Plant,
         ShapeKind.Ruler => PaletteKind.Plant,
         ShapeKind.CircleRuler => PaletteKind.Plant,
         ShapeKind.RectRuler => PaletteKind.Plant,
-        ShapeKind.IrrigationPipe => PaletteKind.Plant,
-        ShapeKind.IrrigationWire => PaletteKind.Plant,
 
         _ => PaletteKind.Plant,
     };
@@ -89,13 +93,20 @@ public static class DrawingSetCaptureRules
         ShapeKind.Bush => true,
         ShapeKind.SoilMarker => true,
 
-        // Issue #220 — irrigation point-placement kinds. The polyline-style
-        // IrrigationPipe and IrrigationWire are intentionally excluded; they
-        // can't be represented as a single perpendicular offset.
+        // Issue #220 — irrigation point-placement kinds.
         ShapeKind.IrrigationHead => true,
         ShapeKind.WaterSource => true,
         ShapeKind.IrrigationControl => true,
         ShapeKind.IrrigationFitting => true,
+
+        // Issue #220 follow-up — polyline-stripe kinds. Each follows the seed-path
+        // axis at the row's perpendicular offset when the drawing set is applied.
+        // For IrrigationPipe rows specifically, an optional AutoAddFittings flag
+        // on the row triggers FittingPlacement.BuildAutoFittingsForPipe at apply
+        // time so the pipe arrives complete with elbows / tees / couplings.
+        ShapeKind.IrrigationPipe => true,
+        ShapeKind.IrrigationWire => true,
+        ShapeKind.Edge => true,
 
         // Explicitly non-capturable. Listed individually rather than via a discard
         // pattern so any future ShapeKind addition surfaces here as a compile-time
@@ -103,13 +114,10 @@ public static class DrawingSetCaptureRules
         ShapeKind.Rectangle => false,
         ShapeKind.Oval => false,
         ShapeKind.FreeDraw => false,
-        ShapeKind.Edge => false,
         ShapeKind.BedKit => false,
         ShapeKind.Ruler => false,
         ShapeKind.CircleRuler => false,
         ShapeKind.RectRuler => false,
-        ShapeKind.IrrigationPipe => false,
-        ShapeKind.IrrigationWire => false,
 
         _ => false,
     };
