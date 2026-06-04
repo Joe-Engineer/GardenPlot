@@ -7312,23 +7312,7 @@ public partial class GardenPlot
     private bool CanCreateDrawingSetFromSelection
         => currentPlot is not null
            && selectedIds.Count >= 1
-           && currentPlot.Shapes.Any(s => selectedIdSet.Contains(s.Id) && IsCapturableAsDrawingSetRow(s));
-
-    private static bool IsCapturableAsDrawingSetRow(Shape s)
-        => s.Kind is ShapeKind.Plant or ShapeKind.Tree or ShapeKind.Bush or ShapeKind.SoilMarker
-           && !string.IsNullOrWhiteSpace(s.Label);
-
-    private static PaletteKind ResolveCaptureKind(ShapeKind kind) => kind switch
-    {
-        ShapeKind.Tree => PaletteKind.Tree,
-        ShapeKind.Bush => PaletteKind.Bush,
-        ShapeKind.Plant => PaletteKind.Plant,
-        ShapeKind.SoilMarker => PaletteKind.SoilMarker,
-        _ => PaletteKind.Plant,
-    };
-
-    private static double[] SnapCapturedOffsets(IReadOnlyList<double> rawOffsets)
-        => CapturedOffsetSnapping.Snap(rawOffsets);
+           && currentPlot.Shapes.Any(s => selectedIdSet.Contains(s.Id) && DrawingSetCaptureRules.IsCapturable(s));
 
     /// <summary>
     /// Captures the currently selected shapes as a new Drawing Set. The longest principal axis of
@@ -7344,7 +7328,7 @@ public partial class GardenPlot
         }
 
         var captured = currentPlot.Shapes
-            .Where(s => selectedIdSet.Contains(s.Id) && IsCapturableAsDrawingSetRow(s))
+            .Where(s => selectedIdSet.Contains(s.Id) && DrawingSetCaptureRules.IsCapturable(s))
             .ToList();
         if (captured.Count == 0)
         {
@@ -7400,7 +7384,7 @@ public partial class GardenPlot
             rows.Add(new AlongPathDrawingSetRow
             {
                 PaletteItemCode = t.Shape.Label ?? string.Empty,
-                PaletteItemKind = ResolveCaptureKind(t.Shape.Kind),
+                PaletteItemKind = DrawingSetCaptureRules.ResolveCaptureKind(t.Shape.Kind),
                 GapFt = 0,
                 OffsetFt = Math.Round(t.Along - alongOrigin, 3),
                 PhaseAlongFt = 0,
