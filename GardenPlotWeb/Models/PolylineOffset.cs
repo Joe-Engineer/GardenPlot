@@ -101,6 +101,97 @@ public static class PolylineOffset
         return result;
     }
 
+    /// <summary>
+    /// Issue #216 — perpendicular-offsets a CLOSED polyline (a ring) by a signed feet
+    /// distance. Same sign convention as <see cref="Offset"/>: positive = right of the
+    /// directed tangent.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Sign convention for the screen-CCW perimeters this codebase uses</b>
+    /// (Rectangle / Oval / closed FreeDraw, all walked counter-clockwise as the
+    /// viewer sees them on screen with Y growing downward): right-of-directed-tangent
+    /// at each vertex points OUTWARD from the closed shape. So <b>positive offset
+    /// expands the ring outward; negative offset shrinks it inward.</b> This is
+    /// the opposite of what naive "math-coordinates CCW" intuition suggests, because
+    /// screen-CCW is mathematically clockwise.
+    /// </para>
+    /// <para>
+    /// Differs from <see cref="Offset"/> in vertex-wrap handling: the "incoming" edge
+    /// for vertex 0 is <c>source[count-1] → source[0]</c>, and the "outgoing" edge for
+    /// vertex <c>count-1</c> is <c>source[count-1] → source[0]</c>. The resulting ring
+    /// has the same vertex count as <paramref name="source"/> with consistent miter
+    /// behaviour at every vertex (including the seam).
+    /// </para>
+    /// <para>
+    /// Source ring is expected to be specified WITHOUT a closing duplicate vertex
+    /// (e.g., a rectangle has 4 points, an oval has 72) — same convention as
+    /// <see cref="PathGeometry.ResolvePath"/>.
+    /// </para>
+    /// </remarks>
+    /// <param name="source">Source ring vertices (no closing duplicate). Returns an
+    /// empty list when fewer than 3 vertices are supplied.</param>
+    /// <param name="offsetFt">Signed perpendicular distance in feet. Positive expands
+    /// the ring outward; negative shrinks it inward (see sign-convention note).</param>
+    /// <returns>The offset ring (same vertex count as <paramref name="source"/>).</returns>
+    public static List<Point> OffsetClosed(IReadOnlyList<Point> source, double offsetFt)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (source.Count < 3)
+        {
+            return new List<Point>();
+        }
+
+        int n = source.Count;
+        var result = new List<Point>(n);
+        for (int i = 0; i < n; i++)
+        {
+            Point p = source[i];
+
+            // Wrap-around indexing: the "incoming" edge for vertex 0 starts at the
+            // last source vertex; the "outgoing" edge for vertex n-1 ends at the
+            // first. This is the only deviation from the open-path Offset.
+            int prevIdx = (i - 1 + n) % n;
+            int nextIdx = (i + 1) % n;
+
+            (double inX, double inY) = UnitVector(source[prevIdx], source[i]);
+            (double outX, double outY) = UnitVector(source[i], source[nextIdx]);
+
+            (double rInX, double rInY) = (-inY, inX);
+            (double rOutX, double rOutY) = (-outY, outX);
+
+            double bisX = rInX + rOutX;
+            double bisY = rInY + rOutY;
+            double bisMag = Math.Sqrt((bisX * bisX) + (bisY * bisY));
+
+            double pdx;
+            double pdy;
+            if (bisMag < 1e-9)
+            {
+                pdx = rInX;
+                pdy = rInY;
+            }
+            else
+            {
+                pdx = bisX * 2.0 / (bisMag * bisMag);
+                pdy = bisY * 2.0 / (bisMag * bisMag);
+
+                double scaleMag = Math.Sqrt((pdx * pdx) + (pdy * pdy));
+                const double capScale = 4.0;
+                if (scaleMag > capScale)
+                {
+                    double trim = capScale / scaleMag;
+                    pdx *= trim;
+                    pdy *= trim;
+                }
+            }
+
+            result.Add(new Point(p.X + (pdx * offsetFt), p.Y + (pdy * offsetFt)));
+        }
+
+        return result;
+    }
+
     private static (double X, double Y) UnitVector(Point a, Point b)
     {
         double dx = b.X - a.X;

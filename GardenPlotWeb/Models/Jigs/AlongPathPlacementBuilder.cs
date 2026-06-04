@@ -38,7 +38,8 @@ public static class AlongPathPlacementBuilder
             return AlongPathPlacementResult.Empty;
         }
 
-        // Partition rows by visual kind. Stripe rows render as continuous ribbon polygons;
+        // Partition rows by visual kind. Stripe rows render as continuous ribbon polygons
+        // (or polylines for IrrigationPipe / IrrigationWire / Edging — see #220 follow-up);
         // stamp rows continue through the existing tile-along-path pipeline below. FillArea
         // rows (for stripes) become a single solid polygon matching the source interior.
         var stripeShapes = new List<Shape>();
@@ -56,6 +57,41 @@ public static class AlongPathPlacementBuilder
                     if (fill is not null)
                     {
                         stripeShapes.Add(fill);
+                    }
+                }
+                else if (AlongPathStripeBuilder.IsPolylineStripeKind(row.Item.Kind))
+                {
+                    // Issue #220 follow-up — pipe / wire / edging stripe rows produce
+                    // canonical polyline Shapes (Kind=IrrigationPipe etc.), not a
+                    // generic ribbon polygon. For pipe rows with AutoAddFittings, also
+                    // generate the elbows / tees / couplings via FittingPlacement.
+                    Shape? polylineStripe = AlongPathStripeBuilder.TryBuildPolylineStripe(
+                        row.Item, row.Spec, points, closed, request.AssignNewIds);
+                    if (polylineStripe is not null)
+                    {
+                        stripeShapes.Add(polylineStripe);
+
+                        if (row.AutoAddFittings
+                            && polylineStripe.Kind == ShapeKind.IrrigationPipe)
+                        {
+                            // BuildAutoFittingsForPipe filters by Kind == IrrigationPipe
+                            // internally; we still gate here to avoid the call for
+                            // wire / edge rows.
+                            double? stockLengthFt = row.Item.StockLengthFt;
+                            var autoFittings = FittingPlacement.BuildAutoFittingsForPipe(
+                                polylineStripe,
+                                otherShapes: null,
+                                stockLengthFt: stockLengthFt);
+                            if (!request.AssignNewIds)
+                            {
+                                foreach (Shape fitting in autoFittings)
+                                {
+                                    fitting.Id = System.Guid.Empty;
+                                }
+                            }
+
+                            stripeShapes.AddRange(autoFittings);
+                        }
                     }
                 }
                 else

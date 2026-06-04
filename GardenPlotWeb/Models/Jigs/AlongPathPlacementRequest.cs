@@ -31,7 +31,9 @@ public readonly record struct AlongPathPlacementRequest(
 /// <param name="Item">The palette item to materialize for this row (Plant / GroundCover / Edging / etc.).</param>
 /// <param name="Spec">Per-row spec: WidthFt, OffsetFt, GapFt — see <see cref="AlongPathRowSpec"/>.</param>
 /// <param name="FillArea">True when the row should be rendered as the source-path interior fill rather than as a ribbon or stamp series.</param>
+/// <param name="AutoAddFittings">Issue #220 follow-up — when true AND <see cref="Item"/> is an irrigation pipe palette item, the apply path invokes <see cref="FittingPlacement.BuildAutoFittingsForPipe"/> on the produced pipe shape and adds the fittings to the placement result. No-op for non-pipe rows.</param>
 public readonly record struct AlongPathRowRequest(
     PaletteItem Item,
     AlongPathRowSpec Spec,
-    bool FillArea);
+    bool FillArea,
+    bool AutoAddFittings = false);

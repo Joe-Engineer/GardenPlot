@@ -1233,8 +1233,19 @@ else
                                 {
                                     <span class="drawing-set-editor-na" title="Phase isn't meaningful for continuous ribbons (ground cover, edging) — they always start at the path start.">—</span>
                                 }
-                                <input class="form-control form-control-sm" type="number" min="0" step="0.1" placeholder="@F(row.CapturedWidthFt)" value="@(row.WidthOverrideFt is double w ? F(w) : string.Empty)" disabled="@row.FillArea"
-                                       @onchange="async (e) => { var s = e.Value?.ToString(); if (string.IsNullOrWhiteSpace(s)) { row.WidthOverrideFt = null; await OnDrawingSetRowFieldChangedAsync(); } else if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.WidthOverrideFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
+                                @if (row.FillArea)
+                                {
+                                    @* Issue #216 — when Fill is checked the row uses the source area's
+                                       geometry instead of a fixed ribbon width. Show a clear "fill"
+                                       indicator in place of the width input so it's obvious the value
+                                       is ignored (not just disabled-with-a-stale-value). *@
+                                    <span class="drawing-set-editor-na" title="Width is not used when Fill is checked — the row fills the source area's geometry.">fill</span>
+                                }
+                                else
+                                {
+                                    <input class="form-control form-control-sm" type="number" min="0" step="0.1" placeholder="@F(row.CapturedWidthFt)" value="@(row.WidthOverrideFt is double w ? F(w) : string.Empty)"
+                                           @onchange="async (e) => { var s = e.Value?.ToString(); if (string.IsNullOrWhiteSpace(s)) { row.WidthOverrideFt = null; await OnDrawingSetRowFieldChangedAsync(); } else if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.WidthOverrideFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
+                                }
                                 @if (showDepth)
                                 {
                                     <input class="form-control form-control-sm" type="number" min="0" step="0.1" placeholder="@F(row.CapturedHeightFt)" value="@(row.DepthOverrideFt is double dv ? F(dv) : string.Empty)"
@@ -1248,6 +1259,17 @@ else
                                     <input type="checkbox" checked="@row.FillArea"
                                            @onchange="async (e) => { row.FillArea = e.Value is bool v && v; await OnDrawingSetRowFieldChangedAsync(); }" />
                                 </span>
+                                @* Issue #220 follow-up — auto-add-fittings only shown for pipe rows. *@
+                                @if (row.PaletteItemKind == PaletteKind.IrrigationPipe)
+                                {
+                                    <span class="drawing-set-editor-fittings-cell"
+                                          title="When checked, applying this drawing set along a path also generates the elbow / tee / coupling fittings for the pipe (same behavior as drawing a pipe directly with Auto-place fittings on).">
+                                        <input type="checkbox" checked="@row.AutoAddFittings"
+                                               @onchange="async (e) => { row.AutoAddFittings = e.Value is bool v && v; await OnDrawingSetRowFieldChangedAsync(); }"
+                                               aria-label="Auto-add fittings for this pipe row" />
+                                        <span class="drawing-set-editor-fittings-label">fittings</span>
+                                    </span>
+                                }
                                 <span class="drawing-set-editor-row-actions">
                                     <button class="btn btn-sm btn-outline-secondary" title="Move row up (towards higher z-order / top)" disabled="@(idx == 0)" @onclick="() => MoveDrawingSetRowAsync(idx, -1)">↑</button>
                                     <button class="btn btn-sm btn-outline-secondary" title="Move row down (towards lower z-order / back)" disabled="@(idx == editingDrawingSet.Rows.Count - 1)" @onclick="() => MoveDrawingSetRowAsync(idx, +1)">↓</button>
