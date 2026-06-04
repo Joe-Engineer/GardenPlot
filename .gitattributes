@@ -11,17 +11,16 @@
 # automatically. Tools that don't preserve line endings (formatters,
 # web editors, "edit" round-trips) won't produce whitespace-only diffs.
 #
-# Per-extension entries below are the Phase A scope: only the extensions
-# we have today are explicitly listed. There is intentionally NO
-# `* text eol=crlf` catchall in Phase A — that, plus the one-time bulk
-# `git add --renormalize .` commit, lands in Phase B (see issue #239).
-# Keeping Phase A explicit means files NOT listed below stay in their
-# current state and don't get silently rewritten on next checkout.
-#
-# When introducing a new extension, add it here in the same PR.
-# When introducing a new Linux-script extension (e.g., .bash, .nu,
-# entry-point .py used as a hashbang), add it to the LF-override
-# block at the bottom.
+# Phase B — the `* text=auto eol=crlf` catchall plus the one-time bulk
+# `git add --renormalize .` commit are now in effect. Any text file not
+# matched by a more specific rule below is auto-detected as text and
+# stored CRLF. Binary files explicitly listed at the bottom are exempt.
+# gitattributes uses "last matching rule wins" semantics, so explicit
+# overrides (especially the LF block for Linux shell scripts) take
+# precedence over the catchall.
+
+# --- Catchall (Phase B) ---
+* text=auto eol=crlf
 
 # --- C# source ---
 *.cs        text eol=crlf
@@ -104,3 +103,12 @@ Dockerfile.* text eol=lf
 *.dll       binary
 *.pdb       binary
 *.dat       binary
+
+# --- Repo-specific binary exceptions (text-looking but with null bytes) ---
+# Recovery snapshot files that contain null-byte-embedded JSON/text blobs.
+# Treat as binary so the catchall doesn't try to normalize their mixed
+# line endings or null bytes. Consider deleting once recovery is no
+# longer needed.
+recovery/**         binary -text -eol
+recovery_*.txt      binary -text -eol
+recovery_*.json     binary -text -eol
