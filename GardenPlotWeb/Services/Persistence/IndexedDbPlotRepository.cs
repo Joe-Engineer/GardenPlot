@@ -175,6 +175,7 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
                 CustomPaletteItems = index.CustomPaletteItems,
                 CustomCatalogItems = index.CustomCatalogItems,
                 DrawingSets = index.DrawingSets,
+                CustomCatalogAssemblies = index.CustomCatalogAssemblies,
             };
 
             foreach (PlotSummary summary in index.Plots)
