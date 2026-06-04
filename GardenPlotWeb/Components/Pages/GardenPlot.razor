@@ -1233,8 +1233,19 @@ else
                                 {
                                     <span class="drawing-set-editor-na" title="Phase isn't meaningful for continuous ribbons (ground cover, edging) — they always start at the path start.">—</span>
                                 }
-                                <input class="form-control form-control-sm" type="number" min="0" step="0.1" placeholder="@F(row.CapturedWidthFt)" value="@(row.WidthOverrideFt is double w ? F(w) : string.Empty)" disabled="@row.FillArea"
-                                       @onchange="async (e) => { var s = e.Value?.ToString(); if (string.IsNullOrWhiteSpace(s)) { row.WidthOverrideFt = null; await OnDrawingSetRowFieldChangedAsync(); } else if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.WidthOverrideFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
+                                @if (row.FillArea)
+                                {
+                                    @* Issue #216 — when Fill is checked the row uses the source area's
+                                       geometry instead of a fixed ribbon width. Show a clear "fill"
+                                       indicator in place of the width input so it's obvious the value
+                                       is ignored (not just disabled-with-a-stale-value). *@
+                                    <span class="drawing-set-editor-na" title="Width is not used when Fill is checked — the row fills the source area's geometry.">fill</span>
+                                }
+                                else
+                                {
+                                    <input class="form-control form-control-sm" type="number" min="0" step="0.1" placeholder="@F(row.CapturedWidthFt)" value="@(row.WidthOverrideFt is double w ? F(w) : string.Empty)"
+                                           @onchange="async (e) => { var s = e.Value?.ToString(); if (string.IsNullOrWhiteSpace(s)) { row.WidthOverrideFt = null; await OnDrawingSetRowFieldChangedAsync(); } else if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) { row.WidthOverrideFt = v; await OnDrawingSetRowFieldChangedAsync(); } }" />
+                                }
                                 @if (showDepth)
                                 {
                                     <input class="form-control form-control-sm" type="number" min="0" step="0.1" placeholder="@F(row.CapturedHeightFt)" value="@(row.DepthOverrideFt is double dv ? F(dv) : string.Empty)"

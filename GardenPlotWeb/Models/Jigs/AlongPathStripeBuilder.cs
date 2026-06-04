@@ -35,10 +35,15 @@ public static class AlongPathStripeBuilder
 
         if (closed)
         {
-            // Closed source paths (Rectangle perimeter, Oval perimeter, closed FreeDraw)
-            // need ribbon-around-perimeter which RibbonGeometry doesn't yet support.
-            // Skip for now; a follow-up can add Buffer-based perimeter stripes.
-            return null;
+            // Issue #216 — closed source paths (Rectangle / Oval / closed FreeDraw)
+            // produce a "ribbon-around-perimeter" ring: a donut polygon bounded by
+            // the source perimeter offset INWARD by half-width and OUTWARD by
+            // half-width. This is the natural model for "a 4-ft sidewalk along
+            // an oval edge". For the EXPLICIT fill case (row.FillArea=true) the
+            // caller already routes to BuildFilledArea before us — by the time
+            // a closed source reaches TryBuildStripe, the user explicitly wants
+            // a ribbon, not a fill.
+            return TryBuildClosedRibbon(item, spec, points, assignNewIds);
         }
 
         double width = spec.WidthFt;
@@ -343,4 +348,92 @@ public static class AlongPathStripeBuilder
 
         _ => item.Trait ?? string.Empty,
     };
+
+    private static Shape? TryBuildClosedRibbon(
+        PaletteItem item,
+        AlongPathRowSpec spec,
+        IReadOnlyList<Point> source,
+        bool assignNewIds)
+    {
+        if (source.Count < 3)
+        {
+            return null;
+        }
+
+        double width = spec.WidthFt;
+        if (width <= 0)
+        {
+            width = item.WidthFt;
+        }
+
+        if (width <= 0)
+        {
+            return null;
+        }
+
+        double halfWidth = width / 2.0;
+
+        // outsideRing: physically larger; outside the source perimeter.
+        // insideRing : physically smaller; inside the source perimeter.
+        // Per the sign-convention note in PolylineOffset.OffsetClosed: positive
+        // offset = outside for screen-CCW perimeters (the codebase convention).
+        List<Point> outsideRing = PolylineOffset.OffsetClosed(source, spec.OffsetFt + halfWidth);
+        List<Point> insideRing = PolylineOffset.OffsetClosed(source, spec.OffsetFt - halfWidth);
+        if (outsideRing.Count < 3 || insideRing.Count < 3)
+        {
+            return null;
+        }
+
+        // Donut polygon (outer ring + seam-in + inner ring CW + seam-out):
+        //   outside[0], outside[1], ..., outside[N-1], outside[0],          // close outer
+        //   inside[0], inside[N-1], inside[N-2], ..., inside[1], inside[0]  // close inner CW
+        // Implicit Z closes back to outside[0]. The seam outside[0]<->inside[0]
+        // is traversed TWICE in opposite directions so visually it is invisible.
+        // SVG nonzero fill rule + opposite winding directions renders the hole.
+        int n = outsideRing.Count;
+        var donut = new List<Point>(checked((n + 1) + (n + 1)));
+        for (int i = 0; i < n; i++)
+        {
+            donut.Add(outsideRing[i]);
+        }
+
+        donut.Add(outsideRing[0]); // close outer ring
+        donut.Add(insideRing[0]);  // jump radially inward (start of seam)
+        for (int i = n - 1; i >= 1; i--)
+        {
+            donut.Add(insideRing[i]); // trace inner ring CW (reverse)
+        }
+
+        donut.Add(insideRing[0]); // close inner ring at the seam's start angular position
+
+        Shape ribbon = new()
+        {
+            Kind = ShapeKind.FreeDraw,
+            CloseEdge = true,
+            Points = donut,
+            Fill = item.FillColor,
+            Stroke = item.StrokeColor,
+            TextureKey = item.TextureKey,
+            MaterialCode = item.Code,
+            IsGroundCoverSurface = item.MaterialSoldBy == MaterialSoldBy.Area,
+        };
+
+        if (item.DefaultDepthIn is double d)
+        {
+            ribbon.DepthIn = d;
+            ribbon.GroundCoverDepthIn = d;
+        }
+
+        // Issue #215 — propagate ground-cover identity so the takeoff reconciler
+        // emits a "Ground Cover" line item (not "Freehand"). Same call as the
+        // open-path ribbon and the BuildFilledArea path.
+        ApplyGroundCoverIdentity(ribbon, item);
+
+        if (!assignNewIds)
+        {
+            ribbon.Id = System.Guid.Empty;
+        }
+
+        return ribbon;
+    }
 }
