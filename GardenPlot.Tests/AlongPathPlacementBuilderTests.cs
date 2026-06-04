@@ -43,6 +43,12 @@ public class AlongPathPlacementBuilderTests
             FillColor: "#cccccc", StrokeColor: "#666666",
             StockLengthFt: stockLengthFt);
 
+    private static Shape MakeOval(double x = 0, double y = 0, double w = 10, double h = 8)
+        => new() { Kind = ShapeKind.Oval, X = x, Y = y, W = w, H = h };
+
+    private static Shape MakeRectangle(double x = 0, double y = 0, double w = 10, double h = 8)
+        => new() { Kind = ShapeKind.Rectangle, X = x, Y = y, W = w, H = h };
+
     [Fact]
     public void BuildPlacement_NoPoints_ReturnsEmpty()
     {
@@ -150,6 +156,156 @@ public class AlongPathPlacementBuilderTests
         Assert.NotNull(result);
         Assert.NotEmpty(result!.Value.Shapes);
         Assert.Single(result.Value.Groups);
+    }
+
+    // ---- Issue #216 — ribbon-around-perimeter for closed source paths ----
+    [Fact]
+    public void BuildPlacement_GroundCoverRow_OvalSource_BuildsRibbonAroundPerimeter()
+    {
+        // The 2026-06-03 demo's exact repro: apply a drawing set with a 4-ft topsoil
+        // ground-cover row to an oval. Before #216, TryBuildStripe returned null for
+        // closed paths and the row silently dropped. Now it produces a donut ribbon.
+        Shape oval = MakeOval(w: 20, h: 12);
+        var spec = new AlongPathRowSpec(WidthFt: 4.0, GapFt: 0, OffsetFt: 0, PhaseAlongFt: 0);
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakeGroundCover(widthFt: 4.0), spec, false),
+        };
+        var request = new AlongPathPlacementRequest(oval, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Shape produced = Assert.Single(result.Shapes);
+        Assert.Equal(ShapeKind.FreeDraw, produced.Kind); // donut polygon
+        Assert.True(produced.CloseEdge);
+        // Donut topology: outer ring (N pts) + close + inner ring (N pts) + close = 2N+2
+        // For 72-vertex oval: 72*2 + 2 = 146 vertices.
+        Assert.Equal((72 * 2) + 2, produced.Points.Count);
+        Assert.Equal("Mulch", produced.MaterialCode);
+        Assert.Equal("ground-cover", produced.Trait); // #215 identity
+        Assert.Equal("Mulch", produced.GroundCoverCode);
+    }
+
+    [Fact]
+    public void BuildPlacement_GroundCoverRow_RectangleSource_BuildsRibbonAroundPerimeter()
+    {
+        Shape rect = MakeRectangle(w: 10, h: 6);
+        var spec = new AlongPathRowSpec(WidthFt: 2.0, GapFt: 0, OffsetFt: 0, PhaseAlongFt: 0);
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakeGroundCover(widthFt: 2.0), spec, false),
+        };
+        var request = new AlongPathPlacementRequest(rect, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Shape produced = Assert.Single(result.Shapes);
+        // 4-vertex rectangle: 4*2 + 2 = 10 vertices in the donut polygon
+        Assert.Equal((4 * 2) + 2, produced.Points.Count);
+    }
+
+    [Fact]
+    public void BuildPlacement_GroundCoverRow_RectangleSource_OffsetShiftsRibbonOutward()
+    {
+        // Positive OffsetFt shifts the ribbon centerline OUTSIDE the source perimeter
+        // (per the sign-convention note in PolylineOffset.OffsetClosed).
+        Shape rect = MakeRectangle(w: 10, h: 6);
+        var spec = new AlongPathRowSpec(WidthFt: 2.0, GapFt: 0, OffsetFt: 2.0, PhaseAlongFt: 0);
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakeGroundCover(widthFt: 2.0), spec, false),
+        };
+        var request = new AlongPathPlacementRequest(rect, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Shape produced = Assert.Single(result.Shapes);
+        // Outside ring is the source perimeter offset by (offset + halfWidth) = 3 ft outward.
+        // Top-left source vertex (0,0) → outside vertex (-3,-3).
+        // Inside ring offset by (offset - halfWidth) = 1 ft outward.
+        // Top-left source vertex (0,0) → inside vertex (-1,-1).
+        // Both rings are entirely OUTSIDE the source rectangle.
+        Assert.All(produced.Points, p => Assert.True(p.X <= 0 || p.Y <= 0 || p.X >= 10 || p.Y >= 6,
+            $"vertex ({p.X},{p.Y}) should be outside the source rectangle"));
+    }
+
+    [Fact]
+    public void BuildPlacement_GroundCoverRow_OvalSource_ExplicitFillArea_StillProducesFill()
+    {
+        // When the user explicitly checks FillArea, the placement uses BuildFilledArea
+        // (interior fill) instead of the new ribbon-around-perimeter path.
+        Shape oval = MakeOval(w: 10, h: 8);
+        var spec = new AlongPathRowSpec(WidthFt: 4.0, GapFt: 0, OffsetFt: 0, PhaseAlongFt: 0);
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakeGroundCover(widthFt: 4.0), spec, FillArea: true),
+        };
+        var request = new AlongPathPlacementRequest(oval, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Shape produced = Assert.Single(result.Shapes);
+        Assert.Equal(ShapeKind.Oval, produced.Kind); // BuildFilledArea mirrors source Kind
+    }
+
+    [Fact]
+    public void BuildPlacement_GroundCoverRow_OpenSource_StillProducesOpenRibbon()
+    {
+        // Open source paths keep the existing ribbon-along-path behavior — closed-source
+        // handling only kicks in when closed=true.
+        Shape openPath = MakeOpenPath((0, 0), (10, 0));
+        var spec = new AlongPathRowSpec(WidthFt: 1.0, GapFt: 0, OffsetFt: 0, PhaseAlongFt: 0);
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakeGroundCover(widthFt: 1.0), spec, false),
+        };
+        var request = new AlongPathPlacementRequest(openPath, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Shape produced = Assert.Single(result.Shapes);
+        // Open-path ribbon polygon is a 4-vertex rectangle (start-L, end-L, end-R, start-R)
+        // — distinct from the closed-path 2N+2 donut.
+        Assert.True(produced.Points.Count >= 4 && produced.Points.Count <= 6);
+    }
+
+    [Fact]
+    public void BuildPlacement_GroundCoverRow_OvalSource_AssignNewIdsFalse_LeavesEmptyId()
+    {
+        Shape oval = MakeOval();
+        var spec = new AlongPathRowSpec(WidthFt: 2.0, GapFt: 0, OffsetFt: 0, PhaseAlongFt: 0);
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakeGroundCover(widthFt: 2.0), spec, false),
+        };
+        var request = new AlongPathPlacementRequest(oval, rows, 0, AssignNewIds: false);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Shape produced = Assert.Single(result.Shapes);
+        Assert.Equal(System.Guid.Empty, produced.Id);
+    }
+
+    [Fact]
+    public void BuildPlacement_GroundCoverRow_OvalSource_TakeoffReconcilesAsGroundCover()
+    {
+        // End-to-end through TakeoffReconciler: the ribbon shape carries the
+        // canonical ground-cover identity (Trait + GroundCoverCode + Label per #215),
+        // so the takeoff produces a "Ground Cover" line item rather than a Freehand
+        // fallback. This is what the user actually wants for bid output.
+        Shape oval = MakeOval(w: 20, h: 12);
+        var spec = new AlongPathRowSpec(WidthFt: 4.0, GapFt: 0, OffsetFt: 0, PhaseAlongFt: 0);
+        var rows = new[]
+        {
+            new AlongPathRowRequest(MakeGroundCover(widthFt: 4.0), spec, false),
+        };
+        var request = new AlongPathPlacementRequest(oval, rows, 0, true);
+        var result = AlongPathPlacementBuilder.BuildPlacement(request);
+
+        Shape produced = Assert.Single(result.Shapes);
+        IReadOnlyList<TakeoffItem> items = TakeoffReconciler.Reconcile(
+            new[] { produced },
+            static (_, _, _) => null);
+
+        TakeoffItem line = Assert.Single(items);
+        Assert.Equal("Ground Cover", line.Kind);
+        Assert.Equal("Mulch", line.CatalogCode);
+        Assert.Equal("yd³", line.QuantityUnit); // depth -> volumetric
+        Assert.True(line.Quantity > 0);
     }
 
     [Fact]
