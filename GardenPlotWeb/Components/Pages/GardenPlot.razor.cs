@@ -454,6 +454,25 @@ public partial class GardenPlot
         return LayerResolver.GetLayerKey(shape, ResolveLayerCatalogItem(shape));
     }
 
+    /// <summary>
+    /// Issue #218 — wraps <see cref="LayerResolver.EnsureLayerVisibleForShape"/> with
+    /// the component's catalog resolver. If the shape's target layer was hidden and
+    /// is now visible, returns the layer's display name so the call site can surface
+    /// a brief notification; otherwise returns null. No-op when there is no current
+    /// plot. Called from user-initiated draw commits (stamp drop, free-draw close,
+    /// drawing-set apply, etc.) to prevent the silent-disappear behaviour where a
+    /// shape lands on a hidden layer with no feedback.
+    /// </summary>
+    private string? EnsureDrawTargetLayerVisible(Shape shape)
+    {
+        if (currentPlot is null || shape is null)
+        {
+            return null;
+        }
+
+        return LayerResolver.EnsureLayerVisibleForShape(currentPlot, shape, ResolveLayerCatalogItem(shape));
+    }
+
     private bool IsShapeVisible(Shape shape)
     {
         if (currentPlot is null)
@@ -6791,6 +6810,11 @@ public partial class GardenPlot
         }
 
         RecordUndoState();
+        foreach (Shape s in placement.Shapes)
+        {
+            EnsureDrawTargetLayerVisible(s); // issue #218
+        }
+
         currentPlot.Shapes.AddRange(placement.Shapes);
         foreach (var group in placement.Groups)
         {
@@ -8982,6 +9006,7 @@ public partial class GardenPlot
                         Distance(drafting.Points[0], drafting.Points[^1]) > 0 || drafting.Points.Count > 2)
                     {
                         RecordUndoState();
+                        EnsureDrawTargetLayerVisible(drafting); // issue #218
                         currentPlot.Shapes.Add(drafting);
                         SelectOnly(drafting.Id);
                         _ = SaveAsync();
@@ -8996,6 +9021,7 @@ public partial class GardenPlot
                 RecordUndoState();
                 foreach (var shape in placement.Shapes)
                 {
+                    EnsureDrawTargetLayerVisible(shape); // issue #218
                     currentPlot.Shapes.Add(shape);
                 }
 
@@ -9598,6 +9624,7 @@ public partial class GardenPlot
                 }
 
                 RecordUndoState();
+                EnsureDrawTargetLayerVisible(drafting); // issue #218
                 currentPlot.Shapes.Add(drafting);
                 added = true;
             }
@@ -9605,6 +9632,7 @@ public partial class GardenPlot
         else if (drafting.W >= minSize && drafting.H >= minSize)
         {
             RecordUndoState();
+            EnsureDrawTargetLayerVisible(drafting); // issue #218
             currentPlot.Shapes.Add(drafting);
             added = true;
         }
@@ -10268,6 +10296,7 @@ public partial class GardenPlot
             {
                 TakeoffMath.Reconcile(drafting);
                 RecordUndoState();
+                EnsureDrawTargetLayerVisible(drafting); // issue #218
                 currentPlot.Shapes.Add(drafting);
                 SelectOnly(drafting.Id);
                 _ = SaveAsync();
@@ -10366,6 +10395,7 @@ public partial class GardenPlot
 
             NormalizeEdgeBulgesOnCommit(drafting); // issue #130
             RecordUndoState();
+            EnsureDrawTargetLayerVisible(drafting); // issue #218
             currentPlot.Shapes.Add(drafting);
 
             // Issue #162a — auto-place elbow fittings at sharp interior vertices of a
@@ -11132,6 +11162,7 @@ public partial class GardenPlot
         }
 
         RecordUndoState();
+        EnsureDrawTargetLayerVisible(preview); // issue #218
         currentPlot.Shapes.Add(preview);
         SelectOnly(preview.Id);
 

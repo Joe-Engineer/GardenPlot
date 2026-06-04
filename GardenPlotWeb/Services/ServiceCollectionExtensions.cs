@@ -24,6 +24,12 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        // Issue #214 — diagnostic capture for unhandled exceptions that bypass the
+        // routed <ErrorBoundary> (fire-and-forget async, JS interop, WASM runtime).
+        // Singleton because Program.cs's global handlers need a stable instance for
+        // the app's lifetime, and the WASM circuit has only one DI scope anyway.
+        _ = services.AddSingleton<UnhandledErrorRecorder>();
+
         // Thin typed wrapper over wwwroot/js/client-store.js (IndexedDB key/value store).
         // The image-blob IndexedDB is kept separate and owned by wwwroot/js/client-images.js
         // to avoid shared-ownership schema-version traps between the structured and binary stores.
