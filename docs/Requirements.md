@@ -1,4 +1,4 @@
-﻿# Garden Plot — Software Requirements
+# Garden Plot — Software Requirements
 
 > Living document capturing the features, boundaries, technical stack, and conventions established for the Garden Plot application. Update this as new requirements are added or existing ones evolve.
 
@@ -11,11 +11,12 @@ Garden Plot is a **local-first, single-user, browser-based garden-planning tool*
 | Layer | Choice | Rationale |
 |---|---|---|
 | Runtime / language | .NET 10 / C# `latest` | Already targeted by all `csproj` in the solution. |
-| UI | **Blazor Server**, `InteractiveServer` render mode | Selected over Razor Pages / MVC per workspace policy. SignalR connection drives interactivity. |
-| Aspire | `GardenPlot.AppHost` orchestrator + `GardenPlot.ServiceDefaults` | OpenTelemetry, health checks, service discovery, resilience. |
+| UI | **Blazor WebAssembly** (PWA, offline-capable, installable) | Migrated from Blazor Server in 2025 to make Garden Plot a true local-first app — no SignalR connection, no server-side data store, installable as a PWA. See `docs/migrating-legacy-data.md` for the upgrade path from the legacy build. |
+| Host | **`GardenPlotWeb.Host`** — minimal ASP.NET Core static-file project that serves the published WASM payload | Required so Azure App Service Linux can run the app (App Service Linux can't serve a pure-WASM publish directly — see PR #211). |
 | Drawing surface | Inline **SVG** with viewBox in feet | Vector, zoomable, exportable. |
-| JS interop | Single ES module `wwwroot/js/gardenplot.js`, loaded via `IJSRuntime.InvokeAsync<IJSObjectReference>("import", …)` | Used for `localStorage`, conditional `preventDefault` on wheel, pointer capture for panel drag, viewport size, PNG/print export, generic blob download. |
-| External API | Wikipedia REST `/api/rest_v1/page/summary/{title}` | Free, no API key, CORS-friendly. Server-side via `IHttpClientFactory`. Polite `User-Agent`. |
+| Persistence | **IndexedDB** (browser-local), via two cooperating ES modules under `wwwroot/js/`: `client-store.js` (structured key/value DB `gardenplot-structured`) and `client-images.js` (blob DB `gardenplot`) | Replaces the previous `localStorage`-based persistence (#92). The structured DB stores the plot library document; the blob DB stores tile / plot-background / dossier photos. |
+| JS interop | Three ES modules under `wwwroot/js/`, all loaded via `IJSRuntime.InvokeAsync<IJSObjectReference>("import", …)`: `gardenplot.js` (canvas interop — wheel/pointer/touch, viewport, PNG/PDF/CSV export, generic helpers), `client-store.js` (IndexedDB key/value for the plot library), `client-images.js` (IndexedDB blobs for tile / plot-background / dossier photos). | Canvas concerns and persistence concerns are intentionally segregated; image-blob IDB is split from structured-data IDB to avoid shared-ownership schema-version traps. |
+| External API | Wikipedia REST `/api/rest_v1/page/summary/{title}` | Free, no API key, CORS-friendly. Called **client-side** (WASM) via the scoped `HttpClient`. Polite `User-Agent`. The Wikipedia integration can be disabled in settings for zero outbound traffic. |
 | Static analysis | `StyleCop.Analyzers` + `latest-recommended` analyzers, `EnforceCodeStyleInBuild=true`, **`TreatWarningsAsErrors=true`** | Configured centrally via `Directory.Build.props` and `.editorconfig`. |
 
 ### 2.1 Project layout
@@ -23,29 +24,51 @@ Garden Plot is a **local-first, single-user, browser-based garden-planning tool*
 ```
 GardenPlot.slnx
 ├── .editorconfig            ← solution-wide style + analyzer rules
+├── .gitattributes           ← line-ending policy (CRLF / LF for .sh / binary) — see #239
 ├── stylecop.json            ← Garden Plot company name + copyright template
 ├── Directory.Build.props    ← TreatWarningsAsErrors, AnalysisMode, StyleCop pkg
-├── docs/Requirements.md     ← this file
-├── GardenPlot.AppHost/      ← Aspire orchestrator
-├── GardenPlot.ServiceDefaults/
-└── GardenPlotWeb/           ← Blazor Server app
-    ├── Components/
-    │   ├── App.razor, Routes.razor, _Imports.razor
-    │   ├── Layout/(MainLayout, NavMenu, ReconnectModal)
-    │   └── Pages/
-    │       ├── Home.razor, Counter.razor, Weather.razor
-    │       └── GardenPlot.razor (+ .razor.css) ← main feature
-    ├── Models/
-    │   ├── GardenPlotModels.cs ← data model + catalogs + companion rules
-    │   └── PlantRendering.cs   ← SVG fragment generators
-    └── wwwroot/js/gardenplot.js
+├── docs/                    ← this file + hosting, persistence-architecture,
+│                              migrating-legacy-data, payload-budget
+├── GardenPlot.DataFetcher/  ← console tool for catalog seed-data refresh
+├── GardenPlotWeb/           ← Blazor WebAssembly app (main feature)
+│   ├── Components/
+│   │   ├── App.razor, Routes.razor, _Imports.razor
+│   │   ├── Layout/(MainLayout, NavMenu, ReconnectModal)
+│   │   └── Pages/
+│   │       └── GardenPlot.razor (+ .razor.cs + .razor.css) ← main feature
+│   ├── Models/
+│   │   ├── GardenPlotModels.cs, PlantRendering.cs
+│   │   ├── Jigs/ (#95 — extracted drawing-tool jigs)
+│   │   └── LayerResolver.cs, Takeoff.cs, etc.
+│   ├── Services/Persistence/
+│   │   ├── IPlotRepository.cs, IndexedDbPlotRepository.cs
+│   │   ├── IndexedDbStorage.cs (IClientKvStorage wrapper)
+│   │   └── PlotLibraryLoader.cs (per-version JSON loader / migrator)
+│   ├── Services/ (ProjectDossierService, CatalogService, CitationService,
+│   │              UnhandledErrorRecorder, …)
+│   ├── Build/PayloadBudget.targets ← enforces 3 MB Brotli first-paint budget
+│   └── wwwroot/
+│       ├── js/gardenplot.js      ← canvas interop (wheel/pointer/touch, viewport, PNG/PDF/CSV export)
+│       ├── js/client-store.js    ← IndexedDB key/value (gardenplot-structured DB)
+│       ├── js/client-images.js   ← IndexedDB blob store (gardenplot DB)
+│       ├── manifest.webmanifest, service-worker.js (passthrough),
+│       │   service-worker.published.js (precache for offline)
+│       └── web.config             ← IIS/SWA SPA fallback + MIME types
+├── GardenPlotWeb.Host/      ← ASP.NET Core static-file host (App Service Linux)
+└── GardenPlot.Tests/        ← unit + integration tests (xUnit; 1,400+ cases)
 ```
+
+> **Migration history.** The original Garden Plot was a Blazor Server app with all
+> data in `localStorage`. The WASM migration (issue #92, completed 2025) moved
+> persistence to IndexedDB across two databases. Auto-migration of legacy
+> `localStorage` plot data is implemented in `PlotLibraryLoader`; see
+> [`docs/migrating-legacy-data.md`](migrating-legacy-data.md) for details.
 
 ## 3. Functional Requirements
 
 ### 3.1 Plot library
 
-- **Multiple plots**, persisted as a single JSON blob under `localStorage` key `gardenplot.library.v1`.
+- **Multiple plots**, persisted as a JSON document in IndexedDB under the `gardenplot-structured` database at key `library/current`. Image blobs (tile images, plot backgrounds, dossier photos) live in a separate `gardenplot` database. Auto-migrated from the legacy `localStorage` key `gardenplot.library.v1` on first load (#92).
 - A **plot selector** (dropdown) above the canvas lists every saved plot as `Name (W ft × H ft)`.
 - **+ New Plot** opens a modal accepting Name, Shape (currently *Rectangle (flat)* — extension point), Width (ft), Height (ft). Width / Height clamped to 1–500 ft.
 - Plot create/edit dialogs include a transient **Lock aspect ratio** chain toggle between Width and Height. It is **off by default**, captures the current ratio when enabled, keeps that ratio while editing, and resets to unlocked each time the dialog opens.
@@ -233,7 +256,7 @@ public class UiPreferences
 
 ### 4.2 Persistence rules
 
-- **Single localStorage key** `gardenplot.library.v1` with a versioned suffix to allow future migration.
+- **IndexedDB-backed** via `IPlotRepository` / `IndexedDbPlotRepository`. The plot library document lives in the `gardenplot-structured` database (`IClientKvStorage` → `wwwroot/js/client-store.js`) under key `library/current`; image blobs (tile images, dossier photos, plot backgrounds) live in the separate `gardenplot` database (`wwwroot/js/client-images.js`). The two databases are intentionally segregated to avoid shared-ownership schema-version traps. Legacy `localStorage` key `gardenplot.library.v1` is auto-migrated on first WASM load (see [`docs/migrating-legacy-data.md`](migrating-legacy-data.md)).
 - **Auto-save** after every mutating action: stamp drop, draft completion, drag end, rotate, delete, clear, plot create / delete / switch, color change, panel reposition.
 - All types are public and have parameterless constructors / settable properties so `System.Text.Json` round-trips cleanly.
 - Backward-compatible: nullable additions (`Stroke`, `Fill`, `FillOpacity`, `Trait`, `UiPreferences` fields) deserialize cleanly from older saves.
@@ -242,8 +265,8 @@ public class UiPreferences
 
 ### 5.1 Privacy / data residency
 
-- **No personal data leaves the browser.** All plots, kit rotations, and panel positions live in the user's local storage.
-- The only outbound network call is to Wikipedia's public REST API, **server-side** (Blazor Server), and only when the user selects a tree / bush. The Wikipedia call sends only the species name (parenthetical stripped) — no user data.
+- **No personal data leaves the browser.** All plots, kit rotations, panel positions, custom palette items, and uploaded images live in the browser's IndexedDB (two databases: `gardenplot-structured` for the plot library document, `gardenplot` for image blobs). There is no server-side data store and no account.
+- The only outbound network call is to Wikipedia's public REST API, called **client-side** from the WASM runtime, and only when the user selects a tree / bush species. The Wikipedia call sends only the species name (parenthetical stripped) — no user data. The integration can be disabled in settings for truly zero outbound traffic.
 
 ### 5.2 Performance
 
@@ -269,11 +292,33 @@ public class UiPreferences
 ### 5.4 Code style
 
 - File-scoped namespaces.
-- Top-level statements in `Program.cs` / `AppHost.cs`.
+- Top-level statements in `Program.cs`.
 - Implicit usings on; `Nullable` enabled.
 - Fields camelCase, properties PascalCase. Records used for value-like data (`Point`, `PaletteItem`, `BedKit`, `WikiSummary`).
-- All UI lives in **`GardenPlot.razor`** + scoped CSS; data and rendering helpers live in **`Models/`**.
-- JS interop is single-module (`gardenplot.js`); never inline `<script>`.
+- All UI lives in **`GardenPlot.razor`** + scoped CSS; data and rendering helpers live in **`Models/`**; cross-component services live in **`Services/`**.
+- JS interop uses three ES modules (`gardenplot.js`, `client-store.js`, `client-images.js`); never inline `<script>`.
+
+### 5.5 Payload budget
+
+- **First-paint Brotli budget: 3 MB** for the `_framework/` directory of the published WASM app. Enforced by `GardenPlotWeb/Build/PayloadBudget.targets` (runs `AfterTargets="Publish"`).
+- See [`docs/payload-budget.md`](payload-budget.md) for the budget rationale, current usage by category, and investigation guidance when the budget is exceeded.
+- Two project-level mitigations are in `GardenPlotWeb.csproj`:
+  - `InvariantGlobalization=true` (saves ~600 KB by removing ICU locale data; only invariant culture sorting is used)
+  - `BlazorEnableTimeZoneSupport=false` (saves ~30 KB by removing the IANA tz DB; only `DateTime.ToLocalTime()` is used, which works off the browser's UTC offset)
+- The PR-validate CI workflow runs `dotnet publish` so payload-budget regressions are caught **before merge** instead of in the deploy workflow.
+
+### 5.6 Continuous integration
+
+Two GitHub Actions workflows in `.github/workflows/`:
+
+- **`pr-validate.yml`** — runs on every PR to `main`. Steps (in order):
+  1. **Verify line-ending policy** — `git add --renormalize .` + `git diff --cached --quiet` to reject any file violating `.gitattributes` (issue #239). Fails fast (~10 s) before expensive steps.
+  2. Set up .NET 10 SDK preview + install `wasm-tools` workload.
+  3. `dotnet restore` / `dotnet build --configuration Release -warnaserror`.
+  4. `dotnet test --configuration Release` — full xUnit suite (1,400+ tests).
+  5. `dotnet publish` — enforces the 3 MB payload budget via `PayloadBudget.targets`.
+
+- **`main_gardenplot.yml`** — runs on push to `main`. Builds, publishes, and deploys the WASM payload to Azure App Service Linux (via `GardenPlotWeb.Host` static-file project — see #211).
 
 ## 6. Visual / Interaction Style
 
