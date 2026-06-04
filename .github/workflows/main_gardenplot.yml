@@ -1,4 +1,10 @@
-# Build and deploy GardenPlotWeb (Blazor Server, .NET 10) to Azure App Service
+# Build and deploy the Blazor WASM app to Azure App Service Linux.
+#
+# The WASM client (GardenPlotWeb) is hosted by a thin ASP.NET Core static-file
+# server (GardenPlotWeb.Host) because App Service Linux / Oryx expects a startup
+# DLL. The host stores NO user data — plots live in the browser's IndexedDB,
+# which is the explicit free-tier privacy model.
+#
 # Auth: OIDC federated identity (no secrets/passwords)
 # Docs: https://github.com/Azure/login
 
@@ -28,11 +34,20 @@ jobs:
           dotnet-version: '10.0.x'
           dotnet-quality: 'preview'
 
-      - name: Publish GardenPlotWeb
-        # Scope to the web project only; the Aspire AppHost is dev-only
-        # and not deployed to App Service.
+      - name: Install wasm-tools workload
+        # Required for Blazor WASM AOT/relink/trim optimization. Without it,
+        # the published _framework/ payload is ~540 KB larger than a local
+        # `dotnet publish` and breaches the 3 MB Brotli first-paint budget
+        # enforced by GardenPlotWeb/Build/PayloadBudget.targets.
+        run: dotnet workload install wasm-tools
+
+      - name: Publish GardenPlotWeb.Host
+        # The Host project references the WASM client and produces a publish
+        # output that includes BOTH the server DLL (Oryx startup target) AND
+        # the WASM client's wwwroot/ static files. The PayloadBudget target
+        # still fires because it's wired to the WASM client csproj.
         run: |
-          dotnet publish ./GardenPlotWeb/GardenPlotWeb.csproj \
+          dotnet publish ./GardenPlotWeb.Host/GardenPlotWeb.Host.csproj \
             --configuration Release \
             --output ${{ runner.temp }}/publish
 
@@ -43,11 +58,26 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'gardenplot'
-          slot-name: 'production'
-          package: ${{ runner.temp }}/publish
+      - name: Zip publish output
+        # az webapp deploy --clean true requires a zip package.
+        # webapps-deploy@v3 zipped internally but doesn't expose --clean.
+        run: |
+          cd ${{ runner.temp }}/publish
+          zip -r ${{ runner.temp }}/publish.zip .
+
+      - name: Deploy to Azure Web App (clean)
+        # IMPORTANT: --clean true wipes /home/site/wwwroot/ BEFORE extracting
+        # the new package. Without this, Azure does incremental file sync
+        # and stale files (e.g. an extra .runtimeconfig.json from a prior
+        # deploy) persist forever and break Oryx startup-DLL detection.
+        # The host stores NO user data on the server, so wiping is safe.
+        run: |
+          az webapp deploy \
+            --resource-group rg-gardenplot-prod \
+            --name gardenplot \
+            --src-path ${{ runner.temp }}/publish.zip \
+            --type zip \
+            --clean true \
+            --restart true
 
 

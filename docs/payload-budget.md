@@ -55,6 +55,34 @@ shipped over the wire.
   trimmer drops unreachable types and methods. We tolerate a couple
   of unavoidable trimmer warnings from NetTopologySuite reflection.
 
+## CI must install `wasm-tools` (gotcha, fixed 2026-06-01)
+
+The Blazor WASM publish pipeline needs the `wasm-tools` workload to
+run its AOT / relink / trim optimization passes. Without it, the
+SDK prints:
+
+```
+Publishing without optimizations. Although it's optional for Blazor,
+we strongly recommend using `wasm-tools` workload!
+```
+
+and ships an **unoptimized** payload that's roughly **540 KB larger**
+than a local optimized publish. With our 3 MB budget that's the
+difference between 2.69 MB (passes) and 3.21 MB (fails by 213 KB).
+
+**Both `.github/workflows/*.yml` files must include**:
+
+```yaml
+- name: Install wasm-tools workload
+  run: dotnet workload install wasm-tools
+```
+
+before `dotnet publish`. The `pr-validate.yml` workflow also runs a
+publish so PR validation catches payload regressions before merge,
+not after deploy fails. Local `dotnet publish -c Release` users on
+boxes that have the workload installed will not reproduce CI bloat;
+**always check CI status, not just local builds**, when sizing changes.
+
 ## If the budget fails
 
 The error message lists the available knobs in order of impact. Start
