@@ -62,6 +62,50 @@ public static class LayerResolver
         return plot.LayerStates[layerKey];
     }
 
+    /// <summary>
+    /// Issue #218 — when the user commits a draw to a hidden target layer, set that
+    /// layer visible so the new shape is not silently invisible. Returns the layer's
+    /// display name when this call actually changed visibility (caller can surface a
+    /// brief notification); returns <c>null</c> when the layer was already visible.
+    /// </summary>
+    /// <remarks>
+    /// The undo system (PlotUndoSnapshot) only captures Shapes + DropGroups, NOT
+    /// LayerStates, so undoing the draw removes the shape but leaves the layer
+    /// visible. This is deliberate: the user retains explicit re-hide control via
+    /// the layers panel after the draw, without an undo step surprising them by
+    /// re-hiding the layer they just looked at.
+    /// </remarks>
+    /// <param name="plot">The plot to mutate.</param>
+    /// <param name="shape">The shape being committed by the user.</param>
+    /// <param name="catalogItem">The shape's catalog item, if known.</param>
+    /// <returns>The newly-visible layer's display name, or null when no change.</returns>
+    public static string? EnsureLayerVisibleForShape(PlotData plot, Shape shape, PaletteItem? catalogItem = null)
+    {
+        ArgumentNullException.ThrowIfNull(plot);
+        ArgumentNullException.ThrowIfNull(shape);
+
+        string layerKey = GetLayerKey(shape, catalogItem);
+        LayerState state = GetLayerState(plot, layerKey);
+        if (state.Visible)
+        {
+            return null;
+        }
+
+        state.Visible = true;
+
+        // Resolve the display name from the well-known definitions; fall back to
+        // the raw key if we ever invent a layer key without a definition entry.
+        foreach (LayerDefinition def in DefinitionsValue)
+        {
+            if (string.Equals(def.Key, layerKey, StringComparison.Ordinal))
+            {
+                return def.Label;
+            }
+        }
+
+        return layerKey;
+    }
+
     /// <summary>Gets the derived layer key for the supplied shape.</summary>
     public static string GetLayerKey(Shape shape, PaletteItem? catalogItem = null)
     {
