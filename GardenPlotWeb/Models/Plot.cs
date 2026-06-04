@@ -133,5 +133,15 @@ public class PlotLibrary
     /// Rows editor or by capturing a multi-shape selection from the canvas.
     /// </summary>
     public List<AlongPathDrawingSet> DrawingSets { get; set; } = new();
+
+    /// <summary>
+    /// Issue #208 — user-defined multi-layer catalog assemblies (paver pads, plant beds,
+    /// concrete slabs, etc.) authored via the Assembly Takeoff Mode. Persist with the
+    /// library so they round-trip through save / load alongside <see cref="CustomCatalogItems"/>
+    /// and <see cref="DrawingSets"/>. All entries should carry <see cref="CatalogSource.Custom"/>
+    /// — Base / Pack assemblies are loaded by <see cref="GardenPlotWeb.Services.Catalog.CatalogService"/>
+    /// from <c>wwwroot/data/catalog/assemblies/</c> and live there, not here.
+    /// </summary>
+    public List<CatalogAssembly> CustomCatalogAssemblies { get; set; } = new();
 }
 
