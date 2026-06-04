@@ -5548,6 +5548,21 @@ public partial class GardenPlot
         {
             selectedItem = null;
             ghostX = ghostY = null;
+
+            // UX paper cut: if the user had a drawing set selected and then picked
+            // a generic drawing tool from the toolbar (Oval, Rectangle, FreeDraw,
+            // Ruler, Polyline, Polygon, etc.) the drawing set would stay active.
+            // Finishing the next draw — particularly an Oval whose perimeter
+            // PaintAsDrawn-applies the entire drawing set — silently dumped all
+            // the drawing-set rows into the takeoff when the user just wanted a
+            // plain oval. Clearing here makes "pick a tool" mean "start fresh".
+            // The user can re-pick the drawing set if they want to use it.
+            // Tool.Stamp is the one exception because Stamp is the only tool the
+            // drawing-set-along-path workflow naturally pairs with from the
+            // toolbar (stamp picks a palette item; the drawing set provides the
+            // multi-row recipe).
+            selectedDrawingSetId = null;
+            editingDrawingSet = null;
         }
 
         if (t != Tool.Ruler && drafting?.Kind == ShapeKind.Ruler)
