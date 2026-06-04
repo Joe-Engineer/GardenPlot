@@ -45,6 +45,14 @@ public sealed class ServiceCollectionExtensionsTests
         // Each browser tab is one WASM circuit -> one scope. Singletons would
         // leak per-user IndexedDB state across reloads; transient would waste
         // catalog seed-data fetches. Scoped is the contract.
+        //
+        // Documented exception: UnhandledErrorRecorder is intentionally Singleton.
+        // It carries only ephemeral diagnostic records (not user data), and the
+        // global exception hooks wired in Program.cs (AppDomain.UnhandledException,
+        // TaskScheduler.UnobservedTaskException) attach at process startup before
+        // any DI scope exists — they need a stable instance for the host's lifetime.
+        // In WASM each circuit is a single tab anyway, so per-tab isolation is
+        // already achieved by the WASM process model.
         ServiceCollection services = new();
         services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
@@ -58,7 +66,19 @@ public sealed class ServiceCollectionExtensionsTests
             .ToArray();
 
         Assert.NotEmpty(gardenDescriptors);
-        Assert.All(gardenDescriptors, d => Assert.Equal(ServiceLifetime.Scoped, d.Lifetime));
+        Assert.All(gardenDescriptors, d =>
+        {
+            // Allowlist: types whose lifetime intentionally diverges from Scoped.
+            // Keep this list small and well-documented — every addition needs to
+            // explain why the Scoped default is the wrong fit.
+            if (d.ServiceType == typeof(UnhandledErrorRecorder))
+            {
+                Assert.Equal(ServiceLifetime.Singleton, d.Lifetime);
+                return;
+            }
+
+            Assert.Equal(ServiceLifetime.Scoped, d.Lifetime);
+        });
     }
 
     [Fact]
