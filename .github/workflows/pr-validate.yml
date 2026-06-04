@@ -1,6 +1,7 @@
-# Validates pull requests against `main` by building with warnings-as-errors
-# and running the full test suite.
-name: 'PR validate (build + test)'
+# Validates pull requests against `main` by building with warnings-as-errors,
+# running the full test suite, and publishing the WASM app to enforce the
+# first-paint payload budget (see GardenPlotWeb/Build/PayloadBudget.targets).
+name: 'PR validate (build + test + publish)'
 
 on:
   pull_request:
@@ -25,6 +26,13 @@ jobs:
           dotnet-version: '10.0.x'
           dotnet-quality: 'preview'
 
+      - name: Install wasm-tools workload
+        # Mirrors the deploy workflow so the PR validator catches payload-
+        # budget regressions before they merge to main, instead of after.
+        # See GardenPlotWeb/Build/PayloadBudget.targets and
+        # docs/payload-budget.md.
+        run: dotnet workload install wasm-tools
+
       - name: Restore
         run: dotnet restore ./GardenPlot.slnx
 
@@ -33,3 +41,19 @@ jobs:
 
       - name: Test
         run: dotnet test ./GardenPlot.slnx --no-build --configuration Release --logger "console;verbosity=normal"
+
+      - name: Publish (enforces payload budget)
+        # The PayloadBudget.targets MSBuild target runs AfterTargets="Publish"
+        # and fails the build if the Brotli-compressed _framework/ payload
+        # exceeds 3 MB. Running this in PR validation catches regressions
+        # before they merge and break the deploy workflow.
+        #
+        # NOTE: no --no-build — publish does its own WASM relink/AOT pass
+        # against an obj/Release/.../for-publish/ tree, separate from the
+        # for-build/ tree that the build + test steps produced.
+        # NOTE: publish the Host project so the budget target sees the same
+        # composition the deploy workflow sees.
+        run: |
+          dotnet publish ./GardenPlotWeb.Host/GardenPlotWeb.Host.csproj \
+            --configuration Release \
+            --output ${{ runner.temp }}/publish

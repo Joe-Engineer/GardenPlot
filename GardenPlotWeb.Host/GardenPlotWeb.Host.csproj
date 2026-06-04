@@ -1,0 +1,57 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!--
+      Host for the Blazor WASM client. App Service Linux looks for a startup
+      DLL on deploy (Oryx); this project produces that DLL and turns around
+      and serves the WASM client's static files.
+
+      NO user data ever touches the server — plots live in the browser's
+      IndexedDB (see GardenPlotWeb's storage layer). This host is a pure
+      static-file server with SPA fallback. Free-tier safe.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Bundles the WASM client into this project's publish output as the
+         standard Blazor "hosted" pattern. The SDK package wires up the
+         publish hook that copies the WASM client's wwwroot/ into this
+         project's wwwroot/ on publish. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.8" />
+    <ProjectReference Include="..\GardenPlotWeb\GardenPlotWeb.csproj" />
+  </ItemGroup>
+
+  <!-- Enforce the same first-paint Brotli payload budget on Host publishes
+       that GardenPlotWeb's standalone publish enforces. The target reads
+       $(PublishDir)wwwroot/_framework which is correctly populated for both
+       publish layouts; importing here lets the deploy workflow (which
+       publishes Host) trip the gate the same way the WASM publish does. -->
+  <PropertyGroup>
+    <!-- 3 MB, mirrors GardenPlotWeb.csproj. Keep in sync. -->
+    <WasmFirstPaintBudgetBytes>3145728</WasmFirstPaintBudgetBytes>
+  </PropertyGroup>
+  <Import Project="..\GardenPlotWeb\Build\PayloadBudget.targets" />
+
+  <!--
+    Oryx (App Service Linux startup) chokes when two *.runtimeconfig.json files
+    are at the publish root because it can't pick the startup DLL deterministically:
+
+      WARNING: Expected to find only one file with extension '.runtimeconfig.json' but found 2
+      WARNING: Found files: 'GardenPlotWeb.Host.runtimeconfig.json, GardenPlotWeb.runtimeconfig.json'
+      Running the default app using command: dotnet "/defaulthome/hostingstart/hostingstart.dll"
+
+    The Blazor WASM SDK emits GardenPlotWeb.runtimeconfig.json at the publish
+    root for tooling/CLI use, but the browser-side WASM runtime reads its
+    config from _framework/blazor.boot.json — NOT from the root file. Safe to
+    delete from the publish output. Leaves GardenPlotWeb.Host.runtimeconfig.json
+    as the sole runtimeconfig, which is what Oryx wants.
+  -->
+  <Target Name="RemoveStrayWasmClientRuntimeConfig" AfterTargets="Publish">
+    <Delete Files="$(PublishDir)GardenPlotWeb.runtimeconfig.json" />
+    <Message Importance="High" Text="Removed stray $(PublishDir)GardenPlotWeb.runtimeconfig.json (Oryx startup-DLL disambiguation; see csproj comment)." />
+  </Target>
+
+</Project>
