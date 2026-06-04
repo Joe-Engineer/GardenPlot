@@ -349,6 +349,9 @@ public sealed class PlotLibraryLoader
         library.Plots ??= new List<PlotData>();
         library.CustomPaletteItems ??= new List<PaletteItem>();
         library.CustomCatalogItems ??= new List<CatalogItem>();
+        // Issue #208 — null-safe default for the new custom-assembly collection
+        // so v4 documents written before this PR don't NRE on first access.
+        library.CustomCatalogAssemblies ??= new List<CatalogAssembly>();
 
         EnsureLayerStates(library);
         EnsureTaskCollections(library);
@@ -583,6 +586,8 @@ public sealed class PlotLibraryLoader
         library.Ui ??= new UiPreferences();
         library.CustomPaletteItems ??= [];
         library.CustomCatalogItems ??= [];
+        // Issue #208 — see note at the v4 path.
+        library.CustomCatalogAssemblies ??= [];
 
         foreach (PlotData plot in library.Plots)
         {
@@ -672,6 +677,8 @@ public sealed class PlotLibraryLoader
         library.Ui ??= new UiPreferences();
         library.CustomPaletteItems ??= new List<PaletteItem>();
         library.CustomCatalogItems ??= new List<CatalogItem>();
+        // Issue #208 — see note at the v4 path.
+        library.CustomCatalogAssemblies ??= new List<CatalogAssembly>();
         foreach (PlotData plot in library.Plots)
         {
             plot.Shapes ??= new List<Shape>();
