@@ -20,6 +20,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify line-ending policy
+        # Issue #239 Phase C — fails the build if any tracked file violates
+        # the .gitattributes line-ending policy. Catches the recurring
+        # diff-noise hazard where a tool round-trip (formatters, web
+        # editors, AI-edit tools) flips LF<->CRLF and turns a 5-line
+        # change into a 200-line "every line changed" diff.
+        #
+        # `git add --renormalize .` re-stages every tracked text file
+        # through the .gitattributes filter without modifying file content.
+        # If the resulting index differs from HEAD, at least one file's
+        # stored line endings don't match policy. Fix locally with the
+        # same command + commit + push.
+        #
+        # Runs first so contributors hit this before the 2-minute build /
+        # publish chain.
+        run: |
+          git add --renormalize .
+          if ! git diff --cached --quiet; then
+            echo "::error::One or more files violate the .gitattributes line-ending policy."
+            echo ""
+            echo "Files that need normalization:"
+            git diff --cached --name-only | sed 's/^/  - /'
+            echo ""
+            echo "Fix locally with:"
+            echo "  git add --renormalize ."
+            echo "  git commit -m \"chore: normalize line endings per .gitattributes\""
+            echo "  git push"
+            echo ""
+            echo "See issue #239 for background on the policy."
+            exit 1
+          fi
+          echo "All tracked files conform to .gitattributes policy."
+
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
         with:
