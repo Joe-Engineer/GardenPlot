@@ -50,7 +50,17 @@ public static class AlongPathPlacementBuilder
             DrawingSetPreview.RowVisualKind visualKind = DrawingSetPreview.VisualKindFor(row.Item.Kind);
             if (visualKind == DrawingSetPreview.RowVisualKind.Stripe)
             {
-                if (row.FillArea && closed)
+                // Issue #216 — for closed source paths (Rectangle / Oval / closed FreeDraw /
+                // closed Polygon) the user's mental model for a ground-cover / surface row
+                // is "fill the interior with this material", NOT "ribbon around the
+                // perimeter". TryBuildStripe returns null for closed paths today (ribbon-
+                // around-perimeter isn't implemented), so without this auto-promotion a
+                // ground-cover row applied to an oval silently dropped — observed during
+                // the 2026-06-03 demo and at #244 review time. Auto-promotion is a one-way
+                // OR: an explicit row.FillArea=true stays true; the auto path adds fill
+                // behaviour for the material-on-closed case.
+                bool effectiveFillArea = row.FillArea || (closed && IsAutoFillKindOnClosed(row.Item.Kind));
+                if (effectiveFillArea && closed)
                 {
                     Shape? fill = AlongPathStripeBuilder.BuildFilledArea(row.Item, sourcePath, request.AssignNewIds);
                     if (fill is not null)
@@ -168,4 +178,22 @@ public static class AlongPathPlacementBuilder
 
         return new AlongPathPlacementResult(shapes, keptGroups);
     }
+
+    /// <summary>
+    /// Issue #216 — returns true for palette kinds where the natural interpretation
+    /// on a CLOSED source path is "fill the interior with this material" rather
+    /// than "ribbon around the perimeter". Used to auto-promote
+    /// <c>FillArea</c> for these kinds in <see cref="BuildPlacement"/> so users
+    /// don't have to manually check the per-row Fill Area checkbox when applying
+    /// a drawing set with a ground-cover row to a rectangle / oval / closed
+    /// polygon.
+    /// </summary>
+    /// <remarks>
+    /// Only material-volume / material-surface kinds qualify. Edging is a
+    /// perimeter concept (a frame around the shape) — auto-fill would be wrong.
+    /// IrrigationPipe / IrrigationWire are polyline concepts and have their own
+    /// closed-source handling (perimeter loop) elsewhere.
+    /// </remarks>
+    private static bool IsAutoFillKindOnClosed(PaletteKind kind) =>
+        kind is PaletteKind.GroundCover or PaletteKind.GroundCoverSurface;
 }
