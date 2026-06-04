@@ -84,6 +84,15 @@ public static class AlongPathStripeBuilder
                 ribbon.GroundCoverDepthIn = d;
             }
 
+            // Issue #215 — drawing-set stripe rows for ground-cover palette items must
+            // carry the canonical ground-cover identity (Trait + GroundCoverCode + Label)
+            // so TakeoffReconciler.IsGroundCoverShape recognizes them and emits a "Ground
+            // Cover" line item with area + volume. Without this, the shape fell through to
+            // the generic Rectangle/Oval/FreeDraw fallback and surfaced as a "Freehand
+            // Quantity=1" row, breaking bid totals. Mirrors the identity that
+            // GroundCoverFreehandGcItemDrawingJig sets for standalone ground-cover items.
+            ApplyGroundCoverIdentity(ribbon, item);
+
             if (!assignNewIds)
             {
                 ribbon.Id = System.Guid.Empty;
@@ -134,11 +143,43 @@ public static class AlongPathStripeBuilder
             fill.GroundCoverDepthIn = d;
         }
 
+        // Issue #215 — see comment on TryBuildStripe.
+        ApplyGroundCoverIdentity(fill, item);
+
         if (!assignNewIds)
         {
             fill.Id = System.Guid.Empty;
         }
 
         return fill;
+    }
+
+    /// <summary>
+    /// Stamps the canonical ground-cover identity (<see cref="Shape.Trait"/>,
+    /// <see cref="Shape.GroundCoverCode"/>, <see cref="Shape.Label"/>) onto
+    /// <paramref name="shape"/> when <paramref name="item"/> is a ground-cover palette
+    /// item. No-op for other palette kinds (Edging, IrrigationPipe/Wire stripes carry
+    /// their own identity model elsewhere). Mirrors
+    /// <c>GroundCoverFreehandGcItemDrawingJig</c>'s shape-construction block so the
+    /// standalone-draw and drawing-set-stamp paths produce equivalent shapes for the
+    /// takeoff reconciler.
+    /// </summary>
+    private static void ApplyGroundCoverIdentity(Shape shape, PaletteItem item)
+    {
+        bool isGroundCover = item.Kind is PaletteKind.GroundCover or PaletteKind.GroundCoverSurface;
+        if (!isGroundCover)
+        {
+            return;
+        }
+
+        bool isSurface = item.Kind == PaletteKind.GroundCoverSurface;
+        shape.Trait = isSurface && !string.IsNullOrWhiteSpace(item.Trait)
+            ? item.Trait
+            : "ground-cover";
+        shape.GroundCoverCode = item.Code;
+        if (string.IsNullOrWhiteSpace(shape.Label))
+        {
+            shape.Label = item.Code;
+        }
     }
 }
