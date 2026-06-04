@@ -42,6 +42,9 @@ public sealed class PlotLibraryIndex
     /// <summary>User-defined along-path drawing sets.</summary>
     public List<AlongPathDrawingSet> DrawingSets { get; set; } = new();
 
+    /// <summary>Issue #208 — user-defined multi-layer catalog assemblies (see <see cref="PlotLibrary.CustomCatalogAssemblies"/>).</summary>
+    public List<CatalogAssembly> CustomCatalogAssemblies { get; set; } = new();
+
     /// <summary>
     /// Lightweight summaries of every plot stored in <c>plot/{id}</c>. Used by the plot
     /// picker and other places that need to enumerate plots without paying the cost of
@@ -69,6 +72,7 @@ public sealed class PlotLibraryIndex
             CustomPaletteItems = library.CustomPaletteItems,
             CustomCatalogItems = library.CustomCatalogItems,
             DrawingSets = library.DrawingSets,
+            CustomCatalogAssemblies = library.CustomCatalogAssemblies,
         };
 
         foreach (PlotData plot in library.Plots)
