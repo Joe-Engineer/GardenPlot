@@ -13909,6 +13909,125 @@ public partial class GardenPlot
 
     private double GrossAreaFt2(Shape shape) => TakeoffMath.GrossAreaFt2(shape);
 
+    /// <summary>
+    /// Issue #229 — SVG fragment for the centroid area / volume label on a
+    /// selected shape. Emitted via <see cref="MarkupString"/> because Razor
+    /// reserves the bare <c>&lt;text&gt;</c> tag for its escape syntax and
+    /// won't accept attributes on it.
+    /// </summary>
+    /// <param name="shape">The shape to label.</param>
+    /// <returns>SVG markup, or an empty string when the shape has no area.</returns>
+    internal static string AreaCentroidLabelSvg(Shape shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+
+        (string? areaLine, string? volumeLine) = AreaCentroidLabel(shape);
+        if (areaLine is null)
+        {
+            return string.Empty;
+        }
+
+        (double anchorX, double anchorY) = AreaCentroidAnchor(shape);
+        const double fontSize = 0.5;
+        const double linePad = 0.12;
+        const double pillPadX = 0.25;
+        const double pillPadY = 0.10;
+
+        int lineCount = volumeLine is null ? 1 : 2;
+        string widest = volumeLine is null || areaLine.Length >= volumeLine.Length
+            ? areaLine
+            : volumeLine;
+
+        // SVG text metrics aren't available server-side; assume ~0.32 ft per
+        // character at fontSize=0.5. Generous enough for "1234.5 ft²" /
+        // "12.34 yd³" without clipping.
+        double pillW = (widest.Length * 0.32) + (2 * pillPadX);
+        double pillH = (lineCount * fontSize) + ((lineCount - 1) * linePad) + (2 * pillPadY);
+        double pillX = anchorX - (pillW / 2.0);
+        double pillY = anchorY - (pillH / 2.0);
+        double firstLineY = anchorY - ((lineCount - 1) * (fontSize + linePad) / 2.0);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append(CultureInfo.InvariantCulture, $"<g pointer-events=\"none\" class=\"centroid-area-label\">");
+        sb.Append(CultureInfo.InvariantCulture, $"<rect x=\"{F(pillX)}\" y=\"{F(pillY)}\" width=\"{F(pillW)}\" height=\"{F(pillH)}\" rx=\"{F(pillPadY)}\" fill=\"rgba(0,0,0,0.65)\" />");
+        // areaLine/volumeLine are emitted unencoded because they are always
+        // produced by `string.Format(InvariantCulture, "{0:0.0} ft²", double)` /
+        // `"{0:0.00} yd³"` — no user input, no XSS surface. The "²" / "³" glyphs
+        // ARE Unicode (U+00B2 / U+00B3) and embed directly in the SVG payload.
+        sb.Append(CultureInfo.InvariantCulture, $"<text x=\"{F(anchorX)}\" y=\"{F(firstLineY)}\" fill=\"#ffffff\" font-size=\"{F(fontSize)}\" font-weight=\"600\" text-anchor=\"middle\" dominant-baseline=\"middle\">{areaLine}</text>");
+        if (volumeLine is not null)
+        {
+            double secondLineY = firstLineY + fontSize + linePad;
+            sb.Append(CultureInfo.InvariantCulture, $"<text x=\"{F(anchorX)}\" y=\"{F(secondLineY)}\" fill=\"#ffffff\" font-size=\"{F(fontSize)}\" font-weight=\"600\" text-anchor=\"middle\" dominant-baseline=\"middle\">{volumeLine}</text>");
+        }
+
+        sb.Append("</g>");
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Issue #229 — formatted area / volume label for the centroid overlay on a
+    /// selected shape. Returns <see langword="null"/> when the shape has no
+    /// measurable area (e.g. Plant, Tree, IrrigationPipe). Format matches the
+    /// right-hand info panel: 1-decimal precision, "ft²" suffix; ground-covers
+    /// with a non-zero depth get a second line with the cubic-yard volume.
+    /// </summary>
+    /// <param name="shape">The shape to label.</param>
+    /// <returns>
+    /// A two-element tuple: <c>AreaLine</c> is always present when the shape
+    /// has area; <c>VolumeLine</c> is non-null only for non-surface ground
+    /// covers with a positive depth.
+    /// </returns>
+    internal static (string? AreaLine, string? VolumeLine) AreaCentroidLabel(Shape shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+
+        double area = GroundCoverMath.AreaFt2(shape);
+        if (area <= 0)
+        {
+            return (null, null);
+        }
+
+        string areaLine = string.Format(
+            CultureInfo.InvariantCulture,
+            "{0:0.0} ft²",
+            area);
+
+        if (!shape.IsGroundCoverSurface
+            && shape.GroundCoverDepthIn is double d
+            && d > 0)
+        {
+            double volumeYd3 = GroundCoverMath.VolumeYd3(area, d);
+            if (volumeYd3 > 0)
+            {
+                string volumeLine = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0:0.00} yd³",
+                    volumeYd3);
+                return (areaLine, volumeLine);
+            }
+        }
+
+        return (areaLine, null);
+    }
+
+    /// <summary>
+    /// Issue #229 — the world-space anchor point for the centroid area / volume
+    /// label. For axis-aligned primitives (Rectangle, Oval, BedKit) this is the
+    /// bounding-box centre. For point-based shapes (FreeDraw, Edge, Ruler) this
+    /// is also the bounding-box centre — close enough to the visual centroid
+    /// for a label placement, without needing area-weighted shoelace math.
+    /// </summary>
+    /// <param name="shape">The shape to anchor the label to.</param>
+    /// <returns>The world-space centre (in plot feet).</returns>
+    internal static (double X, double Y) AreaCentroidAnchor(Shape shape)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+
+        (double x, double y, double w, double h) bounds = GetBounds(shape);
+        return (bounds.x + (bounds.w / 2.0), bounds.y + (bounds.h / 2.0));
+    }
+
     private static bool CanBindTasks(Shape shape)
         => shape.Kind is ShapeKind.Tree or ShapeKind.Bush or ShapeKind.Plant or ShapeKind.Rectangle or ShapeKind.Oval or ShapeKind.FreeDraw;
 

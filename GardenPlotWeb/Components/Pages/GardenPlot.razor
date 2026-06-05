@@ -1580,6 +1580,36 @@ else
                     }
                 </CascadingValue>
 
+                @* Issue #229 — centroid area / volume labels are rendered in a
+                   FINAL pass AFTER every cohort has finished drawing its shapes,
+                   not inside ShapeCohortRenderer. Cohorts are drawn in document
+                   order, so a label emitted from cohort N would be painted OVER
+                   by any shape in cohort N+1 that spatially overlapped it. This
+                   was the bug Joe found in live testing — the pill only appeared
+                   when overlapping shape opacity was lowered, and deselect /
+                   reselect didn't help because paint order was unchanged.
+                   Running the label pass at the page level guarantees every label
+                   is on top of every shape body, regardless of cohort layout.
+                   Labels are pointer-events="none" so z-order has no interaction
+                   consequence.
+
+                   Drag follows the label live (no suppression): when the user
+                   adjusts a vertex or curves an edge the area is exactly what
+                   they want to watch. The centroid anchor is recomputed every
+                   render from the current bounds, so the pill tracks the shape
+                   through whole-shape drag, handle resize, vertex drag, and
+                   edge-bulge drag. *@
+                @if (!IsConceptMode)
+                {
+                    foreach (var s in visibleShapes)
+                    {
+                        if (selectedIdSet.Contains(s.Id))
+                        {
+                            @((MarkupString)AreaCentroidLabelSvg(s))
+                        }
+                    }
+                }
+
                 @if (!IsConceptMode && library.Ui.ShowClipHatch)
                 {
                     <g class="clip-hatch-layer" pointer-events="none">
