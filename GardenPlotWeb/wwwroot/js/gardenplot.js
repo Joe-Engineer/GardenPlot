@@ -377,6 +377,83 @@ async function ensurePdfLibs() {
     return pdfLibsPromise;
 }
 
+// Reads a Blob into a data: URL via FileReader. Used to inline blob: and
+// fetched same-origin image references into the serialized SVG so the
+// rasterizer's <img> tag can render them from a data: URL document.
+function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('FileReader failed reading blob'));
+        reader.readAsDataURL(blob);
+    });
+}
+
+// Walks every <image> in the cloned SVG and replaces any href / xlink:href
+// that points at a blob:, http(s):, or root-relative URL with an inline
+// data: URL. This is required because when the SVG is loaded via
+// `new Image().src = "data:image/svg+xml;..."` the document context is a
+// data: URL with an opaque origin — it cannot resolve blob: URLs (those are
+// scoped to the original document) and has no base URL for relative paths.
+// Any href that can't be inlined is removed so the SVG parses cleanly
+// instead of firing onerror on the outer <img>.
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const XLINK_NS = 'http://www.w3.org/1999/xlink';
+async function inlineEmbeddedImages(svgClone) {
+    const images = Array.from(svgClone.getElementsByTagName('image'));
+    if (images.length === 0) {
+        return;
+    }
+    await Promise.all(images.map(async (el) => {
+        const href = el.getAttribute('href')
+            || el.getAttributeNS(XLINK_NS, 'href')
+            || el.getAttribute('xlink:href');
+        if (!href || href.startsWith('data:')) {
+            return;
+        }
+        try {
+            const response = await fetch(href);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const blob = await response.blob();
+            const dataUrl = await blobToDataUrl(blob);
+            // Strip every form (literal, prefixed, namespaced) before re-setting
+            // so we don't leave a stale blob: URL behind. setAttribute('xlink:href')
+            // and setAttributeNS(XLINK_NS, 'xlink:href') create distinct attributes
+            // that can coexist, and the literal one is what client-images.js writes.
+            el.removeAttribute('href');
+            el.removeAttribute('xlink:href');
+            el.removeAttributeNS(XLINK_NS, 'href');
+            el.setAttribute('href', dataUrl);
+            el.setAttributeNS(XLINK_NS, 'xlink:href', dataUrl);
+        } catch (e) {
+            console.warn('rasterizeSvgToDataUrl: dropping unreachable image href', href, e);
+            el.removeAttribute('href');
+            el.removeAttribute('xlink:href');
+            el.removeAttributeNS(XLINK_NS, 'href');
+        }
+    }));
+}
+
+// Best-effort extraction of a human-readable string from a value that may be
+// an Error, a DOM Event (e.g. from img.onerror), or anything else. Plain
+// String(event) collapses to "[object Event]" which is useless.
+function describeRasterError(err) {
+    if (!err) {
+        return 'unknown error';
+    }
+    if (err.message) {
+        return err.message;
+    }
+    if (typeof Event !== 'undefined' && err instanceof Event) {
+        const target = err.target || {};
+        const src = target.src ? ` (src=${target.src.slice(0, 80)})` : '';
+        return `image failed to load${src}`;
+    }
+    return String(err);
+}
+
 // Rasterizes an SVG element to a PNG data URL at a target pixel width,
 // preserving aspect ratio. Used for embedding the plot snapshot into the PDF.
 //
@@ -427,6 +504,10 @@ async function rasterizeSvgToDataUrl(svgEl, targetWidthPx, opts) {
         clone.removeAttribute('height');
         // preserveAspectRatio default is xMidYMid meet — letterbox if needed.
         clone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        // Inline any embedded <image> hrefs (blob: URLs from IndexedDB-backed
+        // client images, or same-origin /paths) so the serialized SVG is
+        // self-contained when loaded from a data: URL document.
+        await inlineEmbeddedImages(clone);
         xml = new XMLSerializer().serializeToString(clone);
     } else {
         const rect = svgEl.getBoundingClientRect();
@@ -434,14 +515,26 @@ async function rasterizeSvgToDataUrl(svgEl, targetWidthPx, opts) {
             throw new Error('SVG element has no rendered size');
         }
         aspect = rect.height / rect.width;
-        xml = new XMLSerializer().serializeToString(svgEl);
+        // Clone the live SVG so we can rewrite hrefs without mutating the DOM.
+        const clone = svgEl.cloneNode(true);
+        await inlineEmbeddedImages(clone);
+        xml = new XMLSerializer().serializeToString(clone);
     }
 
     const w = Math.max(1, Math.round(targetWidthPx));
     const h = Math.max(1, Math.round(targetWidthPx * aspect));
+    // Guard against runaway memory: a plot with many large textures or a
+    // 30 MB background image becomes a multi-hundred-MB serialized SVG after
+    // base64 inlining. Fail with a clear message instead of OOMing the tab.
+    const MAX_SERIALIZED_XML_BYTES = 32 * 1024 * 1024;
+    if (xml.length > MAX_SERIALIZED_XML_BYTES) {
+        throw new Error(`snapshot too large (${Math.round(xml.length / 1024 / 1024)} MB) — try removing large background or texture images`);
+    }
     const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    // No crossOrigin: the source is a data: URL — CORS doesn't apply, and
+    // setting crossOrigin='anonymous' on data: URLs has tripped browsers in
+    // the past. The SVG is now self-contained after inlineEmbeddedImages.
     await new Promise((resolve, reject) => {
         img.onload = resolve;
         img.onerror = reject;
@@ -508,7 +601,7 @@ export async function exportTakeoffPdf(svgEl, payload) {
             doc.addImage(img.dataUrl, 'PNG', margin, y, finalW, finalH);
         } catch (err) {
             doc.setFontSize(9).setTextColor('#a00');
-            doc.text(`(Plot snapshot unavailable: ${err.message || err})`, margin, y);
+            doc.text(`(Plot snapshot unavailable: ${describeRasterError(err)})`, margin, y);
             doc.setTextColor(0, 0, 0);
         }
     }
