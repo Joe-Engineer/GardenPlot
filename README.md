@@ -1,5 +1,8 @@
 ﻿# Garden Plot
 
+[![PR validate](https://github.com/Joe-Engineer/GardenPlot/actions/workflows/pr-validate.yml/badge.svg?branch=main)](https://github.com/Joe-Engineer/GardenPlot/actions/workflows/pr-validate.yml)
+[![Deploy](https://github.com/Joe-Engineer/GardenPlot/actions/workflows/main_gardenplot.yml/badge.svg?branch=main)](https://github.com/Joe-Engineer/GardenPlot/actions/workflows/main_gardenplot.yml)
+
 A **local-first**, browser-based garden-planning tool. Lay out raised-bed kits, draw freehand shapes, drop trees / bushes / vegetables / herbs from curated palettes, measure with a multi-segment ruler, see live plant-spacing feedback, get Wikipedia summaries on plant species, and export to PNG or PDF — all without an account or server-side data store.
 
 > **Status:** active development. See [`docs/Requirements.md`](docs/Requirements.md) for the canonical feature/boundary specification.
