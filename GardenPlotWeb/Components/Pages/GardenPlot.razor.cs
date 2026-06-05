@@ -9555,6 +9555,9 @@ public partial class GardenPlot
             shapeVertexDragCoMovers = null;
             shapeVertexDragPrevPos = null;
 
+            // Issue #175 — clear the snap chip after a vertex drag commits.
+            irrigationSnap = null;
+
             await SaveAsync();
             return;
         }
@@ -10480,7 +10483,7 @@ public partial class GardenPlot
     /// AND a descriptor for the visual indicator. Snap radius is 14 px at the current
     /// zoom — same forgiving feel as the existing head snap.
     /// </summary>
-    private (double X, double Y, IrrigationSnapTarget? Snap) SnapToIrrigationAnchor(double x, double y)
+    private (double X, double Y, IrrigationSnapTarget? Snap) SnapToIrrigationAnchor(double x, double y, Guid? excludeShapeId = null)
     {
         if (currentPlot is null)
         {
@@ -10496,7 +10499,7 @@ public partial class GardenPlot
         const double snapRadiusPx = 14;
         double snapRadiusFt = snapRadiusPx / scale;
 
-        var (sx, sy, target) = IrrigationSnap.ResolveSnap(currentPlot.Shapes, x, y, snapRadiusFt);
+        var (sx, sy, target) = IrrigationSnap.ResolveSnap(currentPlot.Shapes, x, y, snapRadiusFt, excludeShapeId);
         return (sx, sy, target is null ? null : new IrrigationSnapTarget(target.X, target.Y, target.Label, target.ShapeId));
     }
 
@@ -10509,6 +10512,38 @@ public partial class GardenPlot
     {
         var (sx, sy, _) = SnapToIrrigationAnchor(x, y);
         return (sx, sy);
+    }
+
+    /// <summary>
+    /// Issue #172 — summary for the live pipe/wire length HUD shown while drafting.
+    /// Returns the current cursor-tracking segment length, the cumulative polyline
+    /// length, and (when the drafting pipe has a catalog Label with a known
+    /// StockLengthFt) the stock-stick consumption + waste %.
+    /// Returns null when the drafting state isn't a pipe/wire polyline with at least
+    /// one committed vertex + the trailing cursor vertex.
+    /// </summary>
+    private (double CurrentSegFt, double TotalFt, int? StockUnits, double? WastePercent)? GetDraftingPipeLengthSummary()
+    {
+        if (drafting is null || !buildingPolygon)
+        {
+            return null;
+        }
+
+        if (drafting.Kind is not ShapeKind.IrrigationPipe and not ShapeKind.IrrigationWire)
+        {
+            return null;
+        }
+
+        // Stock summary — only when the drafting pipe has a catalog Label with a
+        // known StockLengthFt. Wires don't have stock-stick rollup so stockLen stays null.
+        double? stockLen = null;
+        if (drafting.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(drafting.Label))
+        {
+            stockLen = PaletteCatalog.FindByCode(drafting.Label)?.StockLengthFt;
+        }
+
+        var result = PipeLengthSummary.Compute(drafting.Points, stockLen);
+        return result is null ? null : (result.CurrentSegFt, result.TotalFt, result.StockUnits, result.WastePercent);
     }
 
     /// <summary>
@@ -11482,6 +11517,20 @@ public partial class GardenPlot
             Math.Clamp(cursorX, 0, PlotWidthFt),
             Math.Clamp(cursorY, 0, PlotHeightFt));
 
+        // Issue #175 — extend irrigation snap to vertex-drag for pipes and wires.
+        // During drafting (the polyline pointer-move path) the snap fires on the
+        // trailing cursor vertex; this mirrors that behavior for an already-committed
+        // shape whose vertex is being re-positioned via the anchor handles. Exclude
+        // the dragged shape itself so its own siblings on the same polyline aren't
+        // snap candidates. The visual snap chip (irrigationSnap) lights up via the
+        // same state the renderer already consumes.
+        if (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire)
+        {
+            var (snappedX, snappedY, snap) = SnapToIrrigationAnchor(newPos.X, newPos.Y, excludeShapeId: shape.Id);
+            irrigationSnap = snap;
+            newPos = new Point(snappedX, snappedY);
+        }
+
         // Issue #162a iteration — translate every co-mover by the same delta as the
         // dragged vertex. Without this the junction "breaks" when the user moves an
         // anchor shared by two pipes. Press 'm' mid-drag to clear the co-mover list and
@@ -12253,9 +12302,27 @@ public partial class GardenPlot
         RecordUndoState();
         foreach (Shape shape in shapes)
         {
-            if (shape.Kind == ShapeKind.IrrigationPipe)
+            if (shape.Kind != ShapeKind.IrrigationPipe)
             {
-                shape.PipeDiameterIn = diameterIn;
+                continue;
+            }
+
+            shape.PipeDiameterIn = diameterIn;
+
+            // Issue #169 — keep Label in sync with the new diameter so PaletteCatalog
+            // .FindByCode(shape.Label) returns the correct row (stock length, Notes,
+            // BOM grouping). Find the source row by current Label to read its material
+            // Trait, then look up the catalog row matching (Trait, newDiameterIn).
+            // If the source row is missing OR no row matches the new pair, leave Label
+            // alone — the inspector will fall back to showing diameter without stock-length.
+            PaletteItem? sourceRow = PaletteCatalog.FindByCode(shape.Label);
+            if (sourceRow is not null)
+            {
+                PaletteItem? newRow = PaletteCatalog.FindPipeByTraitAndDiameter(sourceRow.Trait, diameterIn);
+                if (newRow is not null)
+                {
+                    shape.Label = newRow.Code;
+                }
             }
         }
 

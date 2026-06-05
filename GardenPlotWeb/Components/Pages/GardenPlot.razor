@@ -1947,6 +1947,42 @@ else
                     </g>
                 }
 
+                @* Issue #172 — live pipe/wire length HUD. Renders below the cursor while
+                   drafting a pipe or wire polyline (so the chip sits opposite the snap chip
+                   which goes above). Suppressed when the snap chip is active so the two
+                   chips don't fight for the same screen area. *@
+                @if (!IsConceptMode && irrigationSnap is null && GetDraftingPipeLengthSummary() is { } lenSummary && drafting?.Points is { Count: >= 2 } draftPts)
+                {
+                    var cursorPt = draftPts[^1];
+                    var chipColor = "#2c5282";
+                    string chipText;
+                    if (lenSummary.StockUnits is int sticks && lenSummary.WastePercent is double waste)
+                    {
+                        var stickWord = sticks == 1 ? "stick" : "sticks";
+                        chipText = $"seg {lenSummary.CurrentSegFt:0.0} ft · total {lenSummary.TotalFt:0.0} ft · {sticks} {stickWord} ({waste:0}% waste)";
+                    }
+                    else
+                    {
+                        chipText = $"seg {lenSummary.CurrentSegFt:0.0} ft · total {lenSummary.TotalFt:0.0} ft";
+                    }
+                    var chipFont = 0.22;
+                    var chipPadX = 0.08;
+                    var chipPadY = 0.05;
+                    var chipW = Math.Max(1.0, (chipText.Length * chipFont * 0.55) + (chipPadX * 2));
+                    var chipH = chipFont + (chipPadY * 2);
+                    var chipX = cursorPt.X - (chipW / 2);
+                    var chipY = cursorPt.Y + 0.45;
+                    var chipTextY = chipY + chipPadY + (chipFont * 0.85);
+                    <g pointer-events="none" class="pipe-length-hud">
+                        <rect x="@F(chipX)" y="@F(chipY)" width="@F(chipW)" height="@F(chipH)" rx="0.06"
+                              fill="rgba(255,255,255,0.92)" stroke="@chipColor" stroke-width="0.025" />
+                        <svg:text x="@F(cursorPt.X)" y="@F(chipTextY)" text-anchor="middle"
+                                  font-size="@F(chipFont)" fill="@chipColor"
+                                  style="font-family: sans-serif; pointer-events: none;">@chipText</svg:text>
+                        <title>@chipText</title>
+                    </g>
+                }
+
                 @* Issue #131 — tangent-snap guide line. Drawn whenever tangent mode is
                    armed and a previous segment exists. The line extends far enough in both
                    directions to feel like an infinite reference; the snap glyph marks the
