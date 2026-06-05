@@ -31,12 +31,16 @@ public static class IrrigationSnap
     /// <param name="x">Candidate cursor x in plot-space feet.</param>
     /// <param name="y">Candidate cursor y in plot-space feet.</param>
     /// <param name="snapToleranceFt">Snap radius in feet (typically 14 px / current zoom).</param>
+    /// <param name="excludeShapeId">Optional shape id to exclude from snap candidates.
+    /// Used by the vertex-drag path (#175) so a pipe being edited doesn't snap to its
+    /// own siblings on the same polyline.</param>
     /// <returns>The snapped (x, y) and the target descriptor (null when out of range).</returns>
     public static (double X, double Y, Target? Target) ResolveSnap(
         System.Collections.Generic.IEnumerable<Shape> shapes,
         double x,
         double y,
-        double snapToleranceFt)
+        double snapToleranceFt,
+        System.Guid? excludeShapeId = null)
     {
         System.ArgumentNullException.ThrowIfNull(shapes);
         if (snapToleranceFt <= 0)
@@ -66,6 +70,11 @@ public static class IrrigationSnap
 
         foreach (Shape s in shapes)
         {
+            if (excludeShapeId is System.Guid exId && s.Id == exId)
+            {
+                continue;
+            }
+
             if (s.Kind is ShapeKind.IrrigationHead or ShapeKind.WaterSource or ShapeKind.IrrigationControl or ShapeKind.IrrigationFitting)
             {
                 double cx = s.X + (s.W / 2);
