@@ -12200,9 +12200,27 @@ public partial class GardenPlot
         RecordUndoState();
         foreach (Shape shape in shapes)
         {
-            if (shape.Kind == ShapeKind.IrrigationPipe)
+            if (shape.Kind != ShapeKind.IrrigationPipe)
             {
-                shape.PipeDiameterIn = diameterIn;
+                continue;
+            }
+
+            shape.PipeDiameterIn = diameterIn;
+
+            // Issue #169 — keep Label in sync with the new diameter so PaletteCatalog
+            // .FindByCode(shape.Label) returns the correct row (stock length, Notes,
+            // BOM grouping). Find the source row by current Label to read its material
+            // Trait, then look up the catalog row matching (Trait, newDiameterIn).
+            // If the source row is missing OR no row matches the new pair, leave Label
+            // alone — the inspector will fall back to showing diameter without stock-length.
+            PaletteItem? sourceRow = PaletteCatalog.FindByCode(shape.Label);
+            if (sourceRow is not null)
+            {
+                PaletteItem? newRow = PaletteCatalog.FindPipeByTraitAndDiameter(sourceRow.Trait, diameterIn);
+                if (newRow is not null)
+                {
+                    shape.Label = newRow.Code;
+                }
             }
         }
 
