@@ -1591,8 +1591,15 @@ else
                    Running the label pass at the page level guarantees every label
                    is on top of every shape body, regardless of cohort layout.
                    Labels are pointer-events="none" so z-order has no interaction
-                   consequence. *@
-                @if (!IsConceptMode && !IsAnyDragInProgress)
+                   consequence.
+
+                   Drag follows the label live (no suppression): when the user
+                   adjusts a vertex or curves an edge the area is exactly what
+                   they want to watch. The centroid anchor is recomputed every
+                   render from the current bounds, so the pill tracks the shape
+                   through whole-shape drag, handle resize, vertex drag, and
+                   edge-bulge drag. *@
+                @if (!IsConceptMode)
                 {
                     foreach (var s in visibleShapes)
                     {

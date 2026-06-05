@@ -13966,20 +13966,6 @@ public partial class GardenPlot
     }
 
     /// <summary>
-    /// Issue #229 — true when any in-progress pointer interaction (shape drag,
-    /// resize handle, draft vertex drag, edge-bulge drag, post-commit vertex
-    /// drag) is currently mutating geometry. Used to suppress the centroid
-    /// area / volume label so it doesn't flicker or jump during interactive
-    /// edits.
-    /// </summary>
-    internal bool IsAnyDragInProgress
-        => isDragging
-        || isHandleDragging
-        || isDraftVertexDragging
-        || isEdgeBulgeDragging
-        || isShapeVertexDragging;
-
-    /// <summary>
     /// Issue #229 — formatted area / volume label for the centroid overlay on a
     /// selected shape. Returns <see langword="null"/> when the shape has no
     /// measurable area (e.g. Plant, Tree, IrrigationPipe). Format matches the
