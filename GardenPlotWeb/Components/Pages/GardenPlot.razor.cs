@@ -12143,19 +12143,14 @@ public partial class GardenPlot
             return;
         }
 
-        string? raw = e.Value?.ToString();
-        if (string.IsNullOrWhiteSpace(raw))
+        // Issue #223 — input parsing + clamping + full-circle sentinel logic lives
+        // in SprinklerArcInput so it can be unit-tested without spinning up the page.
+        if (!SprinklerArcInput.TryNormalise(e.Value?.ToString(), out var normalised))
         {
             return;
         }
 
-        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double degrees))
-        {
-            return;
-        }
-
-        // Treat 360 as the "full circle" sentinel (stored as null).
-        double? arcValue = degrees >= 360 - 1e-6 ? null : degrees;
+        double? arcValue = normalised.ArcValue;
 
         RecordUndoState();
         foreach (Shape shape in shapes)
@@ -12163,6 +12158,64 @@ public partial class GardenPlot
             if (shape.Kind == ShapeKind.IrrigationHead)
             {
                 shape.ArcDegrees = arcValue;
+            }
+        }
+
+        await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #223 — handler for the Coverage Arc preset chips (90 / 180 / 270 / 360).
+    /// Reuses the OnSprinklerArcChanged path by synthesising a ChangeEventArgs so the
+    /// clamp + sentinel logic stays in one place.
+    /// </summary>
+    private Task OnSprinklerArcPresetClicked(IReadOnlyList<Shape> shapes, double presetDegrees)
+    {
+        return OnSprinklerArcChanged(shapes, new ChangeEventArgs { Value = presetDegrees.ToString(CultureInfo.InvariantCulture) });
+    }
+
+    /// <summary>
+    /// Issue #223 — handler for the Spray Radius freeform input on the irrigation-head
+    /// inspector. Lets the user shrink (or grow) the spray below / above the catalog
+    /// default (the "screwdriver-down-to-13 ft" case from the 2026-06-03 interview).
+    /// Writes back to Shape.W = 2 × radius and Shape.H = 2 × radius (the head's bounding
+    /// box stays square so cohort fingerprinting and rendering both pick up the change).
+    /// Clamps to [1, 100] ft to keep pathological values out of the renderer.
+    /// </summary>
+    private async Task OnSprinklerThrowRadiusChanged(IReadOnlyList<Shape> shapes, ChangeEventArgs e)
+    {
+        if (currentPlot is null || shapes is null || shapes.Count == 0)
+        {
+            return;
+        }
+
+        string? raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double radiusFt))
+        {
+            return;
+        }
+
+        radiusFt = Math.Clamp(radiusFt, 1.0, 100.0);
+        double diameterFt = radiusFt * 2.0;
+
+        RecordUndoState();
+        foreach (Shape shape in shapes)
+        {
+            if (shape.Kind == ShapeKind.IrrigationHead)
+            {
+                // Preserve centre by adjusting X/Y to keep the head's centre point fixed
+                // while the bounding box grows / shrinks around it.
+                double cx = shape.X + (shape.W / 2);
+                double cy = shape.Y + (shape.H / 2);
+                shape.W = diameterFt;
+                shape.H = diameterFt;
+                shape.X = cx - (diameterFt / 2);
+                shape.Y = cy - (diameterFt / 2);
             }
         }
 
