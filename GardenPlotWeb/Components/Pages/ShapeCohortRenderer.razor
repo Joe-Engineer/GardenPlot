@@ -144,17 +144,38 @@
                       fill="transparent" stroke="none" />
                 break;
             case ShapeKind.Edge:
+                @* Issue #221 — Edge shapes (concrete edging, paver edging, etc.) honor
+                   arc bulges the same way FreeDraw polygons / polylines do, so the
+                   per-edge midpoint handles below can curve them after they're placed. *@
                 @if (s.CloseEdge && s.Points.Count > 1)
                 {
-                    <polygon points="@GardenPlot.PointsString(s.Points)"
-                             fill="none" stroke="@style.Stroke" stroke-width="@GardenPlot.F(GardenPlot.EdgeStrokeWidthFt(s))"
-                             stroke-linecap="round" stroke-linejoin="round" />
+                    @if (ArcPolygonPathBuilder.HasAnyArc(s.EdgeBulges))
+                    {
+                        <path d="@ArcPolygonPathBuilder.Build(s.Points, s.EdgeBulges, close: true)"
+                              fill="none" stroke="@style.Stroke" stroke-width="@GardenPlot.F(GardenPlot.EdgeStrokeWidthFt(s))"
+                              stroke-linecap="round" stroke-linejoin="round" />
+                    }
+                    else
+                    {
+                        <polygon points="@GardenPlot.PointsString(s.Points)"
+                                 fill="none" stroke="@style.Stroke" stroke-width="@GardenPlot.F(GardenPlot.EdgeStrokeWidthFt(s))"
+                                 stroke-linecap="round" stroke-linejoin="round" />
+                    }
                 }
                 else
                 {
-                    <polyline points="@GardenPlot.PointsString(s.Points)"
+                    @if (ArcPolygonPathBuilder.HasAnyArc(s.EdgeBulges))
+                    {
+                        <path d="@ArcPolygonPathBuilder.Build(s.Points, s.EdgeBulges, close: false)"
                               fill="none" stroke="@style.Stroke" stroke-width="@GardenPlot.F(GardenPlot.EdgeStrokeWidthFt(s))"
                               stroke-linecap="round" stroke-linejoin="round" />
+                    }
+                    else
+                    {
+                        <polyline points="@GardenPlot.PointsString(s.Points)"
+                                  fill="none" stroke="@style.Stroke" stroke-width="@GardenPlot.F(GardenPlot.EdgeStrokeWidthFt(s))"
+                                  stroke-linecap="round" stroke-linejoin="round" />
+                    }
                 }
                 <rect x="@GardenPlot.F(sb.x - 0.1)" y="@GardenPlot.F(sb.y - 0.1)"
                       width="@GardenPlot.F(sb.w + 0.2)" height="@GardenPlot.F(sb.h + 0.2)"
@@ -502,8 +523,12 @@
                (the arc on either side follows the new endpoints). Midpoints adjust the
                bulge of their edge; releasing within snap tolerance of the chord restores
                a straight line. Different shapes/colors keep the two affordances visually
-               distinct: squares + blue for vertices, circles + cream/amber for arcs. *@
-            @if (CurrentTool == Tool.Select && s.Kind == ShapeKind.FreeDraw && s.Points.Count >= 2)
+               distinct: squares + blue for vertices, circles + cream/amber for arcs.
+               Issue #221: Edge shapes (concrete edging / paver edging / etc.) get the
+               same affordances — edging IS curveable (the live demo showed paving along
+               an oval bed) and the same OnShapeVertexPointerDown / OnEdgeBulgePointerDown
+               handlers work uniformly because both shape kinds carry Points + EdgeBulges. *@
+            @if (CurrentTool == Tool.Select && (s.Kind == ShapeKind.FreeDraw || s.Kind == ShapeKind.Edge) && s.Points.Count >= 2)
             {
                 var capturedShapeId = s.Id;
                 @for (int vIdx = 0; vIdx < s.Points.Count; vIdx++)
