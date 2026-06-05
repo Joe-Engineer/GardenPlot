@@ -9555,6 +9555,9 @@ public partial class GardenPlot
             shapeVertexDragCoMovers = null;
             shapeVertexDragPrevPos = null;
 
+            // Issue #175 — clear the snap chip after a vertex drag commits.
+            irrigationSnap = null;
+
             await SaveAsync();
             return;
         }
@@ -10480,7 +10483,7 @@ public partial class GardenPlot
     /// AND a descriptor for the visual indicator. Snap radius is 14 px at the current
     /// zoom — same forgiving feel as the existing head snap.
     /// </summary>
-    private (double X, double Y, IrrigationSnapTarget? Snap) SnapToIrrigationAnchor(double x, double y)
+    private (double X, double Y, IrrigationSnapTarget? Snap) SnapToIrrigationAnchor(double x, double y, Guid? excludeShapeId = null)
     {
         if (currentPlot is null)
         {
@@ -10496,7 +10499,7 @@ public partial class GardenPlot
         const double snapRadiusPx = 14;
         double snapRadiusFt = snapRadiusPx / scale;
 
-        var (sx, sy, target) = IrrigationSnap.ResolveSnap(currentPlot.Shapes, x, y, snapRadiusFt);
+        var (sx, sy, target) = IrrigationSnap.ResolveSnap(currentPlot.Shapes, x, y, snapRadiusFt, excludeShapeId);
         return (sx, sy, target is null ? null : new IrrigationSnapTarget(target.X, target.Y, target.Label, target.ShapeId));
     }
 
@@ -11481,6 +11484,20 @@ public partial class GardenPlot
         Point newPos = new(
             Math.Clamp(cursorX, 0, PlotWidthFt),
             Math.Clamp(cursorY, 0, PlotHeightFt));
+
+        // Issue #175 — extend irrigation snap to vertex-drag for pipes and wires.
+        // During drafting (the polyline pointer-move path) the snap fires on the
+        // trailing cursor vertex; this mirrors that behavior for an already-committed
+        // shape whose vertex is being re-positioned via the anchor handles. Exclude
+        // the dragged shape itself so its own siblings on the same polyline aren't
+        // snap candidates. The visual snap chip (irrigationSnap) lights up via the
+        // same state the renderer already consumes.
+        if (shape.Kind is ShapeKind.IrrigationPipe or ShapeKind.IrrigationWire)
+        {
+            var (snappedX, snappedY, snap) = SnapToIrrigationAnchor(newPos.X, newPos.Y, excludeShapeId: shape.Id);
+            irrigationSnap = snap;
+            newPos = new Point(snappedX, snappedY);
+        }
 
         // Issue #162a iteration — translate every co-mover by the same delta as the
         // dragged vertex. Without this the junction "breaks" when the user moves an
