@@ -312,17 +312,108 @@ public sealed class IrrigationFittingTests
 
         var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, otherShapes: new[] { branch }, stockLengthFt: 8.0);
 
-        // Expect: 2 elbows at interior vertices (none of which exceed stockLength=8 in a single
-        // segment; each segment is 10ft which is over the 8ft stock, so 1 coupling per 10ft
-        // segment = 3 couplings), 1 tee at the end junction.
+        // Expect: 2 elbows at interior vertices, 1 tee at the end junction, and
+        // 3 couplings driven by the cumulative-path stock accounting (#170):
+        //   totalRun = 30 ft, stockLen = 8, couplings = ceil(30/8) − 1 = 3.
         // Layout: vertex 0 (no fitting; not junction), vertex 1 elbow90, vertex 2 elbow90,
-        // vertex 3 tee (junction). Plus 3 couplings (one at 8 ft into each of the 3 segments).
+        // vertex 3 tee (junction). Couplings land at cumulative 8 ft, 16 ft, 24 ft.
         int tees = fittings.Count(f => f.FittingType == FittingType.Tee);
         int elbows = fittings.Count(f => f.FittingType is FittingType.Elbow90 or FittingType.Elbow45);
         int couplings = fittings.Count(f => f.FittingType == FittingType.Coupling);
         Assert.Equal(1, tees);
         Assert.Equal(2, elbows);
         Assert.Equal(3, couplings);
+    }
+
+    // Issue #170 — auto-coupling accounting walks the cumulative polyline length.
+    [Fact]
+    public void BuildAutoFittingsForPipe_CumulativeRun_PlacesCouplingAtCrossSegmentBoundary()
+    {
+        // The exact repro from #170: three 12 ft segments (total 36 ft) on 20 ft stock.
+        // Per-segment logic produced 0 couplings (no single segment > 20). The fix walks
+        // the cumulative path and places 1 coupling at the 20 ft mark — which lands inside
+        // segment 2 (at (12 + 8, 0) when the path is straight along Y).
+        Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
+        pipe.Points.Add(new Point(0, 0));
+        pipe.Points.Add(new Point(12, 0));
+        pipe.Points.Add(new Point(24, 0));
+        pipe.Points.Add(new Point(36, 0));
+
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+
+        // Cumulative: 1 coupling at 20 ft. Plus 2 straight-line "elbows" at the colinear
+        // interior vertices — those are exempt (interior angle 180°). So expect 1 fitting total.
+        var couplings = fittings.Where(f => f.FittingType == FittingType.Coupling).ToList();
+        Assert.Single(couplings);
+        Assert.Equal(20.0, couplings[0].X + (couplings[0].W / 2), 2);
+        Assert.Equal(0.0, couplings[0].Y + (couplings[0].H / 2), 2);
+    }
+
+    [Theory]
+    [InlineData(20.0, 1, 0)]       // exactly one stock, no coupling
+    [InlineData(21.0, 2, 1)]       // just over one stock, one coupling
+    [InlineData(36.0, 2, 1)]       // #170 repro
+    [InlineData(40.0, 2, 1)]       // exactly two stocks
+    [InlineData(40.001, 3, 2)]     // just over two stocks → 3 stocks → 2 couplings
+    [InlineData(60.0, 3, 2)]       // exactly three stocks
+    [InlineData(100.0, 5, 4)]      // five stocks
+    public void BuildAutoFittingsForPipe_CouplingCount_AlwaysMatchesStockUnitsMinusOne(double totalRunFt, int expectedStockUnits, int expectedCouplings)
+    {
+        // Straight-line single-segment pipe; segment vs cumulative gives the same answer for
+        // a single segment, but this anchors the count contract against ComputeStockUsage.
+        Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
+        pipe.Points.Add(new Point(0, 0));
+        pipe.Points.Add(new Point(totalRunFt, 0));
+
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+
+        int couplings = fittings.Count(f => f.FittingType == FittingType.Coupling);
+        Assert.Equal(expectedCouplings, couplings);
+
+        // The contract: coupling count == ComputeStockUsage.StockUnits − 1 always.
+        var usage = FittingPlacement.ComputeStockUsage(totalRunFt, 20.0);
+        Assert.NotNull(usage);
+        Assert.Equal(expectedStockUnits, usage!.Value.StockUnits);
+        Assert.Equal(usage.Value.StockUnits - 1, couplings);
+    }
+
+    [Fact]
+    public void BuildAutoFittingsForPipe_MultiSegmentCumulative_CouplingsAtTwentyAndForty()
+    {
+        // 60 ft polyline as 4 × 15 ft segments. Per-segment logic = 0 couplings
+        // (no segment > 20). Cumulative = 2 couplings (at 20 ft and 40 ft).
+        Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
+        pipe.Points.Add(new Point(0, 0));
+        pipe.Points.Add(new Point(15, 0));
+        pipe.Points.Add(new Point(30, 0));
+        pipe.Points.Add(new Point(45, 0));
+        pipe.Points.Add(new Point(60, 0));
+
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+        var couplings = fittings.Where(f => f.FittingType == FittingType.Coupling).ToList();
+
+        Assert.Equal(2, couplings.Count);
+        // Coupling 1 at cumulative 20 ft → falls in segment 2 (15..30), at (15 + 5, 0) = (20, 0).
+        Assert.Equal(20.0, couplings[0].X + (couplings[0].W / 2), 2);
+        // Coupling 2 at cumulative 40 ft → falls in segment 3 (30..45), at (30 + 10, 0) = (40, 0).
+        Assert.Equal(40.0, couplings[1].X + (couplings[1].W / 2), 2);
+    }
+
+    [Fact]
+    public void BuildAutoFittingsForPipe_DegenerateZeroLengthSegment_DoesNotCrash()
+    {
+        // Two coincident vertices in the middle of a 30 ft run. Total still 30 ft.
+        // Cumulative coupling count on 20 ft stock = ceil(30/20) - 1 = 1.
+        Shape pipe = new() { Kind = ShapeKind.IrrigationPipe, PipeDiameterIn = 0.75, Trait = "PVC" };
+        pipe.Points.Add(new Point(0, 0));
+        pipe.Points.Add(new Point(15, 0));
+        pipe.Points.Add(new Point(15, 0)); // zero-length segment
+        pipe.Points.Add(new Point(30, 0));
+
+        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+        int couplings = fittings.Count(f => f.FittingType == FittingType.Coupling);
+
+        Assert.Equal(1, couplings);
     }
 
     [Fact]

@@ -135,27 +135,56 @@ public static class FittingPlacement
             fittings.Add(MakeFittingShape(pipe.Points[i], sizeFt, material, diameterIn, type.Value, pipe));
         }
 
-        // Pass 2 — auto-couplings along long segments. A segment longer than stockLengthFt
-        // gets a coupling at every stockLengthFt boundary so the user knows how many stock
-        // sticks the run consumes.
+        // Pass 2 — auto-couplings along the cumulative path (issue #170). Real-world
+        // pipe runs cut sticks across segment boundaries, so we walk the polyline as
+        // one continuous path and place a coupling each time the cumulative length
+        // crosses a stockLength multiple. Coupling COUNT matches ComputeStockUsage
+        // exactly: ceil(totalRun / stockLen) − 1.
         if (stockLengthFt is double stockLen && stockLen > 0)
         {
+            double totalRunFt = 0;
             for (int i = 0; i < pipe.Points.Count - 1; i++)
             {
                 Point a = pipe.Points[i];
                 Point b = pipe.Points[i + 1];
-                double segLenFt = Math.Sqrt(((b.X - a.X) * (b.X - a.X)) + ((b.Y - a.Y) * (b.Y - a.Y)));
-                if (segLenFt <= stockLen)
-                {
-                    continue;
-                }
+                totalRunFt += Math.Sqrt(((b.X - a.X) * (b.X - a.X)) + ((b.Y - a.Y) * (b.Y - a.Y)));
+            }
 
-                int couplingCount = (int)Math.Floor(segLenFt / stockLen);
-                for (int c = 1; c <= couplingCount; c++)
+            int couplingCount = totalRunFt > stockLen
+                ? (int)Math.Ceiling(totalRunFt / stockLen) - 1
+                : 0;
+
+            if (couplingCount > 0)
+            {
+                int placedSoFar = 0;
+                double cumulativeFt = 0;
+                for (int i = 0; i < pipe.Points.Count - 1 && placedSoFar < couplingCount; i++)
                 {
-                    double t = (c * stockLen) / segLenFt;
-                    Point at = new(a.X + ((b.X - a.X) * t), a.Y + ((b.Y - a.Y) * t));
-                    fittings.Add(MakeFittingShape(at, sizeFt, material, diameterIn, FittingType.Coupling, pipe));
+                    Point a = pipe.Points[i];
+                    Point b = pipe.Points[i + 1];
+                    double segLenFt = Math.Sqrt(((b.X - a.X) * (b.X - a.X)) + ((b.Y - a.Y) * (b.Y - a.Y)));
+                    if (segLenFt <= 0)
+                    {
+                        // Degenerate zero-length segment (duplicate consecutive vertex). Skip.
+                        continue;
+                    }
+
+                    double segEnd = cumulativeFt + segLenFt;
+
+                    while (placedSoFar < couplingCount)
+                    {
+                        double targetFt = (placedSoFar + 1) * stockLen;
+                        if (targetFt > segEnd)
+                        {
+                            break; // Target coupling falls in a later segment.
+                        }
+                        double t = (targetFt - cumulativeFt) / segLenFt;
+                        Point at = new(a.X + ((b.X - a.X) * t), a.Y + ((b.Y - a.Y) * t));
+                        fittings.Add(MakeFittingShape(at, sizeFt, material, diameterIn, FittingType.Coupling, pipe));
+                        placedSoFar++;
+                    }
+
+                    cumulativeFt = segEnd;
                 }
             }
         }

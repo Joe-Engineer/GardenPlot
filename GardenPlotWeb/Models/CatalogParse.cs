@@ -128,11 +128,7 @@ public static class CatalogParse
             return null;
         }
 
-        double tolerance = diameterIn * 0.01;
-        PaletteItem? match = PaletteCatalog.IrrigationPipes.FirstOrDefault(p =>
-            string.Equals(p.Trait, fitting.FittingMaterial, System.StringComparison.OrdinalIgnoreCase)
-            && System.Math.Abs((p.WidthFt * 12.0) - diameterIn) <= tolerance);
-        return match?.Code;
+        return PaletteCatalog.FindPipeByTraitAndDiameter(fitting.FittingMaterial, diameterIn)?.Code;
     }
 
     /// <summary>

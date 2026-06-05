@@ -194,4 +194,70 @@ public sealed class IrrigationSnapTests
     {
         Assert.Equal(expected, IrrigationSnap.VertexPositionLabel(index, total));
     }
+
+    // Issue #175 — excludeShapeId keeps a pipe being edited from snapping to itself.
+    [Fact]
+    public void ResolveSnap_ExcludeShapeId_SkipsThatShape()
+    {
+        // A pipe whose own endpoint is the only nearby snap target. With exclude, no snap.
+        Shape pipe = new()
+        {
+            Kind = ShapeKind.IrrigationPipe,
+            Points = new() { new Point(0, 0), new Point(10, 0) },
+            Label = "PVC Lateral ¾\"",
+        };
+
+        var (sx, sy, target) = IrrigationSnap.ResolveSnap(new[] { pipe }, x: 10.1, y: 0, snapToleranceFt: 0.5, excludeShapeId: pipe.Id);
+        Assert.Equal(10.1, sx, 3);
+        Assert.Equal(0, sy, 3);
+        Assert.Null(target);
+    }
+
+    [Fact]
+    public void ResolveSnap_ExcludeShapeId_StillSnapsToOtherShapes()
+    {
+        // Dragging pipeA's endpoint near a head should still snap to the head even
+        // when pipeA is excluded — only pipeA's own vertices are skipped.
+        Shape pipeA = new()
+        {
+            Kind = ShapeKind.IrrigationPipe,
+            Points = new() { new Point(0, 0), new Point(10, 0) },
+            Label = "PVC Main 1\"",
+        };
+        Shape head = new()
+        {
+            Kind = ShapeKind.IrrigationHead,
+            X = 9.5,
+            Y = -0.5,
+            W = 1.0,
+            H = 1.0,
+            Label = "Rotary 12'",
+        };
+
+        var (sx, sy, target) = IrrigationSnap.ResolveSnap(new[] { pipeA, head }, x: 10.1, y: 0, snapToleranceFt: 0.5, excludeShapeId: pipeA.Id);
+        Assert.NotNull(target);
+        Assert.Equal(head.Id, target!.ShapeId);
+        Assert.Equal(10.0, sx, 3);
+        Assert.Equal(0.0, sy, 3);
+    }
+
+    [Fact]
+    public void ResolveSnap_NoExcludeArg_BackCompat()
+    {
+        // The default exclude is null — original callers (drafting path) keep working unchanged.
+        Shape head = new()
+        {
+            Kind = ShapeKind.IrrigationHead,
+            X = 4.5,
+            Y = 4.5,
+            W = 1.0,
+            H = 1.0,
+            Label = "Rotary 12'",
+        };
+
+        var (sx, sy, target) = IrrigationSnap.ResolveSnap(new[] { head }, x: 5.1, y: 5.0, snapToleranceFt: 0.5);
+        Assert.NotNull(target);
+        Assert.Equal(5.0, sx, 3);
+        Assert.Equal(5.0, sy, 3);
+    }
 }
