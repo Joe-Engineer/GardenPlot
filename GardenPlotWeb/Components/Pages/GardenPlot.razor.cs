@@ -10512,6 +10512,38 @@ public partial class GardenPlot
     }
 
     /// <summary>
+    /// Issue #172 — summary for the live pipe/wire length HUD shown while drafting.
+    /// Returns the current cursor-tracking segment length, the cumulative polyline
+    /// length, and (when the drafting pipe has a catalog Label with a known
+    /// StockLengthFt) the stock-stick consumption + waste %.
+    /// Returns null when the drafting state isn't a pipe/wire polyline with at least
+    /// one committed vertex + the trailing cursor vertex.
+    /// </summary>
+    private (double CurrentSegFt, double TotalFt, int? StockUnits, double? WastePercent)? GetDraftingPipeLengthSummary()
+    {
+        if (drafting is null || !buildingPolygon)
+        {
+            return null;
+        }
+
+        if (drafting.Kind is not ShapeKind.IrrigationPipe and not ShapeKind.IrrigationWire)
+        {
+            return null;
+        }
+
+        // Stock summary — only when the drafting pipe has a catalog Label with a
+        // known StockLengthFt. Wires don't have stock-stick rollup so stockLen stays null.
+        double? stockLen = null;
+        if (drafting.Kind == ShapeKind.IrrigationPipe && !string.IsNullOrWhiteSpace(drafting.Label))
+        {
+            stockLen = PaletteCatalog.FindByCode(drafting.Label)?.StockLengthFt;
+        }
+
+        var result = PipeLengthSummary.Compute(drafting.Points, stockLen);
+        return result is null ? null : (result.CurrentSegFt, result.TotalFt, result.StockUnits, result.WastePercent);
+    }
+
+    /// <summary>
     /// Issue #133 — corner-snap resolver. Enumerates the vertices of every
     /// snappable shape in the current plot (excluding the one being drafted,
     /// to prevent self-snap during the same drag), feeds them into a transient
