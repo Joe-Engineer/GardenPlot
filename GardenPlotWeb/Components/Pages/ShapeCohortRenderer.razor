@@ -588,19 +588,3 @@
         }
     </g>
 }
-
-@* Issue #229 — area / volume labels for ALL selected shapes are rendered in
-   a SECOND pass after every shape body has been drawn. The first version of
-   #229 rendered the pill inside the same foreach iteration as the shape; if
-   another shape drawn later spatially overlapped a selected shape's centroid
-   the later shape's fill would paint OVER the pill. SVG paint order is
-   document order, so the only reliable way to keep the pill on top is to
-   emit it after every shape body. The labels are pointer-events="none" so
-   z-order has no interaction consequence. *@
-@foreach (var s in Shapes)
-{
-    @if (!IsConceptMode && SelectedIds.Contains(s.Id) && !Parent!.IsAnyDragInProgress)
-    {
-        @((MarkupString)GardenPlot.AreaCentroidLabelSvg(s))
-    }
-}
