@@ -587,4 +587,14 @@
             }
         }
     </g>
+    @* Issue #229 — area / volume label rendered at the shape's centroid when
+       it's selected. Emitted via MarkupString because Razor reserves the bare
+       <text> tag for its escape syntax. Lives OUTSIDE the rotated <g> wrapper
+       so the text stays upright even when the shape is rotated. Suppressed
+       during any active drag so the label doesn't jitter while the user is
+       moving / resizing geometry. *@
+    @if (!IsConceptMode && SelectedIds.Contains(s.Id) && !Parent!.IsAnyDragInProgress)
+    {
+        @((MarkupString)GardenPlot.AreaCentroidLabelSvg(s))
+    }
 }
