@@ -881,6 +881,27 @@ public static class PaletteCatalog
         return null;
     }
 
+    /// <summary>
+    /// Issue #169 — looks up an irrigation pipe catalog row by material trait
+    /// ("PVC" / "Poly" / "Copper" / "DripTubing") + outside diameter in inches.
+    /// Diameter matches within a 1% tolerance to absorb stored-as-WidthFt rounding.
+    /// Used by the inspector when the user changes diameter on a selected pipe so the
+    /// Label (catalog code) and downstream stock-length / BOM rollup stay in sync.
+    /// Returns null when no row matches the requested trait+diameter pair.
+    /// </summary>
+    public static PaletteItem? FindPipeByTraitAndDiameter(string? trait, double diameterIn)
+    {
+        if (string.IsNullOrWhiteSpace(trait) || diameterIn <= 0)
+        {
+            return null;
+        }
+
+        double tolerance = diameterIn * 0.01;
+        return IrrigationPipes.FirstOrDefault(p =>
+            string.Equals(p.Trait, trait, StringComparison.OrdinalIgnoreCase)
+            && Math.Abs((p.WidthFt * 12.0) - diameterIn) <= tolerance);
+    }
+
     /// <summary>Filters items by user-facing palette category (combobox option).</summary>
     public static IReadOnlyList<PaletteItem> For(PaletteCategory category)
     {
