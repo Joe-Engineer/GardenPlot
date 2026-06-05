@@ -10873,12 +10873,46 @@ public partial class GardenPlot
         }
 
         RecordUndoState();
-        foreach (var shape in targets)
-        {
-            MirrorShape(shape, horizontal);
-        }
+        MirrorShapesAsGroup(targets, horizontal);
 
         await SaveAsync();
+    }
+
+    /// <summary>
+    /// Issue #219 — multi-selection mirror: ALL selected shapes flip across a SINGLE
+    /// plane positioned at the group's geometric centre. Previously every shape mirrored
+    /// across its OWN bbox centre, so the spatial relationship between shapes was lost
+    /// (e.g. two rectangles side-by-side mirrored in place instead of swapping sides).
+    /// </summary>
+    /// <param name="shapes">Shapes to mirror in-place as a group.</param>
+    /// <param name="horizontal">When <see langword="true"/>, flips across the vertical axis at the group's centre X; otherwise flips across the horizontal axis at the group's centre Y.</param>
+    internal static void MirrorShapesAsGroup(IReadOnlyList<Shape> shapes, bool horizontal)
+    {
+        ArgumentNullException.ThrowIfNull(shapes);
+        if (shapes.Count == 0)
+        {
+            return;
+        }
+
+        double groupMinX = double.MaxValue, groupMinY = double.MaxValue;
+        double groupMaxX = double.MinValue, groupMaxY = double.MinValue;
+        foreach (var shape in shapes)
+        {
+            (double minX, double minY, double maxX, double maxY) = RotatedAABB(shape);
+            if (minX < groupMinX) groupMinX = minX;
+            if (minY < groupMinY) groupMinY = minY;
+            if (maxX > groupMaxX) groupMaxX = maxX;
+            if (maxY > groupMaxY) groupMaxY = maxY;
+        }
+
+        double axis = horizontal
+            ? (groupMinX + groupMaxX) / 2.0
+            : (groupMinY + groupMaxY) / 2.0;
+
+        foreach (var shape in shapes)
+        {
+            MirrorShape(shape, horizontal, axis);
+        }
     }
 
     /// <summary>
@@ -11193,8 +11227,11 @@ public partial class GardenPlot
     }
 
     /// <summary>
-    /// Mirrors a single shape in-place. Public for the unit tests; never reassigns
-    /// <paramref name="shape"/>.
+    /// Mirrors a single shape in-place across the shape's OWN geometric centre.
+    /// Public for the unit tests; never reassigns <paramref name="shape"/>.
+    /// For multi-shape group mirroring, callers should use
+    /// <see cref="MirrorShapesAsGroup"/> or pass an explicit axis via the
+    /// three-argument overload.
     /// </summary>
     /// <param name="shape">The shape to mirror.</param>
     /// <param name="horizontal">When <see langword="true"/>, flips the x coordinate.</param>
@@ -11202,10 +11239,36 @@ public partial class GardenPlot
     {
         ArgumentNullException.ThrowIfNull(shape);
 
+        double axis;
         if (shape.Kind == ShapeKind.FreeDraw && shape.Points.Count >= 2)
         {
             (double minX, double minY, double maxX, double maxY) = PointsBounds(shape.Points);
-            double axis = horizontal ? (minX + maxX) / 2.0 : (minY + maxY) / 2.0;
+            axis = horizontal ? (minX + maxX) / 2.0 : (minY + maxY) / 2.0;
+        }
+        else
+        {
+            axis = horizontal ? shape.X + (shape.W / 2.0) : shape.Y + (shape.H / 2.0);
+        }
+
+        MirrorShape(shape, horizontal, axis);
+    }
+
+    /// <summary>
+    /// Issue #219 — mirrors a single shape in-place across an explicit world-space
+    /// axis. The axis is a single coordinate value (X for horizontal mirror, Y for
+    /// vertical mirror) in plot feet. Used by <see cref="MirrorShapesAsGroup"/> to
+    /// reflect every selected shape across a SHARED plane (the group's centre),
+    /// not each shape's own centre.
+    /// </summary>
+    /// <param name="shape">The shape to mirror.</param>
+    /// <param name="horizontal">When <see langword="true"/>, flips the x coordinate across <paramref name="axis"/>; otherwise flips the y coordinate.</param>
+    /// <param name="axis">The world-space coordinate of the mirror plane (X for horizontal mirror, Y for vertical mirror).</param>
+    internal static void MirrorShape(Shape shape, bool horizontal, double axis)
+    {
+        ArgumentNullException.ThrowIfNull(shape);
+
+        if (shape.Kind == ShapeKind.FreeDraw && shape.Points.Count >= 2)
+        {
             for (int i = 0; i < shape.Points.Count; i++)
             {
                 Point p = shape.Points[i];
@@ -11234,8 +11297,30 @@ public partial class GardenPlot
         }
         else
         {
-            // For axis-aligned primitives (Rectangle, Oval, BedKit), mirroring is purely a
-            // rotation flip when rotation is non-zero; the bounding box itself is symmetric.
+            // Issue #219 — axis-aligned primitives (Rectangle, Oval, BedKit) must
+            // BOTH translate their position to reflect across the axis AND flip
+            // rotation so the orientation mirrors too. The old code only flipped
+            // rotation, which left a single rectangle in place AND made the two
+            // mirror buttons appear identical for axis-aligned shapes.
+            //
+            // Position is stored as the top-left corner of the unrotated bounding
+            // box. Reflecting the centre across `axis` shifts the top-left:
+            //   oldCentre.X = X + W/2
+            //   newCentre.X = 2*axis - oldCentre.X
+            //   newX        = newCentre.X - W/2 = 2*axis - X - W
+            //
+            // Rotation negation is correct for both horizontal and vertical mirror
+            // because Rectangle/Oval/BedKit all have 180° rotational symmetry, so
+            // (180° - θ) and (-θ) render identically.
+            if (horizontal)
+            {
+                shape.X = (2.0 * axis) - shape.X - shape.W;
+            }
+            else
+            {
+                shape.Y = (2.0 * axis) - shape.Y - shape.H;
+            }
+
             shape.Rotation = -shape.Rotation;
         }
     }
