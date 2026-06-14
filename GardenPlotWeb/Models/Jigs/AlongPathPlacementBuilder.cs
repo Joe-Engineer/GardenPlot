@@ -84,7 +84,7 @@ public static class AlongPathPlacementBuilder
                                 stockLengthFt: stockLengthFt);
                             if (!request.AssignNewIds)
                             {
-                                foreach (Shape fitting in autoFittings)
+                                foreach (Shape fitting in result.Fittings)
                                 {
                                     fitting.Id = System.Guid.Empty;
                                 }

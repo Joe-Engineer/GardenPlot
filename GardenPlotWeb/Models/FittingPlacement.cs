@@ -105,10 +105,9 @@ public static class FittingPlacement
 
         var fittings = new List<Shape>();
         var vertexInjections = new List<PipeVertexInjection>();
-        var fittings = new List<Shape>();
         if (pipe.Kind != ShapeKind.IrrigationPipe || pipe.Points is null || pipe.Points.Count < 2)
         {
-            return fittings;
+            return new AutoFittingResult(fittings, vertexInjections);
         }
 
         double diameterIn = pipe.PipeDiameterIn ?? (pipe.W * 12.0);
@@ -328,23 +327,6 @@ public static class FittingPlacement
         t = Math.Clamp(t, 0.0, 1.0);
         return new Point(a.X + (t * dx), a.Y + (t * dy));
     }
-
-            foreach (Point p in other.Points)
-            {
-                double dx = p.X - at.X;
-                double dy = p.Y - at.Y;
-                if ((dx * dx) + (dy * dy) <= tol2)
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>Per-vertex coincidence tolerance for junction detection (feet).</summary>
-    private const double JointToleranceFt = 0.15;
 
     /// <summary>
     /// Issue #162b — computes stock-unit consumption + waste percentage for a pipe run.
