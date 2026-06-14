@@ -23,7 +23,8 @@ public sealed class ProjectDossierServiceTests
     {
         HttpClient http = new() { BaseAddress = new Uri("http://localhost/") };
         CatalogService catalog = new(http, NullLogger<CatalogService>.Instance);
-        service = new ProjectDossierService(new ThrowingJSRuntime(), catalog);
+        ClientImagesAccessor accessor = new(new ThrowingJSRuntime(), NullLogger<ClientImagesAccessor>.Instance);
+        service = new ProjectDossierService(accessor, catalog);
     }
 
     [Fact]

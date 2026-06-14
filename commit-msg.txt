@@ -1,0 +1,28 @@
+fix(#110): route ProjectDossierService.SaveProjectPhotoAsync through ClientImagesAccessor
+
+ProjectDossierService.SaveProjectPhotoAsync was calling IJSRuntime.InvokeAsync with
+a dotted "GardenPlot.clientImages.putImageFromBase64" identifier, relying on the
+window-traversal fallback and the deferred side-effect of client-images.js attaching
+itself to window.GardenPlot.clientImages. This creates a race condition if the user
+triggers a project-photo upload before the module side-effect completes.
+
+Changes:
+- Add ClientImagesAccessor service that exposes EnsureClientImagesModuleAsync (idempotent
+  lazy import with timeout, matching the pattern in GardenPlot.razor.cs).
+- Refactor ProjectDossierService to inject ClientImagesAccessor instead of IJSRuntime.
+- Update SaveProjectPhotoAsync to call module.InvokeAsync("putImageFromBase64") on
+  the imported module reference (bare export name, no dotted path).
+- Extend ClientImagesInteropGuardTests with ServicesFolder_HasNoDottedClientImagesCallsOnIJSRuntime
+  test to scan all Services/**/*.cs files for the dotted-name pattern. The original guard
+  only covered GardenPlot.razor.cs.
+- Update ProjectDossierServiceTests to inject ClientImagesAccessor.
+
+Acceptance:
+- ProjectDossierService no longer references "GardenPlot.clientImages.*" via dotted name
+- Guard test covers Services/*.cs in addition to GardenPlot.razor.cs
+- All tests pass (1543/1543)
+- Build succeeds with 0 warnings
+
+Fixes #110
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

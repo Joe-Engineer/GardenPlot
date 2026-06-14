@@ -21,15 +21,16 @@ namespace GardenPlot.Tests;
 /// </para>
 /// <para>
 /// <see cref="Microsoft.JSInterop.IJSObjectReference.InvokeAsync"/> resolves identifiers within
-/// the referenced module's export scope — it does <b>not</b> fall through to <c>window</c>.
+/// the referenced module's export scope (it does <b>not</b> fall through to <c>window</c>).
 /// So calls like <c>jsModule.InvokeAsync&lt;string&gt;("GardenPlot.clientImages.putImageFromBase64", …)</c>
 /// always throw, which the catch path in <c>SaveCustomTileImageAsync</c> renders as a misleading
 /// "browser storage availability" error.
 /// </para>
 /// <para>
-/// All client-image calls must go through the <c>clientImagesModule</c> reference (the import of
-/// <c>./js/client-images.js</c>) and use the bare export name. The <c>EnsureClientImagesModuleAsync</c>
-/// helper in <c>GardenPlot.razor.cs</c> is the canonical entry point.
+/// <see cref="Microsoft.JSInterop.IJSRuntime.InvokeAsync"/> <i>does</i> fall through to <c>window</c>
+/// for dotted identifiers, but this creates a race condition with the deferred side-effect load.
+/// Services MUST route all client-images calls through <c>ClientImagesAccessor.EnsureClientImagesModuleAsync</c>
+/// (or the equivalent helper in <c>GardenPlot.razor.cs</c>) and use the bare export name.
 /// </para>
 /// </remarks>
 public partial class ClientImagesInteropGuardTests
@@ -40,8 +41,8 @@ public partial class ClientImagesInteropGuardTests
         string source = ReadGardenPlotRazorCs();
 
         // Match any *.InvokeAsync / InvokeVoidAsync that references the dotted
-        // "GardenPlot.clientImages.*" identifier inside a string literal — the
-        // call shape that silently fails because module refs don't traverse window.
+        // "GardenPlot.clientImages.*" identifier inside a string literal (the
+        // call shape that silently fails because module refs don't traverse window).
         MatchCollection matches = DottedClientImagesCallRegex().Matches(source);
 
         Assert.True(
@@ -51,6 +52,39 @@ public partial class ClientImagesInteropGuardTests
             "resolves names within the module's export scope only, so these calls always throw. " +
             "Route them through EnsureClientImagesModuleAsync() and call the bare export name " +
             "(e.g. \"putImageFromBase64\") on the clientImagesModule reference instead.");
+    }
+
+    [Fact]
+    public void ServicesFolder_HasNoDottedClientImagesCallsOnIJSRuntime()
+    {
+        List<string> violations = new();
+
+        string repoRoot = FindRepoRoot();
+        string servicesDir = Path.Combine(repoRoot, "GardenPlotWeb", "Services");
+
+        if (!Directory.Exists(servicesDir))
+        {
+            Assert.Fail($"Services directory not found at {servicesDir}");
+        }
+
+        foreach (string file in Directory.EnumerateFiles(servicesDir, "*.cs", SearchOption.AllDirectories))
+        {
+            string source = File.ReadAllText(file);
+            MatchCollection matches = DottedClientImagesCallRegex().Matches(source);
+
+            if (matches.Count > 0)
+            {
+                violations.Add($"{Path.GetFileName(file)}: {matches.Count} violation(s)");
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            $"Found dotted \"GardenPlot.clientImages.*\" calls in Services/*.cs files. " +
+            "This pattern creates a race condition with the deferred side-effect load. " +
+            "Inject ClientImagesAccessor, call EnsureClientImagesModuleAsync(), and use the " +
+            "bare export name on the returned module reference.\n" +
+            string.Join("\n", violations));
     }
 
     [Fact]
@@ -81,11 +115,9 @@ public partial class ClientImagesInteropGuardTests
         RegexOptions.CultureInvariant)]
     private static partial Regex PutImageFromBase64CallShapeRegex();
 
-    private static string ReadGardenPlotRazorCs()
+    private static string FindRepoRoot()
     {
         string assemblyDir = Path.GetDirectoryName(typeof(ClientImagesInteropGuardTests).Assembly.Location)!;
-
-        // Walk up to the repository root, then resolve the well-known component path.
         DirectoryInfo? dir = new(assemblyDir);
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "GardenPlot.slnx")))
         {
@@ -93,9 +125,14 @@ public partial class ClientImagesInteropGuardTests
         }
 
         Assert.NotNull(dir);
+        return dir!.FullName;
+    }
 
+    private static string ReadGardenPlotRazorCs()
+    {
+        string repoRoot = FindRepoRoot();
         string path = Path.Combine(
-            dir!.FullName,
+            repoRoot,
             "GardenPlotWeb",
             "Components",
             "Pages",

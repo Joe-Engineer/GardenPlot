@@ -52,7 +52,11 @@ public static class ServiceCollectionExtensions
         // Loads from a checked-in manifest at wwwroot/data/catalog/assemblies/_index.json.
         _ = services.AddScoped<Catalog.ICatalogService, Catalog.CatalogService>();
 
-        // Project dossier helpers (as-built cloning, PNG export, photo storage via IJSRuntime, catalog suggestions).
+        // Safe accessor for client-images.js exports via lazy module import with timeout.
+        // Prevents race conditions with window.GardenPlot.clientImages side-effect attachment.
+        _ = services.AddScoped<ClientImagesAccessor>();
+
+        // Project dossier helpers (as-built cloning, PNG export, photo storage via client-images.js, catalog suggestions).
         _ = services.AddScoped<ProjectDossierService>();
 
         // Issue #95 — Wikipedia + OpenGraph citation lookup, extracted from GardenPlot.razor.cs.

@@ -16,14 +16,14 @@ public sealed class ProjectDossierService
 {
     private static readonly JsonSerializerOptions CloneSerializerOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly IJSRuntime js;
+    private readonly ClientImagesAccessor clientImagesAccessor;
     private readonly ICatalogService catalog;
 
-    public ProjectDossierService(IJSRuntime js, ICatalogService catalog)
+    public ProjectDossierService(ClientImagesAccessor clientImagesAccessor, ICatalogService catalog)
     {
-        ArgumentNullException.ThrowIfNull(js);
+        ArgumentNullException.ThrowIfNull(clientImagesAccessor);
         ArgumentNullException.ThrowIfNull(catalog);
-        this.js = js;
+        this.clientImagesAccessor = clientImagesAccessor;
         this.catalog = catalog;
     }
 
@@ -191,9 +191,9 @@ public sealed class ProjectDossierService
 
     /// <summary>
     /// Persists a project photo into the browser's IndexedDB via <c>client-images.js</c>
-    /// (<c>GardenPlot.clientImages.putImageFromBase64</c>) and returns the generated
-    /// GUID reference. <paramref name="plotId"/> is recorded only in telemetry; storage
-    /// is keyed by the returned GUID and is shared across all plots in this browser.
+    /// (<c>putImageFromBase64</c> export) and returns the generated GUID reference.
+    /// <paramref name="plotId"/> is recorded only in telemetry; storage is keyed by the
+    /// returned GUID and is shared across all plots in this browser.
     /// </summary>
     public async Task<string> SaveProjectPhotoAsync(Guid plotId, string originalFileName, Stream input, CancellationToken ct = default)
     {
@@ -206,8 +206,14 @@ public sealed class ProjectDossierService
 
         string mime = GuessMimeFromExtension(Path.GetExtension(originalFileName));
 
-        string? id = await js.InvokeAsync<string>(
-            "GardenPlot.clientImages.putImageFromBase64",
+        IJSObjectReference? module = await clientImagesAccessor.EnsureClientImagesModuleAsync().ConfigureAwait(false);
+        if (module is null)
+        {
+            throw new InvalidOperationException("client-images.js module import failed.");
+        }
+
+        string? id = await module.InvokeAsync<string>(
+            "putImageFromBase64",
             ct,
             base64,
             mime,
