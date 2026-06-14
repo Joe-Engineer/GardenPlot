@@ -1,0 +1,91 @@
+<!--
+  CatalogIndex.targets
+  Auto-generates wwwroot/data/catalog/assemblies/_index.json to list all
+  *.json files in that directory (excluding _index.json itself). Tracked in #103.
+-->
+<Project>
+
+  <UsingTask
+    TaskName="RegenerateCatalogIndex"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <AssembliesDirectory ParameterType="System.String" Required="true" />
+      <IndexFilePath ParameterType="System.String" Required="true" />
+      <FilesWritten ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Text" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+          if (!Directory.Exists(AssembliesDirectory))
+          {
+              Log.LogWarning("Catalog index: assemblies directory '{0}' not found.", AssembliesDirectory);
+              return true;
+          }
+
+          string indexFileName = Path.GetFileName(IndexFilePath);
+          string[] jsonFiles = Directory.GetFiles(AssembliesDirectory, "*.json")
+              .Select(Path.GetFileName)
+              .Where(name => name != indexFileName)
+              .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+              .ToArray();
+
+          var sb = new StringBuilder();
+          sb.AppendLine("{");
+          sb.AppendLine("  \"$comment\": \"Auto-generated manifest of catalog assembly packs. Do not edit by hand; regenerated at build by Build/CatalogIndex.targets.\",");
+          sb.AppendLine("  \"files\": [");
+          for (int i = 0; i < jsonFiles.Length; i++)
+          {
+              sb.Append("    \"");
+              sb.Append(jsonFiles[i]);
+              sb.Append("\"");
+              if (i < jsonFiles.Length - 1) sb.Append(",");
+              sb.AppendLine();
+          }
+          sb.AppendLine("  ]");
+          sb.AppendLine("}");
+
+          string newJson = sb.ToString();
+          bool needsUpdate = true;
+          if (File.Exists(IndexFilePath))
+          {
+              string existingJson = File.ReadAllText(IndexFilePath, Encoding.UTF8);
+              if (existingJson == newJson)
+              {
+                  needsUpdate = false;
+                  Log.LogMessage(MessageImportance.Low, "Catalog index: up-to-date ({0} pack(s)).", jsonFiles.Length);
+              }
+          }
+
+          if (needsUpdate)
+          {
+              File.WriteAllText(IndexFilePath, newJson, Encoding.UTF8);
+              Log.LogMessage(MessageImportance.High, "Catalog index: regenerated with {0} pack(s).", jsonFiles.Length);
+              FilesWritten = new[] { new Microsoft.Build.Utilities.TaskItem(IndexFilePath) };
+          }
+          else
+          {
+              FilesWritten = new Microsoft.Build.Framework.ITaskItem[0];
+          }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target
+    Name="GenerateCatalogIndex"
+    BeforeTargets="PrepareForPublish"
+    AfterTargets="ResolveAssemblyReferences">
+
+    <RegenerateCatalogIndex
+      AssembliesDirectory="$(MSBuildProjectDirectory)\wwwroot\data\catalog\assemblies"
+      IndexFilePath="$(MSBuildProjectDirectory)\wwwroot\data\catalog\assemblies\_index.json">
+      <Output TaskParameter="FilesWritten" ItemName="FileWrites" />
+    </RegenerateCatalogIndex>
+
+  </Target>
+
+</Project>
