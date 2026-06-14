@@ -1,0 +1,111 @@
+<!--
+  CatalogIndex.targets
+  Auto-generates wwwroot/data/catalog/assemblies/_index.json from the *.json
+  files in that directory at build/publish time. WebAssembly can't enumerate
+  wwwroot at runtime, so this manifest must be pre-built.
+
+  Behavior:
+    - Scans wwwroot/data/catalog/assemblies/*.json (excluding _index.json).
+    - Writes a sorted JSON array to _index.json.
+    - Only writes if the content differs (no spurious dirty git state).
+    - Runs before PrepareForPublish (publish) and as part of Build (dev-time).
+
+  References:
+    - Issue #103
+    - Related: #92, PR #101
+-->
+<Project>
+
+  <UsingTask
+    TaskName="GenerateCatalogAssembliesIndex"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <AssembliesDirectory ParameterType="System.String" Required="true" />
+      <OutputFile ParameterType="System.String" Required="true" />
+      <FileCount ParameterType="System.Int32" Output="true" />
+      <WasUpdated ParameterType="System.Boolean" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Text" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+          FileCount = 0;
+          WasUpdated = false;
+
+          if (!Directory.Exists(AssembliesDirectory))
+          {
+              Log.LogWarning("Catalog index: assemblies directory '{0}' not found; skipping generation.", AssembliesDirectory);
+              return true;
+          }
+
+          string[] jsonFiles = Directory.GetFiles(AssembliesDirectory, "*.json", SearchOption.TopDirectoryOnly)
+              .Select(Path.GetFileName)
+              .Where(name => !name.StartsWith("_"))
+              .OrderBy(name => name, StringComparer.Ordinal)
+              .ToArray();
+
+          FileCount = jsonFiles.Length;
+
+          var sb = new StringBuilder();
+          sb.AppendLine("{");
+          sb.AppendLine("  \"$comment\": \"Auto-generated at build/publish by Build/CatalogIndex.targets. DO NOT EDIT BY HAND.\",");
+          sb.AppendLine("  \"files\": [");
+          for (int i = 0; i < jsonFiles.Length; i++)
+          {
+              string comma = (i < jsonFiles.Length - 1) ? "," : "";
+              sb.AppendLine($"    \"{jsonFiles[i]}\"{comma}");
+          }
+          sb.AppendLine("  ]");
+          sb.Append("}");
+
+          string newContent = sb.ToString();
+          string existingContent = File.Exists(OutputFile) ? File.ReadAllText(OutputFile) : null;
+
+          if (newContent != existingContent)
+          {
+              Directory.CreateDirectory(Path.GetDirectoryName(OutputFile));
+              File.WriteAllText(OutputFile, newContent, Encoding.UTF8);
+              WasUpdated = true;
+              Log.LogMessage(MessageImportance.High,
+                  "Catalog index: regenerated {0} with {1} file(s).", OutputFile, jsonFiles.Length);
+          }
+          else
+          {
+              Log.LogMessage(MessageImportance.Low,
+                  "Catalog index: {0} is up-to-date ({1} file(s)).", OutputFile, jsonFiles.Length);
+          }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target
+    Name="GenerateCatalogAssembliesIndexForBuild"
+    AfterTargets="Build">
+
+    <GenerateCatalogAssembliesIndex
+      AssembliesDirectory="$(ProjectDir)wwwroot\data\catalog\assemblies"
+      OutputFile="$(ProjectDir)wwwroot\data\catalog\assemblies\_index.json">
+      <Output TaskParameter="FileCount" PropertyName="CatalogAssembliesFileCount" />
+      <Output TaskParameter="WasUpdated" PropertyName="CatalogAssembliesIndexUpdated" />
+    </GenerateCatalogAssembliesIndex>
+
+  </Target>
+
+  <Target
+    Name="GenerateCatalogAssembliesIndexForPublish"
+    BeforeTargets="PrepareForPublish">
+
+    <GenerateCatalogAssembliesIndex
+      AssembliesDirectory="$(ProjectDir)wwwroot\data\catalog\assemblies"
+      OutputFile="$(ProjectDir)wwwroot\data\catalog\assemblies\_index.json">
+      <Output TaskParameter="FileCount" PropertyName="CatalogAssembliesFileCount" />
+      <Output TaskParameter="WasUpdated" PropertyName="CatalogAssembliesIndexUpdated" />
+    </GenerateCatalogAssembliesIndex>
+
+  </Target>
+
+</Project>
