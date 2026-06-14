@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @page "/plot"
 @implements IAsyncDisposable
 @using System.Diagnostics
@@ -2392,6 +2392,9 @@ else
         var showLineTotal = !isInternalView || library.Ui.ShowLineTotalColumn;
         var itemInternalColumnCount = 10 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
         var summaryInternalColumnCount = 5 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
+        var totalMaterialCost = TakeoffMath.SumCurrency(itemRows.Select(r => r.MaterialCost));
+        var totalLaborCost = TakeoffMath.SumCurrency(itemRows.Select(r => (decimal?)r.LaborCost));
+        var totalLineTotal = TakeoffMath.SumCurrency(itemRows.Select(r => r.LineTotal));
 
         var positioned = library.Ui.TakeoffPanelX is double && library.Ui.TakeoffPanelY is double;
         <div class="floating-panel takeoff-floating @(positioned ? "" : "default-takeoff-pos")"
@@ -3147,18 +3150,45 @@ else
                             <span class="text-muted ms-2">Ø</span>
                             <strong>@F(single!.W) ft</strong>
                         </div>
+                        @* Issue #223 — freeform Coverage Arc input + quick-pick chips. Variable-arc
+                           nozzles support arbitrary angles set by a screwdriver in the field, so
+                           the old <select> bound to StandardSprinklerArcDegrees was too restrictive.
+                           Quick-pick chips next to the input keep the common 90/180/270/360 cases
+                           one-click. The handler clamps to [1, 360]. *@
                         <div class="rotation-edit-row mt-1">
                             <span class="text-muted small">Coverage:</span>
-                            <select class="form-select form-select-sm" style="max-width: 8rem;"
-                                    value="@F(headArc)"
-                                    disabled="@isPreview"
-                                    @onchange="(e) => OnSprinklerArcChanged(headSelectedArray, e)">
-                                @foreach (double deg in PaletteCatalog.StandardSprinklerArcDegrees)
-                                {
-                                    <option value="@F(deg)">@F(deg)°</option>
-                                }
-                            </select>
-                            <span class="small text-muted">arc</span>
+                            <input type="number" class="form-control form-control-sm" style="max-width: 5rem;"
+                                   min="1" max="360" step="1"
+                                   value="@F(headArc)"
+                                   disabled="@isPreview"
+                                   @onchange="(e) => OnSprinklerArcChanged(headSelectedArray, e)" />
+                            <span class="small text-muted">°</span>
+                            @if (!isPreview)
+                            {
+                                <span class="ms-1 d-inline-flex gap-1">
+                                    @foreach (double presetDeg in new double[] { 90, 180, 270, 360 })
+                                    {
+                                        var isActive = Math.Abs(presetDeg - headArc) < 0.5;
+                                        var btnClass = isActive ? "btn btn-sm btn-primary" : "btn btn-sm btn-outline-secondary";
+                                        <button type="button" class="@btnClass" style="padding: 0.05rem 0.35rem; font-size: 0.7rem;"
+                                                @onclick="() => OnSprinklerArcPresetClicked(headSelectedArray, presetDeg)">
+                                            @F(presetDeg)
+                                        </button>
+                                    }
+                                </span>
+                            }
+                        </div>
+                        @* Issue #223 — Spray Radius override. Lets the user shrink a variable-arc
+                           nozzle's spray below the catalog default (the "screwdriver-down-to-13 ft"
+                           case from the interview). The handler writes back to Shape.W = 2 × radius. *@
+                        <div class="rotation-edit-row mt-1">
+                            <span class="text-muted small">Radius:</span>
+                            <input type="number" class="form-control form-control-sm" style="max-width: 5rem;"
+                                   min="1" max="100" step="0.5"
+                                   value="@F(headThrowFt)"
+                                   disabled="@isPreview"
+                                   @onchange="(e) => OnSprinklerThrowRadiusChanged(headSelectedArray, e)" />
+                            <span class="small text-muted">ft</span>
                         </div>
                         @if (isPreview)
                         {
