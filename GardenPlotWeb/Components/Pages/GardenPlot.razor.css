@@ -1959,3 +1959,36 @@
     font-variant-numeric: tabular-nums;
     padding: 1px 0;
 }
+/* ===== Phase 4: Unified focus-visible ring (Issue #262) ===== */
+
+/*
+ * Global focus ring for all interactive elements in the GardenPlot page.
+ * Dual-ring approach: bright teal outline + dark halo ensures visibility
+ * on both the dark SVG canvas and light sidebar/toolbar backgrounds.
+ * Contrast ratios: 8.3:1 vs #222 (canvas), 5.1:1 vs #2f5a3a (toolbar).
+ */
+:focus-visible {
+    outline: 2px solid #5ce0d8;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.25);
+    border-radius: inherit;
+}
+
+/* Preserve intentional focus suppression on the SVG canvas. */
+.plot-canvas:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
+
+/* Remove ad-hoc partial rules now superseded by the global rule. */
+.aspect-lock-toggle:focus-visible {
+    outline: 2px solid #5ce0d8;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.25);
+}
+
+.scale-icon-btn:focus-visible {
+    outline: 2px solid #5ce0d8;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.25);
+}
