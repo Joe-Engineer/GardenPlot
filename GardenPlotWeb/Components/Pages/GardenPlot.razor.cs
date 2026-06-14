@@ -333,7 +333,7 @@ public partial class GardenPlot
             return rows;
         }
 
-        return rows.Where(r => TakeoffCategoryClassifier.Classify(r.Kind) == filter).ToList();
+        return rows.Where(r => r.Category == filter).ToList();
     }
 
     private void SetTakeoffCategoryFilter(TakeoffCategory? category)
@@ -989,7 +989,8 @@ public partial class GardenPlot
         bool HasLaborTypeOverride,
         bool HasMarkupOverride,
         Guid? ShapeId,
-        Guid? ParentShapeId);
+        Guid? ParentShapeId,
+        TakeoffCategory Category);
 
     private sealed record TakeoffAggregateRow(
         string Kind,
@@ -1372,10 +1373,11 @@ public partial class GardenPlot
                 Shape? boundShape = t.ShapeId is Guid shapeId && shapesById.TryGetValue(shapeId, out Shape? resolvedShape)
                     ? resolvedShape
                     : null;
+                string kind = TakeoffMath.Kind(t, catalog, boundShape);
 
                 return new TakeoffItemRow(
                     t.Id,
-                    TakeoffMath.Kind(t, catalog, boundShape),
+                    kind,
                     TakeoffMath.DisplayName(t, catalog),
                     t.Quantity,
                     TakeoffMath.EffectiveUnit(t, catalog),
@@ -1394,7 +1396,8 @@ public partial class GardenPlot
                     t.LaborTypeOverride.HasValue,
                     t.MarkupPercentOverride.HasValue,
                     t.ShapeId,
-                    boundShape?.FilledAreaShapeId);
+                    boundShape?.FilledAreaShapeId,
+                    TakeoffCategoryClassifier.Classify(catalog, kind));
             })
             .ToList();
     }
