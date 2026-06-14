@@ -1,4 +1,4 @@
-﻿// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
+// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -10427,13 +10427,23 @@ public partial class GardenPlot
             if (drafting.Kind == ShapeKind.IrrigationPipe && library.Ui.AutoPlaceFittingsOnPipe)
             {
                 double? stockLengthFt = ResolveStockLengthFtForPipe(drafting);
-                var autoFittings = FittingPlacement.BuildAutoFittingsForPipe(
+                var result = FittingPlacement.BuildAutoFittingsForPipe(
                     drafting,
                     otherShapes: currentPlot.Shapes,
                     stockLengthFt: stockLengthFt);
-                foreach (Shape fitting in autoFittings)
+                foreach (Shape fitting in result.Fittings)
                 {
                     currentPlot.Shapes.Add(fitting);
+                }
+                foreach (var injection in result.VertexInjections)
+                {
+                    var targetPipe = currentPlot.Shapes.FirstOrDefault(s => s.Id == injection.PipeId);
+                    if (targetPipe?.Points is not null && 
+                        injection.SegmentIndex >= 0 && 
+                        injection.SegmentIndex < targetPipe.Points.Count - 1)
+                    {
+                        targetPipe.Points.Insert(injection.SegmentIndex + 1, injection.InsertedVertex);
+                    }
                 }
             }
 

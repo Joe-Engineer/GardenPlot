@@ -1,4 +1,4 @@
-﻿// <copyright file="IrrigationFittingTests.cs" company="Garden Plot">
+// <copyright file="IrrigationFittingTests.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -168,8 +168,8 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(5, 0));
         pipe.Points.Add(new Point(10, 0));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe);
-        Assert.Empty(fittings);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe);
+        Assert.Empty(result.Fittings);
     }
 
     [Fact]
@@ -180,11 +180,11 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(5, 0));
         pipe.Points.Add(new Point(5, 5));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe);
-        Assert.Single(fittings);
-        Assert.Equal(FittingType.Elbow90, fittings[0].FittingType);
-        Assert.Equal(0.75, fittings[0].FittingDiameterIn);
-        Assert.Equal("PVC", fittings[0].FittingMaterial);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe);
+        Assert.Single(result.Fittings);
+        Assert.Equal(FittingType.Elbow90, result.Fittings[0].FittingType);
+        Assert.Equal(0.75, result.Fittings[0].FittingDiameterIn);
+        Assert.Equal("PVC", result.Fittings[0].FittingMaterial);
     }
 
     [Fact]
@@ -194,9 +194,9 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(0, 0));
         pipe.Points.Add(new Point(5, 0));
         pipe.Points.Add(new Point(8.535, 3.535)); // ~135° interior at the middle point
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe);
-        Assert.Single(fittings);
-        Assert.Equal(FittingType.Elbow45, fittings[0].FittingType);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe);
+        Assert.Single(result.Fittings);
+        Assert.Equal(FittingType.Elbow45, result.Fittings[0].FittingType);
     }
 
     [Fact]
@@ -207,8 +207,8 @@ public sealed class IrrigationFittingTests
         notPipe.Points.Add(new Point(5, 0));
         notPipe.Points.Add(new Point(5, 5));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(notPipe);
-        Assert.Empty(fittings);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(notPipe);
+        Assert.Empty(result.Fittings);
     }
 
     [Fact]
@@ -220,9 +220,9 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(5, 5));
         pipe.Points.Add(new Point(10, 5));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe);
-        Assert.Equal(2, fittings.Count);
-        Assert.All(fittings, f => Assert.Equal(FittingType.Elbow90, f.FittingType));
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe);
+        Assert.Equal(2, result.Fittings.Count);
+        Assert.All(result.Fittings, f => Assert.Equal(FittingType.Elbow90, f.FittingType));
     }
 
     [Fact]
@@ -236,9 +236,9 @@ public sealed class IrrigationFittingTests
         branch.Points.Add(new Point(5, 0)); // junction at pipe's endpoint
         branch.Points.Add(new Point(5, 5));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, otherShapes: new[] { branch });
-        Assert.Single(fittings);
-        Assert.Equal(FittingType.Tee, fittings[0].FittingType);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe, otherShapes: new[] { branch });
+        Assert.Single(result.Fittings);
+        Assert.Equal(FittingType.Tee, result.Fittings[0].FittingType);
     }
 
     [Fact]
@@ -253,9 +253,9 @@ public sealed class IrrigationFittingTests
         branch.Points.Add(new Point(5, 0)); // shares the interior vertex
         branch.Points.Add(new Point(10, 0));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, otherShapes: new[] { branch });
-        Assert.Single(fittings);
-        Assert.Equal(FittingType.Tee, fittings[0].FittingType);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe, otherShapes: new[] { branch });
+        Assert.Single(result.Fittings);
+        Assert.Equal(FittingType.Tee, result.Fittings[0].FittingType);
     }
 
     [Fact]
@@ -265,13 +265,13 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(0, 0));
         pipe.Points.Add(new Point(50, 0)); // 50 ft straight run
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
 
         // 50 / 20 = 2.5 → 2 couplings (at 20 ft and 40 ft); the last partial stick has no coupling.
-        Assert.Equal(2, fittings.Count);
-        Assert.All(fittings, f => Assert.Equal(FittingType.Coupling, f.FittingType));
-        Assert.Equal(20, fittings[0].X + (fittings[0].W / 2), 2);
-        Assert.Equal(40, fittings[1].X + (fittings[1].W / 2), 2);
+        Assert.Equal(2, result.Fittings.Count);
+        Assert.All(result.Fittings, f => Assert.Equal(FittingType.Coupling, f.FittingType));
+        Assert.Equal(20, result.Fittings[0].X + (result.Fittings[0].W / 2), 2);
+        Assert.Equal(40, result.Fittings[1].X + (result.Fittings[1].W / 2), 2);
     }
 
     [Fact]
@@ -281,8 +281,8 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(0, 0));
         pipe.Points.Add(new Point(100, 0));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: null);
-        Assert.Empty(fittings);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: null);
+        Assert.Empty(result.Fittings);
     }
 
     [Fact]
@@ -292,8 +292,8 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(0, 0));
         pipe.Points.Add(new Point(15, 0));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
-        Assert.Empty(fittings);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+        Assert.Empty(result.Fittings);
     }
 
     [Fact]
@@ -310,16 +310,16 @@ public sealed class IrrigationFittingTests
         branch.Points.Add(new Point(0, 10)); // junction at last point of pipe
         branch.Points.Add(new Point(-5, 10));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, otherShapes: new[] { branch }, stockLengthFt: 8.0);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe, otherShapes: new[] { branch }, stockLengthFt: 8.0);
 
         // Expect: 2 elbows at interior vertices, 1 tee at the end junction, and
         // 3 couplings driven by the cumulative-path stock accounting (#170):
         //   totalRun = 30 ft, stockLen = 8, couplings = ceil(30/8) − 1 = 3.
         // Layout: vertex 0 (no fitting; not junction), vertex 1 elbow90, vertex 2 elbow90,
         // vertex 3 tee (junction). Couplings land at cumulative 8 ft, 16 ft, 24 ft.
-        int tees = fittings.Count(f => f.FittingType == FittingType.Tee);
-        int elbows = fittings.Count(f => f.FittingType is FittingType.Elbow90 or FittingType.Elbow45);
-        int couplings = fittings.Count(f => f.FittingType == FittingType.Coupling);
+        int tees = result.Fittings.Count(f => f.FittingType == FittingType.Tee);
+        int elbows = result.Fittings.Count(f => f.FittingType is FittingType.Elbow90 or FittingType.Elbow45);
+        int couplings = result.Fittings.Count(f => f.FittingType == FittingType.Coupling);
         Assert.Equal(1, tees);
         Assert.Equal(2, elbows);
         Assert.Equal(3, couplings);
@@ -339,11 +339,11 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(24, 0));
         pipe.Points.Add(new Point(36, 0));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
 
         // Cumulative: 1 coupling at 20 ft. Plus 2 straight-line "elbows" at the colinear
         // interior vertices — those are exempt (interior angle 180°). So expect 1 fitting total.
-        var couplings = fittings.Where(f => f.FittingType == FittingType.Coupling).ToList();
+        var couplings = result.Fittings.Where(f => f.FittingType == FittingType.Coupling).ToList();
         Assert.Single(couplings);
         Assert.Equal(20.0, couplings[0].X + (couplings[0].W / 2), 2);
         Assert.Equal(0.0, couplings[0].Y + (couplings[0].H / 2), 2);
@@ -365,9 +365,9 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(0, 0));
         pipe.Points.Add(new Point(totalRunFt, 0));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
 
-        int couplings = fittings.Count(f => f.FittingType == FittingType.Coupling);
+        int couplings = result.Fittings.Count(f => f.FittingType == FittingType.Coupling);
         Assert.Equal(expectedCouplings, couplings);
 
         // The contract: coupling count == ComputeStockUsage.StockUnits − 1 always.
@@ -389,8 +389,8 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(45, 0));
         pipe.Points.Add(new Point(60, 0));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
-        var couplings = fittings.Where(f => f.FittingType == FittingType.Coupling).ToList();
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+        var couplings = result.Fittings.Where(f => f.FittingType == FittingType.Coupling).ToList();
 
         Assert.Equal(2, couplings.Count);
         // Coupling 1 at cumulative 20 ft → falls in segment 2 (15..30), at (15 + 5, 0) = (20, 0).
@@ -410,8 +410,8 @@ public sealed class IrrigationFittingTests
         pipe.Points.Add(new Point(15, 0)); // zero-length segment
         pipe.Points.Add(new Point(30, 0));
 
-        var fittings = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
-        int couplings = fittings.Count(f => f.FittingType == FittingType.Coupling);
+        var result = FittingPlacement.BuildAutoFittingsForPipe(pipe, stockLengthFt: 20.0);
+        int couplings = result.Fittings.Count(f => f.FittingType == FittingType.Coupling);
 
         Assert.Equal(1, couplings);
     }

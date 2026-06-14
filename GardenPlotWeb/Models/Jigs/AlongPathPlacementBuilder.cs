@@ -1,4 +1,4 @@
-﻿// <copyright file="AlongPathPlacementBuilder.cs" company="Garden Plot">
+// <copyright file="AlongPathPlacementBuilder.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -78,19 +78,19 @@ public static class AlongPathPlacementBuilder
                             // internally; we still gate here to avoid the call for
                             // wire / edge rows.
                             double? stockLengthFt = row.Item.StockLengthFt;
-                            var autoFittings = FittingPlacement.BuildAutoFittingsForPipe(
+                            var result = FittingPlacement.BuildAutoFittingsForPipe(
                                 polylineStripe,
                                 otherShapes: null,
                                 stockLengthFt: stockLengthFt);
                             if (!request.AssignNewIds)
                             {
-                                foreach (Shape fitting in autoFittings)
+                                foreach (Shape fitting in result.Fittings)
                                 {
                                     fitting.Id = System.Guid.Empty;
                                 }
                             }
 
-                            stripeShapes.AddRange(autoFittings);
+                            stripeShapes.AddRange(result.Fittings);
                         }
                     }
                 }
