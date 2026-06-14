@@ -1,4 +1,4 @@
-﻿// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
+// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -332,8 +332,11 @@ public partial class GardenPlot
         {
             return rows;
         }
-
-        return rows.Where(r => TakeoffCategoryClassifier.Classify(r.Kind) == filter).ToList();
+        return rows.Where(r =>
+        {
+            var itemRef = new CatalogItemRef(r.CatalogSource, r.CatalogPackId, r.CatalogCode);
+            return TakeoffCategoryClassifier.Classify(itemRef, r.Kind, Catalog) == filter;
+        }).ToList();
     }
 
     private void SetTakeoffCategoryFilter(TakeoffCategory? category)
