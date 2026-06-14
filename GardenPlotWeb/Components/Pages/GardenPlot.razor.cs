@@ -10431,7 +10431,20 @@ public partial class GardenPlot
                     drafting,
                     otherShapes: currentPlot.Shapes,
                     stockLengthFt: stockLengthFt);
-                foreach (Shape fitting in result.Fittings){currentPlot.Shapes.Add(fitting);}foreach (var injection in result.VertexInjections){var targetPipe=currentPlot.Shapes.FirstOrDefault(s=>s.Id==injection.PipeId);if(targetPipe?.Points is not null && injection.SegmentIndex>=0 && injection.SegmentIndex<targetPipe.Points.Count-1){targetPipe.Points.Insert(injection.SegmentIndex+1,injection.InsertedVertex);}}
+                foreach (Shape fitting in result.Fittings)
+                {
+                    currentPlot.Shapes.Add(fitting);
+                }
+                foreach (var injection in result.VertexInjections)
+                {
+                    var targetPipe = currentPlot.Shapes.FirstOrDefault(s => s.Id == injection.PipeId);
+                    if (targetPipe?.Points is not null && 
+                        injection.SegmentIndex >= 0 && 
+                        injection.SegmentIndex < targetPipe.Points.Count - 1)
+                    {
+                        targetPipe.Points.Insert(injection.SegmentIndex + 1, injection.InsertedVertex);
+                    }
+                }
             }
 
             // Issue #138 — if a drawing set is active AND it has PaintAsDrawn=true, run
