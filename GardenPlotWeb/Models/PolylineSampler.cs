@@ -74,11 +74,20 @@ public static class PolylineSampler
         return SampleAtDistance(segments, arcLengthFt);
     }
 
+    /// <summary>
+    /// Samples points along a polyline at regular intervals with optional perpendicular offset.
+    /// </summary>
+    /// <param name="points">The polyline vertices.</param>
+    /// <param name="spacingFt">The spacing between samples in feet.</param>
+    /// <param name="anchor">How to anchor the first sample on the path.</param>
+    /// <param name="offsetFt">Optional perpendicular offset in feet from the path centerline.</param>
+    /// <param name="alignToTangent">Whether to compute tangent angles at each sample point.</param>
+    /// <returns>A list of sample positions and tangent angles (in degrees).</returns>
     public static IReadOnlyList<(Point Pos, double AngleDeg)> SamplePoints(
         IReadOnlyList<Point> points,
         double spacingFt,
         AlongPathAnchor anchor,
-        double? offsetIn,
+        double? offsetFt,
         bool alignToTangent)
     {
         if (points is null || points.Count == 0 || spacingFt <= 0)
@@ -109,20 +118,20 @@ public static class PolylineSampler
             _ => 0,
         };
 
-        var offsetFt = (offsetIn ?? 0) / 12.0;
+        var offsetFtLocal = offsetFt ?? 0;
         var samples = new List<(Point Pos, double AngleDeg)>(count);
         for (var i = 0; i < count; i++)
         {
             var distanceFt = Math.Min(totalLengthFt, startDistanceFt + (i * spacingFt));
             var (position, tangent) = SampleAtDistance(segments, distanceFt);
-            if (Math.Abs(offsetFt) > double.Epsilon)
+            if (Math.Abs(offsetFtLocal) > double.Epsilon)
             {
                 var tangentLength = Math.Sqrt((tangent.X * tangent.X) + (tangent.Y * tangent.Y));
                 if (tangentLength > 0)
                 {
                     position = new Point(
-                        position.X + ((-tangent.Y / tangentLength) * offsetFt),
-                        position.Y + ((tangent.X / tangentLength) * offsetFt));
+                        position.X + ((-tangent.Y / tangentLength) * offsetFtLocal),
+                        position.Y + ((tangent.X / tangentLength) * offsetFtLocal));
                 }
             }
 

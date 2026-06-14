@@ -37,7 +37,7 @@ public sealed class PolylineSamplerTests
     {
         var points = new List<Point> { new(0, 0), new(10, 0) };
 
-        var samples = PolylineSampler.SamplePoints(points, 4, AlongPathAnchor.Start, offsetIn: null, alignToTangent: true);
+        var samples = PolylineSampler.SamplePoints(points, 4, AlongPathAnchor.Start, offsetFt: null, alignToTangent: true);
 
         Assert.Collection(
             samples,
@@ -58,7 +58,7 @@ public sealed class PolylineSamplerTests
     {
         var points = new List<Point> { new(0, 0), new(10, 0) };
 
-        var samples = PolylineSampler.SamplePoints(points, 4, anchor, offsetIn: null, alignToTangent: true);
+        var samples = PolylineSampler.SamplePoints(points, 4, anchor, offsetFt: null, alignToTangent: true);
 
         Assert.Equal(expectedFirstX, samples[0].Pos.X, 6);
     }
@@ -68,7 +68,7 @@ public sealed class PolylineSamplerTests
     {
         var points = new List<Point> { new(0, 0), new(6, 0), new(6, 6) };
 
-        var samples = PolylineSampler.SamplePoints(points, 3, AlongPathAnchor.Start, offsetIn: 12, alignToTangent: true);
+        var samples = PolylineSampler.SamplePoints(points, 3, AlongPathAnchor.Start, offsetFt: 1, alignToTangent: true);
 
         Assert.Collection(
             samples,

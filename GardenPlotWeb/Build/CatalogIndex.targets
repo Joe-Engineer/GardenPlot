@@ -1,0 +1,111 @@
+<!--
+  CatalogIndex.targets
+  Auto-generates wwwroot/data/catalog/assemblies/_index.json to list all
+  *.json files in that directory (excluding _index.json itself). This solves
+  the manual-manifest problem tracked in #103: WebAssembly cannot enumerate
+  wwwroot at runtime, so the catalog service needs a manifest to discover
+  assembly packs.
+
+  Behavior:
+    - Runs after BeforeBuild (so it runs on every regular build).
+    - Also runs before PrepareForPublish (so publish picks up the manifest).
+    - If the current _index.json matches the discovered *.json files,
+      the target is a no-op (no spurious dirty git state).
+    - File list is sorted deterministically for reproducibility.
+-->
+<Project>
+
+  <UsingTask
+    TaskName="RegenerateCatalogIndex"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <AssembliesDirectory ParameterType="System.String" Required="true" />
+      <IndexFilePath ParameterType="System.String" Required="true" />
+      <FilesWritten ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Text" />
+      <Using Namespace="System.Text.Json" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+          if (!Directory.Exists(AssembliesDirectory))
+          {
+              Log.LogWarning("Catalog index: assemblies directory '{0}' not found; nothing to index.", AssembliesDirectory);
+              return true;
+          }
+
+          // Enumerate all *.json files, sorted, excluding _index.json itself.
+          string indexFileName = Path.GetFileName(IndexFilePath);
+          string[] jsonFiles = Directory.GetFiles(AssembliesDirectory, "*.json")
+              .Select(Path.GetFileName)
+              .Where(name => name != indexFileName)
+              .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+              .ToArray();
+
+          // Build the JSON content with a comment header.
+          var jsonObj = new
+          {
+              comment = "Auto-generated manifest of catalog assembly packs. Do not edit by hand; regenerated at build by Build/CatalogIndex.targets.",
+              files = jsonFiles
+          };
+
+          var options = new JsonSerializerOptions
+          {
+              WriteIndented = true
+          };
+
+          string newJson = JsonSerializer.Serialize(jsonObj, options) + "\n";
+
+          // If the file already exists and matches, skip the write to avoid spurious dirty state.
+          bool needsUpdate = true;
+          if (File.Exists(IndexFilePath))
+          {
+              string existingJson = File.ReadAllText(IndexFilePath, Encoding.UTF8);
+              if (existingJson == newJson)
+              {
+                  needsUpdate = false;
+                  Log.LogMessage(MessageImportance.Low,
+                      "Catalog index: '{0}' is up-to-date (lists {1} assembly pack(s)).",
+                      IndexFilePath, jsonFiles.Length);
+              }
+          }
+
+          if (needsUpdate)
+          {
+              File.WriteAllText(IndexFilePath, newJson, Encoding.UTF8);
+              Log.LogMessage(MessageImportance.High,
+                  "Catalog index: regenerated '{0}' with {1} assembly pack(s).",
+                  IndexFilePath, jsonFiles.Length);
+              FilesWritten = new[] { new Microsoft.Build.Utilities.TaskItem(IndexFilePath) };
+          }
+          else
+          {
+              FilesWritten = new Microsoft.Build.Framework.ITaskItem[0];
+          }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <!--
+    GenerateCatalogIndex: rewrites _index.json after BeforeBuild (so it runs
+    on every build, dev or publish) and before PrepareForPublish (so publish
+    picks up the fresh manifest).
+  -->
+  <Target
+    Name="GenerateCatalogIndex"
+    BeforeTargets="PrepareForPublish"
+    AfterTargets="BeforeBuild">
+
+    <RegenerateCatalogIndex
+      AssembliesDirectory="$(MSBuildProjectDirectory)\wwwroot\data\catalog\assemblies"
+      IndexFilePath="$(MSBuildProjectDirectory)\wwwroot\data\catalog\assemblies\_index.json">
+      <Output TaskParameter="FilesWritten" ItemName="FileWrites" />
+    </RegenerateCatalogIndex>
+
+  </Target>
+
+</Project>

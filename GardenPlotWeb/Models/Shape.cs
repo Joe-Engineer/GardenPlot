@@ -272,6 +272,8 @@ public class DropGroup
     public bool AutoShiftOnRotate { get; set; }
     public Guid? SourcePathShapeId { get; set; }
     public double? SpacingFtOverride { get; set; }
+
+    /// <summary>Perpendicular offset in feet from the path centerline. Positive offsets shift to the left of the path direction.</summary>
     public double? OffsetIn { get; set; }
     public AlongPathAnchor Anchor { get; set; } = AlongPathAnchor.Start;
     public bool AlignToTangent { get; set; } = true;

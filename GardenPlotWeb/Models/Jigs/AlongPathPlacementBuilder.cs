@@ -156,7 +156,7 @@ public static class AlongPathPlacementBuilder
                 AlignToTangent = true,
                 CenterSpacingYFt = stampRowsResolved[i].Item.HeightFt,
                 CenterSpacingXFt = stampRowsResolved[i].Spec.WidthFt + stampRowsResolved[i].Spec.GapFt,
-                OffsetIn = stampRowsResolved[i].Spec.OffsetFt * 12.0,
+                OffsetIn = stampRowsResolved[i].Spec.OffsetFt,
             };
         }
 

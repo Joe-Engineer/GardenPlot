@@ -2717,18 +2717,41 @@ else
                                     }
                                 }
                             </tbody>
-                            @if (isInternalView && labor.Count > 0)
+                            @if (isInternalView)
                             {
                                 <tfoot>
-                                    <tr>
-                                        <td colspan="@(itemInternalColumnCount - 1)" class="text-end text-muted small">Total labor hours</td>
-                                        <td>
-                                            @foreach (var (Type, Hours) in labor)
-                                            {
-                                                <span class="badge text-bg-light text-dark me-1">@Type: @Hours.ToString("0.##", CultureInfo.InvariantCulture) h</span>
-                                            }
-                                        </td>
+                                    <tr class="table-secondary fw-semibold">
+                                        <td colspan="9" class="text-end">@(selectedTakeoffCategory is null ? "Totals" : $"{TakeoffCategoryClassifier.Label(selectedTakeoffCategory.Value)} totals")</td>
+                                        @if (showMaterialCost)
+                                        {
+                                            <td class="text-end">@TakeoffMath.FormatCurrency(TakeoffMath.SumCurrency(itemRows.Select(row => row.MaterialCost)))</td>
+                                        }
+                                        @if (showLaborCost)
+                                        {
+                                            <td class="text-end">@TakeoffMath.FormatCurrency(TakeoffMath.SumCurrency(itemRows.Select(row => (decimal?)row.LaborCost)))</td>
+                                        }
+                                        @if (showMarkupPercent)
+                                        {
+                                            <td></td>
+                                        }
+                                        @if (showLineTotal)
+                                        {
+                                            <td class="text-end">@TakeoffMath.FormatCurrency(TakeoffMath.SumCurrency(itemRows.Select(row => row.LineTotal)))</td>
+                                        }
+                                        <td class="text-center text-muted small">@itemRows.Count</td>
                                     </tr>
+                                    @if (labor.Count > 0)
+                                    {
+                                        <tr>
+                                            <td colspan="@(itemInternalColumnCount - 1)" class="text-end text-muted small">Total labor hours</td>
+                                            <td>
+                                                @foreach (var (Type, Hours) in labor)
+                                                {
+                                                    <span class="badge text-bg-light text-dark me-1">@Type: @Hours.ToString("0.##", CultureInfo.InvariantCulture) h</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
                                 </tfoot>
                             }
                         </table>
@@ -4002,8 +4025,8 @@ else
                         <label>Spacing (ft)</label>
                         <input type="number" min="0.1" max="200" step="0.1" value="@groupSpacingOverrideValue" placeholder="@F(groupCenterSpacingX)" @onchange="OnAlongPathSpacingOverrideChanged" />
 
-                        <label>Offset (in)</label>
-                        <input type="number" min="-240" max="240" step="0.5" value="@groupOffsetValue" @onchange="OnAlongPathOffsetChanged" />
+                        <label>Offset (ft)</label>
+                        <input type="number" min="-20" max="20" step="0.5" value="@groupOffsetValue" @onchange="OnAlongPathOffsetChanged" />
 
                         <label>Anchor</label>
                         <select @onchange="OnAlongPathAnchorChanged" value="@selectedDropGroup.Anchor">

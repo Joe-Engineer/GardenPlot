@@ -12704,9 +12704,9 @@ public partial class GardenPlot
             return;
         }
 
-        if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var offsetIn))
+        if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var offsetFt))
         {
-            group.OffsetIn = Math.Clamp(offsetIn, -240, 240);
+            group.OffsetIn = Math.Clamp(offsetFt, -20, 20);
             await ReflowDropGroup(group);
         }
     }
