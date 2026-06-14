@@ -82,4 +82,24 @@ public interface IPlotRepository
 
     /// <summary>Removes a plot's viewport snapshot. No-op when missing.</summary>
     Task DeleteViewportAsync(Guid plotId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Loads the panel-position snapshot for the specified plot. Returns <c>null</c> if no
+    /// panel layout exists (first run or legacy library import). Failures return <c>null</c>
+    /// so the UI can fall back to default panel positions.
+    /// </summary>
+    Task<PlotPanelLayout?> LoadPanelLayoutAsync(Guid plotId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Persists ONLY the panel-position snapshot for the specified plot. Called on the panel-drag
+    /// hot path where the user has not changed any plot content. Failures are swallowed: panel
+    /// layout isn't user data, and panel drag should never surface IDB write errors.
+    /// </summary>
+    Task SavePanelLayoutAsync(Guid plotId, PlotPanelLayout layout, CancellationToken ct = default);
+
+    /// <summary>
+    /// Removes the panel-position snapshot for the specified plot. Called during plot deletion
+    /// to clean up orphan storage keys.
+    /// </summary>
+    Task DeletePanelLayoutAsync(Guid plotId, CancellationToken ct = default);
 }

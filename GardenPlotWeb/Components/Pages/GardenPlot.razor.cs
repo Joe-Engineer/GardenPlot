@@ -4669,6 +4669,42 @@ public partial class GardenPlot
         }
     }
 
+    /// <summary>
+    /// Persists ONLY the active plot's panel-position snapshot. Called on the panel-drag hot
+    /// path where the user has not changed any plot content: rewriting the plot body, reconciling
+    /// takeoff, or touching the index would be wasted work. Failures are swallowed: panel layout
+    /// isn't user data, and the panel-drag UX should never surface IDB write errors.
+    /// </summary>
+    /// <remarks>
+    /// Pairs with <see cref="GardenPlotWeb.Models.PlotPanelLayout"/> and
+    /// <see cref="GardenPlotWeb.Services.Persistence.IndexedDbPlotRepository.PanelKey(Guid)"/>.
+    /// Item-change commits go through <see cref="SaveAsync"/> instead, which writes the plot
+    /// body (and the body carries the live panel positions for export round-trips).
+    /// </remarks>
+    private async Task SavePanelLayoutAsync()
+    {
+        if (isDisposingOrDisposed || currentPlot is null)
+        {
+            return;
+        }
+
+        try
+        {
+            PlotPanelLayout panelLayout = PlotPanelLayout.FromPlot(currentPlot);
+            await PlotRepository.SavePanelLayoutAsync(currentPlot.Id, panelLayout);
+        }
+        catch (Microsoft.JSInterop.JSDisconnectedException)
+        {
+        }
+        catch (TaskCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "[{Sid}] SavePanelLayoutAsync swallowed error (panel layout is not user data).", SessionTraceId);
+        }
+    }
+
     private async Task SaveAsync()
     {
         if (isDisposingOrDisposed)
@@ -13870,7 +13906,7 @@ public partial class GardenPlot
     {
         if (draggingPanel is null) return;
         draggingPanel = null;
-        await SaveAsync();
+        await SavePanelLayoutAsync();
     }
 
     private async Task ToggleTakeoffPanel()

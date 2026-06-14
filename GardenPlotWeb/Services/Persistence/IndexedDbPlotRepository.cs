@@ -51,6 +51,13 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
     public const string ViewportKeyPrefix = "viewport/";
 
     /// <summary>
+    /// Storage-key prefix for per-plot panel-position snapshots. Full key is
+    /// <c>panels/{guid:N}</c>. Lives separately from the plot body so panel-drag events
+    /// don't have to rewrite the plot's shapes, takeoff, or drop groups.
+    /// </summary>
+    public const string PanelKeyPrefix = "panels/";
+
+    /// <summary>
     /// Legacy storage key for the single-blob library document. Read only during migration;
     /// removed once the split layout is in place.
     /// </summary>
@@ -89,6 +96,9 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
 
     /// <summary>Builds the per-plot viewport storage key for the given id.</summary>
     public static string ViewportKey(Guid id) => ViewportKeyPrefix + id.ToString("N");
+
+    /// <summary>Builds the per-plot panel-layout storage key for the given id.</summary>
+    public static string PanelKey(Guid id) => PanelKeyPrefix + id.ToString("N");
 
     /// <inheritdoc/>
     public async Task<PlotLibraryIndex?> LoadIndexAsync(CancellationToken ct = default)
@@ -207,6 +217,7 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
         {
             HashSet<string> referencedPlotKeys = new(StringComparer.Ordinal);
             HashSet<string> referencedViewportKeys = new(StringComparer.Ordinal);
+            HashSet<string> referencedPanelKeys = new(StringComparer.Ordinal);
             foreach (PlotData plot in library.Plots)
             {
                 string plotJson = JsonSerializer.Serialize(plot, JsonOptions);
@@ -224,12 +235,18 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
                 PlotViewportState viewport = PlotViewportState.FromPlot(plot);
                 await SaveViewportAsync(plot.Id, viewport, ct).ConfigureAwait(false);
                 referencedViewportKeys.Add(ViewportKey(plot.Id));
+
+                // Orthogonal storage: panel positions live in panels/{id}, written even on
+                // full-library saves so import/legacy-migration round-trips preserve them.
+                PlotPanelLayout panelLayout = PlotPanelLayout.FromPlot(plot);
+                await SavePanelLayoutAsync(plot.Id, panelLayout, ct).ConfigureAwait(false);
+                referencedPanelKeys.Add(PanelKey(plot.Id));
             }
 
             PlotLibraryIndex index = IndexFromLibrary(library);
             await SaveIndexAsync(index, ct).ConfigureAwait(false);
 
-            // Prune orphan plot + viewport documents no longer referenced by the index.
+            // Prune orphan plot + viewport + panel documents no longer referenced by the index.
             IReadOnlyList<string> allKeys = await storage.KeysAsync(ct).ConfigureAwait(false);
             foreach (string key in allKeys)
             {
@@ -238,6 +255,10 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
                     await storage.RemoveAsync(key, ct).ConfigureAwait(false);
                 }
                 else if (key.StartsWith(ViewportKeyPrefix, StringComparison.Ordinal) && !referencedViewportKeys.Contains(key))
+                {
+                    await storage.RemoveAsync(key, ct).ConfigureAwait(false);
+                }
+                else if (key.StartsWith(PanelKeyPrefix, StringComparison.Ordinal) && !referencedPanelKeys.Contains(key))
                 {
                     await storage.RemoveAsync(key, ct).ConfigureAwait(false);
                 }
@@ -271,6 +292,9 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
             {
                 PlotViewportState? viewport = await LoadViewportAsync(id, ct).ConfigureAwait(false);
                 viewport?.ApplyTo(plot);
+
+                PlotPanelLayout? panelLayout = await LoadPanelLayoutAsync(id, ct).ConfigureAwait(false);
+                panelLayout?.ApplyTo(plot);
             }
 
             RecordOp("load-plot", plot is null ? "parse-fail" : "ok", sw);
@@ -331,6 +355,7 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
         {
             await storage.RemoveAsync(PlotKey(id), ct).ConfigureAwait(false);
             await storage.RemoveAsync(ViewportKey(id), ct).ConfigureAwait(false);
+            await storage.RemoveAsync(PanelKey(id), ct).ConfigureAwait(false);
             PlotLibraryIndex? index = await LoadIndexAsync(ct).ConfigureAwait(false);
             if (index is not null)
             {
@@ -434,6 +459,77 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
             }
 
             RecordOp("delete-viewport", "error", sw);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<PlotPanelLayout?> LoadPanelLayoutAsync(Guid plotId, CancellationToken ct = default)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+        try
+        {
+            string? json = await storage.GetStringAsync(PanelKey(plotId), ct).ConfigureAwait(false);
+            if (string.IsNullOrEmpty(json))
+            {
+                RecordOp("load-panel-layout", "empty", sw);
+                return null;
+            }
+
+            PlotPanelLayout? layout = JsonSerializer.Deserialize<PlotPanelLayout>(json, JsonOptions);
+            RecordOp("load-panel-layout", layout is null ? "parse-fail" : "ok", sw);
+            return layout;
+        }
+        catch (Exception ex)
+        {
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(ex, "Failed to load panel layout for plot {PlotId} from IndexedDB.", plotId);
+            }
+
+            RecordOp("load-panel-layout", "error", sw);
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task SavePanelLayoutAsync(Guid plotId, PlotPanelLayout layout, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+        Stopwatch sw = Stopwatch.StartNew();
+        try
+        {
+            string json = JsonSerializer.Serialize(layout, JsonOptions);
+            bool ok = await storage.PutStringAsync(PanelKey(plotId), json, ct).ConfigureAwait(false);
+            RecordOp("save-panel-layout", ok ? "ok" : "fail", sw);
+        }
+        catch (Exception ex)
+        {
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(ex, "Failed to save panel layout for plot {PlotId} to IndexedDB.", plotId);
+            }
+
+            RecordOp("save-panel-layout", "error", sw);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task DeletePanelLayoutAsync(Guid plotId, CancellationToken ct = default)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+        try
+        {
+            await storage.RemoveAsync(PanelKey(plotId), ct).ConfigureAwait(false);
+            RecordOp("delete-panel-layout", "ok", sw);
+        }
+        catch (Exception ex)
+        {
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(ex, "Failed to delete panel layout for plot {PlotId} from IndexedDB.", plotId);
+            }
+
+            RecordOp("delete-panel-layout", "error", sw);
         }
     }
 
