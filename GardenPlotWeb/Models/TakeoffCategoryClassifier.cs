@@ -16,6 +16,23 @@ namespace GardenPlotWeb.Models;
 public static class TakeoffCategoryClassifier
 {
     /// <summary>
+    /// Returns the customer-facing category for a catalog item and its Kind label.
+    /// Issue #201: Prefers <paramref name="catalogItem"/>.<see cref="CatalogItem.CategoryOverride"/>
+    /// when set; otherwise falls through to string classification on <paramref name="kindLabel"/>.
+    /// </summary>
+    /// <param name="catalogItem">The catalog item (may be <see langword="null"/> for virtual/unbound items).</param>
+    /// <param name="kindLabel">The row's Kind label (e.g. "Tree", "Irrigation Pipe", "Aggregate").</param>
+    public static TakeoffCategory Classify(CatalogItem? catalogItem, string? kindLabel)
+    {
+        if (catalogItem?.CategoryOverride is { } explicitCategory)
+        {
+            return explicitCategory;
+        }
+
+        return Classify(kindLabel);
+    }
+
+    /// <summary>
     /// Returns the customer-facing category for the supplied Takeoff row Kind label.
     /// Unknown labels fall through to <see cref="TakeoffCategory.Other"/>.
     /// </summary>

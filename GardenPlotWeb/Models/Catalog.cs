@@ -73,6 +73,14 @@ public sealed class CatalogItem
     public string? BagSize { get; set; }
 
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// Issue #201: Optional takeoff-category override. When set, this explicit
+    /// category is used instead of classifying from the <see cref="Kind"/> label.
+    /// Allows custom catalog items with ambiguous labels to appear in the correct
+    /// takeoff filter pill (e.g., "Bamboo border" gets Hardscape instead of Other).
+    /// </summary>
+    public TakeoffCategory? CategoryOverride { get; set; }
 }
 
 /// <summary>
