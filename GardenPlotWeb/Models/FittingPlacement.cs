@@ -1,4 +1,4 @@
-﻿// <copyright file="FittingPlacement.cs" company="Garden Plot">
+// <copyright file="FittingPlacement.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -11,6 +11,20 @@ namespace GardenPlotWeb.Models;
 /// </summary>
 public static class FittingPlacement
 {
+    /// <summary>
+    /// Issue #171 — encapsulates a vertex-injection operation into an existing pipe
+    /// shape when a point-on-segment T-junction is detected.
+    /// </summary>
+    public sealed record PipeVertexInjection(Guid PipeId, int SegmentIndex, Point InsertedVertex);
+
+    /// <summary>
+    /// Issue #171 — result of BuildAutoFittingsForPipe, including both new fittings
+    /// and any vertex-injection operations that must be applied to other pipes.
+    /// </summary>
+    public sealed record AutoFittingResult(
+        List<Shape> Fittings,
+        List<PipeVertexInjection> VertexInjections);
+
     /// <summary>
     /// Interior angle threshold (degrees) at or above which a vertex is "effectively straight"
     /// and gets no fitting. Below this the vertex turns visibly and gets at least a 45° elbow.
@@ -85,10 +99,12 @@ public static class FittingPlacement
     /// <param name="stockLengthFt">Per-stock pipe length in feet (PVC ~20 ft, Poly 100 ft, etc.).
     /// Pass null to skip coupling placement.</param>
     /// <returns>List of new fitting shapes (elbows / tees / couplings) ready to add to the plot.</returns>
-    public static List<Shape> BuildAutoFittingsForPipe(Shape pipe, IEnumerable<Shape>? otherShapes = null, double? stockLengthFt = null)
+    public static AutoFittingResult BuildAutoFittingsForPipe(Shape pipe, IEnumerable<Shape>? otherShapes = null, double? stockLengthFt = null)
     {
         ArgumentNullException.ThrowIfNull(pipe);
 
+        var fittings = new List<Shape>();
+        var vertexInjections = new List<PipeVertexInjection>();
         var fittings = new List<Shape>();
         if (pipe.Kind != ShapeKind.IrrigationPipe || pipe.Points is null || pipe.Points.Count < 2)
         {
@@ -114,7 +130,12 @@ public static class FittingPlacement
         for (int i = 0; i < pipe.Points.Count; i++)
         {
             bool isEndpoint = i == 0 || i == pipe.Points.Count - 1;
-            bool isJunction = IsJunctionVertex(pipe.Points[i], otherList);
+            var junctionInfo = DetectJunction(pipe.Points[i], otherList);
+            bool isJunction = junctionInfo.IsJunction;
+            if (junctionInfo.VertexInjection is not null)
+            {
+                vertexInjections.Add(junctionInfo.VertexInjection);
+            }
 
             FittingType? type = null;
             if (isJunction)
@@ -189,7 +210,7 @@ public static class FittingPlacement
             }
         }
 
-        return fittings;
+        return new AutoFittingResult(fittings, vertexInjections);
     }
 
     /// <summary>
@@ -197,7 +218,7 @@ public static class FittingPlacement
     /// elbow-only entry point; the new <see cref="BuildAutoFittingsForPipe"/> is a superset.
     /// </summary>
     [Obsolete("Prefer BuildAutoFittingsForPipe(pipe, otherShapes, stockLengthFt) for full fitting coverage.")]
-    public static List<Shape> BuildAutoElbowsForPipe(Shape pipe)
+    public static AutoFittingResult BuildAutoElbowsForPipe(Shape pipe)
     {
         return BuildAutoFittingsForPipe(pipe, otherShapes: null, stockLengthFt: null);
     }
@@ -224,9 +245,10 @@ public static class FittingPlacement
     /// <summary>
     /// Issue #162b — returns true when at least one OTHER pipe shape has a vertex
     /// (endpoint or interior) within <see cref="JointToleranceFt"/> of the given point.
-    /// Used to upgrade an elbow → tee at multi-way junctions.
+    /// Issue #171 — also checks for point-on-segment T-junctions and returns vertex
+    /// injection info when the point lies within tolerance of a segment on another pipe.
     /// </summary>
-    private static bool IsJunctionVertex(Point at, IReadOnlyList<Shape> otherShapes)
+    private static (bool IsJunction, PipeVertexInjection? VertexInjection) DetectJunction(Point at, IReadOnlyList<Shape> otherShapes)
     {
         double tol2 = JointToleranceFt * JointToleranceFt;
         foreach (Shape other in otherShapes)
@@ -235,6 +257,77 @@ public static class FittingPlacement
             {
                 continue;
             }
+
+            // First check vertex-to-vertex coincidence.
+            foreach (Point p in other.Points)
+            {
+                double dx = p.X - at.X;
+                double dy = p.Y - at.Y;
+                if ((dx * dx) + (dy * dy) <= tol2)
+                {
+                    return (true, null);
+                }
+            }
+
+            // Issue #171 — check point-on-segment for each segment of the other pipe.
+            for (int i = 0; i < other.Points.Count - 1; i++)
+            {
+                Point a = other.Points[i];
+                Point b = other.Points[i + 1];
+                if (IsPointOnSegment(at, a, b, JointToleranceFt))
+                {
+                    // Project the point onto the segment to get the exact insertion position.
+                    Point projected = ProjectPointOntoSegment(at, a, b);
+                    var injection = new PipeVertexInjection(other.Id, i, projected);
+                    return (true, injection);
+                }
+            }
+        }
+
+        return (false, null);
+    }
+
+    /// <summary>Per-vertex coincidence tolerance for junction detection (feet).</summary>
+    private const double JointToleranceFt = 0.15;
+
+    /// <summary>
+    /// Issue #171 — checks if a point lies within tolerance of a line segment.
+    /// </summary>
+    private static bool IsPointOnSegment(Point point, Point a, Point b, double tolerance)
+    {
+        double cross = ((point.Y - a.Y) * (b.X - a.X)) - ((point.X - a.X) * (b.Y - a.Y));
+        if (Math.Abs(cross) > tolerance)
+        {
+            return false;
+        }
+
+        double dot = ((point.X - a.X) * (b.X - a.X)) + ((point.Y - a.Y) * (b.Y - a.Y));
+        if (dot < -tolerance)
+        {
+            return false;
+        }
+
+        double lenSq = ((b.X - a.X) * (b.X - a.X)) + ((b.Y - a.Y) * (b.Y - a.Y));
+        return dot <= lenSq + tolerance;
+    }
+
+    /// <summary>
+    /// Issue #171 — projects a point onto a line segment, returning the nearest point on the segment.
+    /// </summary>
+    private static Point ProjectPointOntoSegment(Point point, Point a, Point b)
+    {
+        double dx = b.X - a.X;
+        double dy = b.Y - a.Y;
+        double lenSq = (dx * dx) + (dy * dy);
+        if (lenSq < 1e-9)
+        {
+            return a;
+        }
+
+        double t = (((point.X - a.X) * dx) + ((point.Y - a.Y) * dy)) / lenSq;
+        t = Math.Clamp(t, 0.0, 1.0);
+        return new Point(a.X + (t * dx), a.Y + (t * dy));
+    }
 
             foreach (Point p in other.Points)
             {
