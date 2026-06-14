@@ -992,7 +992,10 @@ public partial class GardenPlot
         bool HasLaborTypeOverride,
         bool HasMarkupOverride,
         Guid? ShapeId,
-        Guid? ParentShapeId);
+        Guid? ParentShapeId,
+        CatalogSource CatalogSource,
+        string? CatalogPackId,
+        string CatalogCode);
 
     private sealed record TakeoffAggregateRow(
         string Kind,
@@ -1397,7 +1400,10 @@ public partial class GardenPlot
                     t.LaborTypeOverride.HasValue,
                     t.MarkupPercentOverride.HasValue,
                     t.ShapeId,
-                    boundShape?.FilledAreaShapeId);
+                    boundShape?.FilledAreaShapeId,
+                    t.CatalogSource,
+                    t.CatalogPackId,
+                    t.CatalogCode);
             })
             .ToList();
     }
