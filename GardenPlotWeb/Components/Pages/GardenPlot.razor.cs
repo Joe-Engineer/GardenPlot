@@ -1,4 +1,4 @@
-﻿// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
+// <copyright file="GardenPlot.razor.cs" company="Garden Plot">
 // Copyright (c) Garden Plot. All rights reserved.
 // </copyright>
 
@@ -307,6 +307,44 @@ public partial class GardenPlot
     private string? materialPickerSelectedCode;
     private bool isDisposingOrDisposed;
 
+
+    /// <summary>
+    /// Issue #207: Adds the currently-selected palette item as an unbound takeoff item.
+    /// Disabled when no palette item is selected. Populates catalog code, unit, depth,
+    /// and waste from the palette item's defaults.
+    /// </summary>
+    private void AcceptPaletteItem()
+    {
+        if (currentPlot is null || selectedItem is null)
+        {
+            return;
+        }
+
+        ReconcileTakeoff();
+
+        int nextId = currentPlot.TakeoffIds.Next;
+        foreach (TakeoffItem t in currentPlot.Takeoff)
+        {
+            if (t.Id >= nextId)
+            {
+                nextId = t.Id + 1;
+            }
+        }
+
+        currentPlot.Takeoff.Add(new TakeoffItem
+        {
+            Id = nextId,
+            CatalogSource = CatalogSource.Base,
+            CatalogPackId = null,
+            CatalogCode = selectedItem.Code,
+            Quantity = 1,
+            ShapeId = null,
+            DepthInOverride = selectedItem.DefaultDepthIn,
+            WastePercentOverride = selectedItem.DefaultWastePercent,
+        });
+        currentPlot.TakeoffIds.Next = nextId + 1;
+        _ = SaveAsync();
+    }
     // === Takeoff row selection / context menu / inline edit ===
     private readonly HashSet<int> selectedTakeoffIds = new();
     private bool showTakeoffContextMenu;
@@ -2576,6 +2614,44 @@ public partial class GardenPlot
         _ = SaveAsync();
     }
 
+
+    /// <summary>
+    /// Issue #207: Adds the currently-selected palette item as an unbound takeoff item.
+    /// Disabled when no palette item is selected. Populates catalog code, unit, depth,
+    /// and waste from the palette item's defaults.
+    /// </summary>
+    private void AcceptPaletteItem()
+    {
+        if (currentPlot is null || selectedItem is null)
+        {
+            return;
+        }
+
+        ReconcileTakeoff();
+
+        int nextId = currentPlot.TakeoffIds.Next;
+        foreach (TakeoffItem t in currentPlot.Takeoff)
+        {
+            if (t.Id >= nextId)
+            {
+                nextId = t.Id + 1;
+            }
+        }
+
+        currentPlot.Takeoff.Add(new TakeoffItem
+        {
+            Id = nextId,
+            CatalogSource = CatalogSource.Base,
+            CatalogPackId = null,
+            CatalogCode = selectedItem.Code,
+            Quantity = 1,
+            ShapeId = null,
+            DepthInOverride = selectedItem.DefaultDepthIn,
+            WastePercentOverride = selectedItem.DefaultWastePercent,
+        });
+        currentPlot.TakeoffIds.Next = nextId + 1;
+        _ = SaveAsync();
+    }
     // === Takeoff row selection / context menu / inline edit ===
 
     /// <summary>True when the given takeoff item's row should render highlighted in the panel.</summary>

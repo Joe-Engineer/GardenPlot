@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @page "/plot"
 @implements IAsyncDisposable
 @using System.Diagnostics
@@ -2452,6 +2452,12 @@ else
                                     @onclick="AddVirtualTakeoffItem"
                                     title="Add a takeoff line that is not yet drawn">
                                 + Add item
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary"
+                                    @onclick="AcceptPaletteItem"
+                                    disabled="@(selectedItem is null)"
+                                    title="@(selectedItem is null ? "Select a palette item first" : $"Add {selectedItem.Code} to takeoff without drawing")">
+                                Accept
                             </button>
                             @if (viewMode == TakeoffViewMode.Item)
                             {
