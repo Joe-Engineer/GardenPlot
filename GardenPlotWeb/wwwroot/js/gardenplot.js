@@ -720,3 +720,174 @@ export async function idbSet(key, value) {
         throw e;
     }
 }
+
+/**
+ * Roving keyboard navigation manager for W3C ARIA toolbar/listbox pattern.
+ * Manages tabindex across children of a container and moves DOM focus atomically.
+ * Phase 5 — Issue #262.
+ *
+ * @param {HTMLElement} container — The region container (role="toolbar" or role="listbox")
+ * @param {object} options — Configuration
+ * @param {string} options.selector — CSS selector for focusable children (e.g., 'button:not([disabled])')
+ * @param {'horizontal'|'vertical'} options.orientation — Arrow key direction
+ * @param {boolean} options.wrap — Whether to wrap at boundaries (default: true)
+ * @returns {{ dispose: () => void, refresh: () => void, focusIndex: (number) => void }} — Disposable handle
+ */
+export function attachKeyboardRegion(container, options) {
+    const { selector, orientation, wrap = true } = options;
+
+    function getItems() {
+        return [...container.querySelectorAll(selector)].filter(
+            el => !el.disabled && el.offsetParent !== null // visible + enabled
+        );
+    }
+
+    function getFocusedIndex(items) {
+        const active = document.activeElement;
+        return items.indexOf(active);
+    }
+
+    function moveFocus(items, fromIndex, delta) {
+        if (items.length === 0) return;
+        let next = fromIndex + delta;
+        if (wrap) {
+            next = ((next % items.length) + items.length) % items.length;
+        } else {
+            next = Math.max(0, Math.min(items.length - 1, next));
+        }
+        // Roving tabindex: deactivate all, activate target
+        items.forEach(el => el.setAttribute('tabindex', '-1'));
+        items[next].setAttribute('tabindex', '0');
+        items[next].focus({ preventScroll: true });
+    }
+
+    function onKeyDown(e) {
+        const items = getItems();
+        const idx = getFocusedIndex(items);
+        if (idx === -1) return; // Focus not on a managed child
+
+        const prev = orientation === 'horizontal' ? 'ArrowLeft' : 'ArrowUp';
+        const next = orientation === 'horizontal' ? 'ArrowRight' : 'ArrowDown';
+        const home = 'Home';
+        const end = 'End';
+
+        if (e.key === prev) {
+            e.preventDefault();
+            moveFocus(items, idx, -1);
+        } else if (e.key === next) {
+            e.preventDefault();
+            moveFocus(items, idx, +1);
+        } else if (e.key === home) {
+            e.preventDefault();
+            moveFocus(items, items.length, -(items.length)); // → index 0
+        } else if (e.key === end) {
+            e.preventDefault();
+            moveFocus(items, -1, items.length); // → last index
+        } else if (e.key === 'Enter' || e.key === ' ') {
+            // Activate: let the click handler fire naturally for buttons.
+            // For non-button elements, synthesize click.
+            if (items[idx].tagName !== 'BUTTON' && items[idx].tagName !== 'A') {
+                e.preventDefault();
+                items[idx].click();
+            }
+            // For Space on buttons: prevent scroll but let activation happen
+            if (e.key === ' ') {
+                e.preventDefault();
+            }
+        }
+    }
+
+    // Initialize: set first visible item to tabindex="0", rest to "-1"
+    const items = getItems();
+    items.forEach((el, i) => el.setAttribute('tabindex', i === 0 ? '0' : '-1'));
+
+    container.addEventListener('keydown', onKeyDown);
+
+    return {
+        dispose() {
+            container.removeEventListener('keydown', onKeyDown);
+        },
+        /** Re-scan children after Blazor re-render changes the DOM. */
+        refresh() {
+            const fresh = getItems();
+            const hasActive = fresh.some(el => el.getAttribute('tabindex') === '0');
+            if (!hasActive && fresh.length > 0) {
+                fresh[0].setAttribute('tabindex', '0');
+            }
+        },
+        /** Move focus to a specific index (called from Blazor after tool change). */
+        focusIndex(index) {
+            const fresh = getItems();
+            if (index >= 0 && index < fresh.length) {
+                moveFocus(fresh, -1, index);
+            }
+        }
+    };
+}
+
+/**
+ * Modal focus trap. Traps Tab/Shift+Tab within a modal container.
+ * Phase 5 — Issue #262.
+ *
+ * @param {HTMLElement} modal — The modal element (role="dialog")
+ * @returns {{ dispose: () => void, restoreFocus: () => void }}
+ */
+export function trapFocus(modal) {
+    const previousFocus = document.activeElement;
+
+    const focusableSelector = 'button:not([disabled]), [href], input:not([disabled]),'
+        + ' select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    function getFocusables() {
+        return [...modal.querySelectorAll(focusableSelector)].filter(
+            el => el.offsetParent !== null
+        );
+    }
+
+    function onKeyDown(e) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            // Blazor handles the close; we just prevent propagation
+            modal.dispatchEvent(new CustomEvent('escape-pressed', { bubbles: true }));
+            return;
+        }
+        if (e.key !== 'Tab') return;
+
+        const focusables = getFocusables();
+        if (focusables.length === 0) return;
+
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey) {
+            if (document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            }
+        } else {
+            if (document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    }
+
+    modal.addEventListener('keydown', onKeyDown);
+
+    // Auto-focus first focusable on trap activation
+    requestAnimationFrame(() => {
+        const focusables = getFocusables();
+        if (focusables.length > 0) focusables[0].focus();
+    });
+
+    return {
+        dispose() {
+            modal.removeEventListener('keydown', onKeyDown);
+        },
+        restoreFocus() {
+            if (previousFocus && previousFocus.focus) {
+                previousFocus.focus({ preventScroll: true });
+            }
+        }
+    };
+}

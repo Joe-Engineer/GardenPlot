@@ -268,6 +268,10 @@ public partial class GardenPlot
     private ElementReference rulerPanelRef = default;
     private ElementReference infoPanelRef;
     private ElementReference layersPanelRef;
+    // Phase 5: Keyboard region element references
+    private ElementReference headerRegionRef;
+    private ElementReference toolbarGlobalRef;
+    private ElementReference toolbarContextRef;
     private ElementReference takeoffPanelRef;
     private ElementReference calibrationPanelRef;
     private bool showTakeoffPanel;
@@ -2916,6 +2920,18 @@ public partial class GardenPlot
     private IJSObjectReference? gestureHandle;
     private IJSObjectReference? viewportHandle;
 
+    // Phase 5: Keyboard region handles (roving tabindex per W3C toolbar pattern)
+    private IJSObjectReference? kbHeaderHandle;
+    private IJSObjectReference? kbToolbarGlobalHandle;
+#pragma warning disable CS0649 // Conditionally assigned when context toolbar is visible
+    private IJSObjectReference? kbToolbarContextHandle;
+#pragma warning restore CS0649
+
+    // Phase 5: Modal focus trap handle (restores focus on close)
+#pragma warning disable CS0649 // Assigned when modals open
+    private IJSObjectReference? modalFocusTrapHandle;
+#pragma warning restore CS0649
+
     // Latest scroll-window dimensions pushed from JS (in CSS px on the wrapEl).
     // Null until the first attachViewport callback fires; null disables culling.
     private double? viewportScrollLeftPx;
@@ -4112,6 +4128,15 @@ public partial class GardenPlot
                             wheelHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachWheel", canvasRef, dotnetRef);
                             gestureHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachTouchGestures", canvasRef, wrapRef, dotnetRef);
                             viewportHandle = await jsModule.InvokeAsync<IJSObjectReference>("attachViewport", wrapRef, dotnetRef);
+
+                            // Phase 5: Attach keyboard region managers for W3C roving tabindex pattern
+                            kbHeaderHandle = await jsModule.InvokeAsync<IJSObjectReference>(
+                                "attachKeyboardRegion", headerRegionRef,
+                                new { selector = "button:not([disabled]), select", orientation = "horizontal", wrap = true });
+
+                            kbToolbarGlobalHandle = await jsModule.InvokeAsync<IJSObjectReference>(
+                                "attachKeyboardRegion", toolbarGlobalRef,
+                                new { selector = "button:not([disabled])", orientation = "horizontal", wrap = true });
                         }
 
                         // If startup load was non-authoritative due a transient circuit disconnect,
@@ -4619,6 +4644,15 @@ public partial class GardenPlot
         try { if (gestureHandle is not null) await gestureHandle.DisposeAsync(); } catch { }
         try { if (viewportHandle is not null) await viewportHandle.InvokeVoidAsync("dispose"); } catch { }
         try { if (viewportHandle is not null) await viewportHandle.DisposeAsync(); } catch { }
+        // Phase 5: Dispose keyboard region handles
+        try { if (kbHeaderHandle is not null) await kbHeaderHandle.InvokeVoidAsync("dispose"); } catch { }
+        try { if (kbHeaderHandle is not null) await kbHeaderHandle.DisposeAsync(); } catch { }
+        try { if (kbToolbarGlobalHandle is not null) await kbToolbarGlobalHandle.InvokeVoidAsync("dispose"); } catch { }
+        try { if (kbToolbarGlobalHandle is not null) await kbToolbarGlobalHandle.DisposeAsync(); } catch { }
+        try { if (kbToolbarContextHandle is not null) await kbToolbarContextHandle.InvokeVoidAsync("dispose"); } catch { }
+        try { if (kbToolbarContextHandle is not null) await kbToolbarContextHandle.DisposeAsync(); } catch { }
+        try { if (modalFocusTrapHandle is not null) await modalFocusTrapHandle.InvokeVoidAsync("dispose"); } catch { }
+        try { if (modalFocusTrapHandle is not null) await modalFocusTrapHandle.DisposeAsync(); } catch { }
         try { if (jsModule is not null) await jsModule.DisposeAsync(); } catch { }
         rotationShiftHintCts?.Cancel();
         rotationShiftHintCts?.Dispose();
