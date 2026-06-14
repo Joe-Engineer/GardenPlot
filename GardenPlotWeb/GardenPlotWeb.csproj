@@ -45,6 +45,4 @@
     <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
   </ItemGroup>
 
-  <Import Project="Build\PayloadBudget.targets" />
-
-</Project>
+  <Import Project="Build\PayloadBudget.targets" />`n  <Import Project="Build\CatalogIndexGenerator.targets" />`n`n</Project>
