@@ -1,5 +1,5 @@
-{
-  "$comment": "Manual manifest of catalog assembly packs. WASM can't enumerate wwwroot at runtime, so additions here must be checked in by hand. Tracked as a follow-up for auto-generation in publish.",
+﻿{
+  "$comment": "Auto-generated manifest of catalog assembly packs. Do not edit by hand; regenerated at build by Build/CatalogIndex.targets.",
   "files": [
     "base.json"
   ]
