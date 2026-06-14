@@ -82,4 +82,19 @@ public interface IPlotRepository
 
     /// <summary>Removes a plot's viewport snapshot. No-op when missing.</summary>
     Task DeleteViewportAsync(Guid plotId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reads the tiny takeoff preferences snapshot for a plot, or <see langword="null"/> when none
+    /// has been saved. Includes view mode and column visibility toggles.
+    /// </summary>
+    Task<TakeoffPreferences?> LoadTakeoffPreferencesAsync(Guid plotId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Writes the tiny takeoff preferences snapshot for a plot. Touches only the
+    /// <c>takeoff-prefs/{id}</c> storage key — no plot body, no index, no reconcile.
+    /// </summary>
+    Task SaveTakeoffPreferencesAsync(Guid plotId, TakeoffPreferences prefs, CancellationToken ct = default);
+
+    /// <summary>Removes a plot's takeoff preferences snapshot. No-op when missing.</summary>
+    Task DeleteTakeoffPreferencesAsync(Guid plotId, CancellationToken ct = default);
 }
