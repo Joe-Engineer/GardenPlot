@@ -2576,6 +2576,43 @@ public partial class GardenPlot
         _ = SaveAsync();
     }
 
+    /// <summary>
+    /// Issue #207: Creates an unbound TakeoffItem from the currently-selected palette item.
+    /// Detects whether the item is from the base catalog or custom.
+    /// </summary>
+    private void AcceptPaletteItemToTakeoff()
+    {
+        if (currentPlot is null || selectedItem is null)
+        {
+            return;
+        }
+
+        ReconcileTakeoff();
+
+        int nextId = currentPlot.TakeoffIds.Next;
+        foreach (TakeoffItem t in currentPlot.Takeoff)
+        {
+            if (t.Id >= nextId)
+            {
+                nextId = t.Id + 1;
+            }
+        }
+
+        bool isCustom = library.CustomPaletteItems.Any(i => string.Equals(i.Code, selectedItem.Code, StringComparison.OrdinalIgnoreCase));
+
+        currentPlot.Takeoff.Add(new TakeoffItem
+        {
+            Id = nextId,
+            CatalogSource = isCustom ? CatalogSource.Custom : CatalogSource.Base,
+            CatalogPackId = null,
+            CatalogCode = selectedItem.Code,
+            Quantity = 1,
+            ShapeId = null,
+        });
+        currentPlot.TakeoffIds.Next = nextId + 1;
+        _ = SaveAsync();
+    }
+
     // === Takeoff row selection / context menu / inline edit ===
 
     /// <summary>True when the given takeoff item's row should render highlighted in the panel.</summary>

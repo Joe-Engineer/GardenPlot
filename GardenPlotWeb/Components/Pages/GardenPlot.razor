@@ -2453,6 +2453,12 @@ else
                                     title="Add a takeoff line that is not yet drawn">
                                 + Add item
                             </button>
+                            <button class="btn btn-sm btn-outline-success"
+                                    @onclick="AcceptPaletteItemToTakeoff"
+                                    disabled="@(selectedItem is null)"
+                                    title="@(selectedItem is null ? "No palette item selected" : $"Add {selectedItem.Code} to takeoff")">
+                                <i class="far fa-check"></i> Accept
+                            </button>
                             @if (viewMode == TakeoffViewMode.Item)
                             {
                                 <div class="x-small text-muted">Ctrl+click rows to multi-select.</div>
