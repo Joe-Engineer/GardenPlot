@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @page "/plot"
 @implements IAsyncDisposable
 @using System.Diagnostics
@@ -2392,6 +2392,9 @@ else
         var showLineTotal = !isInternalView || library.Ui.ShowLineTotalColumn;
         var itemInternalColumnCount = 10 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
         var summaryInternalColumnCount = 5 + (showMaterialCost ? 1 : 0) + (showLaborCost ? 1 : 0) + (showMarkupPercent ? 1 : 0) + (showLineTotal ? 1 : 0);
+        var totalMaterialCost = TakeoffMath.SumCurrency(itemRows.Select(r => r.MaterialCost));
+        var totalLaborCost = TakeoffMath.SumCurrency(itemRows.Select(r => (decimal?)r.LaborCost));
+        var totalLineTotal = TakeoffMath.SumCurrency(itemRows.Select(r => r.LineTotal));
 
         var positioned = library.Ui.TakeoffPanelX is double && library.Ui.TakeoffPanelY is double;
         <div class="floating-panel takeoff-floating @(positioned ? "" : "default-takeoff-pos")"
