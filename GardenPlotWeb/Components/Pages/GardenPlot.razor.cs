@@ -5609,6 +5609,20 @@ public partial class GardenPlot
         _ = canvasRef.FocusAsync(preventScroll: true).AsTask();
     }
 
+    /// <summary>
+    /// Returns the accessible name for a toolbar tool button, used in aria-label attributes.
+    /// Maps Tool enum values to human-friendly screen-reader labels.
+    /// Issue #262, Phase 2 — ARIA labels on icon-only buttons.
+    /// </summary>
+    private static string GetToolAriaLabel(Tool tool) => tool switch
+    {
+        Tool.FreeDraw => "Free draw tool",
+        Tool.CircleRuler => "Circle ruler tool",
+        Tool.RectRuler => "Rectangle ruler tool",
+        Tool.GroundCover => "Ground cover tool",
+        _ => $"{tool} tool"
+    };
+
     private void ToggleDropModeLatch()
     {
         isDropModeLatched = !isDropModeLatched;
