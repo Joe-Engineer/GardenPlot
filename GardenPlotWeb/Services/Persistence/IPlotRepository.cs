@@ -82,4 +82,18 @@ public interface IPlotRepository
 
     /// <summary>Removes a plot's viewport snapshot. No-op when missing.</summary>
     Task DeleteViewportAsync(Guid plotId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reads the tiny panel layout snapshot for a plot if present. Returns null if not found.
+    /// </summary>
+    Task<PlotPanelLayout?> LoadPanelLayoutAsync(Guid plotId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Writes the tiny panel layout snapshot for a plot. Touches only the
+    /// <c>panels/{id}</c> storage key — no plot body, no index, no reconcile.
+    /// </summary>
+    Task SavePanelLayoutAsync(Guid plotId, PlotPanelLayout panelLayout, CancellationToken ct = default);
+
+    /// <summary>Removes a plot's panel layout snapshot. No-op when missing.</summary>
+    Task DeletePanelLayoutAsync(Guid plotId, CancellationToken ct = default);
 }

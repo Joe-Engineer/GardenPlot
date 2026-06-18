@@ -4669,6 +4669,32 @@ public partial class GardenPlot
         }
     }
 
+    private async Task SavePanelLayoutAsync()
+    {
+        if (isDisposingOrDisposed || currentPlot is null)
+        {
+            return;
+        }
+
+        try
+        {
+            PlotPanelLayout panelLayout = PlotPanelLayout.FromPlot(currentPlot);
+            await PlotRepository.SavePanelLayoutAsync(currentPlot.Id, panelLayout);
+        }
+        catch (Microsoft.JSInterop.JSDisconnectedException)
+        {
+            // Expected during page refresh/navigation when the circuit is tearing down.
+        }
+        catch (TaskCanceledException)
+        {
+            // Expected if the circuit disconnects while the save is in flight.
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "[{Sid}] SavePanelLayoutAsync swallowed error (panel layout is not user data).", SessionTraceId);
+        }
+    }
+
     private async Task SaveAsync()
     {
         if (isDisposingOrDisposed)
@@ -13880,7 +13906,7 @@ public partial class GardenPlot
     {
         if (draggingPanel is null) return;
         draggingPanel = null;
-        await SaveAsync();
+        await SavePanelLayoutAsync();
     }
 
     private async Task ToggleTakeoffPanel()
