@@ -1,0 +1,9 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  GardenPlotWeb -> D:\git\GardenPlot-fresh\GardenPlotWeb\bin\Debug\net10.0\GardenPlotWeb.dll
+  GardenPlotWeb (Blazor output) -> D:\git\GardenPlot-fresh\GardenPlotWeb\bin\Debug\net10.0\wwwroot
+  GardenPlot.Tests -> D:\git\GardenPlot-fresh\GardenPlot.Tests\bin\Debug\net10.0\GardenPlot.Tests.dll
+Test run for D:\git\GardenPlot-fresh\GardenPlot.Tests\bin\Debug\net10.0\GardenPlot.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:  1542, Skipped:     0, Total:  1542, Duration: 545 ms - GardenPlot.Tests.dll (net10.0)

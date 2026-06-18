@@ -1,0 +1,7 @@
+{
+  "note": "Runtime probe skipped. Test build fails (SavePanelLayoutAsync not found). Root cause: commit implements wrong issue (#103 catalog-index, not #125 layer-states).",
+  "bytes": 0,
+  "url": "n/a",
+  "statusCode": 0,
+  "ms": 0
+}

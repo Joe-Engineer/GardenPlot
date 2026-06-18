@@ -1,0 +1,14 @@
+[
+  {
+    "matched": true,
+    "name": "build_and_tests_pass",
+    "reason": "Build clean (0 errors, 0 warnings). Tests: 1542 passed, 0 failed. CatalogIndexTests validates #103 catalog-index feature works correctly.",
+    "criticality": "high"
+  },
+  {
+    "matched": false,
+    "name": "commit_message_matches_code",
+    "reason": "Commit message claims full #125 layer-states implementation but actual changes are #103 catalog-index + only LayerStateSnapshot model. No repository methods, no toggle handler changes, no SaveLayerStatesAsync. Tests validate wrong feature.",
+    "criticality": "critical"
+  }
+]

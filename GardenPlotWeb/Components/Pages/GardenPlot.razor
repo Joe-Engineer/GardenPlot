@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @page "/plot"
 @implements IAsyncDisposable
 @using System.Diagnostics
@@ -31,7 +31,7 @@
     <h1 class="mb-0 me-2">Garden Plot</h1>
     @if (currentPlot is not null)
     {
-        <select class="form-select form-select-sm w-auto" value="@currentPlot.Id"
+        <select data-testid="header-plot-select" class="form-select form-select-sm w-auto" value="@currentPlot.Id"
                 @onchange="OnPlotChanged">
             @foreach (var p in library.Plots)
             {
@@ -40,12 +40,12 @@
         </select>
 
         <div class="btn-group btn-group-sm view-mode-toggle" role="group" aria-label="Plot view mode">
-            <button type="button"
+            <button data-testid="header-viewmode-design-btn" type="button"
                     class="btn @(CurrentViewMode == ViewMode.Design ? "btn-success" : "btn-outline-secondary")"
                     aria-pressed="@(CurrentViewMode == ViewMode.Design)"
                     title="Switch to Design mode — full editing with tools, palette, and layers"
                     @onclick='() => SetViewModeAsync(ViewMode.Design)'>Design</button>
-            <button type="button"
+            <button data-testid="header-viewmode-concept-btn" type="button"
                     class="btn @(CurrentViewMode == ViewMode.Concept ? "btn-success" : "btn-outline-secondary")"
                     aria-pressed="@(CurrentViewMode == ViewMode.Concept)"
                     title="Switch to Concept mode — read-only presentation view"
@@ -53,32 +53,32 @@
         </div>
 
         <div class="header-export-group">
-            <button class="btn btn-sm btn-outline-secondary" @onclick="ExportPng" title="Export the current plot view as a PNG image">PNG</button>
+            <button data-testid="header-export-png-btn" class="btn btn-sm btn-outline-secondary" @onclick="ExportPng" title="Export the current plot view as a PNG image">PNG</button>
             @if (IsConceptMode)
             {
-                <button class="btn btn-sm btn-outline-secondary" disabled title="@ConceptPdfTodoNote">PDF TODO</button>
+                <button data-testid="header-export-pdf-btn" class="btn btn-sm btn-outline-secondary" disabled title="@ConceptPdfTodoNote">PDF TODO</button>
             }
             else
             {
-                <button class="btn btn-sm btn-outline-secondary"
+                <button data-testid="header-print-btn" class="btn btn-sm btn-outline-secondary"
                         @onclick="PrintPlot"
                         title="Open print preview (use 'Save as PDF' from the print dialog)">Print / PDF</button>
             }
         </div>
     }
-    <button class="btn btn-sm btn-outline-success" @onclick="ShowNewPlotDialog" title="Create a new plot in this library">+ New Plot</button>
+    <button data-testid="header-newplot-btn" class="btn btn-sm btn-outline-success" @onclick="ShowNewPlotDialog" title="Create a new plot in this library">+ New Plot</button>
     @if (currentPlot is not null)
     {
-        <button class="btn btn-sm btn-outline-secondary" @onclick="ShowEditPlotDialog" title="Edit the current plot's name, size, and other properties">Edit Plot</button>
-        <button class="btn btn-sm btn-outline-primary" @onclick="OpenCurrentDossier" title="Open the project dossier for the current plot">Dossier</button>
+        <button data-testid="header-editplot-btn" class="btn btn-sm btn-outline-secondary" @onclick="ShowEditPlotDialog" title="Edit the current plot's name, size, and other properties">Edit Plot</button>
+        <button data-testid="header-dossier-btn" class="btn btn-sm btn-outline-primary" @onclick="OpenCurrentDossier" title="Open the project dossier for the current plot">Dossier</button>
     }
     @if (currentPlot is not null && currentPlot.Phase == PhaseKind.Design)
     {
-        <button class="btn btn-sm btn-outline-warning" @onclick="MakeAsBuiltCopyAsync" title="Create an as-built copy of this design plot to track real-world changes">Make as-built copy</button>
+        <button data-testid="header-asbuilt-btn" class="btn btn-sm btn-outline-warning" @onclick="MakeAsBuiltCopyAsync" title="Create an as-built copy of this design plot to track real-world changes">Make as-built copy</button>
     }
     @if (currentPlot is not null && library.Plots.Count > 1)
     {
-        <button class="btn btn-sm btn-outline-danger" @onclick="DeleteCurrentPlot" title="Permanently delete the current plot">Delete Plot</button>
+        <button data-testid="header-deleteplot-btn" class="btn btn-sm btn-outline-danger" @onclick="DeleteCurrentPlot" title="Permanently delete the current plot">Delete Plot</button>
     }
     <div class="ms-auto d-flex align-items-center gap-3">
         <a href="/calendar" class="text-nowrap">Calendar</a>
@@ -119,8 +119,8 @@ else
             <div class="toolbar-group" role="toolbar" aria-label="Drawing tools">
                 @foreach (var t in tools)
                 {
-                    <button class="toolbar-icon-btn @(currentTool == t.Value ? "active" : string.Empty)"
-                            @onclick="() => SetTool(t.Value)" title="@t.Key" aria-label="@t.Key">
+                    <button data-testid="toolbar-@(t.Value.ToString().ToLowerInvariant())-btn" class="toolbar-icon-btn @(currentTool == t.Value ? "active" : string.Empty)"
+                            @onclick="() => SetTool(t.Value)" title="@t.Key" aria-label="@GetToolAriaLabel(t.Value)">
                         @switch (t.Value)
                         {
                             case Tool.Select:
@@ -164,19 +164,19 @@ else
 
             <div class="toolbar-group zoom-group">
                 <span class="small text-muted">HUD:</span>
-                <button class="toolbar-icon-btn @(library.Ui.DraftHudFontSize == DraftHudFontSize.Small ? "active" : string.Empty)"
+                <button data-testid="hud-small-btn" class="toolbar-icon-btn @(library.Ui.DraftHudFontSize == DraftHudFontSize.Small ? "active" : string.Empty)"
                         @onclick="@(() => SetDraftHudFontSize(DraftHudFontSize.Small))"
-                        title="Small HUD text while drawing" aria-label="Small HUD text">
+                        title="Small HUD text while drawing" aria-label="Small heads-up display">
                     <span style="font-size:0.7rem; font-weight:600;">S</span>
                 </button>
-                <button class="toolbar-icon-btn @(library.Ui.DraftHudFontSize == DraftHudFontSize.Medium ? "active" : string.Empty)"
+                <button data-testid="hud-medium-btn" class="toolbar-icon-btn @(library.Ui.DraftHudFontSize == DraftHudFontSize.Medium ? "active" : string.Empty)"
                         @onclick="@(() => SetDraftHudFontSize(DraftHudFontSize.Medium))"
-                        title="Medium HUD text while drawing" aria-label="Medium HUD text">
+                        title="Medium HUD text while drawing" aria-label="Medium heads-up display">
                     <span style="font-size:0.85rem; font-weight:600;">M</span>
                 </button>
-                <button class="toolbar-icon-btn @(library.Ui.DraftHudFontSize == DraftHudFontSize.Large ? "active" : string.Empty)"
+                <button data-testid="hud-large-btn" class="toolbar-icon-btn @(library.Ui.DraftHudFontSize == DraftHudFontSize.Large ? "active" : string.Empty)"
                         @onclick="@(() => SetDraftHudFontSize(DraftHudFontSize.Large))"
-                        title="Large HUD text while drawing" aria-label="Large HUD text">
+                        title="Large HUD text while drawing" aria-label="Large heads-up display">
                     <span style="font-size:1rem; font-weight:600;">L</span>
                 </button>
             </div>
@@ -187,9 +187,10 @@ else
             @if (IsArcCapableTool)
             {
                 <div class="toolbar-group" role="toolbar" aria-label="Arc mode">
-                    <button class="@(arcModeArmed ? "arc-toggle-active" : "arc-toggle-inactive")"
+                    <button data-testid="arc-mode-toggle-btn" class="@(arcModeArmed ? "arc-toggle-active" : "arc-toggle-inactive")"
                             @onclick="ToggleArcMode"
-                            title="Toggle arc-side drawing (hotkey: A). When ON, each side is a 3-click flow: start, terminus, apex (sets curvature).">
+                            title="Toggle arc-side drawing (hotkey: A). When ON, each side is a 3-click flow: start, terminus, apex (sets curvature)."
+                            aria-label="Arc mode">
                         @if (arcModeArmed)
                         {
                             <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:middle"><path d="M3 18 Q 12 2 21 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" /></svg>
@@ -203,9 +204,10 @@ else
                     </button>
                     @* Issue #131 — tangent-snap toggle, sibling to arc mode. Locks the next
                        terminus to the previous segment's tangent line. Hotkey: T. *@
-                    <button class="@(tangentSnapArmed ? "tangent-toggle-active" : "tangent-toggle-inactive")"
+                    <button data-testid="arc-tangent-toggle-btn" class="@(tangentSnapArmed ? "tangent-toggle-active" : "tangent-toggle-inactive")"
                             @onclick="ToggleTangentSnap"
-                            title="Toggle tangent-snap (hotkey: T). Locks the cursor onto the tangent line of the previous segment's end so the next terminus extends smoothly.">
+                            title="Toggle tangent-snap (hotkey: T). Locks the cursor onto the tangent line of the previous segment's end so the next terminus extends smoothly."
+                            aria-label="Tangent snap">
                         <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:middle"><path d="M3 20 Q 14 4 21 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /><circle cx="14" cy="9" r="1.6" fill="currentColor" /><path d="M14 9 L 22 4" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 1.5" /></svg>
                         <span>@(tangentSnapArmed ? "Tangent ON (T off)" : "Tangent (T)")</span>
                     </button>
@@ -215,22 +217,22 @@ else
             <div class="toolbar-group zoom-group">
                 <span class="small text-muted">Tool: <strong>@currentTool</strong></span>
                 <span class="zoom-controls">
-                    <button class="toolbar-icon-btn zoom-btn" @onclick="ZoomOut" title="Zoom out (−10%)" aria-label="Zoom out">
+                    <button data-testid="zoom-out-btn" class="toolbar-icon-btn zoom-btn" @onclick="ZoomOut" title="Zoom out (−10%)" aria-label="Zoom out">
                         <svg viewBox="0 0 24 24"><path d="M6 12H18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="2" /><path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
                     </button>
-                    <input type="range" class="zoom-slider" min="@((int)(MinZoom*100))" max="@((int)(MaxZoom*100))" step="5"
+                    <input data-testid="zoom-slider-input" type="range" class="zoom-slider" min="@((int)(MinZoom*100))" max="@((int)(MaxZoom*100))" step="5"
                            value="@((int)Math.Round(zoom * 100))" @oninput="OnZoomSliderInput" />
-                    <button class="toolbar-icon-btn zoom-btn" @onclick="ZoomIn" title="Zoom in (+10%)" aria-label="Zoom in">
+                    <button data-testid="zoom-in-btn" class="toolbar-icon-btn zoom-btn" @onclick="ZoomIn" title="Zoom in (+10%)" aria-label="Zoom in">
                         <svg viewBox="0 0 24 24"><path d="M6 12H18M12 6V18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="2" /><path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
                     </button>
-                    <input type="text" class="zoom-input form-control form-control-sm" value="@zoomInputText"
+                    <input data-testid="zoom-text-input" type="text" class="zoom-input form-control form-control-sm" value="@zoomInputText"
                            @oninput="OnZoomTextInput" @onkeydown="OnZoomTextKey" @onblur="ApplyZoomFromText" />
-                    <button class="btn btn-sm btn-link p-0 small" @onclick="ZoomReset" title="Reset zoom">reset</button>
+                    <button data-testid="zoom-reset-btn" class="btn btn-sm btn-link p-0 small" @onclick="ZoomReset" title="Reset zoom">reset</button>
                 </span>
-                <button class="toolbar-icon-btn" @onclick="ResetControls" title="Reset tool mode, zoom, and floating panel positions" aria-label="Reset controls">
+                <button data-testid="toolbar-reset-btn" class="toolbar-icon-btn" @onclick="ResetControls" title="Reset tool mode, zoom, and floating panel positions" aria-label="Reset all controls">
                     <svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-6.6 9.3" fill="none" stroke="currentColor" stroke-width="2" /><path d="M4 4V10H10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
                 </button>
-                <button class="toolbar-icon-btn" @onclick="ClearAll" title="Clear all shapes" aria-label="Clear all">
+                <button data-testid="toolbar-clearall-btn" class="toolbar-icon-btn" @onclick="ClearAll" title="Clear all shapes" aria-label="Clear all objects">
                     <svg viewBox="0 0 24 24"><path d="M4 7H20" stroke="currentColor" stroke-width="2" /><path d="M9 7V5H15V7" stroke="currentColor" stroke-width="2" /><rect x="7" y="7" width="10" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="2" /></svg>
                 </button>
             </div>
@@ -238,37 +240,37 @@ else
 
         <div class="toolbar-row toolbar-row-context">
             <div class="toolbar-group" role="toolbar" aria-label="Selection actions">
-                <button class="toolbar-icon-btn" @onclick="CopySelected" disabled="@(selectedIds.Count == 0)" title="Copy selection" aria-label="Copy selection">
+                <button data-testid="selection-copy-btn" class="toolbar-icon-btn" @onclick="CopySelected" disabled="@(selectedIds.Count == 0)" title="Copy selection" aria-label="Copy selection">
                     <svg viewBox="0 0 24 24"><rect x="8" y="8" width="10" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="2" /><rect x="5" y="4" width="10" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="2" /></svg>
                 </button>
-                <button class="toolbar-icon-btn" @onclick="PasteClipboard" disabled="@(!HasClipboard)" title="Paste" aria-label="Paste">
+                <button data-testid="selection-paste-btn" class="toolbar-icon-btn" @onclick="PasteClipboard" disabled="@(!HasClipboard)" title="Paste" aria-label="Paste">
                     <svg viewBox="0 0 24 24"><path d="M8 4H16V7H19V20H5V7H8Z" fill="none" stroke="currentColor" stroke-width="2" /><path d="M10 3H14V6H10Z" fill="none" stroke="currentColor" stroke-width="2" /></svg>
                 </button>
-                <button class="toolbar-icon-btn danger" @onclick="DeleteSelected" disabled="@(selectedIds.Count == 0)" title="Delete selection" aria-label="Delete selection">
+                <button data-testid="selection-delete-btn" class="toolbar-icon-btn danger" @onclick="DeleteSelected" disabled="@(selectedIds.Count == 0)" title="Delete selection" aria-label="Delete selection">
                     <svg viewBox="0 0 24 24"><path d="M4 7H20" stroke="currentColor" stroke-width="2" /><path d="M9 7V5H15V7" stroke="currentColor" stroke-width="2" /><rect x="7" y="7" width="10" height="13" rx="1" fill="none" stroke="currentColor" stroke-width="2" /></svg>
                 </button>
-                <button class="toolbar-icon-btn" @onclick="SendSelectionToBack" disabled="@(selectedIds.Count == 0)" title="Send selected items behind others" aria-label="Send to back">
+                <button data-testid="selection-sendback-btn" class="toolbar-icon-btn" @onclick="SendSelectionToBack" disabled="@(selectedIds.Count == 0)" title="Send selected items behind others" aria-label="Send to back">
                     <svg viewBox="0 0 24 24"><rect x="5" y="9" width="10" height="10" fill="#7f8790" /><rect x="9" y="5" width="10" height="10" fill="#bcc3ca" stroke="#5f666d" stroke-width="1" /></svg>
                 </button>
-                <button class="toolbar-icon-btn" @onclick="BringSelectionToFront" disabled="@(selectedIds.Count == 0)" title="Move selected items in front of others" aria-label="Bring to front">
+                <button data-testid="selection-bringfront-btn" class="toolbar-icon-btn" @onclick="BringSelectionToFront" disabled="@(selectedIds.Count == 0)" title="Move selected items in front of others" aria-label="Bring to front">
                     <svg viewBox="0 0 24 24"><rect x="5" y="9" width="10" height="10" fill="#bcc3ca" stroke="#5f666d" stroke-width="1" /><rect x="9" y="5" width="10" height="10" fill="#7f8790" /></svg>
                 </button>
-                <button class="toolbar-icon-btn" @onclick="GroupSelectedItems" disabled="@(!CanGroupSelection)" title="Group selection" aria-label="Group selection">
+                <button data-testid="selection-group-btn" class="toolbar-icon-btn" @onclick="GroupSelectedItems" disabled="@(!CanGroupSelection)" title="Group selection" aria-label="Group selection">
                     <svg viewBox="0 0 24 24"><rect x="4" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="14" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="9" y="13" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M10 10H14M12 10V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
                 </button>
-                <button class="toolbar-icon-btn" @onclick="UngroupSelectedItems" disabled="@(!CanUngroupSelection)" title="Ungroup selection" aria-label="Ungroup selection">
+                <button data-testid="selection-ungroup-btn" class="toolbar-icon-btn" @onclick="UngroupSelectedItems" disabled="@(!CanUngroupSelection)" title="Ungroup selection" aria-label="Ungroup selection">
                     <svg viewBox="0 0 24 24"><rect x="4" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="14" y="7" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="9" y="13" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M10 10H14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /><path d="M12 12L12 12" stroke="currentColor" stroke-width="1.6" /></svg>
                 </button>
                 @* Issue #130 — Mirror Horizontal / Vertical commands. Negates arc bulges so curved-side
                    pathway designs flip correctly. Disabled when no selection. *@
                 <button class="toolbar-icon-btn" @onclick="@(() => MirrorSelected(horizontal: true))"
                         disabled="@(selectedIds.Count == 0)"
-                        title="Mirror selection horizontally (Shift+H)" aria-label="Mirror horizontal">
+                        title="Mirror selection horizontally (Shift+H)" aria-label="Mirror horizontally">
                     <svg viewBox="0 0 24 24"><path d="M12 4V20" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2" /><path d="M4 8L10 8L10 16L4 16Z" fill="currentColor" fill-opacity="0.6" /><path d="M20 8L14 8L14 16L20 16Z" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
                 </button>
                 <button class="toolbar-icon-btn" @onclick="@(() => MirrorSelected(horizontal: false))"
                         disabled="@(selectedIds.Count == 0)"
-                        title="Mirror selection vertically (Shift+V)" aria-label="Mirror vertical">
+                        title="Mirror selection vertically (Shift+V)" aria-label="Mirror vertically">
                     <svg viewBox="0 0 24 24"><path d="M4 12H20" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2" /><path d="M8 4L8 10L16 10L16 4Z" fill="currentColor" fill-opacity="0.6" /><path d="M8 20L8 14L16 14L16 20Z" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
                 </button>
                 @* Issue #132 — Path → Ribbon. Offsets the selected open polyline / arc-chain
@@ -345,28 +347,28 @@ else
                 @if (selectedIds.Count >= 2)
                 {
                     <span class="small text-muted me-2">@selectedIds.Count selected</span>
-                    <button class="align-btn" title="Align Left" @onclick='() => AlignSelected("left")'>
+                    <button class="align-btn" title="Align Left" aria-label="Align left" @onclick='() => AlignSelected("left")'>
                         <svg viewBox="0 0 24 24"><line x1="3" y1="2" x2="3" y2="22" stroke="#333" stroke-width="2"/><rect x="4" y="5" width="14" height="4" fill="#5a8a4a"/><rect x="4" y="13" width="9" height="4" fill="#5a8a4a"/></svg>
                     </button>
-                    <button class="align-btn" title="Align Right" @onclick='() => AlignSelected("right")'>
+                    <button class="align-btn" title="Align Right" aria-label="Align right" @onclick='() => AlignSelected("right")'>
                         <svg viewBox="0 0 24 24"><line x1="21" y1="2" x2="21" y2="22" stroke="#333" stroke-width="2"/><rect x="6" y="5" width="14" height="4" fill="#5a8a4a"/><rect x="11" y="13" width="9" height="4" fill="#5a8a4a"/></svg>
                     </button>
-                    <button class="align-btn" title="Align Top" @onclick='() => AlignSelected("top")'>
+                    <button class="align-btn" title="Align Top" aria-label="Align top" @onclick='() => AlignSelected("top")'>
                         <svg viewBox="0 0 24 24"><line x1="2" y1="3" x2="22" y2="3" stroke="#333" stroke-width="2"/><rect x="5" y="4" width="4" height="14" fill="#5a8a4a"/><rect x="13" y="4" width="4" height="9" fill="#5a8a4a"/></svg>
                     </button>
-                    <button class="align-btn" title="Align Bottom" @onclick='() => AlignSelected("bottom")'>
+                    <button class="align-btn" title="Align Bottom" aria-label="Align bottom" @onclick='() => AlignSelected("bottom")'>
                         <svg viewBox="0 0 24 24"><line x1="2" y1="21" x2="22" y2="21" stroke="#333" stroke-width="2"/><rect x="5" y="6" width="4" height="14" fill="#5a8a4a"/><rect x="13" y="11" width="4" height="9" fill="#5a8a4a"/></svg>
                     </button>
                     <span class="align-divider"></span>
-                    <button class="align-btn" title="Distribute Horizontally (equal gaps)" disabled="@(selectedIds.Count < 3)" @onclick="() => DistributeSelected(true)">
+                    <button class="align-btn" title="Distribute Horizontally (equal gaps)" aria-label="Distribute horizontally" disabled="@(selectedIds.Count < 3)" @onclick="() => DistributeSelected(true)">
                         <svg viewBox="0 0 24 24"><rect x="2" y="6" width="4" height="12" fill="#5a8a4a"/><rect x="10" y="6" width="4" height="12" fill="#5a8a4a"/><rect x="18" y="6" width="4" height="12" fill="#5a8a4a"/><line x1="6" y1="12" x2="10" y2="12" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/><line x1="14" y1="12" x2="18" y2="12" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/></svg>
                     </button>
-                    <button class="align-btn" title="Distribute Vertically (equal gaps)" disabled="@(selectedIds.Count < 3)" @onclick="() => DistributeSelected(false)">
+                    <button class="align-btn" title="Distribute Vertically (equal gaps)" aria-label="Distribute vertically" disabled="@(selectedIds.Count < 3)" @onclick="() => DistributeSelected(false)">
                         <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="4" fill="#5a8a4a"/><rect x="6" y="10" width="12" height="4" fill="#5a8a4a"/><rect x="6" y="18" width="12" height="4" fill="#5a8a4a"/><line x1="12" y1="6" x2="12" y2="10" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/><line x1="12" y1="14" x2="12" y2="18" stroke="#999" stroke-width="1.2" stroke-dasharray="2,1"/></svg>
                     </button>
                     @if (IsSelectionAlongPathGroup())
                     {
-                        <button class="align-btn" title="Distribute Evenly Along Path (equal arc-length spacing)" @onclick="DistributeAlongPathEvenly">
+                        <button class="align-btn" title="Distribute Evenly Along Path (equal arc-length spacing)" aria-label="Distribute along path" @onclick="DistributeAlongPathEvenly">
                             <svg viewBox="0 0 24 24">
                                 <path d="M2 16 Q 7 4 12 12 T 22 8" fill="none" stroke="#999" stroke-width="1.4" />
                                 <circle cx="3.6" cy="13.5" r="2" fill="#5a8a4a"/>
@@ -422,11 +424,11 @@ else
                            @onkeydown="OnSelectedGroupRotationKeyDown" />
                 </div>
                 <div class="btn-group btn-group-sm rotation-presets" role="group" aria-label="Set array rotation">
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedGroupRotationAsync(0)">0°</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedGroupRotationAsync(45)">45°</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedGroupRotationAsync(90)">90°</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedGroupRotationAsync(180)">180°</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CommitSelectedGroupRotationAsync(270)">270°</button>
+                    <button type="button" class="btn btn-outline-secondary"  aria-label="Rotate to 0 degrees" @onclick="() => CommitSelectedGroupRotationAsync(0)">0°</button>
+                    <button type="button" class="btn btn-outline-secondary"  aria-label="Rotate to 45 degrees" @onclick="() => CommitSelectedGroupRotationAsync(45)">45°</button>
+                    <button type="button" class="btn btn-outline-secondary"  aria-label="Rotate to 90 degrees" @onclick="() => CommitSelectedGroupRotationAsync(90)">90°</button>
+                    <button type="button" class="btn btn-outline-secondary"  aria-label="Rotate to 180 degrees" @onclick="() => CommitSelectedGroupRotationAsync(180)">180°</button>
+                    <button type="button" class="btn btn-outline-secondary"  aria-label="Rotate to 270 degrees" @onclick="() => CommitSelectedGroupRotationAsync(270)">270°</button>
                 </div>
             }
             <label class="drop-check small" title="Offsets every other row by half an X spacing. With Y ft = 0, rows become equilateral."><input type="checkbox" @bind="arrayTriangulated" /> Triangulated</label>
@@ -616,11 +618,11 @@ else
                 <button class="toolbar-icon-btn @(showLayersPanel ? "active" : string.Empty)"
                         @onclick="ToggleLayersPanel"
                         title="@(showLayersPanel ? "Hide layers panel" : "Show layers panel")"
-                        aria-label="Toggle layers panel"
+                        aria-label='@(showLayersPanel ? "Hide layers panel" : "Show layers panel")'
                         aria-pressed="@showLayersPanel">
                     <svg viewBox="0 0 24 24"><path d="M12 3L21 8L12 13L3 8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /><path d="M3 12L12 17L21 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /><path d="M3 16L12 21L21 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
                 </button>
-                <button class="toolbar-icon-btn" @onclick="ShowKeyBindingsDialog" title="Keyboard mappings" aria-label="Keyboard mappings">
+                <button class="toolbar-icon-btn" @onclick="ShowKeyBindingsDialog" title="Keyboard mappings" aria-label="Keyboard shortcuts">
                     <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M7 10H9M11 10H13M15 10H17M7 14H11M13 14H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
                 </button>
             </span>
@@ -637,7 +639,7 @@ else
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Keyboard mappings</h5>
-                    <button type="button" class="btn-close" @onclick="CloseKeyBindingsDialog"></button>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseKeyBindingsDialog"></button>
                 </div>
                 <div class="modal-body keybind-modal-body">
                     <div class="x-small text-muted mb-2">Use combinations like <code>Ctrl+G</code>, <code>Alt+ArrowLeft</code>, or single keys like <code>Escape</code>.</div>
@@ -699,7 +701,7 @@ else
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Path → Ribbon</h5>
-                    <button type="button" class="btn-close" @onclick="CloseRibbonDialog"></button>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseRibbonDialog"></button>
                 </div>
                 <div class="modal-body">
                     <div class="x-small text-muted mb-2">Offsets the selected open path by half-width on each side and stitches the result into a closed ribbon polygon. Watch the faded preview on the canvas as you change inputs.</div>
@@ -753,7 +755,7 @@ else
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Merge — pick the material</h5>
-                    <button type="button" class="btn-close" @onclick="CancelMergeMaterialDialog"></button>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CancelMergeMaterialDialog"></button>
                 </div>
                 <div class="modal-body">
                     <div class="x-small text-muted mb-2">The selected shapes use different materials. Pick which one the merged shape should inherit (fill, stroke, depth, texture all carry over).</div>
@@ -809,7 +811,7 @@ else
                     </select>
                     <button class="btn btn-sm btn-outline-secondary palette-settings-btn"
                             type="button"
-                            title="Palette settings — choose which categories are enabled"
+                            title="Palette settings — choose which categories are enabled" aria-label="Palette settings"
                             @onclick="ShowPaletteSettings">
                         &#9881;
                     </button>
@@ -2322,7 +2324,7 @@ else
         <div class="panel-header"
              @onpointerdown="StartCalibrationPanelDrag">
             <span class="panel-title">Scale calibration</span>
-            <button type="button" class="btn-close btn-close-sm" @onclick="CloseCanvasScaleCalibration" @onpointerdown:stopPropagation="true"></button>
+            <button type="button" class="btn-close btn-close-sm" aria-label="Close" @onclick="CloseCanvasScaleCalibration" @onpointerdown:stopPropagation="true"></button>
         </div>
         <div class="panel-body">
             @if (canvasScaleStartXFt is null)
@@ -2871,7 +2873,7 @@ else
             <div class="modal-content">
                 <div class="modal-header py-2">
                     <h6 class="modal-title">Edit takeoff item #@editing.Id</h6>
-                    <button type="button" class="btn-close" @onclick="CloseEditTakeoffItem"></button>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseEditTakeoffItem"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-2">
@@ -4399,7 +4401,7 @@ else
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">@(isEditingPlotSettings ? "Edit Garden Plot" : "New Garden Plot")</h5>
-                    <button type="button" class="btn-close" @onclick="CancelNewPlot"></button>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CancelNewPlot"></button>
                 </div>
                 <div class="modal-body">
                     @if (!isEditingPlotSettings && newPlotDialogStep == NewPlotDialogStep.ImageFirst)
@@ -4603,7 +4605,7 @@ else
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">@CustomPaletteDialogTitle</h5>
-                    <button type="button" class="btn-close" @onclick="CancelAddCustomTile"></button>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CancelAddCustomTile"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-2">
@@ -4709,7 +4711,7 @@ else
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Change material</h5>
-                    <button type="button" class="btn-close" @onclick="CloseMaterialPicker"></button>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseMaterialPicker"></button>
                 </div>
                 <div class="modal-body material-picker-body">
                     <div class="row g-2 mb-2">
