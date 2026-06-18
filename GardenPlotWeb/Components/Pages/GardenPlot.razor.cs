@@ -2454,7 +2454,7 @@ public partial class GardenPlot
         }
 
         library.Ui.TakeoffViewMode = mode;
-        _ = SaveAsync();
+        _ = SaveTakeoffPreferencesAsync();
     }
 
     private void SetTakeoffCut(bool showInternalView)
@@ -2489,7 +2489,7 @@ public partial class GardenPlot
                 return;
         }
 
-        _ = SaveAsync();
+        _ = SaveTakeoffPreferencesAsync();
     }
 
     private void OnDefaultLaborRateChanged(ChangeEventArgs e)
@@ -4666,6 +4666,30 @@ public partial class GardenPlot
         catch (Exception ex)
         {
             Logger.LogDebug(ex, "[{Sid}] SaveViewportAsync swallowed error (viewport state is not user data).", SessionTraceId);
+        }
+    }
+
+    private async Task SaveTakeoffPreferencesAsync()
+    {
+        if (isDisposingOrDisposed || currentPlot is null)
+        {
+            return;
+        }
+
+        try
+        {
+            TakeoffPreferences prefs = TakeoffPreferences.FromPlot(currentPlot);
+            await PlotRepository.SaveTakeoffPreferencesAsync(currentPlot.Id, prefs);
+        }
+        catch (Microsoft.JSInterop.JSDisconnectedException)
+        {
+        }
+        catch (TaskCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "[{Sid}] SaveTakeoffPreferencesAsync swallowed error.", SessionTraceId);
         }
     }
 
@@ -13880,7 +13904,7 @@ public partial class GardenPlot
     {
         if (draggingPanel is null) return;
         draggingPanel = null;
-        await SaveAsync();
+        await SavePanelLayoutAsync();
     }
 
     private async Task ToggleTakeoffPanel()

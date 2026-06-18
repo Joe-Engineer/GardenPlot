@@ -51,6 +51,13 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
     public const string ViewportKeyPrefix = "viewport/";
 
     /// <summary>
+    /// Storage-key prefix for tiny per-plot takeoff preferences snapshots. Full key is
+    /// <c>takeoff-prefs/{guid:N}</c>. Lives separately from the plot body so a column-toggle
+    /// or view-mode switch doesn't have to rewrite the plot's shapes, takeoff items, or groups.
+    /// </summary>
+    public const string TakeoffPreferencesKeyPrefix = "takeoff-prefs/";
+
+    /// <summary>
     /// Legacy storage key for the single-blob library document. Read only during migration;
     /// removed once the split layout is in place.
     /// </summary>
@@ -89,6 +96,9 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
 
     /// <summary>Builds the per-plot viewport storage key for the given id.</summary>
     public static string ViewportKey(Guid id) => ViewportKeyPrefix + id.ToString("N");
+
+    /// <summary>Builds the per-plot takeoff preferences storage key for the given id.</summary>
+    public static string TakeoffPreferencesKey(Guid id) => TakeoffPreferencesKeyPrefix + id.ToString("N");
 
     /// <inheritdoc/>
     public async Task<PlotLibraryIndex?> LoadIndexAsync(CancellationToken ct = default)
@@ -434,6 +444,77 @@ public sealed class IndexedDbPlotRepository : IPlotRepository
             }
 
             RecordOp("delete-viewport", "error", sw);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<TakeoffPreferences?> LoadTakeoffPreferencesAsync(Guid plotId, CancellationToken ct = default)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+        try
+        {
+            string? json = await storage.GetStringAsync(TakeoffPreferencesKey(plotId), ct).ConfigureAwait(false);
+            if (string.IsNullOrEmpty(json))
+            {
+                RecordOp("load-takeoff-prefs", "empty", sw);
+                return null;
+            }
+
+            TakeoffPreferences? prefs = JsonSerializer.Deserialize<TakeoffPreferences>(json, JsonOptions);
+            RecordOp("load-takeoff-prefs", prefs is null ? "parse-fail" : "ok", sw);
+            return prefs;
+        }
+        catch (Exception ex)
+        {
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(ex, "Failed to load takeoff preferences for plot {PlotId} from IndexedDB.", plotId);
+            }
+
+            RecordOp("load-takeoff-prefs", "error", sw);
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task SaveTakeoffPreferencesAsync(Guid plotId, TakeoffPreferences prefs, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(prefs);
+        Stopwatch sw = Stopwatch.StartNew();
+        try
+        {
+            string json = JsonSerializer.Serialize(prefs, JsonOptions);
+            bool ok = await storage.PutStringAsync(TakeoffPreferencesKey(plotId), json, ct).ConfigureAwait(false);
+            RecordOp("save-takeoff-prefs", ok ? "ok" : "fail", sw);
+        }
+        catch (Exception ex)
+        {
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(ex, "Failed to save takeoff preferences for plot {PlotId} to IndexedDB.", plotId);
+            }
+
+            RecordOp("save-takeoff-prefs", "error", sw);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task DeleteTakeoffPreferencesAsync(Guid plotId, CancellationToken ct = default)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+        try
+        {
+            await storage.RemoveAsync(TakeoffPreferencesKey(plotId), ct).ConfigureAwait(false);
+            RecordOp("delete-takeoff-prefs", "ok", sw);
+        }
+        catch (Exception ex)
+        {
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(ex, "Failed to delete takeoff preferences for plot {PlotId} from IndexedDB.", plotId);
+            }
+
+            RecordOp("delete-takeoff-prefs", "error", sw);
         }
     }
 
