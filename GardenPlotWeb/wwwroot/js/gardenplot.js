@@ -720,3 +720,8 @@ export async function idbSet(key, value) {
         throw e;
     }
 }
+
+/** Sets the app-level readiness signal on <body> for Playwright test automation. */
+export function setAppState(state) {
+    document.body.dataset.appState = state;
+}
