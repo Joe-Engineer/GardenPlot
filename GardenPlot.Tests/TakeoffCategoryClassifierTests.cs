@@ -112,4 +112,28 @@ public class TakeoffCategoryClassifierTests
             Assert.False(string.IsNullOrWhiteSpace(label), $"Category {cat} has no label.");
         }
     }
+
+    [Theory]
+    [InlineData("Bamboo border", null, TakeoffCategory.Other)]
+    [InlineData("Bamboo border", TakeoffCategory.Hardscape, TakeoffCategory.Hardscape)]
+    [InlineData("Tree", TakeoffCategory.Irrigation, TakeoffCategory.Irrigation)]
+    [InlineData("Tree", null, TakeoffCategory.Plants)]
+    public void Classify_WithCatalogItem_PrefersOverride(string kindLabel, TakeoffCategory? categoryOverride, TakeoffCategory expected)
+    {
+        var catalogItem = new CatalogItem
+        {
+            Code = "TEST-001",
+            Kind = kindLabel,
+            CategoryOverride = categoryOverride,
+        };
+
+        Assert.Equal(expected, TakeoffCategoryClassifier.Classify(catalogItem, kindLabel));
+    }
+
+    [Fact]
+    public void Classify_WithNullCatalogItem_UsesStringClassification()
+    {
+        Assert.Equal(TakeoffCategory.Plants, TakeoffCategoryClassifier.Classify(null, "Tree"));
+        Assert.Equal(TakeoffCategory.Other, TakeoffCategoryClassifier.Classify(null, "Unknown Thing"));
+    }
 }

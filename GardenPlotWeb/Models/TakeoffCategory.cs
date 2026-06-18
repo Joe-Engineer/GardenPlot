@@ -7,7 +7,7 @@ namespace GardenPlotWeb.Models;
 /// <summary>
 /// Issue #139 — customer-facing categorization for the Takeoff list. Each
 /// <see cref="TakeoffItem"/> maps to exactly one category via
-/// <see cref="TakeoffCategoryClassifier.Classify"/>, allowing the UI to filter
+/// <see cref="TakeoffCategoryClassifier.Classify(CatalogItem?, string?)"/>, allowing the UI to filter
 /// to "Plants only" / "Irrigation only" / etc. for focused review.
 ///
 /// Distinct from <see cref="CatalogKinds"/> (substance taxonomy) and Jig
