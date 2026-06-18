@@ -3294,6 +3294,12 @@ public partial class GardenPlot
 
     private bool loaded;
     private bool routeSelectionPending = true;
+
+    /// <summary>
+    /// Macro app state exposed as <c>document.body.dataset.appState</c> for Playwright
+    /// test automation. Values: loading | idle | drawing | saving.
+    /// </summary>
+    private string appState = "loading";
     private Guid? taskEditorShapeId;
     private Guid? editingTaskId;
     private string taskDraftTitle = string.Empty;
@@ -4151,6 +4157,8 @@ public partial class GardenPlot
                     Logger.LogError("[{Sid}] Last-resort recovery: load threw unhandled exception. Created default Garden plot in-memory only (NOT saved).", SessionTraceId);
                     StateHasChanged();
                 }
+
+                SetAppState("idle");
             }
         }
 
@@ -4691,6 +4699,8 @@ public partial class GardenPlot
         Logger.LogDebug("[{Sid}] SaveAsync begin. Plots={PlotCount}, Shapes={ShapeCount}, CurrentPlotId={CurrentPlotId}, LastPlotId={LastPlotId}.",
             SessionTraceId, library.Plots.Count, shapeCount, currentPlot?.Id, library.LastPlotId);
 
+        SetAppState("saving");
+
         if (currentPlot is not null)
         {
             RefreshCatalogOverrides();
@@ -4830,7 +4840,29 @@ public partial class GardenPlot
             RecordSaveMetrics("failed", "none", 0, sw.Elapsed.TotalMilliseconds);
             Logger.LogError(ex, "GardenPlot storage save failed.");
         }
+        finally
+        {
+            SetAppState(RestingAppState);
+        }
     }
+
+    /// <summary>
+    /// Pushes the current <see cref="appState"/> to the DOM via JS interop.
+    /// Fire-and-forget: does not block the caller or throw on JS failure.
+    /// </summary>
+    private void SetAppState(string state)
+    {
+        if (appState == state) return;
+        appState = state;
+        _ = jsModule?.InvokeVoidAsync("setAppState", state);
+    }
+
+    /// <summary>
+    /// Returns the correct resting state based on the active tool.
+    /// Drawing tools → "drawing"; Select → "idle".
+    /// </summary>
+    private string RestingAppState =>
+        currentTool != Tool.Select ? "drawing" : "idle";
 
     private static void RecordLoadMetrics(string outcome, string? sourceKey, PlotLibrary? loadedLibrary, int payloadBytes, double elapsedMs)
     {
@@ -5544,6 +5576,7 @@ public partial class GardenPlot
     private void SetTool(Tool t)
     {
         currentTool = t;
+        SetAppState(t != Tool.Select ? "drawing" : "idle");
         if (t != Tool.Stamp)
         {
             selectedItem = null;
@@ -5608,6 +5641,20 @@ public partial class GardenPlot
 
         _ = canvasRef.FocusAsync(preventScroll: true).AsTask();
     }
+
+    /// <summary>
+    /// Returns the accessible name for a toolbar tool button, used in aria-label attributes.
+    /// Maps Tool enum values to human-friendly screen-reader labels.
+    /// Issue #262, Phase 2 — ARIA labels on icon-only buttons.
+    /// </summary>
+    private static string GetToolAriaLabel(Tool tool) => tool switch
+    {
+        Tool.FreeDraw => "Free draw tool",
+        Tool.CircleRuler => "Circle ruler tool",
+        Tool.RectRuler => "Rectangle ruler tool",
+        Tool.GroundCover => "Ground cover tool",
+        _ => $"{tool} tool"
+    };
 
     private void ToggleDropModeLatch()
     {
